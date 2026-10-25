@@ -1,0 +1,29 @@
+schema: spec-driven
+
+# Shown to the AI for every OpenSpec artifact. Keep it short; AGENTS.md is the
+# authority and wins on any conflict.
+context: |
+  Product: Applicamp — a job-hunting app. It imports your profile, interviews
+  you about your goals, runs agents in throwaway sandboxes to find jobs on
+  public job boards, tailor CVs (PDF) and prepare applications, drafts
+  recruiter replies through Campbooks, and keeps a pipeline of opportunities.
+  Every outward action (submit, send) waits for the user's approval.
+  Stack: Rust modular monolith (axum, sqlx/Postgres, utoipa OpenAPI), React
+  client on @notacamp/ui, NVIDIA OpenShell sandboxes, OpenRouter models by
+  role, Campbooks for mail, calendar and SSO.
+  Rules: read AGENTS.md, docs/architecture.md and docs/adr/ before writing.
+  Domains: identity, profile, sources, pipeline, cvs, runs, approvals,
+  correspondence (baseline specs in openspec/specs/<domain>/).
+
+rules:
+  proposal:
+    - Name the module(s) touched and the tracking issue URL.
+    - Include a Non-goals section.
+  design:
+    - Say which module's schema owns the data and which events are published or consumed.
+    - For any endpoint, state the scope it requires.
+    - For any agent work, state the run kind, its sandbox policy (hosts it may reach) and which steps need an approval.
+    - For any AI use, state the role (complete/decide), the fallback when it is not configured, and what the user can undo.
+  tasks:
+    - Keep each task small enough for one focused session.
+    - "Last tasks are always: OpenAPI regenerated, client types regenerated, changelog entry file (changelog/unreleased/), gates green in CI, recording (UI at 375px and desktop)."

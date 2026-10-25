@@ -16,7 +16,7 @@
 - [ ] 3.1 CI: fmt, clippy -D warnings, xtask, nextest, cargo-deny, gitleaks, client lint/typecheck/test/api:check, openspec validate, PR title, changelog check
 - [ ] 3.2 Dockerfile (distroless, arm64 + amd64), publish to `ghcr.io/notacamp/applicamp` on main, Trivy
 - [ ] 3.3 E2E happy path against the compose stack with the fake OIDC provider (+ axe)
-- [ ] 3.4 Staging deploy (private ops repo), demo data only
+- [ ] 3.4 Staging deploy (driven from `applicamp-cloud`), demo data only
 
 ## 4. Finish
 - [ ] 4.1 OpenAPI regenerated, client types regenerated, changelog entry file, gates green in CI, recording at 375px and desktop

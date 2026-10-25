@@ -11,4 +11,5 @@ approve it.**
 - What it does: [`openspec/specs/`](openspec/specs/)
 - Board: https://github.com/orgs/notacamp/projects/2
 
-A [Not A Camp](https://not-a-camp.com) project. Private.
+A [Not A Camp](https://not-a-camp.com) project. Source-available under the
+[Sustainable Use License](LICENSE).

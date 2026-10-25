@@ -11,4 +11,4 @@
   zod, Vitest next to the code, one Playwright happy-path e2e suite against
   the real stack. Dropped: Storybook, visual regression, sharded and edge-case
   e2e, Gitflow release trains.
-- One image, Docker Compose, the same infrastructure as Campbooks.
+- One image, Docker Compose. The hosted instance runs on the same infrastructure as Campbooks (private `applicamp-cloud` repo).

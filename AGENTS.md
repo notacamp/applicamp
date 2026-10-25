@@ -16,11 +16,15 @@ for your approval.**
 2. `docs/adr/` — decisions already taken. Write a new ADR to change one.
 3. `openspec/config.yaml` and `openspec/specs/` — the behaviour baseline.
 
-## Private repository, careful anyway
+## 🔒 Public repository
 
-This repo is private, but treat it as if it could be opened later: no secrets,
-tokens, IPs or real people's data in code, fixtures, docs or history. Secrets
-come from the environment (Infisical in prod). Demo and test data are invented.
+This repo is public and source-available (Sustainable Use License, see
+`LICENSE`). **Nothing private lives here** — not in code, docs, fixtures,
+issues or history: no secrets, tokens, IPs, hostnames of private
+infrastructure, account IDs, or real people's names, emails or CVs. Hosted-only
+behaviour, deploy pipelines and ops runbooks live in the private
+`notacamp/applicamp-cloud` repo. Configuration comes from the environment with
+neutral `example.com` defaults. Demo and test data are invented.
 *(gitleaks in CI.)*
 
 ## Spec-driven workflow

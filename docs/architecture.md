@@ -63,9 +63,11 @@ generated API types, zod, i18next with en / pt-PT / es-ES / fr, Vitest,
 Playwright happy-path e2e). Components and tokens come from `@notacamp/ui`;
 Applicamp's Notion-like look is its own token set.
 
-## Infrastructure
+## Running it
 
-Same as Campbooks: one image on GHCR (arm64 + amd64, Trivy), Docker Compose
-deploys driven from the private ops repo, secrets from Infisical, Caddy in
-front, Route53 DNS, restic backups, Vector → Loki, Prometheus, GlitchTip,
-ntfy alerts. The OpenShell gateway and sandboxes run on their own arm64 box.
+One image (`ghcr.io/notacamp/applicamp`, arm64 + amd64) plus Postgres and an
+OpenShell gateway, all with Docker Compose (`deploy/`). Self-hosting needs a
+Linux host with Landlock (kernel 6.2+) for the sandboxes; no GPU or KVM.
+Configuration is environment variables (`APPLICAMP_…`, see `deploy/.env.example`).
+How the hosted instance is deployed and operated lives in the private
+`notacamp/applicamp-cloud` repo.

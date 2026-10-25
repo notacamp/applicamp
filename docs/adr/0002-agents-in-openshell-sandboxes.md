@@ -14,8 +14,13 @@ one sandbox per run, created through the gateway's gRPC API from the
 `runs` module and always deleted at the end. Use the **Docker driver**
 (Landlock + seccomp user notification; Linux 6.2+). Each run kind has a
 committed deny-by-default policy. Model calls go through OpenShell's router,
-which injects the key outside the sandbox. The gateway runs on its own arm64
-host so runaway agents can't starve other services.
+which injects the key outside the sandbox.
+
+The gateway may share a host with other services (the hosted instance runs
+next to Campbooks, owner's call 2026-10-25), so it runs **rootless** (Podman)
+under its own unprivileged user, never through a root Docker daemon, inside a
+systemd slice with hard CPU and memory caps and a cap on concurrent sandboxes.
+Sandboxes have no network route to the host's other containers.
 
 Pre-check (2026-10-25) on our arm64 cloud VMs: Ubuntu 24.04, kernel 6.8,
 Landlock on, Docker 29.9, no /dev/kvm. MicroVM mode is therefore unavailable.

@@ -1,6 +1,6 @@
 # 0002 — Agents run in NVIDIA OpenShell sandboxes
 
-**Status:** Accepted · 2026-10-25 (provisional until the spike, issue #2, passes)
+**Status:** Accepted · 2026-10-25 (spike #2 passed on v0.1.4)
 
 ## Context
 Agents browse untrusted job pages, fill forms in a real browser and read
@@ -17,8 +17,9 @@ committed deny-by-default policy. Model calls go through OpenShell's router,
 which injects the key outside the sandbox.
 
 The gateway may share a host with other services (the hosted instance runs
-next to Campbooks, owner's call 2026-10-25), so it runs **rootless** (Podman)
-under its own unprivileged user, never through a root Docker daemon, inside a
+next to Campbooks, owner's call 2026-10-25), so it runs **rootless** (rootless Docker; OpenShell's
+Podman driver needs Podman 5, newer than Ubuntu 24.04 ships) under its own
+unprivileged user, never through a root Docker daemon, inside a
 systemd slice with hard CPU and memory caps and a cap on concurrent sandboxes.
 Sandboxes have no network route to the host's other containers.
 
@@ -35,3 +36,19 @@ Landlock on, Docker 29.9, no /dev/kvm. MicroVM mode is therefore unavailable.
 ## Consequences
 OpenShell is pre-1.0: pin the version and keep the gateway behind our own
 `SandboxRuntime` trait so the gVisor fallback is a second implementation, not a rewrite.
+
+## Spike findings (issue #2)
+- Workloads run with `network=none`, non-root, seccomp filtering and no new
+  privileges; only the supervisor (the egress proxy) has a network. Policies
+  are enforced per host, per HTTP method (L7) and per binary.
+- Docker sandboxes need launch-scoped auth: the gateway is configured with
+  Ed25519 sandbox-session keys (`gateway_jwt`).
+- Rootless Docker 29's host networking is the host's real network namespace,
+  so on a shared host a firewall guard on the sandbox user's uid and subuid
+  range is part of the boundary: no private, tailnet, link-local or loopback
+  destinations except the gateway's own ports.
+- The Rust SDK (`openshell-sdk`, git tag) covers create, wait, exec, delete
+  and templates; one **sandbox template per run kind** carries its policy and
+  limits; log streaming uses the raw gRPC client. It authenticates with TLS +
+  OIDC bearer tokens, so the production gateway trusts the Applicamp server as
+  its OIDC issuer.

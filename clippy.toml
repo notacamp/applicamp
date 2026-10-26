@@ -1,0 +1,4 @@
+# Tests may unwrap/expect: a panic there is a failed assertion, not a production crash.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-print-in-tests = true

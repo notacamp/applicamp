@@ -1,0 +1,69 @@
+# Applicamp for local use and the e2e stack: the server and Postgres.
+#
+#   cp .env.example .env        # then edit it
+#   docker compose up -d
+#   docker compose exec server /app/applicamp invite add you@example.com
+#
+# The sandbox runtime (OpenShell gateway) joins with the runs module. How the
+# hosted instance is deployed lives in the private applicamp-cloud repo.
+name: applicamp
+
+services:
+  server:
+    image: ${APPLICAMP_IMAGE:-ghcr.io/notacamp/applicamp:main}
+    # To build it yourself instead: `docker compose build server`.
+    build: ..
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      APPLICAMP_DATABASE_URL: postgres://applicamp:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/applicamp
+      # Generated on first boot by `server-init` into the `server-secrets`
+      # volume, never an environment variable.
+      APPLICAMP_SECRET_KEY_FILE: /run/applicamp/secret-key
+    volumes:
+      # The instance secret key, read through the supplementary group 10001
+      # (the file is 0440, see server/init.sh).
+      - server-secrets:/run/applicamp:ro
+      # Sign-in providers' client secrets (campbooks-client-secret,
+      # linkedin-client-secret), one file each; point
+      # APPLICAMP_OIDC__<PROVIDER>__CLIENT_SECRET_FILE at /run/secrets/applicamp/<file>.
+      - ./secrets:/run/secrets/applicamp:ro
+    group_add: ["10001"]
+    ports:
+      - "${APPLICAMP_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      server-init:
+        condition: service_completed_successfully
+    # The image's HEALTHCHECK runs `applicamp healthcheck`.
+
+  # One-shot: generates the instance secret key on first boot into the
+  # `server-secrets` volume. See server/init.sh.
+  server-init:
+    image: busybox:1.37.0-musl
+    restart: "no"
+    command: ["sh", "/server/init.sh"]
+    volumes:
+      - ./server:/server:ro
+      - server-secrets:/secrets
+
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: applicamp
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: applicamp
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U applicamp -d applicamp"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  postgres-data:
+  # The instance secret key (read-only for the server).
+  server-secrets:

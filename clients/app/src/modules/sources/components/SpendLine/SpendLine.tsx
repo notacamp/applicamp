@@ -1,3 +1,4 @@
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 
 import { Tagged, Text } from "~/lib/ui";
@@ -5,11 +6,7 @@ import { Tagged, Text } from "~/lib/ui";
 import { formatEuros, formatLimit, useEstimate, type Spend } from "../../api/searches";
 
 /** "AI this month: €0.42 of €3", in the person's language. */
-export function spendText(
-  spend: Spend,
-  language: string,
-  t: (key: "spend.month" | "spend.monthNoLimit", values: Record<string, string>) => string,
-): string {
+export function spendText(spend: Spend, language: string, t: TFunction<"sources">): string {
   const spent = formatEuros(spend.month_eur, language);
   const limit = spend.month_limit_eur;
   return limit === null || limit === undefined
@@ -30,9 +27,7 @@ export function SpendLine({ testId = "spend-line" }: { testId?: string | undefin
   return (
     <Tagged testId={testId}>
       <Text tone="secondary" size="sm">
-        {spendText(estimate.data.spend, i18n.language, (key, values) =>
-          key === "spend.month" ? t("spend.month", values) : t("spend.monthNoLimit", values),
-        )}
+        {spendText(estimate.data.spend, i18n.language, t)}
       </Text>
     </Tagged>
   );

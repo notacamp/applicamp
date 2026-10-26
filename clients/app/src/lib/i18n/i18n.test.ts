@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { createI18n, detectLocale, formatDay, isLocale, mergeMessages, SUPPORTED_LOCALES } from ".";
+import {
+  createI18n,
+  detectLocale,
+  formatDay,
+  formatPartialDate,
+  isLocale,
+  mergeMessages,
+  SUPPORTED_LOCALES,
+} from ".";
 
 const each = (messages: Record<string, unknown>) =>
   Object.fromEntries(SUPPORTED_LOCALES.map((locale) => [locale, messages])) as Record<
@@ -39,5 +47,12 @@ describe("the locale", () => {
     expect(formatDay("en", day)).toBe("Sunday, October 25");
     expect(formatDay("pt-PT", day)).toBe("domingo, 25 de outubro");
     expect(formatDay("en")).not.toBe("");
+  });
+
+  it("says a CV's dates in the UI's language", () => {
+    expect(formatPartialDate("en", "2021-03")).toBe("Mar 2021");
+    expect(formatPartialDate("en", "2021")).toBe("2021");
+    expect(formatPartialDate("en", "2021-03-15")).toBe("Mar 15, 2021");
+    expect(formatPartialDate("en", "last spring")).toBe("last spring");
   });
 });

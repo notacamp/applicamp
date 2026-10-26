@@ -21,6 +21,17 @@ export {
   type AppMarkProps,
 } from "./components/AppMark/AppMark";
 export { AppFrame } from "./components/AppFrame/AppFrame";
+export { FileField, type FileFieldProps } from "./components/FileField/FileField";
+export { InlineText, type InlineTextProps } from "./components/InlineText/InlineText";
+export {
+  Cluster,
+  Section,
+  Stack,
+  type SectionProps,
+  type StackProps,
+} from "./components/Layout/Layout";
 export { Page, type PageProps } from "./components/Page/Page";
 export { Placeholder, type PlaceholderProps } from "./components/Placeholder/Placeholder";
+export { Property, PropertyList, type PropertyProps } from "./components/Properties/Properties";
 export { Tagged } from "./components/Tagged/Tagged";
+export { TextArea, type TextAreaProps } from "./components/TextArea/TextArea";

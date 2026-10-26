@@ -27,7 +27,7 @@ flowchart LR
 | Crate | Role |
 |---|---|
 | `crates/kernel` | Config (figment, `_FILE` secrets), errors (problem+json), DB (sqlx), ids, clock, auth (session + scopes), job queue + scheduler (Postgres), domain events (outbox), telemetry, blobs. Trimmed copy of Campbooks Next's kernel. Knows no domain. |
-| `crates/ai` | Model gateway by role over the OpenAI-compatible API (OpenRouter): `complete` for writing, `decide` for yes/no judgements. Usage ledger. |
+| `crates/ai` | Model gateway by role over the OpenAI-compatible API (OpenRouter): `complete` for structuring and writing (`decide` for yes/no judgements will join it). Retries, usage ledger (`ai` schema), per-account daily token cap. Modules may depend on it like on the kernel. |
 | `crates/server` | Composes modules, serves the web client, BFF (session cookie, CSRF), OpenAPI. |
 | `crates/agent` | The runner binary baked into sandbox images: talks to the agent API, drives Chromium over CDP in the browser image. |
 | `crates/modules/identity` | Accounts, invite list, sign-in with Campbooks and LinkedIn (OIDC), sessions. |

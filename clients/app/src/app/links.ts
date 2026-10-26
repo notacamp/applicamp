@@ -39,3 +39,18 @@ export function useInAppLink() {
     },
   });
 }
+
+/** The import panel of Profile & goals, as an in-app link (Today's "Set up your profile"). */
+export function useImportLink() {
+  const navigate = useNavigate();
+  return {
+    href: "/profile?import=new",
+    onClick: (event: MouseEvent<HTMLElement>) => {
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) {
+        return;
+      }
+      event.preventDefault();
+      void navigate({ to: "/profile", search: { import: "new" } });
+    },
+  };
+}

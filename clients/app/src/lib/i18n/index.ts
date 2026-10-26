@@ -3,7 +3,7 @@ import { initReactI18next } from "react-i18next";
 
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type Locale, type Messages } from "./locales";
 
-export { formatDay } from "./dates";
+export { formatDay, formatPartialDate } from "./dates";
 export {
   DEFAULT_LOCALE,
   detectLocale,

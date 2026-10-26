@@ -8,9 +8,9 @@
 ## Endpoints (session; OpenAPI; problem+json)
 - `POST /api/v1/profile/imports` multipart (`kind`, `file` or `text`) → `201 { import }`. Limits: ZIP 20 MB, PDF 8 MB, text 60 000 chars.
 - `GET /api/v1/profile/imports/{id}` → the draft (404 if not yours).
-- `POST /api/v1/profile/imports/{id}/apply` with `{ mode: "replace" | "merge" }` → the profile. `merge` adds positions/education/skills not already present (same title+company+start, same name) and fills empty fields.
+- `POST /api/v1/profile/imports/{id}/apply` with `{ mode: "replace" | "merge" }` → the profile. `merge` adds positions/education/skills not already present (same title+company+start, same name) and fills empty fields. *As built:* a position is "already present" when the company matches and so does its start **or** its title, so a title (or a start) edited by hand never brings the imported one back beside it; a school by name + degree.
 - `POST /api/v1/profile/imports/{id}/discard`.
-- `GET /api/v1/profile`, `PUT /api/v1/profile` (whole document, validated).
+- `GET /api/v1/profile`, `PUT /api/v1/profile` (whole document, validated). *As built:* both answer `{ profile, source, updated_at, import_kinds }`; `import_kinds` is `["linkedin_zip"]` without the `complete` role and adds `pdf`, `text` with it, which is how the client knows to offer only the ZIP.
 
 ## LinkedIn export ZIP
 - Accept only `.zip`; refuse archives with more than 200 entries, any entry over 5 MB uncompressed, total over 50 MB uncompressed, or paths with `..`/absolute paths (zip-slip). Read only known CSVs, matched case-insensitively by file name: `Profile.csv`, `Positions.csv`, `Education.csv`, `Skills.csv`, `Languages.csv`, `Certifications.csv`, `Projects.csv`, `Email Addresses.csv` (primary only, not stored if it differs from the account's? stored as `basics.email`). Columns are matched by header name, tolerant of order and extra columns; dates like `Jan 2020` / `2020` become `2020-01` / `2020`. Unknown files are ignored.
@@ -23,6 +23,8 @@
 - Fallback: when `complete` is not configured, PDF and text imports answer `503 ai_unavailable` and the UI offers the ZIP import only.
 
 ## AI gateway (`crates/ai`)
+*As built:* the ledger's `ai` schema is infrastructure like `kernel` and `bff` (`cargo xtask arch` knows `crates/ai` and lets modules depend on it); a draft's expiry is a job enqueued for its `expires_at` (`kernel::jobs::enqueue_at`). `basics.location` is one written place (`"Lisbon, Portugal"`), not JSON Resume's address object.
+
 Trim Campbooks Next's `crates/ai` to: the `complete` role (OpenAI-compatible chat completions), timeouts, retries on 429/5xx with backoff, a usage ledger table `ai.usage(account_id, role, model, tokens_in, tokens_out, created_at)` and a per-account daily token cap (`APPLICAMP_AI__DAILY_TOKENS`, default 200 000). Config `APPLICAMP_AI__COMPLETE__{BASE_URL,MODEL,API_KEY(_FILE)}`. Logs never carry prompts or outputs.
 
 ## Client

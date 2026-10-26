@@ -25,6 +25,125 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The signed-in person's profile.
+         * @description Empty (and no `source`) until they import or write one.
+         */
+        get: operations["profile.get"];
+        /**
+         * Save the profile.
+         * @description The whole profile, as edited by hand. Values are trimmed and empty ones
+         *     removed; a value over its length, a date not like `2020`, `2020-03` or
+         *     `2020-03-15`, or a list of more than 200 entries is refused.
+         */
+        put: operations["profile.update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import a profile.
+         * @description A `multipart/form-data` upload of `kind` and either `file` (a LinkedIn
+         *     export ZIP, up to 20 MB; a PDF, up to 8 MB) or `text` (up to 60 000
+         *     characters). The answer is a draft to review: the profile is unchanged
+         *     until the draft is applied. The file is not kept.
+         *
+         *     A ZIP is read from its CSVs without any model; it is refused before
+         *     anything is extracted when it holds more than 200 files, a file over
+         *     5 MB or more than 50 MB uncompressed, or a path leaving the archive.
+         *     A PDF's text and pasted text are structured by the `complete` model, and
+         *     every value the source does not say is dropped and counted (`dropped`).
+         */
+        post: operations["profile.import"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/imports/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A draft.
+         * @description One of the signed-in person's imports, until it expires. Anyone else's
+         *     is not found.
+         */
+        get: operations["profile.get_import"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/imports/{id}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply a draft.
+         * @description `replace` makes the draft the profile; `merge` keeps the profile as it
+         *     is (hand edits included) and adds what the draft has that it does not.
+         *     Once applied, a draft cannot be applied again.
+         */
+        post: operations["profile.apply_import"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/imports/{id}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Throw a draft away.
+         * @description The profile is unchanged. Discarding twice is fine; an applied draft
+         *     cannot be discarded.
+         */
+        post: operations["profile.discard_import"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/bff/callback/{provider}": {
         parameters: {
             query?: never;
@@ -138,12 +257,132 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description How to apply a draft. */
+        ApplyImport: {
+            /** @description Replace the profile, or merge into it. */
+            mode: components["schemas"]["ApplyMode"];
+        };
+        /**
+         * @description How a draft reaches the profile.
+         * @enum {string}
+         */
+        ApplyMode: "replace" | "merge";
+        /** @description Who they are. */
+        Basics: {
+            /** @description The address for applications. */
+            email?: string | null;
+            /** @description Their headline ("Senior software engineer"). */
+            label?: string | null;
+            /** @description Where they are, as written ("Lisbon, Portugal"). */
+            location?: string | null;
+            /** @description Their name. */
+            name?: string | null;
+            /** @description Profiles elsewhere (GitHub, a portfolio). */
+            profiles: components["schemas"]["Link"][];
+            /** @description A few sentences about them. */
+            summary?: string | null;
+            /** @description Their own site. */
+            url?: string | null;
+        };
+        /** @description A certification. */
+        Certificate: {
+            /** @description When, `YYYY`, `YYYY-MM` or `YYYY-MM-DD`. */
+            date?: string | null;
+            /** @description Who issued it. */
+            issuer?: string | null;
+            /** @description Its name. */
+            name: string;
+            /** @description Where it can be checked. */
+            url?: string | null;
+        };
+        /** @description A school or degree. */
+        Education: {
+            /** @description The field ("Computer science"). */
+            area?: string | null;
+            /** @description As `startDate`. */
+            endDate?: string | null;
+            /** @description The school. */
+            institution: string;
+            /** @description `YYYY`, `YYYY-MM` or `YYYY-MM-DD`. */
+            startDate?: string | null;
+            /** @description The degree ("Master's"). */
+            studyType?: string | null;
+        };
         /** @description The instance's health. */
         Health: {
             /** @description `ok`. */
             status: string;
             /** @description The server's version. */
             version: string;
+        };
+        /** @description A draft profile waiting for review. */
+        Import: {
+            /**
+             * Format: date-time
+             * @description When it was made.
+             */
+            created_at: string;
+            /** @description The draft. */
+            draft: components["schemas"]["Profile"];
+            /**
+             * Format: int32
+             * @description Values left out of the draft: ones a model gave that the file does
+             *     not say (the source check), or that did not fit.
+             */
+            dropped: number;
+            /**
+             * Format: date-time
+             * @description When the draft is deleted if it is not applied.
+             */
+            expires_at: string;
+            /**
+             * Format: uuid
+             * @description The import.
+             */
+            id: string;
+            /** @description What it was made from. */
+            kind: components["schemas"]["ImportKind"];
+            /** @description Where it is. */
+            status: components["schemas"]["ImportStatus"];
+        };
+        /**
+         * @description What an import is made from.
+         * @enum {string}
+         */
+        ImportKind: "linkedin_zip" | "pdf" | "text";
+        /**
+         * @description Where an import is.
+         * @enum {string}
+         */
+        ImportStatus: "ready" | "applied" | "discarded";
+        /**
+         * @description An upload (`multipart/form-data`): the kind, then the file (ZIP or PDF)
+         *     or the text.
+         */
+        ImportUpload: {
+            /**
+             * Format: binary
+             * @description The file, for `linkedin_zip` (up to 20 MB) and `pdf` (up to 8 MB).
+             */
+            file?: string | null;
+            /** @description `linkedin_zip`, `pdf` or `text`. */
+            kind: components["schemas"]["ImportKind"];
+            /** @description The text, for `text` (up to 60 000 characters). */
+            text?: string | null;
+        };
+        /** @description A language they speak. */
+        Language: {
+            /** @description How well ("Native or bilingual"). */
+            fluency?: string | null;
+            /** @description The language ("Portuguese"). */
+            language: string;
+        };
+        /** @description A profile elsewhere. */
+        Link: {
+            /** @description Where ("GitHub"). */
+            network?: string | null;
+            /** @description The address. */
+            url: string;
         };
         /** @description The signed-in person. */
         Me: {
@@ -192,6 +431,57 @@ export interface components {
              */
             type: string;
         };
+        /** @description A whole profile. */
+        Profile: {
+            /** @description Who they are. */
+            basics: components["schemas"]["Basics"];
+            /** @description Certifications. */
+            certificates: components["schemas"]["Certificate"][];
+            /** @description Schools and degrees. */
+            education: components["schemas"]["Education"][];
+            /** @description Languages they speak. */
+            languages: components["schemas"]["Language"][];
+            /** @description Projects. */
+            projects: components["schemas"]["Project"][];
+            /** @description Skills. */
+            skills: components["schemas"]["Skill"][];
+            /** @description Positions, newest first. */
+            work: components["schemas"]["Work"][];
+        };
+        /**
+         * @description Where the profile came from last.
+         * @enum {string}
+         */
+        ProfileSource: "linkedin_zip" | "pdf" | "text" | "manual";
+        /** @description The profile, and what can be imported into it. */
+        ProfileView: {
+            /**
+             * @description What this instance can import: always the LinkedIn export; PDFs and
+             *     text only when a model is configured for them.
+             */
+            import_kinds: components["schemas"]["ImportKind"][];
+            /** @description The profile; empty until something is imported or written. */
+            profile: components["schemas"]["Profile"];
+            source?: components["schemas"]["ProfileSource"] | null;
+            /**
+             * Format: date-time
+             * @description When it last changed.
+             */
+            updated_at?: string | null;
+        };
+        /** @description A project. */
+        Project: {
+            /** @description What it is. */
+            description?: string | null;
+            /** @description As `startDate`. */
+            endDate?: string | null;
+            /** @description Its name. */
+            name: string;
+            /** @description `YYYY`, `YYYY-MM` or `YYYY-MM-DD`. */
+            startDate?: string | null;
+            /** @description Where to see it. */
+            url?: string | null;
+        };
         /**
          * @description A sign-in provider.
          * @enum {string}
@@ -201,6 +491,30 @@ export interface components {
         Providers: {
             /** @description In the order the sign-in page shows them. */
             providers: components["schemas"]["Provider"][];
+        };
+        /** @description A skill. */
+        Skill: {
+            /** @description How well, in their words. */
+            level?: string | null;
+            /** @description The skill ("PostgreSQL"). */
+            name: string;
+        };
+        /** @description A position. */
+        Work: {
+            /** @description As `startDate`; none while it is their current position. */
+            endDate?: string | null;
+            /** @description Achievements, one sentence each. */
+            highlights: string[];
+            /** @description Where. */
+            location?: string | null;
+            /** @description The company. */
+            name?: string | null;
+            /** @description The title. */
+            position?: string | null;
+            /** @description `YYYY`, `YYYY-MM` or `YYYY-MM-DD`. */
+            startDate?: string | null;
+            /** @description What they did. */
+            summary?: string | null;
         };
     };
     responses: never;
@@ -231,6 +545,280 @@ export interface operations {
             };
             /** @description `session_required`: no live session. */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The profile. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileView"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Profile"];
+            };
+        };
+        responses: {
+            /** @description The profile, saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileView"];
+                };
+            };
+            /** @description `invalid_profile` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["ImportUpload"];
+            };
+        };
+        responses: {
+            /** @description The draft, waiting for review. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Import"];
+                };
+            };
+            /** @description `invalid_upload`, `invalid_kind`, `file_too_large`, `text_too_long`, `not_a_zip`, `archive_too_many_entries`, `archive_entry_too_large`, `archive_too_large`, `archive_unsafe_path`, `not_a_pdf`, `pdf_unreadable`, `pdf_too_many_pages`, `pdf_no_text`, `nothing_found` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `ai_unavailable`: no model to read a PDF or text (import the LinkedIn ZIP instead); `ai_daily_limit_reached`; `ai_failed` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.get_import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The import. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The import and its draft. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Import"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.apply_import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The import. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyImport"];
+            };
+        };
+        responses: {
+            /** @description The profile, now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileView"];
+                };
+            };
+            /** @description `invalid_request` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `import_not_ready`: already applied or discarded */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.discard_import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The import. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Discarded. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `import_not_ready`: already applied */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

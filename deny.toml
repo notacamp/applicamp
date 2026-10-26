@@ -10,7 +10,13 @@ feature-depth = 1
 [advisories]
 # Vulnerability and unsoundness advisories always fail (cargo-deny default).
 yanked = "deny"
-ignore = []
+ignore = [
+    # Unmaintained, not a vulnerability: lopdf (under pdf-extract, the PDF text
+    # extractor of profile imports, #4) depends on it to measure the TrueType
+    # fonts it embeds when *writing* PDFs, which Applicamp never does. Drop
+    # this once lopdf moves off it.
+    { id = "RUSTSEC-2026-0192", reason = "ttf-parser is unmaintained; only lopdf's PDF writer uses it" },
+]
 
 [licenses]
 confidence-threshold = 0.9

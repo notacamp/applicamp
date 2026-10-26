@@ -1,0 +1,48 @@
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.stack[data-gap="sm"] {
+  gap: var(--space-2);
+}
+
+.stack[data-gap="lg"] {
+  gap: var(--space-6);
+}
+
+.cluster {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.action {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.description {
+  max-width: var(--measure);
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
+}

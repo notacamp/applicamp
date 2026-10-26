@@ -1,0 +1,163 @@
+{
+  "loading": "Chargement de votre profil…",
+  "loadFailed": "Impossible de charger votre profil.",
+  "retry": "Réessayer",
+  "importAgain": "Importer à nouveau",
+  "import": {
+    "title": "Importez votre profil",
+    "lead": "Partez de ce que vous avez déjà. Vous relisez tout avant l’enregistrement, et le fichier lui-même n’est pas conservé.",
+    "choose": "Qu’avez-vous sous la main ?",
+    "kinds": {
+      "linkedin_zip": {
+        "title": "L’export de vos données LinkedIn",
+        "description": "Le ZIP que LinkedIn vous envoie depuis Préférences, Confidentialité des données, Obtenir une copie de vos données. Lu ici, sans IA."
+      },
+      "pdf": {
+        "title": "Un PDF",
+        "description": "Votre CV, ou votre profil LinkedIn enregistré en PDF. Un modèle d’IA le lit."
+      },
+      "text": {
+        "title": "Du texte collé",
+        "description": "Votre CV ou votre profil, copié en texte. Un modèle d’IA le lit."
+      }
+    },
+    "zipOnlyTitle": "Importez l’export de vos données LinkedIn",
+    "zipOnly": "Demandez à LinkedIn une copie de vos données (Préférences, Confidentialité des données), puis envoyez le ZIP reçu. Les PDF et le texte collé nécessitent un modèle d’IA, que cet Applicamp n’a pas configuré.",
+    "zipLabel": "Votre export LinkedIn (.zip)",
+    "zipHint": "Jusqu’à 20 Mo. Seuls votre profil, vos postes, vos formations, vos compétences, vos langues, vos certifications, vos projets et votre e-mail principal sont lus.",
+    "pdfLabel": "Votre CV ou profil LinkedIn (.pdf)",
+    "pdfHint": "Jusqu’à 8 Mo et 30 pages, avec du vrai texte (pas un scan).",
+    "chooseFile": "Choisir un fichier",
+    "textLabel": "Votre CV ou profil, en texte",
+    "textPlaceholder": "Collez-le ici",
+    "charactersLeft": "Encore {{left}} caractères",
+    "submit": "Importer",
+    "reading": "Lecture…",
+    "cancel": "Retour à votre profil",
+    "errors": {
+      "generic": "Cela n’a pas fonctionné. Réessayez.",
+      "invalid_upload": "Choisissez d’abord un fichier, ou collez du texte.",
+      "file_too_large": "Ce fichier est trop volumineux : 20 Mo au plus pour un ZIP, 8 Mo pour un PDF.",
+      "text_too_long": "Ce texte est trop long : 60 000 caractères au plus.",
+      "not_a_zip": "Ce n’est pas une archive ZIP. Envoyez le ZIP reçu de LinkedIn.",
+      "archive_too_many_entries": "Cette archive contient trop de fichiers pour être un export LinkedIn.",
+      "archive_entry_too_large": "Un fichier de cette archive est trop volumineux pour faire partie d’un export LinkedIn.",
+      "archive_too_large": "Une fois décompressée, cette archive est trop volumineuse pour être un export LinkedIn.",
+      "archive_unsafe_path": "Cette archive contient un fichier rangé hors d’elle : elle n’a pas été ouverte.",
+      "not_a_pdf": "Ce n’est pas un PDF. Envoyez un PDF, ou collez plutôt le texte.",
+      "pdf_unreadable": "Impossible de lire ce PDF. Essayez un autre fichier, ou collez plutôt le texte.",
+      "pdf_too_many_pages": "Ce PDF compte plus de 30 pages.",
+      "pdf_no_text": "Ce PDF ne contient aucun texte lisible (c’est peut-être un scan). Collez plutôt le texte.",
+      "nothing_found": "Rien à importer n’a été trouvé ici. Vérifiez que c’est le bon fichier.",
+      "ai_unavailable": "Lire un PDF ou du texte nécessite un modèle d’IA, qui n’est pas configuré ici. Importez plutôt votre export LinkedIn.",
+      "ai_daily_limit_reached": "Vous avez atteint la limite d’IA du jour. Réessayez demain, ou importez votre export LinkedIn.",
+      "ai_failed": "Le modèle d’IA n’a pas pu lire ceci pour l’instant. Réessayez dans une minute."
+    }
+  },
+  "review": {
+    "title": "Relisez ce qui a été trouvé",
+    "lead": "Rien n’est enregistré tant que vous n’avez pas choisi. Remplacer en fait votre profil ; Fusionner garde le vôtre tel quel et n’ajoute que les nouveautés.",
+    "loading": "Chargement du brouillon…",
+    "loadFailed": "Impossible de charger le brouillon.",
+    "gone": "Ce brouillon n’existe plus : les brouillons durent 24 heures.",
+    "dropped": "Détails écartés : {{dropped}}",
+    "droppedBody": "Ils ne figuraient pas dans le fichier, nous ne les avons donc pas gardés. Rien n’est jamais inventé.",
+    "new": "Nouveau",
+    "changed": "Modifié",
+    "same": "Identique",
+    "now": "Actuellement : {{value}}",
+    "replace": "Remplacer",
+    "merge": "Fusionner",
+    "discard": "Abandonner",
+    "failed": "Cela n’a pas fonctionné. Réessayez."
+  },
+  "source": {
+    "label": "Origine du profil",
+    "linkedin_zip": "Export de données LinkedIn",
+    "pdf": "Un PDF",
+    "text": "Texte collé",
+    "manual": "Rédigé ici",
+    "updated": "{{source}} · mis à jour le {{date}}"
+  },
+  "basics": {
+    "name": "Nom",
+    "label": "Titre",
+    "location": "Lieu",
+    "email": "E-mail",
+    "url": "Site web",
+    "summary": "Résumé"
+  },
+  "placeholders": {
+    "name": "Ajoutez votre nom",
+    "label": "Ajoutez un titre",
+    "location": "Ajoutez où vous êtes",
+    "email": "Ajoutez un e-mail pour vos candidatures",
+    "url": "Ajoutez votre site web",
+    "summary": "Ajoutez quelques phrases sur vous"
+  },
+  "sections": {
+    "work": "Expérience",
+    "education": "Formation",
+    "skills": "Compétences",
+    "languages": "Langues",
+    "certificates": "Certifications",
+    "projects": "Projets"
+  },
+  "add": {
+    "work": "Ajouter un poste",
+    "education": "Ajouter une formation",
+    "skills": "Ajouter une compétence",
+    "languages": "Ajouter une langue",
+    "certificates": "Ajouter une certification",
+    "projects": "Ajouter un projet"
+  },
+  "empty": {
+    "work": "Aucun poste pour l’instant. Ajoutez-en un",
+    "education": "Aucune formation pour l’instant. Ajoutez-en une",
+    "skills": "Aucune compétence pour l’instant. Ajoutez-en une",
+    "languages": "Aucune langue pour l’instant. Ajoutez-en une",
+    "certificates": "Aucune certification pour l’instant. Ajoutez-en une",
+    "projects": "Aucun projet pour l’instant. Ajoutez-en un"
+  },
+  "fields": {
+    "title": "Intitulé",
+    "company": "Entreprise",
+    "location": "Lieu",
+    "start": "Début",
+    "end": "Fin",
+    "summary": "Ce que vous avez fait",
+    "highlights": "Réalisations",
+    "school": "Établissement",
+    "degree": "Diplôme",
+    "field": "Domaine d’études",
+    "skill": "Compétence",
+    "level": "Niveau",
+    "language": "Langue",
+    "fluency": "Maîtrise",
+    "certification": "Certification",
+    "issuer": "Délivrée par",
+    "date": "Date",
+    "project": "Projet",
+    "description": "Description",
+    "link": "Lien"
+  },
+  "dates": {
+    "range": "{{start}} – {{end}}",
+    "now": "aujourd’hui"
+  },
+  "form": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "remove": "Supprimer",
+    "edit": "Modifier {{what}}",
+    "editAll": "Modifier",
+    "done": "Terminé",
+    "required": "Ce champ ne peut pas être vide.",
+    "dateInvalid": "Indiquez une année (2021), un mois (2021-03) ou un jour (2021-03-15).",
+    "datePlaceholder": "2021-03",
+    "dateHint": "Une année, ou une année et un mois.",
+    "onePerLine": "Un par ligne.",
+    "charactersLeft": "Encore {{left}} caractères",
+    "saveFailed": "Impossible d’enregistrer la modification. Réessayez."
+  }
+}

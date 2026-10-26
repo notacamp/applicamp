@@ -1,0 +1,30 @@
+[package]
+name = "applicamp-ai"
+description = "Applicamp AI gateway: the `complete` role over any OpenAI-compatible API (OpenRouter), with retries, a usage ledger and a per-account daily token cap. Trimmed from Campbooks Next's."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+applicamp-kernel.workspace = true
+chrono.workspace = true
+figment.workspace = true
+reqwest.workspace = true
+secrecy.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+url.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+wiremock.workspace = true
+
+[lints]
+workspace = true

@@ -47,6 +47,375 @@
         ]
       }
     },
+    "/api/v1/profile": {
+      "get": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "The signed-in person's profile.",
+        "description": "Empty (and no `source`) until they import or write one.",
+        "operationId": "profile.get",
+        "responses": {
+          "200": {
+            "description": "The profile.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Save the profile.",
+        "description": "The whole profile, as edited by hand. Values are trimmed and empty ones\nremoved; a value over its length, a date not like `2020`, `2020-03` or\n`2020-03-15`, or a list of more than 200 entries is refused.",
+        "operationId": "profile.update",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Profile"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The profile, saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_profile`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/imports": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Import a profile.",
+        "description": "A `multipart/form-data` upload of `kind` and either `file` (a LinkedIn\nexport ZIP, up to 20 MB; a PDF, up to 8 MB) or `text` (up to 60 000\ncharacters). The answer is a draft to review: the profile is unchanged\nuntil the draft is applied. The file is not kept.\n\nA ZIP is read from its CSVs without any model; it is refused before\nanything is extracted when it holds more than 200 files, a file over\n5 MB or more than 50 MB uncompressed, or a path leaving the archive.\nA PDF's text and pasted text are structured by the `complete` model, and\nevery value the source does not say is dropped and counted (`dropped`).",
+        "operationId": "profile.import",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportUpload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The draft, waiting for review.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Import"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_upload`, `invalid_kind`, `file_too_large`, `text_too_long`, `not_a_zip`, `archive_too_many_entries`, `archive_entry_too_large`, `archive_too_large`, `archive_unsafe_path`, `not_a_pdf`, `pdf_unreadable`, `pdf_too_many_pages`, `pdf_no_text`, `nothing_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`ai_unavailable`: no model to read a PDF or text (import the LinkedIn ZIP instead); `ai_daily_limit_reached`; `ai_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/imports/{id}": {
+      "get": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "A draft.",
+        "description": "One of the signed-in person's imports, until it expires. Anyone else's\nis not found.",
+        "operationId": "profile.get_import",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The import.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The import and its draft.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Import"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/imports/{id}/apply": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Apply a draft.",
+        "description": "`replace` makes the draft the profile; `merge` keeps the profile as it\nis (hand edits included) and adds what the draft has that it does not.\nOnce applied, a draft cannot be applied again.",
+        "operationId": "profile.apply_import",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The import.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyImport"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The profile, now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_request`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`import_not_ready`: already applied or discarded",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/imports/{id}/discard": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Throw a draft away.",
+        "description": "The profile is unchanged. Discarding twice is fine; an applied draft\ncannot be discarded.",
+        "operationId": "profile.discard_import",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The import.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Discarded."
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`import_not_ready`: already applied",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/bff/callback/{provider}": {
       "get": {
         "tags": [
@@ -285,6 +654,164 @@
   },
   "components": {
     "schemas": {
+      "ApplyImport": {
+        "type": "object",
+        "description": "How to apply a draft.",
+        "required": [
+          "mode"
+        ],
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/ApplyMode",
+            "description": "Replace the profile, or merge into it."
+          }
+        },
+        "additionalProperties": false
+      },
+      "ApplyMode": {
+        "type": "string",
+        "description": "How a draft reaches the profile.",
+        "enum": [
+          "replace",
+          "merge"
+        ]
+      },
+      "Basics": {
+        "type": "object",
+        "description": "Who they are.",
+        "required": [
+          "profiles"
+        ],
+        "properties": {
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The address for applications."
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their headline (\"Senior software engineer\")."
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where they are, as written (\"Lisbon, Portugal\")."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their name."
+          },
+          "profiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Link"
+            },
+            "description": "Profiles elsewhere (GitHub, a portfolio)."
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A few sentences about them."
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their own site."
+          }
+        },
+        "additionalProperties": false
+      },
+      "Certificate": {
+        "type": "object",
+        "description": "A certification.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When, `YYYY`, `YYYY-MM` or `YYYY-MM-DD`."
+          },
+          "issuer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Who issued it."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name."
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where it can be checked."
+          }
+        },
+        "additionalProperties": false
+      },
+      "Education": {
+        "type": "object",
+        "description": "A school or degree.",
+        "required": [
+          "institution"
+        ],
+        "properties": {
+          "area": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The field (\"Computer science\")."
+          },
+          "endDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "As `startDate`."
+          },
+          "institution": {
+            "type": "string",
+            "description": "The school."
+          },
+          "startDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`YYYY`, `YYYY-MM` or `YYYY-MM-DD`."
+          },
+          "studyType": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The degree (\"Master's\")."
+          }
+        },
+        "additionalProperties": false
+      },
       "Health": {
         "type": "object",
         "description": "The instance's health.",
@@ -302,6 +829,142 @@
             "description": "The server's version."
           }
         }
+      },
+      "Import": {
+        "type": "object",
+        "description": "A draft profile waiting for review.",
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "draft",
+          "dropped",
+          "created_at",
+          "expires_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was made."
+          },
+          "draft": {
+            "$ref": "#/components/schemas/Profile",
+            "description": "The draft."
+          },
+          "dropped": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Values left out of the draft: ones a model gave that the file does\nnot say (the source check), or that did not fit.",
+            "minimum": 0
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the draft is deleted if it is not applied."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The import."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ImportKind",
+            "description": "What it was made from."
+          },
+          "status": {
+            "$ref": "#/components/schemas/ImportStatus",
+            "description": "Where it is."
+          }
+        }
+      },
+      "ImportKind": {
+        "type": "string",
+        "description": "What an import is made from.",
+        "enum": [
+          "linkedin_zip",
+          "pdf",
+          "text"
+        ]
+      },
+      "ImportStatus": {
+        "type": "string",
+        "description": "Where an import is.",
+        "enum": [
+          "ready",
+          "applied",
+          "discarded"
+        ]
+      },
+      "ImportUpload": {
+        "type": "object",
+        "description": "An upload (`multipart/form-data`): the kind, then the file (ZIP or PDF)\nor the text.",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "file": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "binary",
+            "description": "The file, for `linkedin_zip` (up to 20 MB) and `pdf` (up to 8 MB)."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ImportKind",
+            "description": "`linkedin_zip`, `pdf` or `text`."
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The text, for `text` (up to 60 000 characters)."
+          }
+        }
+      },
+      "Language": {
+        "type": "object",
+        "description": "A language they speak.",
+        "required": [
+          "language"
+        ],
+        "properties": {
+          "fluency": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "How well (\"Native or bilingual\")."
+          },
+          "language": {
+            "type": "string",
+            "description": "The language (\"Portuguese\")."
+          }
+        },
+        "additionalProperties": false
+      },
+      "Link": {
+        "type": "object",
+        "description": "A profile elsewhere.",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "network": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where (\"GitHub\")."
+          },
+          "url": {
+            "type": "string",
+            "description": "The address."
+          }
+        },
+        "additionalProperties": false
       },
       "Me": {
         "type": "object",
@@ -386,6 +1049,160 @@
           "type": "about:blank"
         }
       },
+      "Profile": {
+        "type": "object",
+        "description": "A whole profile.",
+        "required": [
+          "basics",
+          "work",
+          "education",
+          "skills",
+          "languages",
+          "certificates",
+          "projects"
+        ],
+        "properties": {
+          "basics": {
+            "$ref": "#/components/schemas/Basics",
+            "description": "Who they are."
+          },
+          "certificates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Certificate"
+            },
+            "description": "Certifications."
+          },
+          "education": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Education"
+            },
+            "description": "Schools and degrees."
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Language"
+            },
+            "description": "Languages they speak."
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Project"
+            },
+            "description": "Projects."
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Skill"
+            },
+            "description": "Skills."
+          },
+          "work": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Work"
+            },
+            "description": "Positions, newest first."
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProfileSource": {
+        "type": "string",
+        "description": "Where the profile came from last.",
+        "enum": [
+          "linkedin_zip",
+          "pdf",
+          "text",
+          "manual"
+        ]
+      },
+      "ProfileView": {
+        "type": "object",
+        "description": "The profile, and what can be imported into it.",
+        "required": [
+          "profile",
+          "import_kinds"
+        ],
+        "properties": {
+          "import_kinds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportKind"
+            },
+            "description": "What this instance can import: always the LinkedIn export; PDFs and\ntext only when a model is configured for them."
+          },
+          "profile": {
+            "$ref": "#/components/schemas/Profile",
+            "description": "The profile; empty until something is imported or written."
+          },
+          "source": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProfileSource",
+                "description": "Where it came from last (the last import applied, or `manual`)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it last changed."
+          }
+        }
+      },
+      "Project": {
+        "type": "object",
+        "description": "A project.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What it is."
+          },
+          "endDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "As `startDate`."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name."
+          },
+          "startDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`YYYY`, `YYYY-MM` or `YYYY-MM-DD`."
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where to see it."
+          }
+        },
+        "additionalProperties": false
+      },
       "Provider": {
         "type": "string",
         "description": "A sign-in provider.",
@@ -409,6 +1226,86 @@
             "description": "In the order the sign-in page shows them."
           }
         }
+      },
+      "Skill": {
+        "type": "object",
+        "description": "A skill.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "level": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "How well, in their words."
+          },
+          "name": {
+            "type": "string",
+            "description": "The skill (\"PostgreSQL\")."
+          }
+        },
+        "additionalProperties": false
+      },
+      "Work": {
+        "type": "object",
+        "description": "A position.",
+        "required": [
+          "highlights"
+        ],
+        "properties": {
+          "endDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "As `startDate`; none while it is their current position."
+          },
+          "highlights": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Achievements, one sentence each."
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The company."
+          },
+          "position": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The title."
+          },
+          "startDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`YYYY`, `YYYY-MM` or `YYYY-MM-DD`."
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What they did."
+          }
+        },
+        "additionalProperties": false
       }
     },
     "securitySchemes": {
@@ -428,6 +1325,10 @@
     {
       "name": "identity",
       "description": "Accounts and their ways in (Campbooks, LinkedIn). Who may create an account is the invite list, managed from the server's command line only."
+    },
+    {
+      "name": "profile",
+      "description": "The master profile: what agents know about you. Imported from a LinkedIn data export, a PDF or pasted text as a draft you review, and edited by hand."
     },
     {
       "name": "bff",

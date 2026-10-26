@@ -42,7 +42,24 @@ describe("the app", () => {
   });
 
   it("lands a first visit on Today, which offers to set up the profile", async () => {
-    signedIn();
+    signedIn({
+      "GET /api/v1/profile": {
+        body: {
+          profile: {
+            basics: { profiles: [] },
+            work: [],
+            education: [],
+            skills: [],
+            languages: [],
+            certificates: [],
+            projects: [],
+          },
+          source: null,
+          updated_at: null,
+          import_kinds: ["linkedin_zip"],
+        },
+      },
+    });
     const user = userEvent.setup();
     const { router } = renderApp("/");
 
@@ -52,14 +69,16 @@ describe("the app", () => {
     expect(tagged("nav-today")).toHaveAttribute("aria-current", "page");
     expect(tagged("nav-pipeline")).not.toHaveAttribute("aria-current");
 
+    expect(screen.getByTestId("set-up-profile")).toHaveAttribute("href", "/profile?import=new");
     await user.click(screen.getByTestId("set-up-profile"));
     await waitFor(() => {
       expect(router.state.location.pathname).toBe("/profile");
     });
+    expect(router.state.location.search).toEqual({ import: "new" });
     const account = await screen.findByTestId("profile-account");
     expect(account).toHaveTextContent("demo@example.com");
     expect(account).toHaveTextContent("Campbooks");
-    expect(screen.getByTestId("profile-empty")).toHaveTextContent("Your profile is empty");
+    expect(await screen.findByTestId("import-panel")).toHaveTextContent("Import your profile");
   });
 
   it("moves between the places from the sidebar and the keyboard", async () => {

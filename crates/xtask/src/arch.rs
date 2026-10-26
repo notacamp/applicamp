@@ -16,6 +16,8 @@ use serde::Deserialize;
 pub enum Kind {
     /// `crates/kernel`
     Kernel,
+    /// `crates/ai`: the model gateway, which modules may use like the kernel.
+    Ai,
     /// `crates/server`
     Server,
     /// `crates/modules/<name>`
@@ -33,6 +35,7 @@ impl Kind {
         let parts: Vec<&str> = rel_dir.trim_matches('/').split('/').collect();
         match parts.as_slice() {
             ["crates", "kernel"] => Self::Kernel,
+            ["crates", "ai"] => Self::Ai,
             ["crates", "server"] => Self::Server,
             ["crates", "modules", name] => Self::Module((*name).to_owned()),
             ["crates", "xtask"] => Self::Xtask,
@@ -45,6 +48,7 @@ impl fmt::Display for Kind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Kernel => f.write_str("kernel"),
+            Self::Ai => f.write_str("AI gateway"),
             Self::Server => f.write_str("server"),
             Self::Module(name) => write!(f, "module `{name}`"),
             Self::Xtask => f.write_str("xtask"),
@@ -110,7 +114,7 @@ pub fn check_dependencies(crates: &[Crate], allow: &[Allow]) -> Vec<String> {
         if from == Kind::Unknown {
             violations.push(format!(
                 "`{}` lives at `{}`, which is not a known crate location \
-                 (crates/kernel, crates/server, crates/modules/<name>, crates/xtask)",
+                 (crates/kernel, crates/ai, crates/server, crates/modules/<name>, crates/xtask)",
                 krate.name, krate.path
             ));
             continue;
@@ -139,7 +143,10 @@ fn edge_violation(from: &Kind, to: &Kind, allow: &[Allow]) -> Option<&'static st
     }
     match (from, to) {
         (Kind::Kernel, _) => Some("the kernel depends on no workspace crate"),
-        (Kind::Module(_), Kind::Kernel) | (Kind::Server | Kind::Xtask, _) => None,
+        (Kind::Module(_) | Kind::Ai, Kind::Kernel)
+        | (Kind::Module(_), Kind::Ai)
+        | (Kind::Server | Kind::Xtask, _) => None,
+        (Kind::Ai, _) => Some("the AI gateway depends only on the kernel"),
         (Kind::Module(a), Kind::Module(b)) => {
             if allow.iter().any(|e| &e.from == a && &e.to == b) {
                 None
@@ -150,7 +157,7 @@ fn edge_violation(from: &Kind, to: &Kind, allow: &[Allow]) -> Option<&'static st
                 )
             }
         }
-        (Kind::Module(_), _) => Some("modules may depend only on the kernel"),
+        (Kind::Module(_), _) => Some("modules may depend only on the kernel and the AI gateway"),
         (Kind::Unknown, _) => Some("unclassified crate"),
     }
 }
@@ -184,8 +191,9 @@ pub fn check_allowlist(allow: &[Allow], modules: &BTreeSet<String>) -> Vec<Strin
 }
 
 /// The schemas owned by infrastructure rather than a module: the kernel's
-/// (outbox, job queue) and the server's backend-for-frontend (sessions).
-pub const INFRASTRUCTURE_SCHEMAS: [&str; 2] = ["kernel", "bff"];
+/// (outbox, job queue), the server's backend-for-frontend (sessions) and
+/// the AI gateway's (usage ledger).
+pub const INFRASTRUCTURE_SCHEMAS: [&str; 3] = ["kernel", "bff", "ai"];
 
 /// Operation owners that are not modules: the server's own `/healthz` and
 /// the BFF.
@@ -214,7 +222,7 @@ pub fn check_migrations(file_names: &[String], modules: &BTreeSet<String>) -> Ve
     for reserved in reserved {
         if modules.contains(reserved) {
             violations.push(format!(
-                "crates/modules/{reserved}: `{reserved}` is reserved for the kernel or the server"
+                "crates/modules/{reserved}: `{reserved}` is reserved for the kernel, the server or the AI gateway"
             ));
         }
     }
@@ -233,7 +241,7 @@ pub fn check_migrations(file_names: &[String], modules: &BTreeSet<String>) -> Ve
         if !is_infrastructure(owner) && !modules.contains(owner) {
             let known: Vec<_> = modules.iter().map(String::as_str).collect();
             violations.push(format!(
-                "migrations/{name}: `{owner}` is not a module, `kernel` or `bff` \
+                "migrations/{name}: `{owner}` is not a module, `kernel`, `bff` or `ai` \
                  (known modules: {})",
                 known.join(", ")
             ));
@@ -495,10 +503,11 @@ mod tests {
     fn dependency_directions() {
         let crates = [
             krate("applicamp-kernel", "crates/kernel", &[]),
+            krate("applicamp-ai", "crates/ai", &["applicamp-kernel"]),
             krate(
                 "applicamp-identity",
                 "crates/modules/identity",
-                &["applicamp-kernel"],
+                &["applicamp-kernel", "applicamp-ai"],
             ),
             krate(
                 "applicamp-profile",
@@ -525,6 +534,7 @@ mod tests {
 
         let bad = [
             krate("applicamp-kernel", "crates/kernel", &["applicamp-identity"]),
+            krate("applicamp-ai", "crates/ai", &["applicamp-identity"]),
             krate(
                 "applicamp-identity",
                 "crates/modules/identity",
@@ -534,7 +544,13 @@ mod tests {
             krate("stray", "tools/stray", &[]),
         ];
         let violations = check_dependencies(&bad, &[]);
-        assert_eq!(violations.len(), 3, "{violations:?}");
+        assert_eq!(violations.len(), 4, "{violations:?}");
+        assert!(
+            violations
+                .iter()
+                .any(|v| v.contains("the AI gateway depends only on the kernel")),
+            "{violations:?}"
+        );
     }
 
     #[test]
@@ -554,6 +570,7 @@ mod tests {
             "20261026000000_kernel__events_and_jobs.sql".to_owned(),
             "20261026000100_bff__sessions.sql".to_owned(),
             "20261026000200_identity__init.sql".to_owned(),
+            "20261026120000_ai__usage.sql".to_owned(),
         ];
         assert!(check_migrations(&names, &modules(&["identity"])).is_empty());
 

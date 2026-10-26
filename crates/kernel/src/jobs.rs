@@ -280,6 +280,30 @@ pub async fn enqueue<J: Job>(conn: &mut PgConnection, job: &J) -> Result<Uuid, s
     Ok(id)
 }
 
+/// Enqueue `job` in `conn`'s transaction to run once that commits, but not
+/// before `run_at` (an expiry, a reminder).
+pub async fn enqueue_at<J: Job>(
+    conn: &mut PgConnection,
+    job: &J,
+    run_at: chrono::DateTime<chrono::Utc>,
+) -> Result<Uuid, sqlx::Error> {
+    let payload = serde_json::to_value(job).map_err(|e| sqlx::Error::Encode(e.into()))?;
+    let id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO kernel.jobs (id, kind, queue, payload, max_attempts, run_at)
+         VALUES ($1, $2, $3, $4, $5, $6)",
+    )
+    .bind(id)
+    .bind(J::NAME)
+    .bind(J::QUEUE)
+    .bind(payload)
+    .bind(attempts_to_db(J::MAX_ATTEMPTS))
+    .bind(run_at)
+    .execute(conn)
+    .await?;
+    Ok(id)
+}
+
 /// A claimed job.
 #[derive(sqlx::FromRow)]
 struct Claimed {
@@ -551,6 +575,27 @@ mod tests {
         assert_eq!(RAN.load(Ordering::SeqCst), before + 3);
         assert_eq!(state_of(&db, id).await, ("succeeded".to_owned(), 1));
         assert!(!worker.run_once().await.unwrap());
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_job_enqueued_for_later_waits_for_its_time(db: PgPool) {
+        let registry = registry();
+        let worker = Worker::new(db.clone(), Arc::clone(&registry), EventBus::new(registry));
+        let mut conn = db.acquire().await.unwrap();
+        let later = chrono::Utc::now() + chrono::TimeDelta::hours(1);
+        let id = enqueue_at(&mut conn, &Count { by: 1 }, later)
+            .await
+            .unwrap();
+        drop(conn);
+
+        assert!(!worker.run_once().await.unwrap(), "not before its time");
+        sqlx::query("UPDATE kernel.jobs SET run_at = now() WHERE id = $1")
+            .bind(id)
+            .execute(&db)
+            .await
+            .unwrap();
+        assert!(worker.run_once().await.unwrap());
+        assert_eq!(state_of(&db, id).await, ("succeeded".to_owned(), 1));
     }
 
     #[sqlx::test(migrations = "../../migrations")]

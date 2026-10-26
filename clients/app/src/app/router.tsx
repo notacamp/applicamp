@@ -75,10 +75,28 @@ const agentsRoute = createRoute({
   path: "/agents",
   component: Agents,
 });
+/** `?import=new` opens the import panel (Today's "Set up your profile"). */
+const profileSearch = z.object({ import: z.literal("new") });
+
 const profileRoute = createRoute({
   getParentRoute: () => frameRoute,
   path: "/profile",
-  component: Profile,
+  validateSearch: (search: Record<string, unknown>): { import?: "new" | undefined } => {
+    const parsed = profileSearch.safeParse(search);
+    return { import: parsed.success ? parsed.data.import : undefined };
+  },
+  component: function ProfileRoute() {
+    const search = profileRoute.useSearch();
+    const navigate = profileRoute.useNavigate();
+    return (
+      <Profile
+        importing={search.import === "new"}
+        onImporting={(open) => {
+          void navigate({ search: open ? { import: "new" } : {} });
+        }}
+      />
+    );
+  },
 });
 
 const routeTree = rootRoute.addChildren([

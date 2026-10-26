@@ -1,7 +1,21 @@
+/*
+ * The page beside the sidebar, sized like the package's ReaderPane. Below
+ * 64rem the Shell wraps (the phone header takes a whole row) and a basis of 0
+ * would let the page squeeze onto the header's row with no width at all, so
+ * its basis is --reader-min there: it always starts a row of its own and
+ * shrinks to the screen. From 64rem the Shell is one row and the page takes
+ * what the sidebar leaves.
+ */
 .page {
-  flex: 1 1 0;
+  flex: 999 1 var(--reader-min);
   min-width: 0;
   background: var(--surface-base);
+}
+
+@media (width >= 64rem) {
+  .page {
+    flex-basis: 0;
+  }
 }
 
 .column {

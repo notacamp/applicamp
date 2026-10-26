@@ -147,6 +147,37 @@ describe("the app", () => {
     expect(queryClient.getQueryData(["identity", "me"])).toBeUndefined();
   });
 
+  it("reaches the command menu and sign-out from the phone header", async () => {
+    let signedOut = false;
+    stubApi({
+      "GET /api/v1/me": () => (signedOut ? SIGNED_OUT : { body: DEMO_ME }),
+      "POST /bff/sign-out": () => {
+        signedOut = true;
+        return { status: 204 };
+      },
+      "GET /bff/providers": { body: { providers: ["campbooks"] } },
+    });
+    const user = userEvent.setup();
+    const { router } = renderApp("/");
+    await screen.findByTestId("today");
+    expect(screen.getByTestId("tab-bar")).toHaveTextContent("Pipeline");
+
+    await user.click(screen.getByTestId("jump-phone"));
+    await waitFor(() => {
+      expect(document.activeElement).toHaveAttribute("role", "combobox");
+    });
+    await user.keyboard("Agents{Enter}");
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe("/agents");
+    });
+
+    await user.click(screen.getByTestId("account-menu-phone"));
+    await user.click(screen.getByTestId("sign-out"));
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe("/sign-in");
+    });
+  });
+
   it("says so when signing out fails", async () => {
     signedIn({ "POST /bff/sign-out": { status: 403, body: { code: "csrf_check_failed" } } });
     const user = userEvent.setup();

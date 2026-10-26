@@ -24,5 +24,19 @@ export default defineConfig({
       ? {}
       : { launchOptions: { args: [`--host-resolver-rules=${hostRules}`] } }),
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  // The same happy path at desktop width (sidebar, keyboard) and at 375px
+  // (phone header, tab bar, touch).
+  projects: [
+    { name: "desktop", use: { ...devices["Desktop Chrome"] } },
+    {
+      name: "phone",
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 375, height: 812 },
+        deviceScaleFactor: 2,
+        isMobile: true,
+        hasTouch: true,
+      },
+    },
+  ],
 });

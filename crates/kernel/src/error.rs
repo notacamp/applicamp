@@ -73,7 +73,7 @@ impl Error {
             | Self::Conflict(code, _)
             | Self::Unauthorized(code)
             | Self::Forbidden(code)
-            | Self::Unavailable(code) => *code,
+            | Self::Unavailable(code) => code,
             Self::Internal(_) => "internal_error",
         }
     }

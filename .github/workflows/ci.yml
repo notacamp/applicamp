@@ -89,7 +89,7 @@ jobs:
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
         with: { tool: cargo-nextest }
       - name: Tests
-        run: cargo nextest run --workspace --locked --no-tests=fail
+        run: cargo nextest run --workspace --locked --no-tests=fail --no-fail-fast
 
   rust:
     # The required check: every Rust job above passed.

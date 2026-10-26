@@ -27,6 +27,8 @@ applicamp-ai = { path = "crates/ai" }
 applicamp-server = { path = "crates/server" }
 applicamp-identity = { path = "crates/modules/identity" }
 applicamp-profile = { path = "crates/modules/profile" }
+applicamp-pipeline = { path = "crates/modules/pipeline" }
+applicamp-sources = { path = "crates/modules/sources" }
 
 # The same versions and features as Campbooks Next, trimmed to what is used.
 

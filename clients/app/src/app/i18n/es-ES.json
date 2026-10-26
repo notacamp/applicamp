@@ -11,15 +11,31 @@
   "today": {
     "title": "Hoy",
     "lead": "Lo que te espera, cada día. Los agentes trabajan en segundo plano; nada sale en tu nombre sin tu permiso.",
-    "emptyTitle": "Todavía no hay nada para ti",
-    "emptyBody": "Cuando los agentes encuentren una oferta, preparen una candidatura o redacten una respuesta a un reclutador, te esperará aquí. Empieza por contarles quién eres y qué buscas ahora.",
-    "setUp": "Configurar tu perfil"
+    "loading": "Cargando…",
+    "loadFailed": "No se pudo cargar Hoy.",
+    "retry": "Reintentar",
+    "setUpTitle": "Primero, cuéntales a los agentes quién eres",
+    "setUpBody": "Cuando los agentes encuentren una oferta, preparen una candidatura o redacten una respuesta a un reclutador, te esperará aquí. Empieza por contarles quién eres y qué buscas ahora.",
+    "setUp": "Configura tu perfil",
+    "goalsTitle": "Ahora, ¿qué buscas?",
+    "goalsBody": "Unas preguntas cortas sobre los puestos, los lugares y el salario que buscas: las búsquedas se ciñen a ellos. {{answered}} de {{total}} respondidas.",
+    "answerGoals": "Responder unas preguntas",
+    "searchTitle": "Todo listo para una primera búsqueda",
+    "searchBody": "Tu perfil y tus objetivos están listos. Busca ahora en los portales de empleo: las ofertas que encajan llegan a Oportunidades como Encontradas, con por qué encajan y sus carencias.",
+    "matchesTitle": "Nuevas coincidencias: {{count}}",
+    "matchesBody": "Una búsqueda encontró ofertas que encajan con tu perfil y tus objetivos. Ábrelas, preselecciona las que te gusten y di “No es para mí” al resto.",
+    "reviewMatches": "Revisarlas",
+    "nothingTitle": "Todavía no hay nada para ti",
+    "nothingBody": "No hay coincidencias nuevas desde la última vez. Esta noche se hace otra búsqueda, o busca de nuevo ahora.",
+    "strength": {
+      "add_headline": "Añade un titular a tu perfil: afina todas las coincidencias.",
+      "add_work": "Añade tus puestos a tu perfil: las coincidencias se valoran según ellos.",
+      "add_skills": "Añade tus habilidades a tu perfil: las coincidencias se valoran según ellas."
+    }
   },
   "pipeline": {
     "title": "Oportunidades",
-    "lead": "Todas las oportunidades que encuentran los agentes o que añades tú, desde la primera coincidencia hasta la oferta.",
-    "emptyTitle": "Todavía no hay oportunidades",
-    "emptyBody": "Las ofertas llegan aquí con cuánto encajan con tu perfil, su fase y el siguiente paso, para que no se te escape nada."
+    "lead": "Todas las oportunidades que encuentran los agentes o que añades tú, desde la primera coincidencia hasta la oferta."
   },
   "agents": {
     "title": "Agentes",

@@ -1,9 +1,12 @@
-use crate::Role;
+use crate::{Role, usage::Limit};
 
 /// Problem code of a feature whose model is not configured.
 pub const AI_UNAVAILABLE: &str = "ai_unavailable";
 /// Problem code of an account over its daily token cap.
 pub const AI_DAILY_LIMIT_REACHED: &str = "ai_daily_limit_reached";
+/// Problem code of a call refused because it would cross a spending limit
+/// (the account's for the day or the month, or the instance's for the month).
+pub const AI_BUDGET_REACHED: &str = "ai_budget_reached";
 /// Problem code of a model call that failed (the provider was down, or its
 /// answer was unusable).
 pub const AI_FAILED: &str = "ai_failed";
@@ -40,6 +43,12 @@ pub enum Error {
         /// Tokens an account may use per UTC day.
         cap: u64,
     },
+    /// The call would cross a spending limit; nothing was sent.
+    #[error("the {} AI spending limit is reached; nothing was sent", .limit.as_str())]
+    OverBudget {
+        /// The limit it would cross.
+        limit: Limit,
+    },
     /// The call could not be counted (the ledger is unavailable), so it was
     /// not made: a broken ledger never lifts the cap.
     #[error("the AI call could not be counted; nothing was sent")]
@@ -58,6 +67,7 @@ impl From<Error> for applicamp_kernel::Error {
         match err {
             Error::NotConfigured(_) => Self::Unavailable(AI_UNAVAILABLE),
             Error::OverDailyCap { .. } => Self::Unavailable(AI_DAILY_LIMIT_REACHED),
+            Error::OverBudget { .. } => Self::Unavailable(AI_BUDGET_REACHED),
             Error::Transport(_)
             | Error::Status { .. }
             | Error::InvalidResponse(_)
@@ -81,6 +91,10 @@ mod tests {
         assert_eq!(unavailable.status().as_u16(), 503);
         let capped = applicamp_kernel::Error::from(Error::OverDailyCap { cap: 10 });
         assert_eq!(capped.code(), AI_DAILY_LIMIT_REACHED);
+        let budget = applicamp_kernel::Error::from(Error::OverBudget {
+            limit: Limit::AccountMonth,
+        });
+        assert_eq!(budget.code(), AI_BUDGET_REACHED);
         let failed = applicamp_kernel::Error::from(Error::Status { status: 502 });
         assert_eq!(failed.code(), AI_FAILED);
     }

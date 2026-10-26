@@ -1,0 +1,101 @@
+{
+  "loading": "Cargando las oportunidades…",
+  "loadFailed": "No se pudieron cargar las oportunidades.",
+  "retry": "Reintentar",
+  "untitled": "Puesto sin nombre",
+  "views": {
+    "label": "Vista",
+    "table": "Todas las oportunidades",
+    "board": "Por fase"
+  },
+  "filter": {
+    "search": "Buscar en las oportunidades",
+    "stage": "Fase",
+    "allStages": "Todas las fases",
+    "newOnly": "Solo se muestran las nuevas coincidencias.",
+    "showAll": "Mostrar todo"
+  },
+  "columns": {
+    "role": "Puesto",
+    "company": "Empresa",
+    "match": "Encaje",
+    "stage": "Fase",
+    "source": "Origen",
+    "nextStep": "Siguiente paso",
+    "updated": "Actualizada"
+  },
+  "stages": {
+    "found": "Encontrada",
+    "shortlisted": "Preseleccionada",
+    "applying": "Preparando candidatura",
+    "applied": "Candidatura enviada",
+    "talking": "En conversación",
+    "interview": "Entrevista",
+    "offer": "Oferta",
+    "closed": "Cerrada"
+  },
+  "sources": {
+    "greenhouse": "Greenhouse",
+    "lever": "Lever",
+    "ashby": "Ashby",
+    "arbeitnow": "Arbeitnow",
+    "hn": "HN “Who is hiring”",
+    "link": "Enlace"
+  },
+  "workModes": {
+    "remote": "En remoto",
+    "hybrid": "Híbrido",
+    "onsite": "Presencial"
+  },
+  "empty": {
+    "title": "Todavía no hay oportunidades",
+    "body": "Las ofertas llegan aquí con cuánto encajan con tu perfil, su fase y el siguiente paso, para que no se te escape nada. Busca ahora en los portales de empleo o añade una oferta por su enlace.",
+    "filteredTitle": "Aquí no hay nada",
+    "filteredBody": "Ninguna oportunidad coincide con estos filtros."
+  },
+  "board": {
+    "empty": "Aquí no hay nada"
+  },
+  "new": {
+    "button": "Nueva",
+    "title": "Añadir una oferta por su enlace",
+    "description": "Pega el enlace de una oferta. Las de Greenhouse, Lever y Ashby se leen automáticamente; para cualquier otro sitio, escribes el puesto y la empresa.",
+    "url": "Enlace de la oferta",
+    "add": "Añadir",
+    "adding": "Añadiendo…",
+    "cancel": "Cancelar",
+    "invalid": "Pega un enlace que empiece por https://.",
+    "failed": "No se pudo añadir la oferta. Inténtalo de nuevo."
+  },
+  "peek": {
+    "eyebrow": "Oportunidad",
+    "close": "Cerrar",
+    "role": "Puesto",
+    "addRole": "Escribe el puesto",
+    "company": "Empresa",
+    "addCompany": "Escribe la empresa",
+    "where": "Dónde",
+    "addWhere": "Escribe dónde es",
+    "unknown": "No se indica",
+    "pay": "Salario",
+    "match": "Encaje",
+    "notScored": "Sin valorar",
+    "stage": "Fase",
+    "source": "Origen",
+    "nextStep": "Siguiente paso",
+    "addNextStep": "Añade el siguiente paso",
+    "posted": "Publicada",
+    "why": "Por qué encaja",
+    "gaps": "Carencias",
+    "notes": "Notas",
+    "addNotes": "Añade notas que solo ves tú",
+    "charactersLeft": "Quedan {{left}} caracteres",
+    "description": "De la oferta",
+    "open": "Abrir la oferta",
+    "notForMe": "No es para mí",
+    "dismissed": "No es para mí · {{title}}",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "saveFailed": "No se pudo guardar el cambio. Inténtalo de nuevo."
+  }
+}

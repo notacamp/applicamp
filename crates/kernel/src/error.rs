@@ -38,6 +38,9 @@ pub enum Error {
     /// A dependency (database, provider) is unavailable.
     #[error("unavailable: {0}")]
     Unavailable(&'static str),
+    /// Too many of these in too short a time: a code and when to try again.
+    #[error("too many requests: {0}")]
+    TooManyRequests(&'static str, String),
     /// Anything else. Logged; the client sees a generic message.
     #[error("internal error")]
     Internal(#[source] Box<dyn std::error::Error + Send + Sync>),
@@ -61,6 +64,7 @@ impl Error {
             Self::Forbidden(_) => StatusCode::FORBIDDEN,
             Self::Conflict(..) => StatusCode::CONFLICT,
             Self::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
+            Self::TooManyRequests(..) => StatusCode::TOO_MANY_REQUESTS,
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -71,6 +75,7 @@ impl Error {
             Self::NotFound => "not_found",
             Self::BadRequest(code, _)
             | Self::Conflict(code, _)
+            | Self::TooManyRequests(code, _)
             | Self::Unauthorized(code)
             | Self::Forbidden(code)
             | Self::Unavailable(code) => code,
@@ -82,7 +87,9 @@ impl Error {
     pub fn to_problem(&self) -> Problem {
         let detail = match self {
             Self::NotFound => "This resource does not exist, or you cannot see it.".to_owned(),
-            Self::BadRequest(_, detail) | Self::Conflict(_, detail) => detail.clone(),
+            Self::BadRequest(_, detail)
+            | Self::Conflict(_, detail)
+            | Self::TooManyRequests(_, detail) => detail.clone(),
             Self::Unauthorized(_) => "Sign in first.".to_owned(),
             Self::Forbidden(_) => "You may not do this.".to_owned(),
             Self::Unavailable(_) => {
@@ -213,6 +220,18 @@ mod tests {
         assert_eq!(status, StatusCode::BAD_REQUEST);
         assert_eq!(body["code"], "invalid_email");
         assert_eq!(body["detail"], "Not an address.");
+    }
+
+    #[tokio::test]
+    async fn too_many_requests_is_429_with_its_detail() {
+        let (status, _, body) = render(Error::TooManyRequests(
+            "search_limit_reached",
+            "Try again later.".into(),
+        ))
+        .await;
+        assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(body["code"], "search_limit_reached");
+        assert_eq!(body["detail"], "Try again later.");
     }
 
     #[test]

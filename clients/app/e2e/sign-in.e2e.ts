@@ -1,7 +1,8 @@
 import { fileURLToPath } from "node:url";
 
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+
+import { expectAccessible, expectPageFillsTheScreen, focusedRole } from "./helpers";
 
 /**
  * An invented LinkedIn data export (Alex Demo at Example Org and Sample
@@ -9,36 +10,6 @@ import { expect, test, type Page } from "@playwright/test";
  * Certifications, Projects and Email Addresses CSVs.
  */
 const LINKEDIN_EXPORT = fileURLToPath(new URL("fixtures/linkedin-export.zip", import.meta.url));
-
-/** No WCAG 2.1 A/AA violation on the page as it is now. */
-async function expectAccessible(page: Page) {
-  const { violations } = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-    .analyze();
-  const found = violations.map(
-    ({ id, impact, nodes }) =>
-      `${id} (${impact ?? "?"}): ${nodes.map((node) => node.target.join(" ")).join(", ")}`,
-  );
-  expect(found).toEqual([]);
-}
-
-/** The ARIA role of the element that has the focus. */
-const focusedRole = (page: Page) =>
-  page.evaluate(() => document.activeElement?.getAttribute("role") ?? null);
-
-/** The page (`main`, by its test id) fills the screen's width, inside the viewport. */
-async function expectPageFillsTheScreen(page: Page, testId: string) {
-  const main = page.getByTestId(testId);
-  await expect(main).toBeInViewport();
-  const box = await main.boundingBox();
-  const width = page.viewportSize()?.width ?? 0;
-  expect(box).not.toBeNull();
-  if (box !== null) {
-    expect(box.x).toBeGreaterThanOrEqual(0);
-    expect(box.x + box.width).toBeLessThanOrEqual(width + 1);
-    expect(box.width).toBeGreaterThan(Math.min(300, width - 1));
-  }
-}
 
 test("an invited person signs in with Campbooks, lands on Today, imports their LinkedIn export, answers a few goals questions, finds Pipeline with ⌘K and signs out", async ({
   page,
@@ -57,8 +28,6 @@ test("an invited person signs in with Campbooks, lands on Today, imports their L
   await campbooks.click();
   await expect(page).toHaveURL(/:\d+\/$/);
   await expectPageFillsTheScreen(page, "today");
-  await expect(page.getByTestId("today-empty")).toBeVisible();
-  await expect(page.getByTestId("today-empty")).toBeInViewport();
   await expectAccessible(page);
 
   // Both projects share one stack and one person: start with no goals answered, as a new person would.
@@ -74,12 +43,22 @@ test("an invited person signs in with Campbooks, lands on Today, imports their L
   );
   expect(cleared).toBe(200);
 
-  // "Set up your profile" opens the import panel. With no AI model on this
-  // stack, it offers the LinkedIn export only; the server reads its CSVs.
-  await page.getByTestId("set-up-profile").click();
+  // Today follows where the person is. A first visit offers "Set up your
+  // profile", which opens the import panel; once another test has set a
+  // profile, Today asks for the next step instead, so go to the panel.
+  await expect(page.getByTestId("today-loading")).toHaveCount(0);
+  const setUp = page.getByTestId("set-up-profile");
+  if (await setUp.isVisible()) {
+    await expect(page.getByTestId("today-setup")).toBeInViewport();
+    await setUp.click();
+  } else {
+    await page.goto("/profile?import=new");
+  }
   await expect(page).toHaveURL(/\/profile\?import=new$/);
   await expectPageFillsTheScreen(page, "profile");
-  await expect(page.getByTestId("import-zip-only")).toBeVisible();
+  // This stack has an AI model (the fake), so PDFs and text are offered too;
+  // the LinkedIn export is the default, read from its CSVs on the server.
+  await expect(page.getByTestId("import-kinds")).toBeVisible();
   await page.getByTestId("import-file").setInputFiles(LINKEDIN_EXPORT);
   await page.getByTestId("import-submit").click();
 
@@ -139,7 +118,6 @@ test("an invited person signs in with Campbooks, lands on Today, imports their L
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/pipeline$/);
   await expectPageFillsTheScreen(page, "pipeline");
-  await expect(page.getByTestId("pipeline-empty")).toBeVisible();
 
   // Sign out from the account menu (the avatar in the phone header on a
   // phone): the sign-in page, and signed out for real.

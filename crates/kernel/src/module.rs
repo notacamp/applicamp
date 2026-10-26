@@ -5,6 +5,8 @@
 //! Routes are declared with `utoipa-axum` (`routes!`) so every endpoint lands
 //! in the OpenAPI document by construction.
 
+use std::{future::Future, pin::Pin};
+
 use utoipa_axum::router::OpenApiRouter;
 
 use crate::{jobs::Background, state::AppState};
@@ -27,3 +29,9 @@ impl std::fmt::Debug for Module {
             .finish_non_exhaustive()
     }
 }
+
+/// The future a **port** returns: a trait a module declares for what it
+/// needs from another module, implemented by the server (the only crate
+/// that composes modules). Modules never import each other; a port keeps
+/// it so while letting one ask another a question synchronously.
+pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;

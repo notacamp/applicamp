@@ -26,6 +26,7 @@ fn config(server: &MockServer, daily_tokens: Option<u64>) -> AiConfig {
             .with_api_key("sk-test"),
         ),
         daily_tokens,
+        ..AiConfig::default()
     }
 }
 
@@ -103,6 +104,7 @@ async fn a_busy_provider_is_retried_and_the_call_is_counted(db: PgPool) {
     assert_eq!(body["model"], "test/model");
     assert_eq!(body["stream"], false);
     assert_eq!(body["messages"][0]["role"], "system");
+    assert_eq!(body["usage"]["include"], true, "the cost is asked for");
     assert_eq!(body["response_format"]["type"], "json_schema");
     assert_eq!(body["response_format"]["json_schema"]["name"], "answer");
 
@@ -242,4 +244,164 @@ async fn an_unconfigured_role_sends_nothing(db: PgPool) {
         .unwrap_err();
     assert!(matches!(err, Error::NotConfigured(_)), "{err}");
     assert_eq!(applicamp_kernel::Error::from(err).code(), "ai_unavailable");
+}
+
+fn completion_costing(content: &str, cost: f64) -> serde_json::Value {
+    let mut body = completion(content);
+    body["usage"]["cost"] = json!(cost);
+    body
+}
+
+async fn spent_usd(db: &PgPool, account: Uuid) -> f64 {
+    sqlx::query_scalar(
+        "SELECT coalesce(sum(cost_usd), 0)::float8 FROM ai.usage WHERE account_id = $1",
+    )
+    .bind(account)
+    .fetch_one(db)
+    .await
+    .unwrap()
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_providers_cost_is_recorded_and_returned(db: PgPool) {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(completion_costing("{}", 0.000_42)))
+        .mount(&server)
+        .await;
+    let account = Uuid::now_v7();
+    let now = Utc::now();
+    let gateway = gateway(config(&server, None));
+    let answer = gateway
+        .complete(
+            Caller {
+                db: &db,
+                account,
+                now,
+            },
+            request(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(answer.cost_usd, Some(0.000_42));
+    assert!((spent_usd(&db, account).await - 0.000_42).abs() < 1e-12);
+    let spend = gateway.spend(&db, account, now).await.unwrap();
+    assert!(
+        (spend.month_eur - 0.000_42 * 0.92).abs() < 1e-9,
+        "{spend:?}"
+    );
+    assert_eq!(spend.month_limit_eur, Some(3.0));
+    let instance = gateway.instance_spend(&db, now).await.unwrap();
+    assert_eq!(instance.calls, 1);
+    assert_eq!(instance.limit_eur, Some(15.0));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn without_a_cost_the_price_table_counts(db: PgPool) {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(completion("{}")))
+        .mount(&server)
+        .await;
+    let mut config = config(&server, None);
+    if let Some(provider) = config.complete.take() {
+        config.complete = Some(provider.with_price(1.0, 10.0));
+    }
+    let account = Uuid::now_v7();
+    let answer = gateway(config)
+        .complete(
+            Caller {
+                db: &db,
+                account,
+                now: Utc::now(),
+            },
+            request(),
+        )
+        .await
+        .unwrap();
+    // 120 tokens in at $1/M, 30 out at $10/M.
+    let expected = (120.0 + 300.0) / 1_000_000.0;
+    assert!((answer.cost_usd.unwrap() - expected).abs() < 1e-12);
+    assert!((spent_usd(&db, account).await - expected).abs() < 1e-12);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn over_a_spending_limit_nothing_is_sent(db: PgPool) {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(completion_costing("{}", 0.05)))
+        .mount(&server)
+        .await;
+    let mut config = config(&server, None);
+    config.budget.account_monthly_eur = Some(0.10);
+    config.budget.usd_to_eur = Some(1.0);
+    if let Some(provider) = config.complete.take() {
+        // Worst case of `request()`: a few tokens in, 100 out at $100/M = $0.01.
+        config.complete = Some(provider.with_price(1.0, 100.0));
+    }
+    let gateway = gateway(config);
+    let account = Uuid::now_v7();
+    let now = Utc::now();
+    let caller = Caller {
+        db: &db,
+        account,
+        now,
+    };
+    gateway.complete(caller, request()).await.unwrap();
+    gateway.complete(caller, request()).await.unwrap();
+    // $0.10 spent: the next one's worst case would cross the month's limit.
+    let err = gateway.complete(caller, request()).await.unwrap_err();
+    assert!(
+        matches!(
+            err,
+            Error::OverBudget {
+                limit: crate::usage::Limit::AccountMonth
+            }
+        ),
+        "{err}"
+    );
+    assert_eq!(
+        applicamp_kernel::Error::from(err).code(),
+        "ai_budget_reached"
+    );
+    assert_eq!(server.received_requests().await.unwrap().len(), 2);
+    // Another account still has its own month, under the instance's limit.
+    gateway
+        .complete(
+            Caller {
+                db: &db,
+                account: Uuid::now_v7(),
+                now,
+            },
+            request(),
+        )
+        .await
+        .unwrap();
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_refused_call_costs_nothing(db: PgPool) {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(400))
+        .mount(&server)
+        .await;
+    let account = Uuid::now_v7();
+    gateway(config(&server, None))
+        .complete(
+            Caller {
+                db: &db,
+                account,
+                now: Utc::now(),
+            },
+            request(),
+        )
+        .await
+        .unwrap_err();
+    let rows: i64 = sqlx::query_scalar("SELECT count(*) FROM ai.usage WHERE account_id = $1")
+        .bind(account)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    assert_eq!(rows, 0, "the reservation is released");
 }

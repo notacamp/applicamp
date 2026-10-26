@@ -24,5 +24,5 @@ pub use config::Config;
 pub use error::{Error, Problem, Result};
 pub use events::{DomainEvent, Event, EventBus, EventHandler};
 pub use jobs::{Background, Job, JobContext, JobError};
-pub use module::Module;
+pub use module::{BoxFuture, Module};
 pub use state::AppState;

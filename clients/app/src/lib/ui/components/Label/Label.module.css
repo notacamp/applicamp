@@ -1,0 +1,45 @@
+.label {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0 var(--space-1-5);
+  border-radius: var(--radius-sm);
+  background: var(--tag-gray);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.label[data-hue="brown"] {
+  background: var(--tag-brown);
+}
+
+.label[data-hue="orange"] {
+  background: var(--tag-orange);
+}
+
+.label[data-hue="yellow"] {
+  background: var(--tag-yellow);
+}
+
+.label[data-hue="green"] {
+  background: var(--tag-green);
+}
+
+.label[data-hue="blue"] {
+  background: var(--tag-blue);
+}
+
+.label[data-hue="purple"] {
+  background: var(--tag-purple);
+}
+
+.label[data-hue="pink"] {
+  background: var(--tag-pink);
+}
+
+.label[data-hue="red"] {
+  background: var(--tag-red);
+}

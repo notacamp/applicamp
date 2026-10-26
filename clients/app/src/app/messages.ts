@@ -5,10 +5,18 @@ import identityEn from "~/modules/identity/i18n/en.json";
 import identityEs from "~/modules/identity/i18n/es-ES.json";
 import identityFr from "~/modules/identity/i18n/fr.json";
 import identityPt from "~/modules/identity/i18n/pt-PT.json";
+import pipelineEn from "~/modules/pipeline/i18n/en.json";
+import pipelineEs from "~/modules/pipeline/i18n/es-ES.json";
+import pipelineFr from "~/modules/pipeline/i18n/fr.json";
+import pipelinePt from "~/modules/pipeline/i18n/pt-PT.json";
 import profileEn from "~/modules/profile/i18n/en.json";
 import profileEs from "~/modules/profile/i18n/es-ES.json";
 import profileFr from "~/modules/profile/i18n/fr.json";
 import profilePt from "~/modules/profile/i18n/pt-PT.json";
+import sourcesEn from "~/modules/sources/i18n/en.json";
+import sourcesEs from "~/modules/sources/i18n/es-ES.json";
+import sourcesFr from "~/modules/sources/i18n/fr.json";
+import sourcesPt from "~/modules/sources/i18n/pt-PT.json";
 
 import en from "./i18n/en.json";
 import es from "./i18n/es-ES.json";
@@ -24,5 +32,7 @@ export const NAMESPACES: Record<string, Record<Locale, Messages>> = {
   shell: { en, "pt-PT": pt, "es-ES": es, fr },
   identity: { en: identityEn, "pt-PT": identityPt, "es-ES": identityEs, fr: identityFr },
   profile: { en: profileEn, "pt-PT": profilePt, "es-ES": profileEs, fr: profileFr },
+  pipeline: { en: pipelineEn, "pt-PT": pipelinePt, "es-ES": pipelineEs, fr: pipelineFr },
+  sources: { en: sourcesEn, "pt-PT": sourcesPt, "es-ES": sourcesEs, fr: sourcesFr },
   ...UI_NAMESPACES,
 };

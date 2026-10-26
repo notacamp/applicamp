@@ -11,6 +11,9 @@
 //! - **Goals** ([`goals::Goals`]): what they want next, answered one
 //!   question at a time and versioned.
 //!
+//! - **Matching** ([`matching`]): how far a person is, and what a job search
+//!   matches against, for the ports the server wires to other modules.
+//!
 //! Publishes `profile.updated` (ids only) whenever a profile changes and
 //! `profile.goals_updated` (id and version) whenever the goals do.
 
@@ -19,6 +22,7 @@
 pub mod events;
 pub mod features;
 pub mod goals;
+pub mod matching;
 pub mod schema;
 
 use applicamp_ai::Gateway;

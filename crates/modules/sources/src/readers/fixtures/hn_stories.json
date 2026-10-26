@@ -1,0 +1,69 @@
+{
+  "exhaustive": {
+    "nbHits": true,
+    "typo": true
+  },
+  "exhaustiveNbHits": true,
+  "exhaustiveTypo": true,
+  "hitsPerPage": 5,
+  "nbHits": 3,
+  "nbPages": 1,
+  "page": 0,
+  "params": "tags=story%2Cauthor_whoishiring&hitsPerPage=5",
+  "processingTimeMS": 1,
+  "query": "",
+  "serverTimeMS": 103,
+  "hits": [
+    {
+      "_tags": [
+        "story",
+        "author_whoishiring",
+        "story_49922569",
+        "ask_hn"
+      ],
+      "author": "whoishiring",
+      "created_at": "2026-10-01T15:02:07Z",
+      "created_at_i": 1790866927,
+      "num_comments": 392,
+      "objectID": "49922569",
+      "points": 277,
+      "story_id": 49922569,
+      "title": "Ask HN: Who is hiring? (October 2026)",
+      "updated_at": "2026-10-26T14:21:35Z"
+    },
+    {
+      "_tags": [
+        "story",
+        "author_whoishiring",
+        "story_49922568",
+        "ask_hn"
+      ],
+      "author": "whoishiring",
+      "created_at": "2026-10-01T15:02:07Z",
+      "created_at_i": 1790866927,
+      "num_comments": 702,
+      "objectID": "49922568",
+      "points": 136,
+      "story_id": 49922568,
+      "title": "Ask HN: Who wants to be hired? (October 2026)",
+      "updated_at": "2026-10-26T10:06:34Z"
+    },
+    {
+      "_tags": [
+        "story",
+        "author_whoishiring",
+        "story_49522897",
+        "ask_hn"
+      ],
+      "author": "whoishiring",
+      "created_at": "2026-09-01T15:01:17Z",
+      "created_at_i": 1788274877,
+      "num_comments": 389,
+      "objectID": "49522897",
+      "points": 254,
+      "story_id": 49522897,
+      "title": "Ask HN: Who is hiring? (September 2026)",
+      "updated_at": "2026-10-24T18:19:00Z"
+    }
+  ]
+}

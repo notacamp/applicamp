@@ -1,0 +1,66 @@
+{
+  "exhaustive": {
+    "nbHits": true,
+    "typo": true
+  },
+  "exhaustiveNbHits": true,
+  "exhaustiveTypo": true,
+  "hitsPerPage": 5,
+  "nbHits": 3,
+  "nbPages": 1,
+  "page": 0,
+  "params": "tags=comment%2Cstory_49922569&hitsPerPage=5",
+  "processingTimeMS": 1,
+  "query": "",
+  "serverTimeMS": 1,
+  "hits": [
+    {
+      "_tags": [
+        "comment",
+        "author_example-author",
+        "story_49922569"
+      ],
+      "author": "example-author",
+      "comment_text": "Example Co | Senior Backend Engineer | Lisbon, Portugal | REMOTE (EU) | Full-time | €80k–€100k<p>We build invoicing tools for freelancers. Rust, Postgres, React.<p>Apply: <a href=\"https:&#x2F;&#x2F;example.com&#x2F;jobs\" rel=\"nofollow\">https:&#x2F;&#x2F;example.com&#x2F;jobs</a>",
+      "created_at": "2026-10-02T09:12:00Z",
+      "created_at_i": 1790946720,
+      "objectID": "50200001",
+      "parent_id": 49922569,
+      "story_id": 49922569,
+      "story_title": "Ask HN: Who is hiring? (October 2026)",
+      "updated_at": "2026-10-02T09:12:00Z"
+    },
+    {
+      "_tags": [
+        "comment",
+        "author_example-author",
+        "story_49922569"
+      ],
+      "author": "example-author",
+      "comment_text": "Sample Labs | Machine Learning Engineer, Data Engineer | Berlin | ONSITE | Visa sponsorship<p>We help farms predict yields from satellite images. Python, PyTorch.<p>Email jobs at example.org",
+      "created_at": "2026-10-01T16:40:00Z",
+      "created_at_i": 1790872800,
+      "objectID": "50200002",
+      "parent_id": 49922569,
+      "story_id": 49922569,
+      "story_title": "Ask HN: Who is hiring? (October 2026)",
+      "updated_at": "2026-10-01T16:40:00Z"
+    },
+    {
+      "_tags": [
+        "comment",
+        "author_example-author",
+        "story_49922569"
+      ],
+      "author": "example-author",
+      "comment_text": "Is the role open to people based in the UK?",
+      "created_at": "2026-10-03T11:00:00Z",
+      "created_at_i": 1791039600,
+      "objectID": "50200003",
+      "parent_id": 50200001,
+      "story_id": 49922569,
+      "story_title": "Ask HN: Who is hiring? (October 2026)",
+      "updated_at": "2026-10-03T11:00:00Z"
+    }
+  ]
+}

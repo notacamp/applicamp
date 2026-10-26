@@ -55,6 +55,14 @@ function Frame() {
   useShortcut("nav.pipeline", go("/pipeline"));
   useShortcut("nav.agents", go("/agents"));
   useShortcut("nav.profile", go("/profile"));
+  // ⌘K's "Search now" and "New opportunity" (and their keys) from any page:
+  // the Pipeline starts the search, or opens New, once it is shown.
+  useShortcut("sources.start", () => {
+    void navigate({ to: "/pipeline", search: { run: "search" } });
+  });
+  useShortcut("pipeline.add", () => {
+    void navigate({ to: "/pipeline", search: { run: "add" } });
+  });
   useShortcut("command.open", () => {
     setSheetOpen(false);
     setMenuOpen((open) => !open);

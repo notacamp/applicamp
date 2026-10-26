@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { writePref } from "~/lib/storage/prefs";
 
+import { estimate, todayAnswer } from "../../test/pipeline";
 import { DEMO_ME, renderApp, SIGNED_OUT, stubApi, type StubAnswer } from "../../test/render";
 
 /** The element a `Tagged` test handle wraps (a nav item, a page). */
@@ -16,7 +17,14 @@ function tagged(testId: string): HTMLElement {
 }
 
 function signedIn(extra: Record<string, StubAnswer | (() => StubAnswer)> = {}) {
-  return stubApi({ "GET /api/v1/me": { body: DEMO_ME }, ...extra });
+  return stubApi({
+    "GET /api/v1/me": { body: DEMO_ME },
+    "GET /api/v1/today": { body: todayAnswer("set_up_profile") },
+    "GET /api/v1/opportunities": { body: { opportunities: [] } },
+    "GET /api/v1/searches/latest": { body: { search: null } },
+    "GET /api/v1/searches/estimate": { body: estimate() },
+    ...extra,
+  });
 }
 
 describe("the app", () => {
@@ -65,7 +73,9 @@ describe("the app", () => {
 
     const today = await screen.findByTestId("today");
     expect(today).toHaveTextContent("Today");
-    expect(screen.getByTestId("today-empty")).toHaveTextContent("Nothing needs you yet");
+    expect(await screen.findByTestId("today-setup")).toHaveTextContent(
+      "First, tell the agents who you are",
+    );
     expect(tagged("nav-today")).toHaveAttribute("aria-current", "page");
     expect(tagged("nav-pipeline")).not.toHaveAttribute("aria-current");
 

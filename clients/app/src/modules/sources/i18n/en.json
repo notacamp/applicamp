@@ -1,0 +1,45 @@
+{
+  "searchNow": "Search now",
+  "starting": "Starting…",
+  "confirm": {
+    "title": "Search the job boards now?",
+    "body": "This search will cost about {{cost}} of AI to score about {{jobs}} jobs. Go ahead?",
+    "go": "Search",
+    "cancel": "Not now"
+  },
+  "progress": {
+    "label": "Searching the job boards",
+    "queued": "Starting the search…",
+    "running": "{{fetched}} jobs read · {{scored}} scored · {{added}} added"
+  },
+  "line": {
+    "running": "Searching the job boards now…",
+    "failed": "The last search failed. Try again in a while.",
+    "counts": "{{fetched}} jobs read, {{added}} matched",
+    "lastNight": "Last night: {{counts}}",
+    "today": "Today at {{time}}: {{counts}}",
+    "on": "{{date}}: {{counts}}",
+    "cost": "AI {{cost}}"
+  },
+  "stopped": {
+    "ai_budget_reached": "Stopped at the AI spending limit. The jobs already scored are kept.",
+    "ai_unavailable": "Stopped: no AI model is set up to score jobs.",
+    "ai_failed": "Stopped: the AI model didn’t answer. The jobs already scored are kept.",
+    "no_profile": "Stopped: set up your profile and goals first.",
+    "sources_failed": "Stopped: the job boards couldn’t be read."
+  },
+  "errors": {
+    "profile_needed": "Set up your profile and answer a few goals first: the search scores jobs against them.",
+    "search_running": "A search is already running.",
+    "search_limit_reached": "That’s the search limit for now: 3 searches a day, one every 15 minutes.",
+    "ai_unavailable": "Searching needs an AI model, and none is set up here.",
+    "ai_budget_reached": "The AI spending limit is reached, so no search can run until it resets.",
+    "ai_daily_limit_reached": "You’ve used today’s AI allowance. Try again tomorrow.",
+    "ai_failed": "The AI model didn’t answer. Try again shortly.",
+    "generic": "The search couldn’t start. Try again."
+  },
+  "spend": {
+    "month": "AI this month: {{spent}} of {{limit}}",
+    "monthNoLimit": "AI this month: {{spent}}"
+  }
+}

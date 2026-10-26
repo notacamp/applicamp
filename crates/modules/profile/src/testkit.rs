@@ -187,6 +187,7 @@ pub(crate) fn gateway(server: &MockServer, daily_tokens: Option<u64>) -> Gateway
             "test/model",
         )),
         daily_tokens,
+        ..AiConfig::default()
     })
     .unwrap()
     .with_retry(RetryPolicy {

@@ -1,0 +1,101 @@
+{
+  "loading": "Loading the pipeline…",
+  "loadFailed": "The pipeline couldn’t be loaded.",
+  "retry": "Try again",
+  "untitled": "Untitled role",
+  "views": {
+    "label": "View",
+    "table": "All opportunities",
+    "board": "By stage"
+  },
+  "filter": {
+    "search": "Search the pipeline",
+    "stage": "Stage",
+    "allStages": "All stages",
+    "newOnly": "Showing the new matches only.",
+    "showAll": "Show everything"
+  },
+  "columns": {
+    "role": "Role",
+    "company": "Company",
+    "match": "Match",
+    "stage": "Stage",
+    "source": "Source",
+    "nextStep": "Next step",
+    "updated": "Updated"
+  },
+  "stages": {
+    "found": "Found",
+    "shortlisted": "Shortlisted",
+    "applying": "Applying",
+    "applied": "Applied",
+    "talking": "Talking",
+    "interview": "Interview",
+    "offer": "Offer",
+    "closed": "Closed"
+  },
+  "sources": {
+    "greenhouse": "Greenhouse",
+    "lever": "Lever",
+    "ashby": "Ashby",
+    "arbeitnow": "Arbeitnow",
+    "hn": "HN “Who is hiring”",
+    "link": "Link"
+  },
+  "workModes": {
+    "remote": "Remote",
+    "hybrid": "Hybrid",
+    "onsite": "On site"
+  },
+  "empty": {
+    "title": "No opportunities yet",
+    "body": "Jobs land here with how well they match your profile, their stage and the next step, so nothing slips. Search the job boards now, or add a job by its link.",
+    "filteredTitle": "Nothing here",
+    "filteredBody": "No opportunity matches these filters."
+  },
+  "board": {
+    "empty": "Nothing here"
+  },
+  "new": {
+    "button": "New",
+    "title": "Add a job by its link",
+    "description": "Paste the link to a posting. Greenhouse, Lever and Ashby postings are read for you; for any other site, you type the role and the company.",
+    "url": "Link to the posting",
+    "add": "Add",
+    "adding": "Adding…",
+    "cancel": "Cancel",
+    "invalid": "Paste a link that starts with https://.",
+    "failed": "The job couldn’t be added. Try again."
+  },
+  "peek": {
+    "eyebrow": "Opportunity",
+    "close": "Close",
+    "role": "Role",
+    "addRole": "Type the role",
+    "company": "Company",
+    "addCompany": "Type the company",
+    "where": "Where",
+    "addWhere": "Type where it is",
+    "unknown": "Not said",
+    "pay": "Pay",
+    "match": "Match",
+    "notScored": "Not scored",
+    "stage": "Stage",
+    "source": "Source",
+    "nextStep": "Next step",
+    "addNextStep": "Add the next step",
+    "posted": "Posted",
+    "why": "Why it matches",
+    "gaps": "Gaps",
+    "notes": "Notes",
+    "addNotes": "Add notes only you see",
+    "charactersLeft": "{{left}} characters left",
+    "description": "From the posting",
+    "open": "Open the posting",
+    "notForMe": "Not for me",
+    "dismissed": "Not for me · {{title}}",
+    "save": "Save",
+    "cancel": "Cancel",
+    "saveFailed": "That change couldn’t be saved. Try again."
+  }
+}

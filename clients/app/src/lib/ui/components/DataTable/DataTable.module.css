@@ -1,0 +1,73 @@
+/* The prototype's database table: hairlines, no boxes, a quiet header. */
+.scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  font-size: var(--text-md);
+}
+
+.head {
+  padding: var(--space-1-5) var(--space-2);
+  border-bottom: var(--border-width) solid var(--border-subtle);
+  color: var(--text-tertiary);
+  font-weight: var(--weight-regular);
+  text-align: start;
+  white-space: nowrap;
+}
+
+.head + .head,
+.cell + .cell {
+  border-inline-start: var(--border-width) solid var(--border-subtle);
+}
+
+.row {
+  position: relative;
+}
+
+.cell {
+  padding: var(--space-1-5) var(--space-2);
+  border-bottom: var(--border-width) solid var(--border-subtle);
+  color: var(--text-primary);
+  vertical-align: top;
+}
+
+.cell[data-nowrap] {
+  white-space: nowrap;
+}
+
+.row:hover .cell,
+.row[data-selected] .cell {
+  background: var(--surface-hover);
+}
+
+.open {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: var(--weight-medium);
+  text-align: start;
+  cursor: pointer;
+}
+
+/* The open button covers the whole row, so the row is one target. */
+.open::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.open:focus-visible {
+  outline: none;
+}
+
+.open:focus-visible::after {
+  outline: var(--focus-width) solid var(--focus-ring);
+  outline-offset: calc(-1 * var(--focus-width));
+}

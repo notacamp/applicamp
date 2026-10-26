@@ -41,3 +41,27 @@ Every model call is metered **in money**, not only tokens, and stopped before a 
 
 ## Testing
 Readers against recorded fixtures (wiremock) per source; hard limits; pre-rank; scoring with a fake complete endpoint (incl. a hostile description trying to inject instructions — the output still parses and the job is just scored); dedupe; add-by-link incl. a refused non-ATS host; e2e: Search now with fake sources/model → Found rows appear → open peek → move to Shortlisted (desktop + phone).
+
+## Implementation notes (where the build differs from the plan above)
+- **Modules talk through ports.** `sources` and `pipeline` each declare a `Neighbours` port
+  (what they need from the profile, the pipeline or the sources); the server implements them
+  (`crates/server/src/wiring.rs`). No module imports another; no `architecture.toml` entry.
+- **The score cache is `sources.scores`**, beside the search that fills it, so the search asks
+  the pipeline only "what do you have" and "add these". The profile's version is when it last
+  changed (`profile.profiles.updated_at`); the goals' is their version number.
+- **The opportunities' `match` column is `match_score`** (the API field is `match`).
+- **Body caps.** Greenhouse's list is read without `content` (big boards pass 2 MB with it); the
+  description is read per job only for the 40 kept. Arbeitnow's pages hold 300 jobs (about
+  2.3 MB), so they are capped at 4 MB; every other answer at 2 MB. HN comments are read 1 000 a
+  page.
+- **Worst case.** A call's worst case is its prompt (a token per three characters) plus its
+  whole `max_tokens` answer at the model's price; it is reserved in `ai.usage` before the call
+  under one instance-wide lock, then settled at the provider's cost. A call that timed out keeps
+  its worst case (it may have been charged); one the provider refused costs nothing. A model the
+  price table does not know is priced at $3 / $15 per million tokens unless configured.
+- **Estimate.** The jobs the last search kept (at most 40), in batches of ten, at the average
+  cost of this person's past batches (or the price table's for a typical batch).
+- **Background work.** The kernel gained a per-kind lease (a search may run 15 minutes), jobs
+  that read what their module was composed with, and a unique "schedule the next one" enqueue
+  for the nightly search; the server runs four workers so a search never holds up sign-outs.
+- **Search limits** answer 429 `search_limit_reached` (a new `TooManyRequests` problem).

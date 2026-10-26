@@ -10,7 +10,7 @@
 //! Event deliveries ([`crate::events`]) are jobs too: one per consumer,
 //! enqueued with the event.
 
-use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc, time::Duration};
+use std::{any::Any, collections::HashMap, future::Future, pin::Pin, sync::Arc, time::Duration};
 
 use serde::{Serialize, de::DeserializeOwned};
 use sqlx::{PgConnection, PgPool};
@@ -23,7 +23,8 @@ use crate::events::{DomainEvent, Event, EventBus, EventHandler};
 pub const DEFAULT_MAX_ATTEMPTS: u32 = 10;
 /// The queue of jobs that name none.
 pub const DEFAULT_QUEUE: &str = "default";
-/// How long a claimed job is leased to its worker (and may run).
+/// How long a claimed job is leased to its worker (and may run), unless its
+/// kind says otherwise ([`Job::LEASE`]).
 pub const LEASE: Duration = Duration::from_secs(60);
 /// How long an idle worker waits before it looks again.
 pub const POLL_INTERVAL: Duration = Duration::from_secs(2);
@@ -68,6 +69,20 @@ pub struct JobContext {
     pub attempt: u32,
     /// The event a delivery carries.
     pub event_id: Option<Uuid>,
+    /// What the job's module was composed with, when it was registered with
+    /// [`Background::job_with`]; read it with [`deps`](Self::deps).
+    pub deps: Option<Arc<dyn Any + Send + Sync>>,
+}
+
+impl JobContext {
+    /// What the job's module was composed with, as registered with
+    /// [`Background::job_with`]. `None` for a job registered without it, or
+    /// with something of another type.
+    pub fn deps<D: Any + Send + Sync>(&self) -> Option<&D> {
+        self.deps
+            .as_deref()
+            .and_then(|deps| deps.downcast_ref::<D>())
+    }
 }
 
 /// A kind of background work. The value is the payload, stored as JSON:
@@ -79,6 +94,8 @@ pub trait Job: Serialize + DeserializeOwned + Send + Sync + 'static {
     const QUEUE: &'static str = DEFAULT_QUEUE;
     /// Attempts before it is marked failed.
     const MAX_ATTEMPTS: u32 = DEFAULT_MAX_ATTEMPTS;
+    /// How long one attempt may run (and its worker holds the lease).
+    const LEASE: Duration = LEASE;
 
     /// Do the work.
     fn run(self, ctx: JobContext) -> impl Future<Output = Result<(), JobError>> + Send;
@@ -93,6 +110,7 @@ struct Entry {
     kind: &'static str,
     queue: &'static str,
     max_attempts: u32,
+    lease: Duration,
     /// For an event handler, the event it consumes.
     event: Option<&'static str>,
     runner: Runner,
@@ -125,18 +143,33 @@ impl Background {
 
     /// Register job kind `J`.
     #[must_use]
-    pub fn job<J: Job>(mut self) -> Self {
-        let runner: Runner = Arc::new(|ctx: JobContext, payload: serde_json::Value| -> BoxFuture {
-            Box::pin(async move {
-                let job: J = serde_json::from_value(payload)
-                    .map_err(|e| JobError::Permanent(format!("payload: {e}")))?;
-                job.run(ctx).await
-            })
-        });
+    pub fn job<J: Job>(self) -> Self {
+        self.register::<J>(None)
+    }
+
+    /// Register job kind `J`, which reads `deps` (what its module was
+    /// composed with: a gateway, a client) through [`JobContext::deps`].
+    #[must_use]
+    pub fn job_with<J: Job, D: Any + Send + Sync>(self, deps: D) -> Self {
+        self.register::<J>(Some(Arc::new(deps)))
+    }
+
+    fn register<J: Job>(mut self, deps: Option<Arc<dyn Any + Send + Sync>>) -> Self {
+        let runner: Runner = Arc::new(
+            move |mut ctx: JobContext, payload: serde_json::Value| -> BoxFuture {
+                ctx.deps.clone_from(&deps);
+                Box::pin(async move {
+                    let job: J = serde_json::from_value(payload)
+                        .map_err(|e| JobError::Permanent(format!("payload: {e}")))?;
+                    job.run(ctx).await
+                })
+            },
+        );
         self.entries.push(Entry {
             kind: J::NAME,
             queue: J::QUEUE,
             max_attempts: J::MAX_ATTEMPTS,
+            lease: J::LEASE,
             event: None,
             runner,
         });
@@ -160,6 +193,7 @@ impl Background {
             kind: H::NAME,
             queue: H::QUEUE,
             max_attempts: H::MAX_ATTEMPTS,
+            lease: LEASE,
             event: Some(<H::Event as DomainEvent>::NAME),
             runner,
         });
@@ -304,6 +338,33 @@ pub async fn enqueue_at<J: Job>(
     Ok(id)
 }
 
+/// Enqueue `job` in `conn`'s transaction to run at `run_at`, unless a job
+/// of its kind is already waiting or running: a recurring job that
+/// schedules its next run. Whether it was enqueued. Concurrent callers are
+/// serialised on the kind, so two servers starting at once enqueue one.
+pub async fn enqueue_unique_at<J: Job>(
+    conn: &mut PgConnection,
+    job: &J,
+    run_at: chrono::DateTime<chrono::Utc>,
+) -> Result<bool, sqlx::Error> {
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtext($1))")
+        .bind(J::NAME)
+        .execute(&mut *conn)
+        .await?;
+    let waiting: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM kernel.jobs
+                         WHERE kind = $1 AND state IN ('pending', 'running'))",
+    )
+    .bind(J::NAME)
+    .fetch_one(&mut *conn)
+    .await?;
+    if waiting {
+        return Ok(false);
+    }
+    enqueue_at(conn, job, run_at).await?;
+    Ok(true)
+}
+
 /// A claimed job.
 #[derive(sqlx::FromRow)]
 struct Claimed {
@@ -363,17 +424,30 @@ impl Worker {
             // Claimed only among registered kinds; nothing to run.
             return Ok(true);
         };
+        if entry.lease != LEASE {
+            sqlx::query(
+                "UPDATE kernel.jobs SET locked_until = now() + make_interval(secs => $2)
+                  WHERE id = $1",
+            )
+            .bind(job.id)
+            .bind(entry.lease.as_secs_f64())
+            .execute(&self.db)
+            .await?;
+        }
         let ctx = JobContext {
             db: self.db.clone(),
             events: self.events.clone(),
             job_id: job.id,
             attempt: u32::try_from(job.attempts).unwrap_or(1),
             event_id: job.event_id,
+            deps: None,
         };
-        let outcome =
-            tokio::time::timeout(LEASE, (entry.runner)(ctx, std::mem::take(&mut job.payload)))
-                .await
-                .unwrap_or_else(|_| Err(JobError::Retry("timed out".into())));
+        let outcome = tokio::time::timeout(
+            entry.lease,
+            (entry.runner)(ctx, std::mem::take(&mut job.payload)),
+        )
+        .await
+        .unwrap_or_else(|_| Err(JobError::Retry("timed out".into())));
         self.finish(&job, entry.kind, outcome).await?;
         Ok(true)
     }
@@ -515,6 +589,26 @@ mod tests {
         }
     }
 
+    static WITH_DEPS: AtomicUsize = AtomicUsize::new(0);
+
+    #[derive(Serialize, Deserialize)]
+    struct UsesDeps;
+
+    #[derive(Debug)]
+    struct Composed(usize);
+
+    impl Job for UsesDeps {
+        const NAME: &'static str = "test.uses_deps";
+        const LEASE: Duration = Duration::from_secs(600);
+        async fn run(self, ctx: JobContext) -> Result<(), JobError> {
+            let deps = ctx
+                .deps::<Composed>()
+                .ok_or_else(|| JobError::Permanent("not composed".into()))?;
+            WITH_DEPS.fetch_add(deps.0, Ordering::SeqCst);
+            Ok(())
+        }
+    }
+
     #[derive(Debug, Serialize, Deserialize)]
     struct Happened {
         n: usize,
@@ -540,6 +634,7 @@ mod tests {
         let background = Background::new()
             .job::<Count>()
             .job::<Flaky>()
+            .job_with::<UsesDeps, _>(Composed(4))
             .on_event::<OnHappened>()
             .publishes::<Happened>();
         Arc::new(Registry::build(vec![("test", background)]).unwrap())
@@ -596,6 +691,42 @@ mod tests {
             .unwrap();
         assert!(worker.run_once().await.unwrap());
         assert_eq!(state_of(&db, id).await, ("succeeded".to_owned(), 1));
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_job_reads_what_it_was_composed_with(db: PgPool) {
+        let registry = registry();
+        let worker = Worker::new(db.clone(), Arc::clone(&registry), EventBus::new(registry));
+        let mut conn = db.acquire().await.unwrap();
+        let id = enqueue(&mut conn, &UsesDeps).await.unwrap();
+        drop(conn);
+        let before = WITH_DEPS.load(Ordering::SeqCst);
+        assert!(worker.run_once().await.unwrap());
+        assert_eq!(WITH_DEPS.load(Ordering::SeqCst), before + 4);
+        assert_eq!(state_of(&db, id).await, ("succeeded".to_owned(), 1));
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_unique_job_is_enqueued_once(db: PgPool) {
+        let later = chrono::Utc::now() + chrono::TimeDelta::hours(1);
+        let mut tx = db.begin().await.unwrap();
+        assert!(
+            enqueue_unique_at(&mut tx, &Count { by: 1 }, later)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !enqueue_unique_at(&mut tx, &Count { by: 1 }, later)
+                .await
+                .unwrap()
+        );
+        tx.commit().await.unwrap();
+        let waiting: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM kernel.jobs WHERE kind = 'test.count'")
+                .fetch_one(&db)
+                .await
+                .unwrap();
+        assert_eq!(waiting, 1);
     }
 
     #[sqlx::test(migrations = "../../migrations")]

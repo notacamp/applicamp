@@ -11,15 +11,31 @@
   "today": {
     "title": "Today",
     "lead": "What waits on you, every day. Agents work in the background; nothing leaves your name without your say.",
-    "emptyTitle": "Nothing needs you yet",
-    "emptyBody": "When agents find a job, prepare an application or draft a reply to a recruiter, it waits for you here. Start by telling them who you are and what you want next.",
-    "setUp": "Set up your profile"
+    "loading": "Loading…",
+    "loadFailed": "Today couldn’t be loaded.",
+    "retry": "Try again",
+    "setUpTitle": "First, tell the agents who you are",
+    "setUpBody": "When agents find a job, prepare an application or draft a reply to a recruiter, it waits for you here. Start by telling them who you are and what you want next.",
+    "setUp": "Set up your profile",
+    "goalsTitle": "Now, what do you want next?",
+    "goalsBody": "A few short questions about the roles, places and pay you want: searches keep to them. {{answered}} of {{total}} answered.",
+    "answerGoals": "Answer a few questions",
+    "searchTitle": "Ready for a first search",
+    "searchBody": "Your profile and goals are set. Search the job boards now: the good matches land in your Pipeline as Found, with why they match and their gaps.",
+    "matchesTitle": "New matches: {{count}}",
+    "matchesBody": "A search found jobs that fit your profile and goals. Open them, shortlist the ones you like, and say “Not for me” to the rest.",
+    "reviewMatches": "Review them",
+    "nothingTitle": "Nothing needs you yet",
+    "nothingBody": "No new matches since your last look. Another search runs tonight, or search again now.",
+    "strength": {
+      "add_headline": "Add a headline to your profile: it sharpens every match.",
+      "add_work": "Add your positions to your profile: matches are scored against them.",
+      "add_skills": "Add your skills to your profile: matches are scored against them."
+    }
   },
   "pipeline": {
     "title": "Pipeline",
-    "lead": "Every opportunity agents find or you add, from first match to offer.",
-    "emptyTitle": "No opportunities yet",
-    "emptyBody": "Jobs land here with how well they match your profile, their stage and the next step, so nothing slips."
+    "lead": "Every opportunity agents find or you add, from first match to offer."
   },
   "agents": {
     "title": "Agents",

@@ -7,5 +7,11 @@
   },
   "command": {
     "open": "Menu de comandos"
+  },
+  "sources": {
+    "start": "Pesquisar agora"
+  },
+  "pipeline": {
+    "add": "Nova oportunidade"
   }
 }

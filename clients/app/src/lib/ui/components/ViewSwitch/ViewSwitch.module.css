@@ -1,0 +1,38 @@
+/* The prototype's database views: quiet tabs on a hairline, the pressed one underlined. */
+.views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-0-5);
+  border-bottom: var(--border-width) solid var(--border-subtle);
+}
+
+.view {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  min-height: var(--size-control-md);
+  margin-bottom: calc(-1 * var(--border-width));
+  padding: var(--space-1-5) var(--space-2);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-md);
+  cursor: pointer;
+}
+
+.view:hover {
+  color: var(--text-primary);
+}
+
+.view[aria-pressed="true"] {
+  border-bottom-color: var(--text-primary);
+  color: var(--text-primary);
+  font-weight: var(--weight-medium);
+}
+
+.view:focus-visible {
+  outline: var(--focus-width) solid var(--focus-ring);
+  outline-offset: calc(-1 * var(--focus-width));
+}

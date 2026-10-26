@@ -1,0 +1,60 @@
+{
+  "absolute_url": "https://job-boards.greenhouse.io/exampleco/jobs/7001001",
+  "data_compliance": [
+    {
+      "type": "gdpr",
+      "requires_consent": true,
+      "requires_processing_consent": false,
+      "requires_retention_consent": true,
+      "retention_period": 365,
+      "demographic_data_consent_applies": false
+    }
+  ],
+  "internal_job_id": 3500001,
+  "location": {
+    "name": "Remote - Europe"
+  },
+  "metadata": [
+    {
+      "id": 64103,
+      "name": "Order",
+      "value": "0.0",
+      "value_type": "number"
+    },
+    {
+      "id": 1026531,
+      "name": "Team",
+      "value": "Platform",
+      "value_type": "single_select"
+    }
+  ],
+  "id": 7001001,
+  "updated_at": "2026-10-20T05:11:24-04:00",
+  "requisition_id": "101",
+  "title": "Senior Backend Engineer",
+  "company_name": "Example Co",
+  "first_published": "2026-10-15T10:14:35-04:00",
+  "language": "en",
+  "application_deadline": null,
+  "ai_disclaimer": null,
+  "ai_opt_out_request_url": null,
+  "include_ai_disclaimer": false,
+  "content": "&lt;div class=&quot;content-intro&quot;&gt;&lt;h3&gt;Who we are&lt;/h3&gt;&lt;p&gt;Example Co builds tools that help small teams keep their books tidy.&lt;/p&gt;&lt;/div&gt;&lt;script&gt;alert(&quot;not text&quot;)&lt;/script&gt;&lt;h3&gt;What you will do&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;Design and run the services behind our API &amp;amp; webhooks.&lt;/li&gt;&lt;li&gt;Keep Postgres fast and boring.&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;We work remotely across Europe, with two meet-ups a year.&lt;/p&gt;&lt;div class=&quot;content-pay-transparency&quot;&gt;&lt;div class=&quot;pay-input&quot;&gt;&lt;div class=&quot;title&quot;&gt;Salary range&lt;/div&gt;&lt;div class=&quot;pay-range&quot;&gt;&lt;span&gt;€70,000&lt;/span&gt;&lt;span class=&quot;divider&quot;&gt;&amp;mdash;&lt;/span&gt;&lt;span&gt;€90,000 EUR&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;",
+  "departments": [
+    {
+      "id": 19392,
+      "name": "Engineering",
+      "child_ids": [],
+      "parent_id": null
+    }
+  ],
+  "offices": [
+    {
+      "id": 87938,
+      "name": "Remote - Europe",
+      "location": null,
+      "child_ids": [],
+      "parent_id": 84513
+    }
+  ]
+}

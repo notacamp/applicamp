@@ -11,15 +11,31 @@
   "today": {
     "title": "Hoje",
     "lead": "O que espera por si, todos os dias. Os agentes trabalham em segundo plano; nada sai em seu nome sem a sua autorização.",
-    "emptyTitle": "Ainda nada precisa de si",
-    "emptyBody": "Quando os agentes encontrarem uma oferta, prepararem uma candidatura ou escreverem uma resposta a um recrutador, fica aqui à sua espera. Comece por lhes dizer quem é e o que procura a seguir.",
-    "setUp": "Configurar o perfil"
+    "loading": "A carregar…",
+    "loadFailed": "Não foi possível carregar o Hoje.",
+    "retry": "Tentar de novo",
+    "setUpTitle": "Primeiro, diga aos agentes quem é",
+    "setUpBody": "Quando os agentes encontrarem uma oferta, prepararem uma candidatura ou escreverem uma resposta a um recrutador, fica aqui à sua espera. Comece por lhes dizer quem é e o que procura a seguir.",
+    "setUp": "Configurar o seu perfil",
+    "goalsTitle": "Agora, o que procura a seguir?",
+    "goalsBody": "Algumas perguntas curtas sobre as funções, os locais e a remuneração que procura: as pesquisas respeitam-nas. {{answered}} de {{total}} respondidas.",
+    "answerGoals": "Responder a algumas perguntas",
+    "searchTitle": "Pronto para uma primeira pesquisa",
+    "searchBody": "O seu perfil e os seus objetivos estão definidos. Pesquise agora nos sites de emprego: as boas correspondências chegam às Oportunidades como Encontradas, com o porquê e as lacunas.",
+    "matchesTitle": "Novas correspondências: {{count}}",
+    "matchesBody": "Uma pesquisa encontrou ofertas que encaixam no seu perfil e nos seus objetivos. Abra-as, pré-selecione as que lhe interessam e diga “Não é para mim” às restantes.",
+    "reviewMatches": "Ver as correspondências",
+    "nothingTitle": "Ainda nada precisa de si",
+    "nothingBody": "Não há novas correspondências desde a última vez. Esta noite corre outra pesquisa, ou pesquise de novo agora.",
+    "strength": {
+      "add_headline": "Acrescente um título ao seu perfil: torna todas as correspondências mais precisas.",
+      "add_work": "Acrescente as suas posições ao perfil: as correspondências são avaliadas com base nelas.",
+      "add_skills": "Acrescente as suas competências ao perfil: as correspondências são avaliadas com base nelas."
+    }
   },
   "pipeline": {
     "title": "Oportunidades",
-    "lead": "Todas as oportunidades que os agentes encontram ou que acrescenta, da primeira correspondência à proposta.",
-    "emptyTitle": "Ainda não há oportunidades",
-    "emptyBody": "As ofertas chegam aqui com o grau de correspondência com o seu perfil, a fase em que estão e o passo seguinte, para que nada escape."
+    "lead": "Todas as oportunidades que os agentes encontram ou que acrescenta, da primeira correspondência à proposta."
   },
   "agents": {
     "title": "Agentes",

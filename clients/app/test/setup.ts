@@ -28,3 +28,8 @@ if (typeof globalThis.matchMedia !== "function") {
     }),
   });
 }
+
+// jsdom does not scroll elements into view; the pipeline's keyboard cursor does.
+if (typeof Element.prototype.scrollIntoView !== "function") {
+  Object.defineProperty(Element.prototype, "scrollIntoView", { value: vi.fn(), writable: true });
+}

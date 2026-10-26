@@ -1,0 +1,29 @@
+.match {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.bar {
+  position: relative;
+  width: 46px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--match-track);
+}
+
+.fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--match-fill);
+}
+
+.number {
+  color: var(--text-primary);
+}
+
+.empty {
+  color: var(--text-tertiary);
+}

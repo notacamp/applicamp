@@ -18,6 +18,7 @@
     "api:check": "pnpm -r run api:check",
     "i18n:check": "pnpm -r run i18n:check",
     "fake-oidc": "pnpm --filter @applicamp/app run fake-oidc",
+    "fake-jobs": "pnpm --filter @applicamp/app run fake-jobs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

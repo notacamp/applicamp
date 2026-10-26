@@ -1,0 +1,45 @@
+{
+  "searchNow": "Pesquisar agora",
+  "starting": "A começar…",
+  "confirm": {
+    "title": "Pesquisar agora nos sites de emprego?",
+    "body": "Esta pesquisa vai custar cerca de {{cost}} de IA para avaliar cerca de {{jobs}} ofertas. Continuar?",
+    "go": "Pesquisar",
+    "cancel": "Agora não"
+  },
+  "progress": {
+    "label": "A pesquisar nos sites de emprego",
+    "queued": "A começar a pesquisa…",
+    "running": "{{fetched}} ofertas lidas · {{scored}} avaliadas · {{added}} adicionadas"
+  },
+  "line": {
+    "running": "A pesquisar nos sites de emprego…",
+    "failed": "A última pesquisa falhou. Tente de novo daqui a pouco.",
+    "counts": "{{fetched}} ofertas lidas, {{added}} compatíveis",
+    "lastNight": "Ontem à noite: {{counts}}",
+    "today": "Hoje às {{time}}: {{counts}}",
+    "on": "{{date}}: {{counts}}",
+    "cost": "IA {{cost}}"
+  },
+  "stopped": {
+    "ai_budget_reached": "Parou no limite de gastos com IA. As ofertas já avaliadas ficam guardadas.",
+    "ai_unavailable": "Parou: não há nenhum modelo de IA configurado para avaliar ofertas.",
+    "ai_failed": "Parou: o modelo de IA não respondeu. As ofertas já avaliadas ficam guardadas.",
+    "no_profile": "Parou: configure primeiro o seu perfil e os seus objetivos.",
+    "sources_failed": "Parou: não foi possível ler os sites de emprego."
+  },
+  "errors": {
+    "profile_needed": "Configure primeiro o seu perfil e responda a alguns objetivos: a pesquisa avalia as ofertas com base neles.",
+    "search_running": "Já está a decorrer uma pesquisa.",
+    "search_limit_reached": "Chegou ao limite de pesquisas por agora: 3 por dia, uma a cada 15 minutos.",
+    "ai_unavailable": "A pesquisa precisa de um modelo de IA, e não há nenhum configurado aqui.",
+    "ai_budget_reached": "Atingiu o limite de gastos com IA, por isso nenhuma pesquisa pode correr até ser reposto.",
+    "ai_daily_limit_reached": "Já usou a IA disponível para hoje. Tente de novo amanhã.",
+    "ai_failed": "O modelo de IA não respondeu. Tente de novo daqui a pouco.",
+    "generic": "Não foi possível começar a pesquisa. Tente de novo."
+  },
+  "spend": {
+    "month": "IA este mês: {{spent}} de {{limit}}",
+    "monthNoLimit": "IA este mês: {{spent}}"
+  }
+}

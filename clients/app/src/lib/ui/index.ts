@@ -32,8 +32,28 @@ export {
   type SectionProps,
   type StackProps,
 } from "./components/Layout/Layout";
+export {
+  Board,
+  BoardCard,
+  BoardColumn,
+  type BoardCardProps,
+  type BoardColumnProps,
+  type BoardProps,
+} from "./components/Board/Board";
+export { Bullets } from "./components/Bullets/Bullets";
+export { CardList, type CardListProps } from "./components/CardList/CardList";
+export { DataTable, type DataColumn, type DataTableProps } from "./components/DataTable/DataTable";
+export { Label, LABEL_HUES, type LabelHue, type LabelProps } from "./components/Label/Label";
+export { MatchBar, type MatchBarProps } from "./components/MatchBar/MatchBar";
 export { Page, type PageProps } from "./components/Page/Page";
+export { SidePeek, type SidePeekProps } from "./components/SidePeek/SidePeek";
+export { NARROW_QUERY, useNarrowScreen } from "./hooks/narrow";
 export { Placeholder, type PlaceholderProps } from "./components/Placeholder/Placeholder";
 export { Property, PropertyList, type PropertyProps } from "./components/Properties/Properties";
 export { Tagged } from "./components/Tagged/Tagged";
 export { TextArea, type TextAreaProps } from "./components/TextArea/TextArea";
+export {
+  ViewSwitch,
+  type ViewSwitchOption,
+  type ViewSwitchProps,
+} from "./components/ViewSwitch/ViewSwitch";

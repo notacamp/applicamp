@@ -13,10 +13,20 @@ Events: `pipeline.opportunity_added` v1 `{ account, opportunity }`, `sources.sea
 
 ## Choosing and scoring (one search)
 1. **Hard limits from goals** (structured fields only, no text heuristics on the job's prose): drop jobs older than 30 days, jobs already in the pipeline or dismissed, and jobs whose structured location/work mode clearly conflicts with `work_mode` + `locations` + `relocate` (e.g. onsite in a city not listed and relocate = no). Anything ambiguous goes to the model.
-2. **Pre-rank** the rest cheaply by title similarity to `goals.roles` (token overlap) and recency; keep the top 80.
-3. **Score** with the `complete` role in batches of 10: input = a compact profile summary (headline, roles held, skills, years, languages) + goals + each job's title/company/location/salary/first 1 500 chars of description; output JSON per job `{ ref, match 0–100, why: [≤3 short reasons citing the profile], gaps: [≤2], work_mode?, salary_text? }`. Job text is untrusted data (the prompt says so; output parsed strictly).
-4. **Keep** `match ≥ 65` (configurable per account later) as **Found**, at most 25 per search. Searches are capped at 1 per 15 minutes per account and use the account's daily token cap.
-5. A search runs as a background job (`sources.search`), with progress events on the search row for the UI (fetched / scored / added). Nightly at 21:00 Europe/Lisbon for accounts with goals.
+2. **Pre-rank** the rest cheaply by title similarity to `goals.roles` (token overlap) and recency; keep the top 40.
+3. **Score** (only jobs never scored before for this account and the current profile+goals versions; scores are cached in `pipeline.scores(account_id, source, source_ref, profile_version, goals_version, match, why, gaps)`) with the `complete` role in batches of 10: input = a compact profile summary (headline, roles held, skills, years, languages) + goals + each job's title/company/location/salary/first 1 500 chars of description; output JSON per job `{ ref, match 0–100, why: [≤3 short reasons citing the profile], gaps: [≤2], work_mode?, salary_text? }`. Job text is untrusted data (the prompt says so; output parsed strictly).
+4. **Keep** `match ≥ 65` (configurable per account later) as **Found**, at most 25 per search. Manual searches: at most 3 a day per account, 1 per 15 minutes. Every search goes through the spend limits below.
+5. A search runs as a background job (`sources.search`), with progress events on the search row for the UI (fetched / scored / added). Nightly at 21:00 Europe/Lisbon for accounts with goals **only when the boards returned jobs not seen before**, and never past the limits.
+
+## Spend limits (owner, 2026-10-26: "we have to be really cost conscious … imposing limits on spending")
+Every model call is metered **in money**, not only tokens, and stopped before a limit is crossed.
+- `crates/ai` asks OpenRouter for usage with cost (`usage: {"include": true}`) and records `cost_usd` per call in `ai.usage` (with a per-model price table as fallback when the provider omits it). Each call is checked **before** it is sent against the remaining budget, using the request's `max_tokens` × output price as the worst case.
+- Limits (config, defaults): **per account €0.30/day and €3/month**; **instance €15/month hard cap** (all accounts, all roles). Reaching one refuses further calls with `ai_budget_reached` (search stops, keeps what it scored, says why); nothing retries past a limit. `APPLICAMP_AI__BUDGET__{ACCOUNT_DAILY_EUR,ACCOUNT_MONTHLY_EUR,INSTANCE_MONTHLY_EUR}`, EUR converted with a fixed configured rate.
+- **Before Search now** the UI shows the estimate ("about €0.01") from the number of unscored jobs × average cost per batch; above €0.05 it asks to confirm.
+- **Visible spend**: "AI this month: €0.42 of €3" on Profile & goals (settings area) and on each search row; the instance total and limit in the admin CLI (`applicamp ai usage`).
+- **Alerts**: a log line at 80 % and 100 % of the instance cap (ops wires it to ntfy).
+- Search economy also: titles pre-ranked without the model, top 40 only, batches of 10, short descriptions (1 500 chars), scores cached per profile/goals version so the same job is never scored twice.
+- The same budget applies to profile imports (already metered) and, later, to agent runs.
 
 ## Add by link
 `POST /api/v1/opportunities { url }`: if the URL is a Greenhouse/Lever/Ashby posting on a known pattern, fetch it through the same reader (and add its board to `sources.boards` for future searches); otherwise create an opportunity with the URL and let the person type title and company. The server never fetches arbitrary hosts (SSRF): only the three ATS API hosts.

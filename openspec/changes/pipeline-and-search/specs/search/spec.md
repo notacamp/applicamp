@@ -22,3 +22,16 @@ answer the goals, run a first search, or review new matches.
 #### Scenario: Profile and goals done
 - **WHEN** someone with a profile and answered goals opens Today before any search
 - **THEN** Today offers Search now instead of asking them to set up their profile
+
+### Requirement: Spending stays within limits
+Every model call SHALL be metered in money and refused before it would cross
+the account's daily or monthly limit or the instance's monthly limit; the
+person SHALL see what they spent and an estimate before a search.
+
+#### Scenario: The monthly limit is reached
+- **WHEN** an account's monthly AI spend has reached its limit and a search runs
+- **THEN** no model call is made, the search ends saying the limit was reached, and the jobs already scored stay in the pipeline
+
+#### Scenario: The same job twice
+- **WHEN** a job was already scored for the current profile and goals
+- **THEN** the next search reuses that score and makes no model call for it

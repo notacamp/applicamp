@@ -1,0 +1,49 @@
+{
+  "signIn": {
+    "title": "Inicia sesión en Applicamp",
+    "lead": "Tu búsqueda de empleo en un solo lugar. Los agentes encuentran ofertas y preparan candidaturas; nada sale en tu nombre sin tu permiso.",
+    "with": "Continuar con {{provider}}",
+    "loading": "Cargando las formas de iniciar sesión…",
+    "unreachableTitle": "No se puede conectar con Applicamp",
+    "unreachableBody": "Comprueba la conexión y vuelve a intentarlo.",
+    "retry": "Reintentar",
+    "noneTitle": "Todavía no hay ninguna forma de iniciar sesión",
+    "noneBody": "Quien gestiona este Applicamp tiene que conectar antes Campbooks o LinkedIn.",
+    "footer": "Por ahora, Applicamp funciona solo con invitación.",
+    "errors": {
+      "sign_in_failed": {
+        "title": "No se ha podido iniciar sesión",
+        "body": "No se ha guardado nada. Vuelve a intentarlo o inicia sesión de otra forma."
+      },
+      "provider_unavailable": {
+        "title": "Ese servicio de inicio de sesión no responde",
+        "body": "Vuelve a intentarlo dentro de un minuto o inicia sesión de otra forma."
+      }
+    }
+  },
+  "notInvited": {
+    "title": "Todavía no estás en la lista",
+    "lead": "Por ahora, Applicamp funciona solo con invitación y el correo con el que has iniciado sesión no está en la lista. Pide a quien gestiona este Applicamp que lo añada y vuelve a iniciar sesión.",
+    "back": "Volver a iniciar sesión",
+    "footer": "No se ha creado ninguna cuenta ni se ha guardado nada."
+  },
+  "gate": {
+    "opening": "Abriendo Applicamp…",
+    "unreachableTitle": "No se puede conectar con Applicamp",
+    "unreachableLead": "Comprueba la conexión y vuelve a intentarlo.",
+    "retry": "Reintentar"
+  },
+  "account": {
+    "label": "Cuenta",
+    "theme": "Tema",
+    "themes": {
+      "system": "Sistema",
+      "light": "Claro",
+      "dark": "Oscuro"
+    },
+    "language": "Idioma",
+    "signOut": "Cerrar sesión",
+    "signingOut": "Cerrando sesión…",
+    "signOutFailed": "No se ha podido cerrar la sesión. Vuelve a intentarlo."
+  }
+}

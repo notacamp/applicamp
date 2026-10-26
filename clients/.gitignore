@@ -1,0 +1,8 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+*.local
+.vite/
+app/test-results/
+app/playwright-report/

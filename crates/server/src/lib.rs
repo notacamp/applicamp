@@ -5,12 +5,14 @@
 //! collected by [`registry`]; their routes, the BFF's and `/healthz` form
 //! the OpenAPI document ([`openapi`]), and every route is declared through
 //! `utoipa-axum` so it cannot be missing from it (`cargo xtask arch`).
+//! Everything else is the web client ([`web`]), when one is configured.
 
 #![forbid(unsafe_code)]
 
 pub mod bff;
+pub mod web;
 
-use std::{sync::Arc, time::Instant};
+use std::{convert::Infallible, sync::Arc, time::Instant};
 
 use applicamp_kernel::{AppState, Error, Module, Problem, Result, jobs::Registry};
 use axum::{
@@ -104,10 +106,10 @@ pub fn openapi() -> utoipa::openapi::OpenApi {
 }
 
 /// The whole HTTP application over `state`: module routes (behind the
-/// session lookup), the BFF, a problem+json 404 fallback, and the
-/// middleware every request passes (CSRF check, security headers,
-/// `no-store` on the API, a log line per request).
-pub fn app(state: AppState, bff: &bff::Bff) -> Router {
+/// session lookup), the BFF, then the web client (`web`) or a problem+json
+/// 404 for everything else, and the middleware every request passes (CSRF
+/// check, security headers, `no-store` on the API, a log line per request).
+pub fn app(state: AppState, bff: &bff::Bff, web: Option<web::Web>) -> Router {
     let (api, _) = api().split_for_parts();
     let api = api
         .layer(middleware::from_fn_with_state(
@@ -119,8 +121,17 @@ pub fn app(state: AppState, bff: &bff::Bff) -> Router {
     let [nosniff, referrer, frame] = SECURITY_HEADERS.map(|(name, value)| {
         SetResponseHeaderLayer::overriding(name, HeaderValue::from_static(value))
     });
-    api.merge(bff_routes.with_state(bff.clone()))
-        .fallback(|| async { Error::NotFound })
+    let routes = api.merge(bff_routes.with_state(bff.clone()));
+    let routes = match web {
+        // Unmatched paths: the client's files and routes. The API's and the
+        // BFF's own paths still answer their problem+json 404 (see `web`).
+        Some(web) => routes.fallback_service(tower::service_fn(move |request: Request| {
+            let web = web.clone();
+            async move { Ok::<_, Infallible>(web.serve(request).await) }
+        })),
+        None => routes.fallback(|| async { Error::NotFound }),
+    };
+    routes
         .layer(middleware::from_fn_with_state(
             bff.public_origin(),
             bff::csrf::check,

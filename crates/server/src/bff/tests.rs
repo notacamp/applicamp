@@ -145,6 +145,11 @@ struct Harness {
 
 impl Harness {
     async fn new(db: PgPool) -> Self {
+        Self::serving(db, None).await
+    }
+
+    /// The app serving the web client in `web`.
+    async fn serving(db: PgPool, web: Option<crate::web::Web>) -> Self {
         let campbooks = Fake::start("applicamp-campbooks").await;
         let linkedin = Fake::start("applicamp-linkedin").await;
         let mut config = Config::for_database("postgres://unused");
@@ -155,7 +160,7 @@ impl Harness {
         let state = AppState::new(db.clone(), config, SecretKey::from_bytes([9; 32]));
         let bff = Bff::new(&state, &settings).unwrap();
         Self {
-            app: crate::app(state, &bff),
+            app: crate::app(state, &bff, web),
             db,
             campbooks,
             linkedin,
@@ -582,6 +587,49 @@ async fn the_public_endpoints(db: PgPool) {
         missing.headers()[header::CONTENT_TYPE].to_str().unwrap(),
         "application/problem+json"
     );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_web_client_is_served_beside_the_api(db: PgPool) {
+    let dir = std::env::temp_dir().join(format!("applicamp-app-web-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("index.html"),
+        "<!doctype html><title>Applicamp</title>",
+    )
+    .unwrap();
+    let h = Harness::serving(db, Some(crate::web::Web::new(&dir).unwrap())).await;
+
+    for page in ["/", "/pipeline", "/sign-in?error=sign_in_failed"] {
+        let response = h.get(page, None).await;
+        assert_eq!(response.status(), StatusCode::OK, "{page}");
+        let content_type = response.headers()[header::CONTENT_TYPE].to_str().unwrap();
+        assert!(
+            content_type.starts_with("text/html"),
+            "{page}: {content_type}"
+        );
+        // The security headers cover the client too.
+        assert_eq!(response.headers()["x-frame-options"], "DENY", "{page}");
+    }
+
+    // The API and the BFF keep their own answers.
+    let (status, problem) = h.me(None).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_eq!(problem["code"], "session_required");
+    assert_eq!(
+        body(h.get("/bff/providers", None).await).await,
+        json!({ "providers": ["campbooks", "linkedin"] })
+    );
+    for missing in ["/api/v1/nothing", "/bff/nothing"] {
+        let response = h.get(missing, None).await;
+        assert_eq!(response.status(), StatusCode::NOT_FOUND, "{missing}");
+        assert_eq!(
+            response.headers()[header::CONTENT_TYPE].to_str().unwrap(),
+            "application/problem+json",
+            "{missing}"
+        );
+    }
+    std::fs::remove_dir_all(dir).unwrap();
 }
 
 #[test]

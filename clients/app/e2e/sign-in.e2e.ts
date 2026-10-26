@@ -62,11 +62,17 @@ test("an invited person signs in with Campbooks, lands on Today, imports their L
   await expectAccessible(page);
 
   // Both projects share one stack and one person: start with no goals answered, as a new person would.
-  const cleared = await page.request.put("/api/v1/goals", {
-    headers: { "X-Applicamp-CSRF": "1" },
-    data: {},
-  });
-  expect(cleared.ok()).toBe(true);
+  const cleared = await page.evaluate(
+    async () =>
+      (
+        await fetch("/api/v1/goals", {
+          method: "PUT",
+          headers: { "content-type": "application/json", "X-Applicamp-CSRF": "1" },
+          body: "{}",
+        })
+      ).status,
+  );
+  expect(cleared).toBe(200);
 
   // "Set up your profile" opens the import panel. With no AI model on this
   // stack, it offers the LinkedIn export only; the server reads its CSVs.

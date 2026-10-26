@@ -62,7 +62,7 @@ describe("the list and in-place editing compositions", () => {
   it("adds an item to a list: trimmed, once, and never past the limit", () => {
     expect(withItem(["a"], "\tb\n c ", 3)).toEqual(["a", "b c"]);
     expect(withItem(["a"], "A", 3)).toEqual(["a"]);
-    expect(withItem(["a"], "   ", 3)).toEqual(["a"]);
+    expect(withItem(["a"], " \t\n ", 3)).toEqual(["a"]);
     expect(withItem(["a", "b"], "c", 2)).toEqual(["a", "b"]);
   });
 

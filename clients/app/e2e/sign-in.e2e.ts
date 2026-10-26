@@ -1,5 +1,14 @@
+import { fileURLToPath } from "node:url";
+
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+
+/**
+ * An invented LinkedIn data export (Alex Demo at Example Org and Sample
+ * Labs; nobody real): Profile, Positions, Education, Skills, Languages,
+ * Certifications, Projects and Email Addresses CSVs.
+ */
+const LINKEDIN_EXPORT = fileURLToPath(new URL("fixtures/linkedin-export.zip", import.meta.url));
 
 /** No WCAG 2.1 A/AA violation on the page as it is now. */
 async function expectAccessible(page: Page) {
@@ -31,7 +40,7 @@ async function expectPageFillsTheScreen(page: Page, testId: string) {
   }
 }
 
-test("an invited person signs in with Campbooks, lands on Today, finds Pipeline with ⌘K and signs out", async ({
+test("an invited person signs in with Campbooks, lands on Today, imports their LinkedIn export, finds Pipeline with ⌘K and signs out", async ({
   page,
 }, testInfo) => {
   const phone = testInfo.project.name === "phone";
@@ -50,6 +59,28 @@ test("an invited person signs in with Campbooks, lands on Today, finds Pipeline 
   await expectPageFillsTheScreen(page, "today");
   await expect(page.getByTestId("today-empty")).toBeVisible();
   await expect(page.getByTestId("today-empty")).toBeInViewport();
+  await expectAccessible(page);
+
+  // "Set up your profile" opens the import panel. With no AI model on this
+  // stack, it offers the LinkedIn export only; the server reads its CSVs.
+  await page.getByTestId("set-up-profile").click();
+  await expect(page).toHaveURL(/\/profile\?import=new$/);
+  await expectPageFillsTheScreen(page, "profile");
+  await expect(page.getByTestId("import-zip-only")).toBeVisible();
+  await page.getByTestId("import-file").setInputFiles(LINKEDIN_EXPORT);
+  await page.getByTestId("import-submit").click();
+
+  // The draft, to review: nothing is saved yet. Replace makes it the profile.
+  await expect(page.getByTestId("import-review")).toBeVisible();
+  await expect(page.getByTestId("review-work")).toContainText("Senior Engineer");
+  await expectAccessible(page);
+  await page.getByTestId("review-replace").click();
+  const work = page.getByTestId("section-work");
+  await expect(work).toContainText("Senior Engineer");
+  await expect(work).toContainText("Example Org");
+  await expect(work).toContainText("Sample Labs");
+  await expect(page.getByTestId("profile-source")).toContainText("LinkedIn data export");
+  await expectPageFillsTheScreen(page, "profile");
   await expectAccessible(page);
 
   // The command menu: ⌘K (Ctrl+K here) on a desktop, the search button on a

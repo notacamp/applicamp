@@ -1,0 +1,163 @@
+{
+  "loading": "Loading your profile…",
+  "loadFailed": "Your profile couldn’t be loaded.",
+  "retry": "Try again",
+  "importAgain": "Import again",
+  "import": {
+    "title": "Import your profile",
+    "lead": "Start from what you already have. You review everything before it’s saved, and the file itself isn’t kept.",
+    "choose": "What do you have?",
+    "kinds": {
+      "linkedin_zip": {
+        "title": "Your LinkedIn data export",
+        "description": "The ZIP LinkedIn sends you from Settings, Data privacy, Get a copy of your data. Read here, without AI."
+      },
+      "pdf": {
+        "title": "A PDF",
+        "description": "Your CV, or your LinkedIn profile saved as a PDF. An AI model reads it."
+      },
+      "text": {
+        "title": "Pasted text",
+        "description": "Your CV or your profile, copied as text. An AI model reads it."
+      }
+    },
+    "zipOnlyTitle": "Import your LinkedIn data export",
+    "zipOnly": "Ask LinkedIn for a copy of your data (Settings, Data privacy), then upload the ZIP it sends you. PDFs and pasted text need an AI model, which this Applicamp hasn’t set up.",
+    "zipLabel": "Your LinkedIn export (.zip)",
+    "zipHint": "Up to 20 MB. Only your profile, positions, education, skills, languages, certifications, projects and main email are read.",
+    "pdfLabel": "Your CV or LinkedIn profile (.pdf)",
+    "pdfHint": "Up to 8 MB and 30 pages, with real text (not a scan).",
+    "chooseFile": "Choose a file",
+    "textLabel": "Your CV or profile, as text",
+    "textPlaceholder": "Paste it here",
+    "charactersLeft": "{{left}} characters left",
+    "submit": "Import",
+    "reading": "Reading…",
+    "cancel": "Back to your profile",
+    "errors": {
+      "generic": "That didn’t work. Try again.",
+      "invalid_upload": "Choose a file, or paste some text, first.",
+      "file_too_large": "This file is too large: up to 20 MB for a ZIP, 8 MB for a PDF.",
+      "text_too_long": "This text is too long: up to 60,000 characters.",
+      "not_a_zip": "This isn’t a ZIP archive. Upload the ZIP LinkedIn sent you.",
+      "archive_too_many_entries": "This archive holds too many files to be a LinkedIn export.",
+      "archive_entry_too_large": "A file in this archive is too large to be part of a LinkedIn export.",
+      "archive_too_large": "This archive is too large once unpacked to be a LinkedIn export.",
+      "archive_unsafe_path": "This archive has a file stored outside it, so it wasn’t opened.",
+      "not_a_pdf": "This isn’t a PDF. Upload a PDF, or paste the text instead.",
+      "pdf_unreadable": "This PDF couldn’t be read. Try another file, or paste the text instead.",
+      "pdf_too_many_pages": "This PDF has more than 30 pages.",
+      "pdf_no_text": "This PDF has no text we can read (it may be a scan). Paste the text instead.",
+      "nothing_found": "Nothing to import was found in this. Check it’s the right file.",
+      "ai_unavailable": "Reading PDFs and text needs an AI model, which isn’t set up here. Import your LinkedIn export instead.",
+      "ai_daily_limit_reached": "You’ve reached today’s AI limit. Try again tomorrow, or import your LinkedIn export.",
+      "ai_failed": "The AI model couldn’t read this just now. Try again in a minute."
+    }
+  },
+  "review": {
+    "title": "Review what was found",
+    "lead": "Nothing is saved until you choose. Replace makes this your profile; Merge keeps yours as it is and adds only what’s new.",
+    "loading": "Loading the draft…",
+    "loadFailed": "The draft couldn’t be loaded.",
+    "gone": "This draft is no longer here: drafts last 24 hours.",
+    "dropped": "Details left out: {{dropped}}",
+    "droppedBody": "They weren’t in the file, so we didn’t keep them. Nothing is ever made up.",
+    "new": "New",
+    "changed": "Changed",
+    "same": "Same",
+    "now": "Now: {{value}}",
+    "replace": "Replace",
+    "merge": "Merge",
+    "discard": "Discard",
+    "failed": "That didn’t work. Try again."
+  },
+  "source": {
+    "label": "Profile source",
+    "linkedin_zip": "LinkedIn data export",
+    "pdf": "A PDF",
+    "text": "Pasted text",
+    "manual": "Written here",
+    "updated": "{{source}} · updated {{date}}"
+  },
+  "basics": {
+    "name": "Name",
+    "label": "Headline",
+    "location": "Location",
+    "email": "Email",
+    "url": "Website",
+    "summary": "Summary"
+  },
+  "placeholders": {
+    "name": "Add your name",
+    "label": "Add a headline",
+    "location": "Add where you are",
+    "email": "Add an email for applications",
+    "url": "Add your website",
+    "summary": "Add a few sentences about you"
+  },
+  "sections": {
+    "work": "Experience",
+    "education": "Education",
+    "skills": "Skills",
+    "languages": "Languages",
+    "certificates": "Certifications",
+    "projects": "Projects"
+  },
+  "add": {
+    "work": "Add a position",
+    "education": "Add a school",
+    "skills": "Add a skill",
+    "languages": "Add a language",
+    "certificates": "Add a certification",
+    "projects": "Add a project"
+  },
+  "empty": {
+    "work": "No positions yet. Add one",
+    "education": "No schools yet. Add one",
+    "skills": "No skills yet. Add one",
+    "languages": "No languages yet. Add one",
+    "certificates": "No certifications yet. Add one",
+    "projects": "No projects yet. Add one"
+  },
+  "fields": {
+    "title": "Title",
+    "company": "Company",
+    "location": "Location",
+    "start": "Start",
+    "end": "End",
+    "summary": "What you did",
+    "highlights": "Highlights",
+    "school": "School",
+    "degree": "Degree",
+    "field": "Field of study",
+    "skill": "Skill",
+    "level": "Level",
+    "language": "Language",
+    "fluency": "Fluency",
+    "certification": "Certification",
+    "issuer": "Issued by",
+    "date": "Date",
+    "project": "Project",
+    "description": "Description",
+    "link": "Link"
+  },
+  "dates": {
+    "range": "{{start}} – {{end}}",
+    "now": "now"
+  },
+  "form": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "remove": "Remove",
+    "edit": "Edit {{what}}",
+    "editAll": "Edit",
+    "done": "Done",
+    "required": "This can’t be empty.",
+    "dateInvalid": "Write a year (2021), a month (2021-03) or a day (2021-03-15).",
+    "datePlaceholder": "2021-03",
+    "dateHint": "A year, or a year and a month.",
+    "onePerLine": "One per line.",
+    "charactersLeft": "{{left}} characters left",
+    "saveFailed": "Your change couldn’t be saved. Try again."
+  }
+}

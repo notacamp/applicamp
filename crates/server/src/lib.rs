@@ -1,7 +1,8 @@
 //! `applicamp-server`: composes the modules into one HTTP application.
 //!
 //! This is the only crate that knows the full list of modules. Adding a
-//! module means adding one line to [`modules`]. Their background work is
+//! module means adding one line to [`modules_with`]; what modules are
+//! composed with (the AI gateway) is the [`Composition`]. Their background work is
 //! collected by [`registry`]; their routes, the BFF's and `/healthz` form
 //! the OpenAPI document ([`openapi`]), and every route is declared through
 //! `utoipa-axum` so it cannot be missing from it (`cargo xtask arch`).
@@ -41,9 +42,56 @@ const SECURITY_HEADERS: [(HeaderName, &str); 3] = [
     (header::X_FRAME_OPTIONS, "DENY"),
 ];
 
-/// Every module, in the order their routes are mounted.
+/// What the modules are composed with, read from the environment.
+#[derive(Debug, Clone, Default)]
+pub struct Composition {
+    /// The profile module's AI gateway (its `complete` role reads PDFs and
+    /// pasted text).
+    pub profile: applicamp_profile::ProfileDeps,
+}
+
+impl Composition {
+    /// From the `APPLICAMP_AI__…` variables. No AI role configured is fine:
+    /// the features that need one say they are unavailable.
+    pub fn from_env() -> Result<Self, String> {
+        let ai = applicamp_ai::AiConfig::from_env().map_err(|e| e.to_string())?;
+        Self::with_ai(ai)
+    }
+
+    /// Composed over `ai`.
+    pub fn with_ai(ai: applicamp_ai::AiConfig) -> Result<Self, String> {
+        let gateway = if ai.is_configured(applicamp_ai::Role::Complete) {
+            Some(applicamp_ai::Gateway::new(ai).map_err(|e| e.to_string())?)
+        } else {
+            None
+        };
+        Ok(Self {
+            profile: applicamp_profile::ProfileDeps { ai: gateway },
+        })
+    }
+
+    /// The model serving `complete`, if any (for the startup log).
+    pub fn complete_model(&self) -> Option<&str> {
+        self.profile
+            .ai
+            .as_ref()
+            .and_then(|g| g.config().complete.as_ref())
+            .map(|p| p.model.as_str())
+    }
+}
+
+/// Every module, in mount order, composed inertly (for catalogues: the
+/// OpenAPI document, the architecture check, the job registry).
 pub fn modules() -> Vec<Module> {
-    vec![applicamp_identity::module()]
+    modules_with(&Composition::default())
+}
+
+/// Every module, in mount order, composed with `composition`.
+pub fn modules_with(composition: &Composition) -> Vec<Module> {
+    vec![
+        applicamp_identity::module(),
+        applicamp_profile::module(composition.profile.clone()),
+    ]
 }
 
 /// Every module's background work.
@@ -82,6 +130,9 @@ pub async fn migrate(db: &PgPool) -> Result<(), sqlx::migrate::MigrateError> {
         (name = "identity", description = "Accounts and their ways in (Campbooks, LinkedIn). \
             Who may create an account is the invite list, managed from the server's command \
             line only."),
+        (name = "profile", description = "The master profile: what agents know about you. \
+            Imported from a LinkedIn data export, a PDF or pasted text as a draft you review, \
+            and edited by hand."),
         (name = "bff", description = "The web app's backend-for-frontend: sign-in with a \
             provider, the session cookie, sign-out. Browsers only."),
     ),
@@ -89,13 +140,13 @@ pub async fn migrate(db: &PgPool) -> Result<(), sqlx::migrate::MigrateError> {
 struct ApiDoc;
 
 /// The module routes and `/healthz`, with their docs.
-fn api() -> OpenApiRouter<AppState> {
+fn api(composition: &Composition) -> OpenApiRouter<AppState> {
     let mut doc = ApiDoc::openapi();
     VERSION.clone_into(&mut doc.info.version);
     doc.components
         .get_or_insert_with(Default::default)
         .add_security_scheme(bff::SESSION_SCHEME, bff::security_scheme());
-    modules()
+    modules_with(composition)
         .into_iter()
         .fold(OpenApiRouter::with_openapi(doc), |api, module| {
             api.merge(module.router)
@@ -105,7 +156,7 @@ fn api() -> OpenApiRouter<AppState> {
 
 /// The OpenAPI document: every route the server answers.
 pub fn openapi() -> utoipa::openapi::OpenApi {
-    let mut doc = api().into_openapi();
+    let mut doc = api(&Composition::default()).into_openapi();
     doc.merge(bff::router().into_openapi());
     doc
 }
@@ -115,7 +166,17 @@ pub fn openapi() -> utoipa::openapi::OpenApi {
 /// 404 for everything else, and the middleware every request passes (CSRF
 /// check, security headers, `no-store` on the API, a log line per request).
 pub fn app(state: AppState, bff: &bff::Bff, web: Option<web::Web>) -> Router {
-    let (api, _) = api().split_for_parts();
+    app_with(state, bff, web, &Composition::default())
+}
+
+/// [`app`] with the modules composed with `composition`.
+pub fn app_with(
+    state: AppState,
+    bff: &bff::Bff,
+    web: Option<web::Web>,
+    composition: &Composition,
+) -> Router {
+    let (api, _) = api(composition).split_for_parts();
     let api = api
         .layer(middleware::from_fn_with_state(
             bff.clone(),

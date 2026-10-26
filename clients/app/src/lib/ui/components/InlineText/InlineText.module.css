@@ -1,0 +1,47 @@
+/* A property value that reads as text and opens a field on click. */
+.value {
+  display: block;
+  width: 100%;
+  min-height: var(--size-control-md);
+  padding: var(--space-1-5) var(--space-2);
+  margin-inline-start: calc(-1 * var(--space-2));
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: start;
+  overflow-wrap: anywhere;
+  cursor: text;
+}
+
+.value[data-multiline="true"] {
+  white-space: pre-line;
+  line-height: var(--leading-relaxed);
+}
+
+.value:hover {
+  background: var(--surface-hover);
+}
+
+.value:focus-visible {
+  outline: var(--focus-width) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.value[data-empty="true"] {
+  color: var(--text-tertiary);
+}
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

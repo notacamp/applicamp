@@ -1,7 +1,8 @@
 # Module dependency allowlist, read by `cargo xtask arch`.
 #
 # By default a module crate (crates/modules/<name>) may depend only on
-# `applicamp-kernel`. Cross-module needs go through durable domain events.
+# `applicamp-kernel` and the AI gateway, `applicamp-ai`. Cross-module needs go
+# through durable domain events.
 # When a module truly needs another module's API, add an entry; it is
 # reviewed like an ADR:
 #

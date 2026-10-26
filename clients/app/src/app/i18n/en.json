@@ -31,9 +31,7 @@
     "title": "Profile & goals",
     "lead": "What agents know about you. They use only what is written here, and every claim in a CV must trace back to it.",
     "signedInAs": "Signed in as",
-    "waysIn": "Ways to sign in",
-    "emptyTitle": "Your profile is empty",
-    "emptyBody": "Soon you can import your LinkedIn data export or your CV, then answer a few questions about the role, the place and the pay you want next."
+    "waysIn": "Ways to sign in"
   },
   "notFound": {
     "title": "This page doesn’t exist",

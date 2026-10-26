@@ -106,11 +106,15 @@ fn serve() -> ExitCode {
         Ok(web) => web,
         Err(e) => return fail(&e.to_string()),
     };
+    let composition = match applicamp_server::Composition::from_env() {
+        Ok(composition) => composition,
+        Err(e) => return fail(&e),
+    };
     let runtime = match runtime() {
         Ok(runtime) => runtime,
         Err(e) => return fail(&e),
     };
-    match runtime.block_on(run(config, secret, &settings, web)) {
+    match runtime.block_on(run(config, secret, &settings, web, &composition)) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             tracing::error!(error = %e, "server failed");
@@ -124,6 +128,7 @@ async fn run(
     secret: SecretKey,
     settings: &bff::Settings,
     web: Option<Web>,
+    composition: &applicamp_server::Composition,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let registry = Arc::new(
         applicamp_server::registry()
@@ -153,12 +158,19 @@ async fn run(
     if web.is_none() {
         tracing::info!("APPLICAMP_WEB_DIR is unset: serving the API without the web client");
     }
+    match composition.complete_model() {
+        Some(model) => tracing::info!(model, "AI role `complete` configured"),
+        None => tracing::info!(
+            "AI role `complete` is not configured: profile imports take only the LinkedIn \
+             export (set APPLICAMP_AI__COMPLETE__BASE_URL and __MODEL)"
+        ),
+    }
 
     let (stop, stopped) = watch::channel(false);
     let worker = tokio::spawn(Worker::new(db.clone(), registry, events).run(stopped.clone()));
     let pruner = tokio::spawn(prune_sessions(state.clone(), stopped));
 
-    let app = applicamp_server::app(state, &bff, web);
+    let app = applicamp_server::app_with(state, &bff, web, composition);
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!(%addr, providers = ?providers, version = applicamp_server::VERSION, "listening");
     axum::serve(listener, app)

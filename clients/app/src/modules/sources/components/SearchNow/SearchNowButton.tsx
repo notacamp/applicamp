@@ -57,7 +57,7 @@ export function SearchNowButton({
     start.reset();
     setChecking(true);
     queryClient
-      .fetchQuery({ ...estimateQuery, staleTime: 0 })
+      .query({ ...estimateQuery, staleTime: 0 })
       .then(
         (estimate) => {
           if (estimate.confirm) {

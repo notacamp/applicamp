@@ -94,11 +94,11 @@ export function useOpportunity(id: string | null) {
 }
 
 /** Refetch the pipeline and Today (after a search added jobs). */
-export function invalidatePipeline(queryClient: QueryClient): Promise<void> {
-  return Promise.all([
+export async function invalidatePipeline(queryClient: QueryClient): Promise<void> {
+  await Promise.all([
     queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEY }),
     queryClient.invalidateQueries({ queryKey: TODAY_QUERY_KEY }),
-  ]).then(() => undefined);
+  ]);
 }
 
 /** Adds a job by its link (`POST /api/v1/opportunities`). */

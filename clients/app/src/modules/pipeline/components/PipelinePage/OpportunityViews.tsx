@@ -1,3 +1,4 @@
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -44,10 +45,12 @@ function CardMeta({ row }: { row: OpportunitySummary }) {
   );
 }
 
-/** "All opportunities" as the prototype's table: role, company, match, stage, source, next step, updated. */
-export function OpportunityTable({ rows, selected, onOpen }: OpportunityViewProps) {
-  const { t, i18n } = useTranslation("pipeline");
-  const columns: DataColumn<OpportunitySummary>[] = [
+/** The table's columns: role, company, match, stage, source, next step, updated. */
+function tableColumns(
+  t: TFunction<"pipeline">,
+  language: string,
+): DataColumn<OpportunitySummary>[] {
+  return [
     { id: "role", header: t("columns.role"), cell: (row) => titleOf(row, t("untitled")) },
     { id: "company", header: t("columns.company"), cell: (row) => row.company },
     {
@@ -73,9 +76,15 @@ export function OpportunityTable({ rows, selected, onOpen }: OpportunityViewProp
       id: "updated",
       header: t("columns.updated"),
       nowrap: true,
-      cell: (row) => formatShortDate(row.updated_at, i18n.language),
+      cell: (row) => formatShortDate(row.updated_at, language),
     },
   ];
+}
+
+/** "All opportunities" as the prototype's table: role, company, match, stage, source, next step, updated. */
+export function OpportunityTable({ rows, selected, onOpen }: OpportunityViewProps) {
+  const { t, i18n } = useTranslation("pipeline");
+  const columns = tableColumns(t, i18n.language);
   return (
     <DataTable
       label={t("views.table")}

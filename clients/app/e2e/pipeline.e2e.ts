@@ -60,7 +60,7 @@ test("someone with a profile and goals presses Search now, sees the matches arri
   );
   await page.getByTestId("pipeline-search-now").click();
   const confirm = page.getByTestId("search-confirm");
-  await Promise.race([posted, confirm.waitFor().catch(() => undefined)]);
+  await Promise.race([posted, confirm.waitFor().catch(() => null)]);
   if (await confirm.isVisible()) {
     await confirm.click();
   }

@@ -62,14 +62,14 @@ function fakePipeline(extra: Record<string, Stub> = {}) {
   return { patches, requests, store };
 }
 
-function renderPage(props: { newOnly?: boolean; adding?: boolean } = {}) {
+function renderPage(options: { newOnly?: boolean; adding?: boolean } = {}) {
   const onNewOnly = vi.fn<(newOnly: boolean) => void>();
   const onAdding = vi.fn<(open: boolean) => void>();
   function Harness() {
-    const [adding, setAdding] = useState(props.adding ?? false);
+    const [adding, setAdding] = useState(options.adding ?? false);
     return (
       <PipelinePage
-        newOnly={props.newOnly ?? false}
+        newOnly={options.newOnly ?? false}
         onNewOnly={onNewOnly}
         adding={adding}
         onAdding={(open) => {

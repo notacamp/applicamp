@@ -4,6 +4,7 @@ import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { renderWithProviders, stubApi, type Stub } from "../../../../../test/render";
+import { EMPTY_GOALS } from "../../api/goals";
 import { EMPTY_PROFILE, type Profile, type ProfileView } from "../../api/profile";
 import { ImportReview } from "../ImportReview/ImportReview";
 
@@ -63,10 +64,16 @@ function draftOf(draft: Profile, dropped = 0) {
 /** The workspace as the route drives it, with `?import` as state. */
 function Workspace({ startImporting = false }: { startImporting?: boolean }) {
   const [importing, setImporting] = useState(startImporting);
-  return <ProfileWorkspace importing={importing} onImporting={setImporting} />;
+  return (
+    <ProfileWorkspace importing={importing} onImporting={setImporting} onStartGoals={vi.fn()} />
+  );
 }
 
-const stub = (routes: Record<string, Stub>) => stubApi(routes);
+/** Nothing answered about goals yet, unless a test says otherwise. */
+const NO_GOALS = { version: 0, answers: EMPTY_GOALS, updated_at: null };
+
+const stub = (routes: Record<string, Stub>) =>
+  stubApi({ "GET /api/v1/goals": { body: NO_GOALS }, ...routes });
 
 const zip = () =>
   new File(["PK\u0003\u0004"], "Basic_LinkedInDataExport.zip", { type: "application/zip" });
@@ -107,6 +114,8 @@ describe("the profile workspace", () => {
     const upload = requests.find(({ route }) => route === "POST /api/v1/profile/imports");
     expect(upload?.headers.get("x-applicamp-csrf")).toBe("1");
     expect(screen.getByTestId("profile-source")).toHaveTextContent("LinkedIn data export");
+    // The profile is saved: the Goals section offers its questions, without forcing them.
+    expect(await screen.findByTestId("goals-offer")).toHaveTextContent("Answer a few questions");
   });
 
   it("says why an upload was refused, before and after sending it", async () => {

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Banner, Button, InlineText, Property, PropertyList, Stack, Tagged, Text } from "~/lib/ui";
@@ -15,6 +16,8 @@ export interface ProfileViewProps {
   view: View;
   /** Open the import panel again. */
   onImportAgain: () => void;
+  /** Goals, between the about-you properties and the lists. */
+  goals?: ReactNode;
 }
 
 /**
@@ -22,7 +25,7 @@ export interface ProfileViewProps {
  * you) and its lists, every value edited in place; each change saves the
  * whole profile.
  */
-export function ProfileView({ view, onImportAgain }: ProfileViewProps) {
+export function ProfileView({ view, onImportAgain, goals }: ProfileViewProps) {
   const { t, i18n } = useTranslation("profile");
   const save = useSaveProfile();
   const { profile } = view;
@@ -85,6 +88,7 @@ export function ProfileView({ view, onImportAgain }: ProfileViewProps) {
           <Banner tone="danger" icon="warning" role="alert" title={t("form.saveFailed")} />
         </Tagged>
       ) : null}
+      {goals}
       {LISTS.map((list) => (
         <EntryList
           key={list}

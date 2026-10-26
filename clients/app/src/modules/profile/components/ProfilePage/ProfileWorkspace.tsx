@@ -4,8 +4,10 @@ import { useTranslation } from "react-i18next";
 import { Banner, Button, Tagged, Text } from "~/lib/ui";
 
 import { isEmptyProfile, useProfile } from "../../api/profile";
+import type { Question } from "../../api/questions";
 import { ImportPanel } from "../ImportPanel/ImportPanel";
 import { ImportReview } from "../ImportReview/ImportReview";
+import { GoalsSection } from "../GoalsSection/GoalsSection";
 import { ProfileView } from "../ProfileView/ProfileView";
 
 export interface ProfileWorkspaceProps {
@@ -13,6 +15,8 @@ export interface ProfileWorkspaceProps {
   importing: boolean;
   /** Open or close the import panel. */
   onImporting: (open: boolean) => void;
+  /** Open the goals interview at a question (the Goals section's buttons). */
+  onStartGoals: (question: Question) => void;
 }
 
 /**
@@ -20,10 +24,12 @@ export interface ProfileWorkspaceProps {
  * profile (or one is asked for), the review of a draft, else the profile
  * itself, edited in place.
  */
-export function ProfileWorkspace({ importing, onImporting }: ProfileWorkspaceProps) {
+export function ProfileWorkspace({ importing, onImporting, onStartGoals }: ProfileWorkspaceProps) {
   const { t } = useTranslation("profile");
   const profile = useProfile();
   const [review, setReview] = useState<string | null>(null);
+  // A profile was just imported: the Goals section offers its questions.
+  const [offer, setOffer] = useState(false);
 
   if (profile.isPending) {
     return (
@@ -66,8 +72,9 @@ export function ProfileWorkspace({ importing, onImporting }: ProfileWorkspacePro
         id={review}
         current={view.profile}
         onRestart={restart}
-        onDone={() => {
+        onDone={(outcome) => {
           setReview(null);
+          setOffer(outcome === "applied");
           onImporting(false);
         }}
       />
@@ -96,6 +103,15 @@ export function ProfileWorkspace({ importing, onImporting }: ProfileWorkspacePro
       onImportAgain={() => {
         onImporting(true);
       }}
+      goals={
+        <GoalsSection
+          offer={offer}
+          onDismissOffer={() => {
+            setOffer(false);
+          }}
+          onStart={onStartGoals}
+        />
+      }
     />
   );
 }

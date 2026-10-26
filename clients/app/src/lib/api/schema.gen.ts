@@ -4,6 +4,34 @@
  */
 
 export interface paths {
+    "/api/v1/goals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The signed-in person's goals.
+         * @description Version 0 and no answers until they answer a question.
+         */
+        get: operations["profile.get_goals"];
+        /**
+         * Save the goals.
+         * @description All the answers at once, as the interview or an edit leaves them; a
+         *     question left out is unanswered. Values are trimmed and blank ones
+         *     removed. Lists over their limit (5 roles; 10 places, things to avoid and
+         *     must-haves), a currency that is not ISO 4217 or a choice that does not
+         *     exist are refused. Every save, even of the same answers, is a new version.
+         */
+        put: operations["profile.update_goals"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me": {
         parameters: {
             query?: never;
@@ -267,6 +295,12 @@ export interface components {
          * @enum {string}
          */
         ApplyMode: "replace" | "merge";
+        /**
+         * @description How much agents may do alone. Applying and emailing always wait for the
+         *     person, whatever this says.
+         * @enum {string}
+         */
+        Autonomy: "find_only" | "prepare" | "prepare_and_schedule";
         /** @description Who they are. */
         Basics: {
             /** @description The address for applications. */
@@ -284,6 +318,18 @@ export interface components {
             /** @description Their own site. */
             url?: string | null;
         };
+        /** @description The least they would take, before tax. */
+        CashFloor: {
+            /**
+             * Format: int32
+             * @description Whole units of `currency` per `period`, 1 to 100 000 000.
+             */
+            amount: number;
+            /** @description An ISO 4217 code such as `EUR`. */
+            currency: string;
+            /** @description Per year or per month. */
+            period: components["schemas"]["Period"];
+        };
         /** @description A certification. */
         Certificate: {
             /** @description When, `YYYY`, `YYYY-MM` or `YYYY-MM-DD`. */
@@ -295,6 +341,11 @@ export interface components {
             /** @description Where it can be checked. */
             url?: string | null;
         };
+        /**
+         * @description What kind of company.
+         * @enum {string}
+         */
+        CompanyStage: "early" | "growth" | "established" | "public" | "nonprofit";
         /** @description A school or degree. */
         Education: {
             /** @description The field ("Computer science"). */
@@ -307,6 +358,45 @@ export interface components {
             startDate?: string | null;
             /** @description The degree ("Master's"). */
             studyType?: string | null;
+        };
+        /** @description The answers to the goals interview. Nothing is required. */
+        Goals: {
+            autonomy?: components["schemas"]["Autonomy"] | null;
+            /** @description What they will not work on (up to 10). */
+            avoid: string[];
+            cash_floor?: components["schemas"]["CashFloor"] | null;
+            /** @description The kinds of company. */
+            company_stage: components["schemas"]["CompanyStage"][];
+            /** @description Whether equity counts toward the cash floor. */
+            equity_counts?: boolean | null;
+            /** @description The languages they can work in, as BCP 47 tags (`en`, `pt-PT`). */
+            languages_for_work: string[];
+            /** @description Where they can work from: cities, countries or regions (up to 10). */
+            locations: string[];
+            /** @description What the job must have (up to 10). */
+            must_have: string[];
+            relocate?: components["schemas"]["Relocate"] | null;
+            /** @description The roles they want next (up to 5). */
+            roles: string[];
+            /** @description The levels that fit. */
+            seniority: components["schemas"]["Seniority"][];
+            /** @description How they want to work. */
+            work_mode: components["schemas"]["WorkMode"][];
+        };
+        /** @description The goals and the version they are at. */
+        GoalsView: {
+            /** @description The answers; every one optional. */
+            answers: components["schemas"]["Goals"];
+            /**
+             * Format: date-time
+             * @description When they last changed.
+             */
+            updated_at?: string | null;
+            /**
+             * Format: int32
+             * @description 0 until something is saved; each save adds one.
+             */
+            version: number;
         };
         /** @description The instance's health. */
         Health: {
@@ -401,6 +491,11 @@ export interface components {
             ways_in: components["schemas"]["Provider"][];
         };
         /**
+         * @description What a cash floor is counted over.
+         * @enum {string}
+         */
+        Period: "year" | "month";
+        /**
          * @description RFC 9457 problem details.
          * @example {
          *       "code": "not_found",
@@ -492,6 +587,16 @@ export interface components {
             /** @description In the order the sign-in page shows them. */
             providers: components["schemas"]["Provider"][];
         };
+        /**
+         * @description Whether they would move for the right job.
+         * @enum {string}
+         */
+        Relocate: "no" | "within_country" | "within_eu" | "anywhere";
+        /**
+         * @description Which levels fit.
+         * @enum {string}
+         */
+        Seniority: "junior" | "mid" | "senior" | "staff" | "principal" | "lead" | "manager" | "director" | "founding";
         /** @description A skill. */
         Skill: {
             /** @description How well, in their words. */
@@ -516,6 +621,11 @@ export interface components {
             /** @description What they did. */
             summary?: string | null;
         };
+        /**
+         * @description How they want to work.
+         * @enum {string}
+         */
+        WorkMode: "remote" | "hybrid" | "onsite";
     };
     responses: never;
     parameters: never;
@@ -525,6 +635,77 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    "profile.get_goals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The goals. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoalsView"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.update_goals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Goals"];
+            };
+        };
+        responses: {
+            /** @description The goals, saved, at their new version. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoalsView"];
+                };
+            };
+            /** @description `invalid_goals` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "identity.me": {
         parameters: {
             query?: never;

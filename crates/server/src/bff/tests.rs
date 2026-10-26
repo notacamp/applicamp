@@ -3,7 +3,11 @@
 //! endpoint), one for Campbooks and one for LinkedIn.
 
 use applicamp_identity::invites;
-use applicamp_kernel::{AppState, Config, config::ProviderConfig, crypto::SecretKey};
+use std::sync::Arc;
+
+use applicamp_kernel::{
+    AppState, Config, config::ProviderConfig, crypto::SecretKey, events::EventBus, jobs::Worker,
+};
 use aws_lc_rs::signature::Ed25519KeyPair;
 use axum::{
     Router,
@@ -139,6 +143,7 @@ fn sign_with(key: &EncodingKey, claims: &Value) -> String {
 struct Harness {
     app: Router,
     db: PgPool,
+    events: EventBus,
     campbooks: Fake,
     linkedin: Fake,
 }
@@ -152,11 +157,14 @@ impl Harness {
         config.oidc.campbooks = campbooks.settings();
         config.oidc.linkedin = linkedin.settings();
         let settings = Settings::from_config(&config).unwrap();
-        let state = AppState::new(db.clone(), config, SecretKey::from_bytes([9; 32]));
+        let events = EventBus::new(Arc::new(crate::registry().unwrap()));
+        let state = AppState::new(db.clone(), config, SecretKey::from_bytes([9; 32]))
+            .with_events(events.clone());
         let bff = Bff::new(&state, &settings).unwrap();
         Self {
             app: crate::app(state, &bff),
             db,
+            events,
             campbooks,
             linkedin,
         }
@@ -217,6 +225,16 @@ impl Harness {
         let response = self.get("/api/v1/me", session).await;
         let status = response.status();
         (status, body(response).await)
+    }
+
+    /// Run every queued background job (event deliveries included).
+    async fn work(&self) {
+        let worker = Worker::new(
+            self.db.clone(),
+            Arc::new(crate::registry().unwrap()),
+            self.events.clone(),
+        );
+        while worker.run_once().await.unwrap() {}
     }
 
     async fn count(&self, sql: &'static str) -> i64 {
@@ -613,4 +631,50 @@ fn a_provider_needs_its_secret_and_campbooks_its_issuer() {
     assert!(settings.secure);
     assert_eq!(settings.public_origin, "https://applicamp.example.com");
     assert_eq!(settings.providers.len(), 2);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn removing_an_invite_ends_every_session_and_blocks_sign_in(db: PgPool) {
+    invite(&db, "ana@example.com").await;
+    invite(&db, "bo@example.com").await;
+    let h = Harness::new(db.clone()).await;
+    let first = h.sign_in("campbooks", "cb-1", "ana@example.com").await;
+    let second = h.sign_in("linkedin", "li-1", "ana@example.com").await;
+    let bo = h.sign_in("campbooks", "cb-2", "bo@example.com").await;
+    let (first, second, bo) = (
+        cookie_named(&first, "applicamp_session").unwrap(),
+        cookie_named(&second, "applicamp_session").unwrap(),
+        cookie_named(&bo, "applicamp_session").unwrap(),
+    );
+    assert_eq!(h.me(Some(&first)).await.0, StatusCode::OK);
+
+    assert!(
+        invites::remove(&db, &h.events, "ana@example.com")
+            .await
+            .unwrap()
+    );
+    h.work().await;
+
+    // Both of her sessions ended; Bo's did not.
+    for session in [&first, &second] {
+        let (status, problem) = h.me(Some(session)).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        assert_eq!(problem["code"], "session_required");
+    }
+    assert_eq!(h.me(Some(&bo)).await.0, StatusCode::OK);
+    assert_eq!(h.count("SELECT count(*) FROM bff.sessions").await, 1);
+
+    // She cannot sign back in with a linked way in, and nothing is deleted.
+    let again = h.sign_in("campbooks", "cb-1", "ana@example.com").await;
+    assert_eq!(location(&again), handlers::NOT_INVITED);
+    assert!(cookie_named(&again, "applicamp_session").is_none());
+    assert_eq!(h.count("SELECT count(*) FROM identity.accounts").await, 2);
+    assert_eq!(h.count("SELECT count(*) FROM identity.ways_in").await, 3);
+
+    // Inviting her again restores access.
+    invite(&db, "ana@example.com").await;
+    let back = h.sign_in("linkedin", "li-1", "ana@example.com").await;
+    assert_eq!(location(&back), "/");
+    let session = cookie_named(&back, "applicamp_session").unwrap();
+    assert_eq!(h.me(Some(&session)).await.0, StatusCode::OK);
 }

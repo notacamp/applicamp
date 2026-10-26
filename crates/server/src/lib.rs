@@ -50,6 +50,11 @@ pub fn registry() -> Result<Registry, Vec<String>> {
         modules()
             .into_iter()
             .map(|module| (module.name, module.background))
+            // The server's own work: the BFF owns the session store.
+            .chain([(
+                "bff",
+                applicamp_kernel::Background::new().on_event::<bff::EndSessions>(),
+            )])
             .collect(),
     )
 }

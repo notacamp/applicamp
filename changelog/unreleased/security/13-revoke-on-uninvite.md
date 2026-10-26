@@ -1,0 +1,1 @@
+- **Removing an invite now cuts off access.** `applicamp invite remove you@example.com` ends every session of that account and stops its linked ways in from signing in, until the address is invited again. The account and its data are kept.

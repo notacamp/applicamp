@@ -1,7 +1,8 @@
 //! Signing in: which account a provider identity is, if any.
 //!
 //! The rule (`openspec/specs/identity`):
-//! 1. A way in already linked (same provider and subject) signs its account in.
+//! 1. A way in already linked (same provider and subject) signs its account in,
+//!    but only while the account's address is on the invite list.
 //! 2. Else a **verified** address on the **invite list** that is an
 //!    account's address links this way in to that account.
 //! 3. Else a verified address on the invite list creates an account with
@@ -87,7 +88,14 @@ pub async fn sign_in(state: &AppState, who: ProviderIdentity) -> Result<SignIn> 
     .await?;
 
     let (way_in, account) = match linked {
-        Some(found) => found,
+        Some(found) => {
+            if !account_is_invited(&mut tx, found.1).await? {
+                tx.rollback().await?;
+                tracing::info!(provider = %who.provider, "sign-in refused: account not on the invite list");
+                return Ok(SignIn::NotInvited);
+            }
+            found
+        }
         None => {
             let Some(email) = invited_address(&mut tx, &who).await? else {
                 tx.rollback().await?;
@@ -145,6 +153,19 @@ pub async fn sign_in(state: &AppState, who: ProviderIdentity) -> Result<SignIn> 
         .await?;
     tx.commit().await?;
     Ok(SignIn::Account(account))
+}
+
+/// Whether the address of `account` is on the invite list.
+async fn account_is_invited(conn: &mut PgConnection, account: Uuid) -> Result<bool> {
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS (
+             SELECT 1 FROM identity.accounts a
+               JOIN identity.invites i ON i.email = a.email
+              WHERE a.id = $1)",
+    )
+    .bind(account)
+    .fetch_one(conn)
+    .await?)
 }
 
 /// `who`'s address, normalized, when it is verified and on the invite list.

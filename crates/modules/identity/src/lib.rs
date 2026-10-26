@@ -33,6 +33,8 @@ pub fn module() -> Module {
     Module {
         name: NAME,
         router: OpenApiRouter::new().routes(routes!(features::me::handler)),
-        background: Background::new().publishes::<events::AccountCreated>(),
+        background: Background::new()
+            .publishes::<events::AccountCreated>()
+            .publishes::<events::InviteRevoked>(),
     }
 }

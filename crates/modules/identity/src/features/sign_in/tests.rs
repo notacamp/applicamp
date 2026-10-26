@@ -142,33 +142,49 @@ async fn both_ways_in_reach_one_account(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn a_linked_way_in_still_signs_in_once_uninvited(db: PgPool) {
+async fn a_linked_way_in_stops_signing_in_once_uninvited(db: PgPool) {
     invite(&db, "ana@example.com").await;
     let state = state(db.clone());
-    let first = sign_in(
+    let SignIn::Account(account) = sign_in(
         &state,
         identity(Provider::Campbooks, "cb-1", "ana@example.com"),
     )
     .await
-    .unwrap();
-    assert!(invites::remove(&db, "ana@example.com").await.unwrap());
+    .unwrap() else {
+        panic!("an invited person signs in");
+    };
+    assert!(
+        invites::remove(&db, &state.events, "ana@example.com")
+            .await
+            .unwrap()
+    );
 
-    let again = sign_in(
-        &state,
+    // The linked way in no longer signs in, and neither does a new one.
+    for who in [
         identity(Provider::Campbooks, "cb-1", "ana@example.com"),
-    )
-    .await
-    .unwrap();
-
-    assert_eq!(first, again);
-    // A new way in for the same address is no longer accepted.
-    let other = sign_in(
-        &state,
         identity(Provider::Linkedin, "li-1", "ana@example.com"),
-    )
-    .await
-    .unwrap();
-    assert_eq!(other, SignIn::NotInvited);
+    ] {
+        assert_eq!(sign_in(&state, who).await.unwrap(), SignIn::NotInvited);
+    }
+
+    // Nothing was deleted: the account and its way in are kept.
+    assert_eq!(
+        count(&db, "SELECT count(*) FROM identity.accounts").await,
+        1
+    );
+    assert_eq!(count(&db, "SELECT count(*) FROM identity.ways_in").await, 1);
+
+    // Inviting the address again restores access to the same account.
+    invite(&db, "ana@example.com").await;
+    assert_eq!(
+        sign_in(
+            &state,
+            identity(Provider::Campbooks, "cb-1", "ana@example.com")
+        )
+        .await
+        .unwrap(),
+        SignIn::Account(account)
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

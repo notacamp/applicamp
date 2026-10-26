@@ -122,7 +122,6 @@ function EntryForm({ list, initial, busy, testId, onSave, onCancel, onRemove }: 
     return problem === "required" ? t("form.required") : undefined;
   };
 
-
   return (
     <Tagged testId={testId}>
       <Stack gap="sm">

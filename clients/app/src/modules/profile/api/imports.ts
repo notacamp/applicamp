@@ -55,6 +55,8 @@ export const importQueryKey = (id: string) => ["profile", "imports", id] as cons
 export function importQuery(id: string) {
   return queryOptions({
     queryKey: importQueryKey(id),
+    // A draft never changes on the server: the one the upload answered with stands.
+    staleTime: Number.POSITIVE_INFINITY,
     queryFn: async ({ signal }): Promise<Import> =>
       unwrap(await api.GET("/api/v1/profile/imports/{id}", { params: { path: { id } }, signal })),
   });

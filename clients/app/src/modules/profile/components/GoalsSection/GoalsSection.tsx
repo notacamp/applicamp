@@ -196,11 +196,13 @@ export function GoalsSection({ offer, onDismissOffer, onStart }: GoalsSectionPro
                       question={question}
                       answers={open.working}
                       onAnswers={(working) => {
-                        setEditing({ ...open, working });
+                        setEditing((now) => (now === null ? now : { ...now, working }));
                       }}
                       pending={open.pending}
                       onPending={(pending) => {
-                        setEditing({ ...open, pending, amountInvalid: false });
+                        setEditing((now) =>
+                          now === null ? now : { ...now, pending, amountInvalid: false },
+                        );
                       }}
                       amountInvalid={open.amountInvalid}
                     />

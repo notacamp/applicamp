@@ -73,7 +73,7 @@ describe("the goals questions", () => {
     expect(typed("90.000")).toEqual(expect.objectContaining({ amount: 90_000 }));
     expect(typed("1 250 000")).toEqual(expect.objectContaining({ amount: 1_250_000 }));
     for (const junk of ["abc", "0", "90.5", "-5", "100000001", "9,00"]) {
-      expect(typed(junk), junk).toBe("invalid");
+      expect(typed(junk)).toBe("invalid");
     }
   });
 

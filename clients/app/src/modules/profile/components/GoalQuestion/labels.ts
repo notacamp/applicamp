@@ -9,7 +9,7 @@ import type {
   Seniority,
   WorkMode,
 } from "../../api/goals";
-import { type Question } from "../../api/questions";
+import type { Question } from "../../api/questions";
 
 /** `text` with its first letter in capitals (a language's name, in a language that writes them small). */
 function capitalised(text: string, locale: string): string {
@@ -26,7 +26,7 @@ export function useGoalLabels() {
     try {
       return new Intl.DisplayNames(locale, { type });
     } catch {
-      return undefined;
+      return null;
     }
   };
   const languageName = (tag: string): string => {

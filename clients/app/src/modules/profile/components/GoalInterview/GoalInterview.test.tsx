@@ -43,10 +43,9 @@ function fakeGoals(initial: Goals = EMPTY_GOALS, failing = false) {
 
 /** The input of a choice (a radio or a checkbox) in a question's field. */
 function choice(question: string, value: string): HTMLElement {
-  const input = screen
-    .getByTestId(`goal-${question}-field`)
-    .querySelector(`input[value="${value}"]`);
-  if (!(input instanceof HTMLElement)) {
+  const inputs = screen.getByTestId(`goal-${question}-field`).querySelectorAll("input");
+  const input = [...inputs].find((candidate) => candidate.value === value);
+  if (input === undefined) {
     throw new TypeError(`No choice ${value} in ${question}`);
   }
   return input;

@@ -1,0 +1,437 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Applicamp API",
+    "description": "The Applicamp HTTP API. Errors are RFC 9457 `application/problem+json` with a stable `code`. Operations either are public or take the web app's session cookie (`session`); unsafe methods also need the `X-Applicamp-CSRF: 1` header and the app's own `Origin`.",
+    "license": {
+      "name": "Sustainable Use License",
+      "identifier": "LicenseRef-Sustainable-Use"
+    },
+    "version": "0.0.0"
+  },
+  "paths": {
+    "/api/v1/me": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Who is signed in.",
+        "description": "The account behind the session cookie, with the providers linked to it.\nNever a token.",
+        "operationId": "identity.me",
+        "responses": {
+          "200": {
+            "description": "The signed-in person.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`: no live session.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/bff/callback/{provider}": {
+      "get": {
+        "tags": [
+          "bff"
+        ],
+        "summary": "Finish signing in.",
+        "description": "Checks `state` against the login cookie, redeems the code, validates the\nID token, and signs the person in if their provider identity is linked\nor their verified address is on the invite list: a session cookie and a\nredirect to `/`. Someone not on the list lands on `/not-invited`; any\nfailure on `/sign-in?error=sign_in_failed`. The login cookie is cleared\neither way.",
+        "operationId": "bff.callback",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "description": "`campbooks` or `linkedin`.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Provider"
+            }
+          },
+          {
+            "name": "code",
+            "in": "query",
+            "description": "The authorization code.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "description": "The `state` sent with the authorization request.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "error",
+            "in": "query",
+            "description": "An error code instead of a code.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "303": {
+            "description": "To `/` signed in (with the session cookie), to `/not-invited`, or to `/sign-in?error=sign_in_failed`.",
+            "headers": {
+              "location": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "set-cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such provider is configured.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {}
+        ]
+      }
+    },
+    "/bff/providers": {
+      "get": {
+        "tags": [
+          "bff"
+        ],
+        "summary": "The sign-in providers.",
+        "description": "Only the configured ones; the sign-in page shows one button each.",
+        "operationId": "bff.providers",
+        "responses": {
+          "200": {
+            "description": "The configured providers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Providers"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {}
+        ]
+      }
+    },
+    "/bff/sign-in/{provider}": {
+      "get": {
+        "tags": [
+          "bff"
+        ],
+        "summary": "Start signing in with a provider.",
+        "description": "Seals a new sign-in (`state`, `nonce`, PKCE verifier) into a\nten-minute, `SameSite=Lax` login cookie and redirects to the provider's\nauthorization endpoint.",
+        "operationId": "bff.sign_in",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "description": "`campbooks` or `linkedin`.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Provider"
+            }
+          }
+        ],
+        "responses": {
+          "303": {
+            "description": "To the provider, or to `/sign-in?error=provider_unavailable` when it cannot be reached.",
+            "headers": {
+              "location": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "set-cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such provider is configured.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {}
+        ]
+      }
+    },
+    "/bff/sign-out": {
+      "post": {
+        "tags": [
+          "bff"
+        ],
+        "summary": "Sign out.",
+        "description": "Deletes the session on the server and clears the cookie. Needs the\n`X-Applicamp-CSRF: 1` header and a same-origin request, like every\nunsafe request.",
+        "operationId": "bff.sign_out",
+        "responses": {
+          "204": {
+            "description": "Signed out (also when there was no session).",
+            "headers": {
+              "set-cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`csrf_check_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/healthz": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Health check.",
+        "description": "`ok` when the server answers and reaches its database.",
+        "operationId": "system.health",
+        "responses": {
+          "200": {
+            "description": "Healthy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`database_unavailable`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {}
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Health": {
+        "type": "object",
+        "description": "The instance's health.",
+        "required": [
+          "status",
+          "version"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "`ok`."
+          },
+          "version": {
+            "type": "string",
+            "description": "The server's version."
+          }
+        }
+      },
+      "Me": {
+        "type": "object",
+        "description": "The signed-in person.",
+        "required": [
+          "id",
+          "email",
+          "ways_in"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The verified address the account was created with."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Their account."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their name, as their first way in gave it."
+          },
+          "picture_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their photo, if a provider gave one."
+          },
+          "ways_in": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Provider"
+            },
+            "description": "The providers that sign them in."
+          }
+        }
+      },
+      "Problem": {
+        "type": "object",
+        "description": "RFC 9457 problem details.",
+        "required": [
+          "type",
+          "title",
+          "status",
+          "detail",
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Stable machine-readable reason (`not_found`, `session_required`, …).\nMatch and translate on this, never on `title` or `detail`."
+          },
+          "detail": {
+            "type": "string",
+            "description": "What went wrong in this occurrence, in English."
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "description": "HTTP status code.",
+            "minimum": 0
+          },
+          "title": {
+            "type": "string",
+            "description": "Short summary: the HTTP status's reason phrase."
+          },
+          "type": {
+            "type": "string",
+            "description": "URI identifying the problem type; `about:blank` when the HTTP status\nsays it all."
+          }
+        },
+        "example": {
+          "code": "not_found",
+          "detail": "This resource does not exist, or you cannot see it.",
+          "status": 404,
+          "title": "Not Found",
+          "type": "about:blank"
+        }
+      },
+      "Provider": {
+        "type": "string",
+        "description": "A sign-in provider.",
+        "enum": [
+          "campbooks",
+          "linkedin"
+        ]
+      },
+      "Providers": {
+        "type": "object",
+        "description": "The sign-in providers this instance offers.",
+        "required": [
+          "providers"
+        ],
+        "properties": {
+          "providers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Provider"
+            },
+            "description": "In the order the sign-in page shows them."
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__Host-applicamp_session",
+        "description": "The web app's session cookie, set by `/bff/callback/{provider}` (`HttpOnly`, `Secure`, `SameSite=Strict`; named `applicamp_session` when the instance's public URL is plain http). Unsafe methods also need the `X-Applicamp-CSRF: 1` header and the app's own `Origin`."
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "system",
+      "description": "Instance health and version."
+    },
+    {
+      "name": "identity",
+      "description": "Accounts and their ways in (Campbooks, LinkedIn). Who may create an account is the invite list, managed from the server's command line only."
+    },
+    {
+      "name": "bff",
+      "description": "The web app's backend-for-frontend: sign-in with a provider, the session cookie, sign-out. Browsers only."
+    }
+  ]
+}

@@ -1,0 +1,91 @@
+[workspace]
+resolver = "3"
+# `crates/*` would also match the `crates/modules` directory (which has no
+# manifest), so the platform crates are listed explicitly; modules use a glob.
+members = [
+    "crates/kernel",
+    "crates/server",
+    "crates/modules/*",
+    "crates/xtask",
+]
+exclude = ["clients"]
+
+[workspace.package]
+# Must equal the `VERSION` file at the repo root (checked by `cargo xtask arch`).
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.96"
+license = "LicenseRef-Sustainable-Use"
+repository = "https://github.com/notacamp/applicamp"
+publish = false
+
+[workspace.dependencies]
+# Internal crates
+applicamp-kernel = { path = "crates/kernel" }
+applicamp-server = { path = "crates/server" }
+applicamp-identity = { path = "crates/modules/identity" }
+
+# The same versions and features as Campbooks Next, trimmed to what is used.
+
+# HTTP / async
+axum = { version = "0.8.9", default-features = false, features = ["http1", "http2", "json", "query", "form", "tokio", "tower-log", "tracing", "matched-path"] }
+tokio = { version = "1.53.2", features = ["macros", "rt-multi-thread", "signal", "net", "sync", "time", "io-util"] }
+tower = { version = "0.5.3", features = ["util"] }
+tower-http = { version = "0.7.1", features = ["request-id", "util", "set-header"] }
+http-body-util = "0.1.5"
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "http2", "json", "charset"] }
+url = { version = "2.5.8", features = ["serde"] }
+
+# OpenAPI
+utoipa = { version = "6.0.0", features = ["axum_extras", "uuid", "chrono", "url"] }
+utoipa-axum = "0.3.0"
+
+# Database
+sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "tls-rustls-aws-lc-rs", "postgres", "macros", "migrate", "uuid", "chrono", "json"] }
+
+# Serialization / config
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+figment = { version = "0.10.19", features = ["env"] }
+toml = "1.1.8"
+
+# Errors, observability, misc
+thiserror = "2.0.21"
+anyhow = "1.0.104"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json", "fmt"] }
+uuid = { version = "1.28.0", features = ["v7", "serde"] }
+chrono = { version = "0.4.45", default-features = false, features = ["clock", "serde", "std"] }
+secrecy = { version = "0.10.3", features = ["serde"] }
+# ID-token validation. aws-lc-rs is the crypto backend rustls already uses.
+jsonwebtoken = { version = "11.1.0", default-features = false, features = ["aws_lc_rs"] }
+clap = { version = "4.6.7", features = ["derive", "env"] }
+# Random tokens, hashes and sealing (`kernel::crypto`); already the crypto
+# backend of rustls and jsonwebtoken.
+aws-lc-rs = "1.18.1"
+base64 = "0.22.1"
+
+# Tooling (xtask)
+cargo_metadata = "0.23.1"
+regex = "1.13.1"
+
+# Tests
+# The fake OIDC providers (discovery, JWKS, token endpoint).
+wiremock = "0.6.5"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+dbg_macro = "deny"
+todo = "deny"
+print_stdout = "deny"
+print_stderr = "deny"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

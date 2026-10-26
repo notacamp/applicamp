@@ -1,0 +1,145 @@
+name: CI
+
+# Every deterministic code gate. Job names are short because the workflow
+# name is the section on a PR: `CI / rust`, `CI / deny`, … A job name is a
+# required-check interface: renaming one means updating the branch ruleset
+# in the same change. Agents never build or test locally (AGENTS.md); this
+# is the test runner.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  # Line numbers in backtraces without full debug info: faster links and
+  # smaller caches.
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
+
+jobs:
+  rust-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2, reads rust-toolchain.toml
+        with: { cache: false }
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with: { save-if: "${{ github.ref == 'refs/heads/main' }}" }
+      - name: Format
+        if: always()
+        run: cargo fmt --all --check
+      - name: Clippy
+        if: always()
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Architecture (module boundaries, migrations, operation security, documented routes)
+        if: always()
+        run: cargo xtask arch
+      - name: OpenAPI drift
+        id: openapi
+        if: always()
+        run: cargo xtask openapi --check
+      # On drift, write the document the server generates and upload it, so a
+      # change can commit it without compiling the server locally
+      # (`gh run download <run> -n generated-openapi -D openapi`). The check
+      # above still fails the job.
+      - name: Generate the stale OpenAPI document
+        if: always() && steps.openapi.outcome == 'failure'
+        run: cargo xtask openapi
+      - name: Upload the generated OpenAPI document
+        if: always() && steps.openapi.outcome == 'failure'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: generated-openapi
+          path: openapi/openapi.json
+          retention-days: 7
+          if-no-files-found: error
+
+  rust-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: applicamp
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      # `#[sqlx::test]` creates a fresh database per test on this server.
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/applicamp
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2, reads rust-toolchain.toml
+        with: { cache: false }
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with: { save-if: "${{ github.ref == 'refs/heads/main' }}" }
+      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+        with: { tool: cargo-nextest }
+      - name: Tests
+        run: cargo nextest run --workspace --locked --no-tests=fail --no-fail-fast
+
+  rust:
+    # The required check: every Rust job above passed.
+    if: always()
+    needs: [rust-checks, rust-tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "rust-checks, rust-tests: $RESULTS"
+          for r in $RESULTS; do [ "$r" = success ] || exit 1; done
+
+  deny:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2
+        with:
+          command: check
+          arguments: --all-features
+
+  image:
+    # On a pull request: builds the release image exactly as published (one
+    # architecture) and scans it. Not pushed; `publish.yml` pushes on main.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: .
+          load: true
+          tags: applicamp:ci
+          build-args: GIT_SHA=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: The image's binary runs
+        run: |
+          docker run --rm applicamp:ci --version
+          docker run --rm applicamp:ci openapi > /dev/null
+      - name: Trivy (HIGH/CRITICAL, fixable)
+        # Pinned by SHA: this action's tags have been tampered with before.
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: applicamp:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"

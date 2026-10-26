@@ -1,0 +1,23 @@
+# Keep the build context to what the image build needs: the Rust workspace
+# (crates, migrations) and, with skeleton-client, the web client sources.
+.git
+.github
+.claude
+.cargo/registry
+target
+**/target
+docs
+openspec
+deploy
+openapi
+changelog
+*.md
+.env
+.env.*
+**/*.rs.bk
+.DS_Store
+compose*.yml
+Dockerfile
+.dockerignore
+**/node_modules
+**/dist

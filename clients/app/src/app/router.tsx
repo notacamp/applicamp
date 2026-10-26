@@ -10,9 +10,11 @@ import { z } from "zod";
 
 import { ThemeProvider } from "~/lib/ui";
 import { NotInvitedPage, SIGN_IN_ERRORS, SignInPage, type SignInError } from "~/modules/identity";
+import { QUESTIONS, type Question } from "~/modules/profile";
 
 import { Agents } from "./routes/agents";
 import { SignedInFrame } from "./routes/frame";
+import { GoalsInterview } from "./routes/goals-interview";
 import { NotFound } from "./routes/not-found";
 import { Pipeline } from "./routes/pipeline";
 import { Profile } from "./routes/profile";
@@ -94,6 +96,37 @@ const profileRoute = createRoute({
         onImporting={(open) => {
           void navigate({ search: open ? { import: "new" } : {} });
         }}
+        onStartGoals={(step) => {
+          void navigate({ to: "/goals/interview", search: { step } });
+        }}
+      />
+    );
+  },
+});
+
+/** `?step=` is the question on screen; none (or an unknown one) is the first. */
+const interviewSearch = z.object({ step: z.enum(QUESTIONS) });
+
+/** The goals interview: signed in, but outside the app frame, so nothing else competes with the question. */
+const interviewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/goals/interview",
+  validateSearch: (search: Record<string, unknown>): { step?: Question | undefined } => {
+    const parsed = interviewSearch.safeParse(search);
+    return { step: parsed.success ? parsed.data.step : undefined };
+  },
+  component: function InterviewRoute() {
+    const search = interviewRoute.useSearch();
+    const navigate = interviewRoute.useNavigate();
+    return (
+      <GoalsInterview
+        question={search.step}
+        onQuestion={(step) => {
+          void navigate({ search: { step } });
+        }}
+        onLeave={(reason) => {
+          void navigate({ to: reason === "done" ? "/profile" : "/" });
+        }}
       />
     );
   },
@@ -102,6 +135,7 @@ const profileRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   signInRoute,
   notInvitedRoute,
+  interviewRoute,
   frameRoute.addChildren([todayRoute, pipelineRoute, agentsRoute, profileRoute]),
 ]);
 

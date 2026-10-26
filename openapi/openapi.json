@@ -10,6 +10,98 @@
     "version": "0.0.0"
   },
   "paths": {
+    "/api/v1/goals": {
+      "get": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "The signed-in person's goals.",
+        "description": "Version 0 and no answers until they answer a question.",
+        "operationId": "profile.get_goals",
+        "responses": {
+          "200": {
+            "description": "The goals.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalsView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Save the goals.",
+        "description": "All the answers at once, as the interview or an edit leaves them; a\nquestion left out is unanswered. Values are trimmed and blank ones\nremoved. Lists over their limit (5 roles; 10 places, things to avoid and\nmust-haves), a currency that is not ISO 4217 or a choice that does not\nexist are refused. Every save, even of the same answers, is a new version.",
+        "operationId": "profile.update_goals",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Goals"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The goals, saved, at their new version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_goals`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/v1/me": {
       "get": {
         "tags": [
@@ -676,6 +768,15 @@
           "merge"
         ]
       },
+      "Autonomy": {
+        "type": "string",
+        "description": "How much agents may do alone. Applying and emailing always wait for the\nperson, whatever this says.",
+        "enum": [
+          "find_only",
+          "prepare",
+          "prepare_and_schedule"
+        ]
+      },
       "Basics": {
         "type": "object",
         "description": "Who they are.",
@@ -735,6 +836,32 @@
         },
         "additionalProperties": false
       },
+      "CashFloor": {
+        "type": "object",
+        "description": "The least they would take, before tax.",
+        "required": [
+          "amount",
+          "currency",
+          "period"
+        ],
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Whole units of `currency` per `period`, 1 to 100 000 000.",
+            "minimum": 0
+          },
+          "currency": {
+            "type": "string",
+            "description": "An ISO 4217 code such as `EUR`."
+          },
+          "period": {
+            "$ref": "#/components/schemas/Period",
+            "description": "Per year or per month."
+          }
+        },
+        "additionalProperties": false
+      },
       "Certificate": {
         "type": "object",
         "description": "A certification.",
@@ -769,6 +896,17 @@
           }
         },
         "additionalProperties": false
+      },
+      "CompanyStage": {
+        "type": "string",
+        "description": "What kind of company.",
+        "enum": [
+          "early",
+          "growth",
+          "established",
+          "public",
+          "nonprofit"
+        ]
       },
       "Education": {
         "type": "object",
@@ -811,6 +949,146 @@
           }
         },
         "additionalProperties": false
+      },
+      "Goals": {
+        "type": "object",
+        "description": "The answers to the goals interview. Nothing is required.",
+        "required": [
+          "roles",
+          "seniority",
+          "work_mode",
+          "locations",
+          "company_stage",
+          "avoid",
+          "must_have",
+          "languages_for_work"
+        ],
+        "properties": {
+          "autonomy": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Autonomy",
+                "description": "How much agents may do alone."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "avoid": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What they will not work on (up to 10)."
+          },
+          "cash_floor": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CashFloor",
+                "description": "The least they would take, before tax."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "company_stage": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompanyStage"
+            },
+            "description": "The kinds of company."
+          },
+          "equity_counts": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Whether equity counts toward the cash floor."
+          },
+          "languages_for_work": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The languages they can work in, as BCP 47 tags (`en`, `pt-PT`)."
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Where they can work from: cities, countries or regions (up to 10)."
+          },
+          "must_have": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What the job must have (up to 10)."
+          },
+          "relocate": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Relocate",
+                "description": "Whether they would move for the right job."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The roles they want next (up to 5)."
+          },
+          "seniority": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Seniority"
+            },
+            "description": "The levels that fit."
+          },
+          "work_mode": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkMode"
+            },
+            "description": "How they want to work."
+          }
+        },
+        "additionalProperties": false
+      },
+      "GoalsView": {
+        "type": "object",
+        "description": "The goals and the version they are at.",
+        "required": [
+          "version",
+          "answers"
+        ],
+        "properties": {
+          "answers": {
+            "$ref": "#/components/schemas/Goals",
+            "description": "The answers; every one optional."
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When they last changed."
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "description": "0 until something is saved; each save adds one."
+          }
+        }
       },
       "Health": {
         "type": "object",
@@ -1006,6 +1284,14 @@
             "description": "The providers that sign them in."
           }
         }
+      },
+      "Period": {
+        "type": "string",
+        "description": "What a cash floor is counted over.",
+        "enum": [
+          "year",
+          "month"
+        ]
       },
       "Problem": {
         "type": "object",
@@ -1227,6 +1513,31 @@
           }
         }
       },
+      "Relocate": {
+        "type": "string",
+        "description": "Whether they would move for the right job.",
+        "enum": [
+          "no",
+          "within_country",
+          "within_eu",
+          "anywhere"
+        ]
+      },
+      "Seniority": {
+        "type": "string",
+        "description": "Which levels fit.",
+        "enum": [
+          "junior",
+          "mid",
+          "senior",
+          "staff",
+          "principal",
+          "lead",
+          "manager",
+          "director",
+          "founding"
+        ]
+      },
       "Skill": {
         "type": "object",
         "description": "A skill.",
@@ -1306,6 +1617,15 @@
           }
         },
         "additionalProperties": false
+      },
+      "WorkMode": {
+        "type": "string",
+        "description": "How they want to work.",
+        "enum": [
+          "remote",
+          "hybrid",
+          "onsite"
+        ]
       }
     },
     "securitySchemes": {

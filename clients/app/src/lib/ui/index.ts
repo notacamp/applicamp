@@ -22,7 +22,9 @@ export {
 } from "./components/AppMark/AppMark";
 export { AppFrame } from "./components/AppFrame/AppFrame";
 export { FileField, type FileFieldProps } from "./components/FileField/FileField";
+export { InlineEdit, type InlineEditProps } from "./components/InlineEdit/InlineEdit";
 export { InlineText, type InlineTextProps } from "./components/InlineText/InlineText";
+export { ListField, withItem, type ListFieldProps } from "./components/ListField/ListField";
 export {
   Cluster,
   Section,

@@ -84,7 +84,7 @@ export function stubApi(routes: Record<string, StubAnswer | (() => StubAnswer)>)
     }
     const contentType = status >= 400 ? "application/problem+json" : "application/json";
     return Promise.resolve(
-      new Response(JSON.stringify(body), { status, headers: { "content-type": contentType } }),
+      Response.json(body, { status, headers: { "content-type": contentType } }),
     );
   };
   vi.stubGlobal("fetch", fetch);

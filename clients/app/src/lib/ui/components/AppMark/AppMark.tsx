@@ -8,7 +8,7 @@ export interface AppMarkProps {
 /** The product's mark: its initial in an ink square (decorative). */
 export function AppMark({ size = "md" }: AppMarkProps) {
   return (
-    <span className={styles.mark} data-size={size} aria-hidden="true">
+    <span className={styles["mark"]} data-size={size} aria-hidden="true">
       A
     </span>
   );
@@ -26,11 +26,11 @@ export interface AppBrandProps {
 /** The mark and the name, for the sidebar's top and pages outside the app frame. */
 export function AppBrand({ name, detail, place = "page" }: AppBrandProps) {
   return (
-    <span className={styles.brand} data-place={place}>
+    <span className={styles["brand"]} data-place={place}>
       <AppMark />
-      <span className={styles.text}>
-        <span className={styles.name}>{name}</span>
-        {detail === undefined ? null : <span className={styles.detail}>{detail}</span>}
+      <span className={styles["text"]}>
+        <span className={styles["name"]}>{name}</span>
+        {detail === undefined ? null : <span className={styles["detail"]}>{detail}</span>}
       </span>
     </span>
   );

@@ -21,8 +21,9 @@ export function useSignOut() {
   return useMutation({
     mutationFn: signOut,
     onSuccess: async () => {
-      await navigate({ to: "/sign-in", replace: true });
+      // Forget first: the sign-in page then starts from an empty cache.
       queryClient.clear();
+      await navigate({ to: "/sign-in", replace: true });
     },
   });
 }

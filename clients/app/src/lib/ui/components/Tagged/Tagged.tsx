@@ -9,7 +9,7 @@ import styles from "./Tagged.module.css";
  */
 export function Tagged({ testId, children }: { testId: string; children: ReactNode }) {
   return (
-    <div className={styles.tagged} data-testid={testId}>
+    <div className={styles["tagged"]} data-testid={testId}>
       {children}
     </div>
   );

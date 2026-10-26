@@ -22,14 +22,14 @@ export interface PlaceholderProps {
  */
 export function Placeholder({ title, children, icon, action, testId }: PlaceholderProps) {
   return (
-    <section className={styles.placeholder} data-testid={testId}>
-      <span className={styles.icon}>
+    <section className={styles["placeholder"]} data-testid={testId}>
+      <span className={styles["icon"]}>
         <Icon name={icon} size="lg" />
       </span>
       <Heading level={2} size="title">
         {title}
       </Heading>
-      {children === undefined ? null : <div className={styles.body}>{children}</div>}
+      {children === undefined ? null : <div className={styles["body"]}>{children}</div>}
       {action}
     </section>
   );

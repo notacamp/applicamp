@@ -28,9 +28,9 @@ describe("the locale", () => {
   it("starts synchronously with every namespace", () => {
     const i18n = createI18n({
       locale: "pt-PT",
-      namespaces: { shell: { ...each({ hello: "Hello" }), "pt-PT": { hello: "Olá" } } },
+      namespaces: { shell: { ...each({ appName: "Applicamp" }), "pt-PT": { appName: "Olá" } } },
     });
-    expect(i18n.t("hello")).toBe("Olá");
+    expect(i18n.t("appName")).toBe("Olá");
     expect(i18n.language).toBe("pt-PT");
   });
 

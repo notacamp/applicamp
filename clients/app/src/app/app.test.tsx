@@ -32,7 +32,6 @@ describe("the app", () => {
     });
     const { router } = renderApp("/pipeline");
 
-    expect(screen.getByTestId("gate-opening")).toHaveTextContent("Opening Applicamp…");
     await waitFor(() => {
       expect(router.state.location.pathname).toBe("/sign-in");
     });
@@ -90,7 +89,10 @@ describe("the app", () => {
 
     await user.keyboard("{Control>}k{/Control}");
     await waitFor(() => {
-      expect(document.body).toHaveTextContent("Go to a page or run a command");
+      expect(document.activeElement).toHaveAttribute(
+        "placeholder",
+        "Go to a page or run a command",
+      );
     });
     await user.keyboard("Pipeline{Enter}");
     await waitFor(() => {

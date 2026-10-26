@@ -2,7 +2,7 @@
 // pt-PT.json, es-ES.json and fr.json with the same keys, no empty string, and
 // the same {{placeholders}} as English. Run with `pnpm i18n:check`.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const LOCALES = ["en", "pt-PT", "es-ES", "fr"] as const;
@@ -12,10 +12,10 @@ const root = fileURLToPath(new URL("../src", import.meta.url));
 function folders(dir: string): string[] {
   const found: string[] = [];
   for (const name of readdirSync(dir)) {
-    const path = join(dir, name);
-    if (statSync(path).isDirectory()) {
+    const entry = path.join(dir, name);
+    if (statSync(entry).isDirectory()) {
       found.push(
-        ...(name === "i18n" && existsSync(join(path, "en.json")) ? [path] : folders(path)),
+        ...(name === "i18n" && existsSync(path.join(entry, "en.json")) ? [entry] : folders(entry)),
       );
     }
   }
@@ -41,15 +41,15 @@ const placeholders = (text: unknown): string =>
   typeof text === "string"
     ? [...text.matchAll(/\{\{\s*(\w+)\s*\}\}/g)]
         .map((match) => match[1])
-        .sort()
+        .toSorted()
         .join(",")
     : "";
 
 const problems: string[] = [];
 for (const folder of folders(root)) {
-  const where = relative(root, folder);
+  const where = path.relative(root, folder);
   const read = (locale: string) =>
-    flatten(JSON.parse(readFileSync(join(folder, `${locale}.json`), "utf8")) as unknown);
+    flatten(JSON.parse(readFileSync(path.join(folder, `${locale}.json`), "utf8")) as unknown);
   const english = read("en");
   for (const locale of LOCALES) {
     let messages: Map<string, unknown>;

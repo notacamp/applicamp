@@ -9,7 +9,7 @@ import styles from "./AppFrame.module.css";
  */
 export function AppFrame({ children }: { children: ReactNode }) {
   return (
-    <div className={styles.frame}>
+    <div className={styles["frame"]}>
       <Shell>{children}</Shell>
     </div>
   );

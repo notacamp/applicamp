@@ -67,11 +67,11 @@ impl Web {
             return Error::NotFound.into_response();
         }
         let asset = path.starts_with(ASSETS);
-        let Ok(response) = (if asset {
+        let Ok(response) = if asset {
             self.assets.oneshot(request).await
         } else {
             self.pages.oneshot(request).await
-        });
+        };
         if response.status() == StatusCode::NOT_FOUND {
             return Error::NotFound.into_response();
         }

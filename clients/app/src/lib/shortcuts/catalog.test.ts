@@ -16,7 +16,7 @@ describe("the shortcut catalogue", () => {
         for (const key of path) {
           value = (value as Record<string, unknown> | undefined)?.[key];
         }
-        expect(typeof value, label).toBe("string");
+        expect({ label, type: typeof value }).toEqual({ label, type: "string" });
       }
     }
   });

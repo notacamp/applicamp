@@ -18,14 +18,14 @@ export interface PageProps {
 /** A place's page in the app frame: a calm, centred column, like a Notion page. */
 export function Page({ title, eyebrow, lead, testId, children }: PageProps) {
   return (
-    <main className={styles.page} data-testid={testId}>
-      <div className={styles.column}>
-        <header className={styles.head}>
-          {eyebrow === undefined ? null : <p className={styles.eyebrow}>{eyebrow}</p>}
+    <main className={styles["page"]} data-testid={testId}>
+      <div className={styles["column"]}>
+        <header className={styles["head"]}>
+          {eyebrow === undefined ? null : <p className={styles["eyebrow"]}>{eyebrow}</p>}
           <Heading level={1} size="hero">
             {title}
           </Heading>
-          {lead === undefined ? null : <p className={styles.lead}>{lead}</p>}
+          {lead === undefined ? null : <p className={styles["lead"]}>{lead}</p>}
         </header>
         {children}
       </div>

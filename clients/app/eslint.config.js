@@ -22,7 +22,7 @@ const NO_STYLE =
 // Playwright's role/text/CSS locators are refused.
 const LOCATOR_MESSAGE =
   "Locate elements by data-testid only (getByTestId); assert on text with toHaveTextContent.";
-const NON_TESTID_QUERY = String.raw`/^(get|query|find)(All)?By(?!TestId$)/`;
+const NON_TESTID_QUERY = "/^(get|query|find)(All)?By(?!TestId$)/";
 const TESTID_ONLY_RULES = [
   {
     selector: `CallExpression[callee.property.name=${NON_TESTID_QUERY}]`,
@@ -30,7 +30,7 @@ const TESTID_ONLY_RULES = [
   },
   { selector: `CallExpression[callee.name=${NON_TESTID_QUERY}]`, message: LOCATOR_MESSAGE },
   {
-    selector: "CallExpression[callee.property.name=/^(locator|\\$|\\$\\$)$/]",
+    selector: String.raw`CallExpression[callee.property.name=/^(locator|\$|\$\$)$/]`,
     message: LOCATOR_MESSAGE,
   },
 ];

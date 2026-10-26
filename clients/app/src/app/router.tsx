@@ -39,9 +39,11 @@ const signInSearch = z.object({ error: z.enum(SIGN_IN_ERRORS) });
 const signInRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sign-in",
-  validateSearch: (search: Record<string, unknown>): { error?: SignInError } => {
+  // Always says `error`, so an unknown one never passes through from the
+  // root's raw search.
+  validateSearch: (search: Record<string, unknown>): { error?: SignInError | undefined } => {
     const parsed = signInSearch.safeParse(search);
-    return parsed.success ? { error: parsed.data.error } : {};
+    return { error: parsed.success ? parsed.data.error : undefined };
   },
   component: function SignInRoute() {
     const { error } = signInRoute.useSearch();

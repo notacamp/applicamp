@@ -53,7 +53,7 @@ function fakePipeline(extra: Record<string, Stub> = {}) {
         ...current,
         ...kept,
         ...(changes["opened"] === true ? { new: false } : {}),
-      } as Opportunity;
+      };
       store.set(opportunity().id, next);
       return { body: next };
     },

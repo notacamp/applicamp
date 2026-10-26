@@ -30,7 +30,9 @@ export function SpendLine({ testId = "spend-line" }: { testId?: string | undefin
   return (
     <Tagged testId={testId}>
       <Text tone="secondary" size="sm">
-        {spendText(estimate.data.spend, i18n.language, (key, values) => t(key, values))}
+        {spendText(estimate.data.spend, i18n.language, (key, values) =>
+          key === "spend.month" ? t("spend.month", values) : t("spend.monthNoLimit", values),
+        )}
       </Text>
     </Tagged>
   );

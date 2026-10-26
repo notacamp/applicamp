@@ -42,17 +42,17 @@ export function summary(whole: Opportunity): OpportunitySummary {
     id: whole.id,
     title: whole.title,
     company: whole.company,
-    location: whole.location,
-    work_mode: whole.work_mode,
     url: whole.url,
     source: whole.source,
-    match: whole.match,
     stage: whole.stage,
-    next_step: whole.next_step,
-    salary_text: whole.salary_text,
     new: whole.new,
     created_at: whole.created_at,
     updated_at: whole.updated_at,
+    ...(whole.location === undefined ? {} : { location: whole.location }),
+    ...(whole.work_mode === undefined ? {} : { work_mode: whole.work_mode }),
+    ...(whole.match === undefined ? {} : { match: whole.match }),
+    ...(whole.next_step === undefined ? {} : { next_step: whole.next_step }),
+    ...(whole.salary_text === undefined ? {} : { salary_text: whole.salary_text }),
   };
 }
 

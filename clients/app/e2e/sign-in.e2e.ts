@@ -54,11 +54,7 @@ test("an invited person signs in with Campbooks, lands on Today, finds Pipeline 
 
   // The command menu: ⌘K (Ctrl+K here) on a desktop, the search button on a
   // phone. Type a place, Enter goes there.
-  if (phone) {
-    await page.getByTestId("jump-phone").click();
-  } else {
-    await page.keyboard.press("ControlOrMeta+k");
-  }
+  await (phone ? page.getByTestId("jump-phone").click() : page.keyboard.press("ControlOrMeta+k"));
   await expect.poll(() => focusedRole(page)).toBe("combobox");
   await page.keyboard.type("Pipeline");
   await page.keyboard.press("Enter");

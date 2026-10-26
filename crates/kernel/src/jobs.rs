@@ -332,7 +332,7 @@ impl Worker {
         .bind(LEASE.as_secs_f64())
         .fetch_optional(&self.db)
         .await?;
-        let Some(job) = claimed else {
+        let Some(mut job) = claimed else {
             return Ok(false);
         };
         let Some(entry) = self.registry.entries.get(job.kind.as_str()) else {
@@ -346,9 +346,10 @@ impl Worker {
             attempt: u32::try_from(job.attempts).unwrap_or(1),
             event_id: job.event_id,
         };
-        let outcome = tokio::time::timeout(LEASE, (entry.runner)(ctx, job.payload))
-            .await
-            .unwrap_or_else(|_| Err(JobError::Retry("timed out".into())));
+        let outcome =
+            tokio::time::timeout(LEASE, (entry.runner)(ctx, std::mem::take(&mut job.payload)))
+                .await
+                .unwrap_or_else(|_| Err(JobError::Retry("timed out".into())));
         self.finish(&job, entry.kind, outcome).await?;
         Ok(true)
     }

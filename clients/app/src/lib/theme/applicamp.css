@@ -29,6 +29,8 @@
   /* A Notion-wide sidebar and a readable page column. */
   --sidebar-width: 248px;
   --page-width: 900px;
+  /* Database pages (the Pipeline): room for a table of seven columns. */
+  --page-width-wide: 1200px;
 }
 
 :root,
@@ -73,6 +75,23 @@
   --shadow-overlay:
     0 4px 18px var(--shadow-color),
     0 0 0 1px light-dark(rgb(15 15 15 / 0.05), rgb(255 255 255 / 0.06));
+
+  /*
+   * Notion's tag colours (Label): soft fills under the primary text, which
+   * keeps AA contrast on every one of them, light and dark.
+   */
+  --tag-gray: light-dark(#e3e2e0, #373737);
+  --tag-brown: light-dark(#eee0da, #4a3c34);
+  --tag-orange: light-dark(#fadec9, #5c3b23);
+  --tag-yellow: light-dark(#fdecc8, #564328);
+  --tag-green: light-dark(#dbeddb, #243d30);
+  --tag-blue: light-dark(#d3e5ef, #143a4e);
+  --tag-purple: light-dark(#e8deee, #3c2d49);
+  --tag-pink: light-dark(#f5e0e9, #4e2c3c);
+  --tag-red: light-dark(#ffe2dd, #522e2a);
+  /* The match bar: its track and the part filled. */
+  --match-track: var(--border-subtle);
+  --match-fill: var(--success);
 
   /* The app's own marks (AppMark): ink on the page, page on the ink. */
   --mark-bg: var(--text-primary);

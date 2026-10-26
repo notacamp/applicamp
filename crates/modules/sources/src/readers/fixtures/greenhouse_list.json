@@ -1,0 +1,124 @@
+{
+  "jobs": [
+    {
+      "absolute_url": "https://job-boards.greenhouse.io/exampleco/jobs/7001001",
+      "data_compliance": [
+        {
+          "type": "gdpr",
+          "requires_consent": true,
+          "requires_processing_consent": false,
+          "requires_retention_consent": true,
+          "retention_period": 365,
+          "demographic_data_consent_applies": false
+        }
+      ],
+      "internal_job_id": 3500001,
+      "location": {
+        "name": "Remote - Europe"
+      },
+      "metadata": [
+        {
+          "id": 64103,
+          "name": "Order",
+          "value": "0.0",
+          "value_type": "number"
+        },
+        {
+          "id": 1026531,
+          "name": "Team",
+          "value": "Platform",
+          "value_type": "single_select"
+        }
+      ],
+      "id": 7001001,
+      "updated_at": "2026-10-20T05:11:24-04:00",
+      "requisition_id": "101",
+      "title": "Senior Backend Engineer",
+      "company_name": "Example Co",
+      "first_published": "2026-10-15T10:14:35-04:00",
+      "language": "en",
+      "application_deadline": null
+    },
+    {
+      "absolute_url": "https://job-boards.greenhouse.io/exampleco/jobs/7001002",
+      "data_compliance": [
+        {
+          "type": "gdpr",
+          "requires_consent": true,
+          "requires_processing_consent": false,
+          "requires_retention_consent": true,
+          "retention_period": 365,
+          "demographic_data_consent_applies": false
+        }
+      ],
+      "internal_job_id": 3500002,
+      "location": {
+        "name": "Berlin, Germany"
+      },
+      "metadata": [
+        {
+          "id": 64103,
+          "name": "Order",
+          "value": "0.0",
+          "value_type": "number"
+        },
+        {
+          "id": 1026531,
+          "name": "Team",
+          "value": "Platform",
+          "value_type": "single_select"
+        }
+      ],
+      "id": 7001002,
+      "updated_at": "2026-10-22T09:00:00-04:00",
+      "requisition_id": "102",
+      "title": "Product Designer",
+      "company_name": "Example Co",
+      "first_published": "2026-10-21T08:30:00-04:00",
+      "language": "en",
+      "application_deadline": null
+    },
+    {
+      "absolute_url": "https://job-boards.greenhouse.io/exampleco/jobs/7001003",
+      "data_compliance": [
+        {
+          "type": "gdpr",
+          "requires_consent": true,
+          "requires_processing_consent": false,
+          "requires_retention_consent": true,
+          "retention_period": 365,
+          "demographic_data_consent_applies": false
+        }
+      ],
+      "internal_job_id": 3500003,
+      "location": {
+        "name": "Lisbon, Portugal"
+      },
+      "metadata": [
+        {
+          "id": 64103,
+          "name": "Order",
+          "value": "0.0",
+          "value_type": "number"
+        },
+        {
+          "id": 1026531,
+          "name": "Team",
+          "value": "Platform",
+          "value_type": "single_select"
+        }
+      ],
+      "id": 7001003,
+      "updated_at": "2026-08-03T12:00:00-04:00",
+      "requisition_id": "103",
+      "title": "Data Engineer",
+      "company_name": "Example Co",
+      "first_published": "2026-07-28T12:00:00-04:00",
+      "language": "en",
+      "application_deadline": null
+    }
+  ],
+  "meta": {
+    "total": 3
+  }
+}

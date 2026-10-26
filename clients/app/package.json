@@ -19,7 +19,8 @@
     "api:generate": "openapi-typescript ../../openapi/openapi.json --output src/lib/api/schema.gen.ts",
     "api:check": "pnpm run api:generate && git diff --exit-code -- src/lib/api/schema.gen.ts",
     "i18n:check": "node scripts/i18n-check.ts",
-    "fake-oidc": "node scripts/fake-oidc.ts"
+    "fake-oidc": "node scripts/fake-oidc.ts",
+    "fake-jobs": "node scripts/fake-jobs.ts"
   },
   "dependencies": {
     "@notacamp/ui": "0.1.0",

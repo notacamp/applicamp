@@ -8,7 +8,7 @@ import {
 } from "@tanstack/react-router";
 import { z } from "zod";
 
-import { ThemeProvider } from "~/lib/ui";
+import { ThemeProvider, UndoProvider } from "~/lib/ui";
 import { NotInvitedPage, SIGN_IN_ERRORS, SignInPage, type SignInError } from "~/modules/identity";
 import { QUESTIONS, type Question } from "~/modules/profile";
 
@@ -28,7 +28,9 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
   component: function RootLayout() {
     return (
       <ThemeProvider>
-        <Outlet />
+        <UndoProvider>
+          <Outlet />
+        </UndoProvider>
       </ThemeProvider>
     );
   },
@@ -67,10 +69,38 @@ const frameRoute = createRoute({
 });
 
 const todayRoute = createRoute({ getParentRoute: () => frameRoute, path: "/", component: Today });
+
+/**
+ * `?new=true` shows only the new matches (Today's "N new matches");
+ * `?run=search` starts a search and `?run=add` opens New (⌘K, from anywhere).
+ */
+const pipelineSearch = z.object({
+  new: z.boolean().optional(),
+  run: z.enum(["search", "add"]).optional(),
+});
+
 const pipelineRoute = createRoute({
   getParentRoute: () => frameRoute,
   path: "/pipeline",
-  component: Pipeline,
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { new?: boolean | undefined; run?: "search" | "add" | undefined } => {
+    const parsed = pipelineSearch.safeParse(search);
+    return parsed.success ? { new: parsed.data.new, run: parsed.data.run } : {};
+  },
+  component: function PipelineRoute() {
+    const search = pipelineRoute.useSearch();
+    const navigate = pipelineRoute.useNavigate();
+    return (
+      <Pipeline
+        newOnly={search.new === true}
+        run={search.run}
+        onSearch={(next) => {
+          void navigate({ search: next, replace: true });
+        }}
+      />
+    );
+  },
 });
 const agentsRoute = createRoute({
   getParentRoute: () => frameRoute,

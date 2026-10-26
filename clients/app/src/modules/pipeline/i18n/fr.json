@@ -1,0 +1,101 @@
+{
+  "loading": "Chargement des opportunités…",
+  "loadFailed": "Les opportunités n’ont pas pu être chargées.",
+  "retry": "Réessayer",
+  "untitled": "Poste sans titre",
+  "views": {
+    "label": "Vue",
+    "table": "Toutes les opportunités",
+    "board": "Par étape"
+  },
+  "filter": {
+    "search": "Rechercher dans les opportunités",
+    "stage": "Étape",
+    "allStages": "Toutes les étapes",
+    "newOnly": "Seules les nouvelles correspondances sont affichées.",
+    "showAll": "Tout afficher"
+  },
+  "columns": {
+    "role": "Poste",
+    "company": "Entreprise",
+    "match": "Adéquation",
+    "stage": "Étape",
+    "source": "Source",
+    "nextStep": "Prochaine étape",
+    "updated": "Mise à jour"
+  },
+  "stages": {
+    "found": "Trouvée",
+    "shortlisted": "Présélectionnée",
+    "applying": "Candidature en cours",
+    "applied": "Candidature envoyée",
+    "talking": "En discussion",
+    "interview": "Entretien",
+    "offer": "Offre",
+    "closed": "Close"
+  },
+  "sources": {
+    "greenhouse": "Greenhouse",
+    "lever": "Lever",
+    "ashby": "Ashby",
+    "arbeitnow": "Arbeitnow",
+    "hn": "HN « Who is hiring »",
+    "link": "Lien"
+  },
+  "workModes": {
+    "remote": "Télétravail",
+    "hybrid": "Hybride",
+    "onsite": "Sur site"
+  },
+  "empty": {
+    "title": "Aucune opportunité pour l’instant",
+    "body": "Les offres arrivent ici avec leur adéquation à votre profil, leur étape et la prochaine action, pour que rien ne vous échappe. Lancez une recherche sur les sites d’emploi, ou ajoutez une offre par son lien.",
+    "filteredTitle": "Rien ici",
+    "filteredBody": "Aucune opportunité ne correspond à ces filtres."
+  },
+  "board": {
+    "empty": "Rien ici"
+  },
+  "new": {
+    "button": "Nouvelle",
+    "title": "Ajouter une offre par son lien",
+    "description": "Collez le lien d’une annonce. Les annonces Greenhouse, Lever et Ashby sont lues pour vous ; pour tout autre site, vous saisissez le poste et l’entreprise.",
+    "url": "Lien de l’annonce",
+    "add": "Ajouter",
+    "adding": "Ajout…",
+    "cancel": "Annuler",
+    "invalid": "Collez un lien qui commence par https://.",
+    "failed": "L’offre n’a pas pu être ajoutée. Réessayez."
+  },
+  "peek": {
+    "eyebrow": "Opportunité",
+    "close": "Fermer",
+    "role": "Poste",
+    "addRole": "Saisissez le poste",
+    "company": "Entreprise",
+    "addCompany": "Saisissez l’entreprise",
+    "where": "Lieu",
+    "addWhere": "Saisissez le lieu",
+    "unknown": "Non précisé",
+    "pay": "Rémunération",
+    "match": "Adéquation",
+    "notScored": "Non évaluée",
+    "stage": "Étape",
+    "source": "Source",
+    "nextStep": "Prochaine étape",
+    "addNextStep": "Ajoutez la prochaine étape",
+    "posted": "Publiée",
+    "why": "Pourquoi elle correspond",
+    "gaps": "Écarts",
+    "notes": "Notes",
+    "addNotes": "Ajoutez des notes que vous seul voyez",
+    "charactersLeft": "{{left}} caractères restants",
+    "description": "Extrait de l’annonce",
+    "open": "Ouvrir l’annonce",
+    "notForMe": "Pas pour moi",
+    "dismissed": "Pas pour moi · {{title}}",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "saveFailed": "La modification n’a pas pu être enregistrée. Réessayez."
+  }
+}

@@ -169,6 +169,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "applicamp-pipeline"
+version = "0.0.0"
+dependencies = [
+ "applicamp-kernel",
+ "axum",
+ "chrono",
+ "http-body-util",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "tower",
+ "tracing",
+ "url",
+ "utoipa",
+ "utoipa-axum",
+ "uuid",
+]
+
+[[package]]
 name = "applicamp-profile"
 version = "0.0.0"
 dependencies = [
@@ -202,7 +222,9 @@ dependencies = [
  "applicamp-ai",
  "applicamp-identity",
  "applicamp-kernel",
+ "applicamp-pipeline",
  "applicamp-profile",
+ "applicamp-sources",
  "aws-lc-rs",
  "axum",
  "base64 0.22.1",
@@ -219,6 +241,32 @@ dependencies = [
  "tokio",
  "tower",
  "tower-http 0.7.1",
+ "tracing",
+ "url",
+ "utoipa",
+ "utoipa-axum",
+ "uuid",
+ "wiremock",
+]
+
+[[package]]
+name = "applicamp-sources"
+version = "0.0.0"
+dependencies = [
+ "applicamp-ai",
+ "applicamp-kernel",
+ "axum",
+ "chrono",
+ "figment",
+ "http-body-util",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "toml",
+ "tower",
  "tracing",
  "url",
  "utoipa",

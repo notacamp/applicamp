@@ -289,7 +289,13 @@ impl Profile {
             work.highlights.retain_mut(|highlight| {
                 let mut value = Some(std::mem::take(highlight));
                 visitor.value(Kind::Long, &mut value);
-                value.map(|kept| *highlight = kept).is_some()
+                match value {
+                    Some(kept) => {
+                        *highlight = kept;
+                        true
+                    }
+                    None => false,
+                }
             });
             true
         });

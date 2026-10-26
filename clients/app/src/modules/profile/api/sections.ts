@@ -130,7 +130,7 @@ export function textOf(entry: Entry, key: FieldKey): string | undefined {
 }
 
 /** The form values of `entry` in `list`. */
-export function valuesOf(list: ListKey, entry: Entry | undefined): Values {
+export function valuesOf(list: ListKey, entry?: Entry): Values {
   const values: Values = {};
   for (const spec of FIELDS[list]) {
     values[spec.key] = entry === undefined ? "" : (textOf(entry, spec.key) ?? "");

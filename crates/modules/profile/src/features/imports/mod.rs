@@ -374,8 +374,6 @@ impl ImportRow {
     }
 }
 
-const IMPORT_COLUMNS: &str = "id, kind, status, draft, dropped, created_at, expires_at";
-
 /// A draft.
 ///
 /// One of the signed-in person's imports, until it expires. Anyone else's
@@ -400,10 +398,10 @@ pub async fn get(
     SignedIn(principal): SignedIn,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Import>> {
-    let row: ImportRow = sqlx::query_as(&format!(
-        "SELECT {IMPORT_COLUMNS} FROM profile.imports
-          WHERE id = $1 AND account_id = $2 AND expires_at > $3 AND draft IS NOT NULL"
-    ))
+    let row: ImportRow = sqlx::query_as(
+        "SELECT id, kind, status, draft, dropped, created_at, expires_at FROM profile.imports
+          WHERE id = $1 AND account_id = $2 AND expires_at > $3 AND draft IS NOT NULL",
+    )
     .bind(id)
     .bind(principal.account_id)
     .bind(state.clock.now())
@@ -476,11 +474,11 @@ pub async fn apply(
         body.map_err(|rejection| Error::BadRequest("invalid_request", rejection.body_text()))?;
     let now = state.clock.now();
     let mut tx = state.db.begin().await?;
-    let row: ImportRow = sqlx::query_as(&format!(
-        "SELECT {IMPORT_COLUMNS} FROM profile.imports
+    let row: ImportRow = sqlx::query_as(
+        "SELECT id, kind, status, draft, dropped, created_at, expires_at FROM profile.imports
           WHERE id = $1 AND account_id = $2 AND expires_at > $3 AND draft IS NOT NULL
-            FOR UPDATE"
-    ))
+            FOR UPDATE",
+    )
     .bind(id)
     .bind(principal.account_id)
     .bind(now)

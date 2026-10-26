@@ -75,7 +75,7 @@ describe("the profile's lists", () => {
       position: "Engineer",
       highlights: ["One", "Two"],
     });
-    expect(valuesOf("skills", undefined)).toEqual({ name: "", level: "" });
+    expect(valuesOf("skills")).toEqual({ name: "", level: "" });
     expect(entryOf("skills", { name: " Go ", level: "" })).toEqual({ name: "Go" });
     expect(entryOf("work", { name: "Example Org" })).toEqual({
       name: "Example Org",

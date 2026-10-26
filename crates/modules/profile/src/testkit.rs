@@ -174,7 +174,7 @@ impl Harness {
         while worker.run_once().await.unwrap() {}
     }
 
-    pub(crate) async fn count(&self, sql: &str) -> i64 {
+    pub(crate) async fn count(&self, sql: &'static str) -> i64 {
         sqlx::query_scalar(sql).fetch_one(&self.db).await.unwrap()
     }
 }

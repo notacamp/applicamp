@@ -47,7 +47,7 @@ export const IMPORT_ERRORS = [
 export type ImportError = (typeof IMPORT_ERRORS)[number] | "generic";
 
 function isImportError(code: string | undefined): code is (typeof IMPORT_ERRORS)[number] {
-  return IMPORT_ERRORS.some((known) => known === code);
+  return code !== undefined && (IMPORT_ERRORS as readonly string[]).includes(code);
 }
 
 /** What to say about a failed upload: its problem's own message, else a generic one. */

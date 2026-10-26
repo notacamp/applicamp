@@ -3,7 +3,7 @@
 
 use std::time::Duration;
 
-use applicamp_ai::{
+use crate::{
     AiConfig, Caller, ChatRequest, Error, Gateway, Message, ProviderConfig, ResponseFormat,
     RetryPolicy, usage,
 };

@@ -36,7 +36,7 @@ export function InlineText({
   onSave,
   multiline = false,
   maxLength = 10_000,
-  counter = (left: number) => String(left),
+  counter = String,
   saveLabel,
   cancelLabel,
   busy = false,

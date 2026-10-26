@@ -22,9 +22,12 @@ mod error;
 mod gateway;
 pub mod usage;
 
+#[cfg(test)]
+mod tests;
+
 pub use config::{AiConfig, DEFAULT_DAILY_TOKENS, ProviderConfig, Role};
 pub use error::{AI_DAILY_LIMIT_REACHED, AI_FAILED, AI_UNAVAILABLE, Error};
 pub use gateway::{
     Caller, ChatRequest, ChatResponse, DEFAULT_CONNECT_TIMEOUT, DEFAULT_REQUEST_TIMEOUT, Gateway,
-    Message, MessageRole, ResponseFormat, RetryPolicy, Usage,
+    JsonSchema, Message, MessageRole, ResponseFormat, RetryPolicy, Usage,
 };

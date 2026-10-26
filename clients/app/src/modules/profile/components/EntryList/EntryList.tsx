@@ -90,7 +90,7 @@ export function useDescribe() {
 
 interface EntryFormProps {
   list: ListKey;
-  initial: Entry | undefined;
+  initial?: Entry | undefined;
   busy: boolean;
   testId: string;
   onSave: (entry: Entry) => void;
@@ -116,11 +116,12 @@ function EntryForm({ list, initial, busy, testId, onSave, onCancel, onRemove }: 
   };
   const problemText = (spec: FieldSpec) => {
     const problem = problems[spec.key];
-    if (problem === undefined) {
-      return undefined;
+    if (problem === "date") {
+      return t("form.dateInvalid");
     }
-    return problem === "date" ? t("form.dateInvalid") : t("form.required");
+    return problem === "required" ? t("form.required") : undefined;
   };
+
 
   return (
     <Tagged testId={testId}>
@@ -307,7 +308,6 @@ export function EntryList({ list, entries, onChange, busy }: EntryListProps) {
       {editing === entries.length ? (
         <EntryForm
           list={list}
-          initial={undefined}
           busy={busy}
           testId={`${testId}-form`}
           onSave={saveAt(entries.length)}

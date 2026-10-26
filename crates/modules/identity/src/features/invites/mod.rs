@@ -5,9 +5,12 @@
 #[cfg(test)]
 mod tests;
 
-use applicamp_kernel::{Error, Result};
+use applicamp_kernel::{Error, Result, events::EventBus};
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
+use uuid::Uuid;
+
+use crate::events::InviteRevoked;
 
 /// Longest address accepted (RFC 5321's path limit).
 const MAX_EMAIL_LEN: usize = 254;
@@ -79,14 +82,31 @@ pub async fn add(
     })
 }
 
-/// Take `email` off the list. Whether it was on it. Accounts already
-/// created keep their ways in.
-pub async fn remove(db: &PgPool, email: &str) -> Result<bool> {
+/// Take `email` off the list and withdraw access from the account with that
+/// address, if any: [`InviteRevoked`] is published in the same transaction,
+/// so every session of the account ends. The account, its ways in and its
+/// data are kept; inviting the address again restores access. Whether it was
+/// on the list.
+///
+/// The event is published even when the address was not on the list but an
+/// account has it, so running the command again finishes an interrupted
+/// revocation.
+pub async fn remove(db: &PgPool, events: &EventBus, email: &str) -> Result<bool> {
     let email = normalize_email(email)?;
+    let mut tx = db.begin().await?;
     let removed = sqlx::query("DELETE FROM identity.invites WHERE email = $1")
         .bind(email.as_str())
-        .execute(db)
+        .execute(&mut *tx)
         .await?;
+    let account: Option<Uuid> =
+        sqlx::query_scalar("SELECT id FROM identity.accounts WHERE email = $1")
+            .bind(email.as_str())
+            .fetch_optional(&mut *tx)
+            .await?;
+    if let Some(account) = account {
+        events.publish(&mut tx, &InviteRevoked { account }).await?;
+    }
+    tx.commit().await?;
     Ok(removed.rows_affected() == 1)
 }
 

@@ -2,21 +2,27 @@ import { useTranslation } from "react-i18next";
 
 import { Fact, FactList, Page, Tagged } from "~/lib/ui";
 import { PROVIDER_NAMES, useMe } from "~/modules/identity";
-import { ProfileWorkspace } from "~/modules/profile";
+import { ProfileWorkspace, type Question } from "~/modules/profile";
 
 export interface ProfileProps {
   /** The import panel is asked for (`?import=new`). */
   importing: boolean;
   onImporting: (open: boolean) => void;
+  /** Open the goals interview at a question. */
+  onStartGoals: (question: Question) => void;
 }
 
 /** `/profile`: what agents know about you, and how you sign in. */
-export function Profile({ importing, onImporting }: ProfileProps) {
+export function Profile({ importing, onImporting, onStartGoals }: ProfileProps) {
   const { t } = useTranslation();
   const me = useMe();
   return (
     <Page testId="profile" title={t("profile.title")} lead={t("profile.lead")}>
-      <ProfileWorkspace importing={importing} onImporting={onImporting} />
+      <ProfileWorkspace
+        importing={importing}
+        onImporting={onImporting}
+        onStartGoals={onStartGoals}
+      />
       {me.data === undefined ? null : (
         <Tagged testId="profile-account">
           <FactList>

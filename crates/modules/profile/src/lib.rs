@@ -8,12 +8,17 @@
 //!   source check) becomes a draft the person reviews, then applies
 //!   (Replace or Merge) or discards. Files are never stored.
 //!
-//! Publishes `profile.updated` (ids only) whenever a profile changes.
+//! - **Goals** ([`goals::Goals`]): what they want next, answered one
+//!   question at a time and versioned.
+//!
+//! Publishes `profile.updated` (ids only) whenever a profile changes and
+//! `profile.goals_updated` (id and version) whenever the goals do.
 
 #![forbid(unsafe_code)]
 
 pub mod events;
 pub mod features;
+pub mod goals;
 pub mod schema;
 
 use applicamp_ai::Gateway;
@@ -36,7 +41,7 @@ pub struct ProfileDeps {
 
 /// The profile module, composed with `deps`.
 pub fn module(deps: ProfileDeps) -> Module {
-    use features::{imports, profile};
+    use features::{goals, imports, profile};
     // Uploads take up to a 20 MB export; every other route keeps axum's
     // default body limit.
     let uploads = OpenApiRouter::new()
@@ -44,6 +49,7 @@ pub fn module(deps: ProfileDeps) -> Module {
         .layer(DefaultBodyLimit::max(imports::UPLOAD_BODY_LIMIT));
     let router = OpenApiRouter::new()
         .routes(routes!(profile::get, profile::update))
+        .routes(routes!(goals::get, goals::update))
         .routes(routes!(imports::get))
         .routes(routes!(imports::apply))
         .routes(routes!(imports::discard))
@@ -54,7 +60,8 @@ pub fn module(deps: ProfileDeps) -> Module {
         router,
         background: Background::new()
             .job::<imports::ExpireImports>()
-            .publishes::<events::ProfileUpdated>(),
+            .publishes::<events::ProfileUpdated>()
+            .publishes::<events::GoalsUpdated>(),
     }
 }
 

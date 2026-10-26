@@ -40,7 +40,7 @@ async function expectPageFillsTheScreen(page: Page, testId: string) {
   }
 }
 
-test("an invited person signs in with Campbooks, lands on Today, imports their LinkedIn export, finds Pipeline with ⌘K and signs out", async ({
+test("an invited person signs in with Campbooks, lands on Today, imports their LinkedIn export, answers a few goals questions, finds Pipeline with ⌘K and signs out", async ({
   page,
 }, testInfo) => {
   const phone = testInfo.project.name === "phone";
@@ -60,6 +60,19 @@ test("an invited person signs in with Campbooks, lands on Today, imports their L
   await expect(page.getByTestId("today-empty")).toBeVisible();
   await expect(page.getByTestId("today-empty")).toBeInViewport();
   await expectAccessible(page);
+
+  // Both projects share one stack and one person: start with no goals answered, as a new person would.
+  const cleared = await page.evaluate(
+    async () =>
+      (
+        await fetch("/api/v1/goals", {
+          method: "PUT",
+          headers: { "content-type": "application/json", "X-Applicamp-CSRF": "1" },
+          body: "{}",
+        })
+      ).status,
+  );
+  expect(cleared).toBe(200);
 
   // "Set up your profile" opens the import panel. With no AI model on this
   // stack, it offers the LinkedIn export only; the server reads its CSVs.
@@ -81,6 +94,41 @@ test("an invited person signs in with Campbooks, lands on Today, imports their L
   await expect(work).toContainText("Sample Labs");
   await expect(page.getByTestId("profile-source")).toContainText("LinkedIn data export");
   await expectPageFillsTheScreen(page, "profile");
+  await expectAccessible(page);
+
+  // The profile is saved, and Profile & goals offers a few questions (never
+  // forced). One per screen: roles are answered (Shift+Enter adds one, Enter
+  // saves and goes on), the next four are skipped, and so is the salary.
+  await expect(page.getByTestId("goals-offer")).toBeVisible();
+  await page.getByTestId("goals-offer-start").click();
+  await expect(page).toHaveURL(/\/goals\/interview\?step=roles$/);
+  await expect(page.getByTestId("interview-roles")).toContainText("Question 1 of 11");
+  await expect(page.getByTestId("interview-next")).toBeInViewport();
+  await expectAccessible(page);
+  await page.getByTestId("goal-roles-input").fill("Staff engineer");
+  await page.keyboard.press("Shift+Enter");
+  await expect(page.getByTestId("goal-roles-item-0")).toContainText("Staff engineer");
+  await page.getByTestId("goal-roles-input").fill("Founding engineer");
+  await page.keyboard.press("Enter");
+  for (const question of ["seniority", "work_mode", "locations", "relocate"]) {
+    await expect(page.getByTestId(`interview-${question}`)).toBeVisible();
+    await page.getByTestId("interview-skip").click();
+  }
+  await expect(page.getByTestId("interview-cash_floor")).toBeVisible();
+  await expect(page.getByTestId("interview-next")).toBeInViewport();
+  await page.getByTestId("interview-skip").click();
+  // With no cash floor, equity is not asked: the company question is next.
+  await expect(page.getByTestId("interview-company_stage")).toBeVisible();
+
+  // Finish later leaves for Today, with the roles saved and the salary unanswered.
+  await page.getByTestId("interview-later").click();
+  await expect(page).toHaveURL(/:\d+\/$/);
+  await expect(page.getByTestId("today")).toBeVisible();
+  await page.goto("/profile");
+  await expectPageFillsTheScreen(page, "profile");
+  await expect(page.getByTestId("goal-roles")).toContainText("Staff engineer, Founding engineer");
+  await expect(page.getByTestId("goal-cash_floor")).toContainText("Add your cash floor");
+  await expect(page.getByTestId("goals-continue")).toBeVisible();
   await expectAccessible(page);
 
   // The command menu: ⌘K (Ctrl+K here) on a desktop, the search button on a

@@ -159,5 +159,178 @@
     "onePerLine": "Un par ligne.",
     "charactersLeft": "Encore {{left}} caractères",
     "saveFailed": "Impossible d’enregistrer la modification. Réessayez."
+  },
+  "goals": {
+    "loading": "Chargement de vos objectifs…",
+    "loadFailed": "Impossible de charger vos objectifs.",
+    "section": {
+      "title": "Objectifs",
+      "description": "Ce que vous voulez ensuite. Les agents cherchent, classent et adaptent avec ces réponses ; modifiez-en une et la prochaine recherche s’en sert.",
+      "status": "{{answered}} questions sur {{total}} répondues",
+      "version": "Version {{version}}",
+      "start": "Commencer les questions",
+      "continue": "Continuer",
+      "offerTitle": "Votre profil est enregistré.",
+      "offerBody": "Voulez-vous dire aux agents ce que vous cherchez ? Ce sont quelques questions courtes, une à la fois. Passez celles que vous voulez et arrêtez-vous quand vous voulez.",
+      "offerStart": "Répondre à quelques questions",
+      "notNow": "Pas maintenant"
+    },
+    "interview": {
+      "progress": "Question {{n}} sur {{total}}",
+      "optional": "Toutes les questions sont facultatives.",
+      "next": "Suivant",
+      "done": "Terminer",
+      "skip": "Passer",
+      "back": "Retour",
+      "later": "Terminer plus tard",
+      "saveFailed": "Cette réponse n’a pas pu être enregistrée. Réessayez, ou passez-la.",
+      "invalidAmount": "Saisissez un montant entier, comme 90000.",
+      "add": "Ajouter",
+      "remove": "Retirer {{item}}",
+      "addAnother": "en ajoute un autre",
+      "limit": "Jusqu’à {{max}}.",
+      "loading": "Préparation des questions…"
+    },
+    "q": {
+      "roles": {
+        "label": "Postes",
+        "title": "Quels postes voulez-vous ensuite ?",
+        "lead": "Nommez-les comme vous les chercheriez.",
+        "field": "Poste",
+        "placeholder": "Ingénieur staff",
+        "empty": "Ajoutez les postes que vous voulez"
+      },
+      "seniority": {
+        "label": "Niveaux",
+        "title": "Quels niveaux conviennent ?",
+        "lead": "Choisissez ce qui convient.",
+        "empty": "Ajoutez les niveaux qui conviennent"
+      },
+      "work_mode": {
+        "label": "Mode de travail",
+        "title": "Comment voulez-vous travailler ?",
+        "lead": "Choisissez ce qui convient.",
+        "empty": "Dites comment vous voulez travailler"
+      },
+      "locations": {
+        "label": "Lieux",
+        "title": "D’où pouvez-vous travailler ?",
+        "lead": "Villes, pays ou régions.",
+        "field": "Lieu",
+        "placeholder": "Lisbonne",
+        "empty": "Ajoutez les lieux d’où vous pouvez travailler"
+      },
+      "relocate": {
+        "label": "Déménagement",
+        "title": "Déménageriez-vous pour le bon poste ?",
+        "lead": "Choisissez-en une.",
+        "empty": "Dites si vous déménageriez"
+      },
+      "cash_floor": {
+        "label": "Plancher en espèces",
+        "title": "Quel est le minimum que vous accepteriez, avant impôts ?",
+        "lead": "En espèces seulement. Vous pouvez le modifier à tout moment.",
+        "empty": "Ajoutez votre plancher en espèces"
+      },
+      "equity_counts": {
+        "label": "Actions",
+        "title": "Les actions comptent-elles pour cela ?",
+        "lead": "Choisissez-en une.",
+        "empty": "Dites si les actions comptent"
+      },
+      "company_stage": {
+        "label": "Entreprise",
+        "title": "Quel type d’entreprise ?",
+        "lead": "Choisissez ce qui convient.",
+        "empty": "Ajoutez les types d’entreprise"
+      },
+      "avoid": {
+        "label": "À éviter",
+        "title": "Quelque chose sur quoi vous ne travailleriez pas ?",
+        "lead": "Secteurs, produits, pratiques.",
+        "field": "À éviter",
+        "placeholder": "Jeux d’argent",
+        "empty": "Ajoutez ce que vous voulez éviter"
+      },
+      "must_have": {
+        "label": "Indispensable",
+        "title": "Que doit avoir le poste ?",
+        "lead": "Ce qui vous ferait dire oui.",
+        "field": "Indispensable",
+        "placeholder": "Une équipe qui travaille à distance",
+        "empty": "Ajoutez ce que le poste doit avoir"
+      },
+      "languages_for_work": {
+        "label": "Langues",
+        "title": "Dans quelles langues pouvez-vous travailler ?",
+        "lead": "Choisissez ce qui convient.",
+        "empty": "Ajoutez les langues dans lesquelles vous travaillez"
+      },
+      "autonomy": {
+        "label": "Agents",
+        "title": "Que doivent faire les agents seuls ?",
+        "lead": "Postuler et envoyer des e-mails attendent toujours votre accord, quel que soit votre choix.",
+        "empty": "Dites ce que les agents peuvent faire"
+      }
+    },
+    "cash": {
+      "amount": "Montant",
+      "currency": "Devise",
+      "period": "Par",
+      "amountPlaceholder": "90000"
+    },
+    "options": {
+      "seniority": {
+        "junior": "Junior",
+        "mid": "Confirmé",
+        "senior": "Senior",
+        "staff": "Staff",
+        "principal": "Principal",
+        "lead": "Lead",
+        "manager": "Manager",
+        "director": "Directeur",
+        "founding": "Fondateur"
+      },
+      "work_mode": {
+        "remote": "À distance",
+        "hybrid": "Hybride",
+        "onsite": "Sur site"
+      },
+      "relocate": {
+        "no": "Non, je reste où je suis",
+        "within_country": "Oui, dans mon pays",
+        "within_eu": "Oui, dans l’UE",
+        "anywhere": "Oui, n’importe où"
+      },
+      "company_stage": {
+        "early": "Startup en démarrage",
+        "growth": "Entreprise en croissance",
+        "established": "Entreprise établie",
+        "public": "Entreprise cotée",
+        "nonprofit": "Association ou secteur public"
+      },
+      "autonomy": {
+        "find_only": {
+          "title": "Trouver des offres seulement",
+          "description": "Les agents cherchent et classent. Le reste, vous le demandez."
+        },
+        "prepare": {
+          "title": "Préparer les candidatures",
+          "description": "Les agents adaptent aussi votre CV et rédigent lettres de motivation et réponses."
+        },
+        "prepare_and_schedule": {
+          "title": "Préparer et planifier",
+          "description": "Les agents rédigent aussi les réponses aux recruteurs et proposent des horaires. Vous approuvez toujours chaque envoi."
+        }
+      },
+      "equity": {
+        "yes": "Oui, les actions comptent",
+        "no": "Non, en espèces seulement"
+      },
+      "period": {
+        "year": "par an",
+        "month": "par mois"
+      }
+    }
   }
 }

@@ -159,5 +159,178 @@
     "onePerLine": "Um por linha.",
     "charactersLeft": "Faltam {{left}} caracteres",
     "saveFailed": "Não foi possível guardar a alteração. Tente de novo."
+  },
+  "goals": {
+    "loading": "A carregar os seus objetivos…",
+    "loadFailed": "Não foi possível carregar os seus objetivos.",
+    "section": {
+      "title": "Objetivos",
+      "description": "O que quer a seguir. Os agentes pesquisam, ordenam e adaptam com estas respostas; altere uma e a próxima pesquisa usa-a.",
+      "status": "{{answered}} de {{total}} perguntas respondidas",
+      "version": "Versão {{version}}",
+      "start": "Começar as perguntas",
+      "continue": "Continuar",
+      "offerTitle": "O seu perfil está guardado.",
+      "offerBody": "Quer dizer aos agentes o que procura? São poucas perguntas curtas, uma de cada vez. Salte as que quiser e pare quando lhe apetecer.",
+      "offerStart": "Responder a algumas perguntas",
+      "notNow": "Agora não"
+    },
+    "interview": {
+      "progress": "Pergunta {{n}} de {{total}}",
+      "optional": "Todas as perguntas são opcionais.",
+      "next": "Seguinte",
+      "done": "Concluir",
+      "skip": "Saltar",
+      "back": "Voltar",
+      "later": "Acabar mais tarde",
+      "saveFailed": "Não foi possível guardar esta resposta. Tente de novo ou salte-a.",
+      "invalidAmount": "Indique um valor inteiro, como 90000.",
+      "add": "Adicionar",
+      "remove": "Remover {{item}}",
+      "addAnother": "adiciona mais um",
+      "limit": "Até {{max}}.",
+      "loading": "A preparar as perguntas…"
+    },
+    "q": {
+      "roles": {
+        "label": "Funções",
+        "title": "Que funções quer a seguir?",
+        "lead": "Indique-as como as pesquisaria.",
+        "field": "Função",
+        "placeholder": "Engenheiro principal",
+        "empty": "Acrescente as funções que quer"
+      },
+      "seniority": {
+        "label": "Níveis",
+        "title": "Que níveis servem?",
+        "lead": "Escolha as que servirem.",
+        "empty": "Acrescente os níveis que servem"
+      },
+      "work_mode": {
+        "label": "Modo de trabalho",
+        "title": "Como quer trabalhar?",
+        "lead": "Escolha as que servirem.",
+        "empty": "Diga como quer trabalhar"
+      },
+      "locations": {
+        "label": "Locais",
+        "title": "De onde pode trabalhar?",
+        "lead": "Cidades, países ou regiões.",
+        "field": "Local",
+        "placeholder": "Lisboa",
+        "empty": "Acrescente os locais de onde pode trabalhar"
+      },
+      "relocate": {
+        "label": "Mudança",
+        "title": "Mudava-se para o emprego certo?",
+        "lead": "Escolha uma.",
+        "empty": "Diga se se mudaria"
+      },
+      "cash_floor": {
+        "label": "Mínimo em dinheiro",
+        "title": "Qual é o mínimo que aceitaria, antes de impostos?",
+        "lead": "Só em dinheiro. Pode alterá-lo quando quiser.",
+        "empty": "Acrescente o seu mínimo em dinheiro"
+      },
+      "equity_counts": {
+        "label": "Capital",
+        "title": "O capital conta para isso?",
+        "lead": "Escolha uma.",
+        "empty": "Diga se o capital conta"
+      },
+      "company_stage": {
+        "label": "Empresa",
+        "title": "Que tipo de empresa?",
+        "lead": "Escolha as que servirem.",
+        "empty": "Acrescente os tipos de empresa"
+      },
+      "avoid": {
+        "label": "Evitar",
+        "title": "Algo em que não trabalharia?",
+        "lead": "Setores, produtos, práticas.",
+        "field": "O que evitar",
+        "placeholder": "Jogo a dinheiro",
+        "empty": "Acrescente o que quer evitar"
+      },
+      "must_have": {
+        "label": "Indispensável",
+        "title": "O que tem de ter o emprego?",
+        "lead": "O que o faria dizer que sim.",
+        "field": "Indispensável",
+        "placeholder": "Uma equipa que trabalha remotamente",
+        "empty": "Acrescente o que o emprego tem de ter"
+      },
+      "languages_for_work": {
+        "label": "Línguas",
+        "title": "Em que línguas pode trabalhar?",
+        "lead": "Escolha as que servirem.",
+        "empty": "Acrescente as línguas em que trabalha"
+      },
+      "autonomy": {
+        "label": "Agentes",
+        "title": "Quanto devem os agentes fazer sozinhos?",
+        "lead": "Candidatar-se e enviar emails esperam sempre pela sua aprovação, escolha o que escolher.",
+        "empty": "Diga quanto os agentes podem fazer"
+      }
+    },
+    "cash": {
+      "amount": "Valor",
+      "currency": "Moeda",
+      "period": "Por",
+      "amountPlaceholder": "90000"
+    },
+    "options": {
+      "seniority": {
+        "junior": "Júnior",
+        "mid": "Intermédio",
+        "senior": "Sénior",
+        "staff": "Staff",
+        "principal": "Principal",
+        "lead": "Líder",
+        "manager": "Gestor",
+        "director": "Diretor",
+        "founding": "Fundador"
+      },
+      "work_mode": {
+        "remote": "Remoto",
+        "hybrid": "Híbrido",
+        "onsite": "Presencial"
+      },
+      "relocate": {
+        "no": "Não, fico onde estou",
+        "within_country": "Sim, dentro do meu país",
+        "within_eu": "Sim, dentro da UE",
+        "anywhere": "Sim, para qualquer lado"
+      },
+      "company_stage": {
+        "early": "Startup em fase inicial",
+        "growth": "Empresa em crescimento",
+        "established": "Empresa consolidada",
+        "public": "Empresa cotada",
+        "nonprofit": "Organização sem fins lucrativos ou setor público"
+      },
+      "autonomy": {
+        "find_only": {
+          "title": "Só encontrar empregos",
+          "description": "Os agentes pesquisam e ordenam. O resto, pede-o você."
+        },
+        "prepare": {
+          "title": "Preparar candidaturas",
+          "description": "Os agentes adaptam também o seu CV e redigem cartas de apresentação e respostas."
+        },
+        "prepare_and_schedule": {
+          "title": "Preparar e agendar",
+          "description": "Os agentes redigem também respostas a recrutadores e sugerem horários. Continua a aprovar cada envio."
+        }
+      },
+      "equity": {
+        "yes": "Sim, o capital conta",
+        "no": "Não, só dinheiro"
+      },
+      "period": {
+        "year": "por ano",
+        "month": "por mês"
+      }
+    }
   }
 }

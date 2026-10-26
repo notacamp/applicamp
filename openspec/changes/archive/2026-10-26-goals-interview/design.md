@@ -20,9 +20,9 @@ Answers (all optional; typed in `crates/modules/profile/src/goals.rs`):
 | `autonomy` | `find_only, prepare, prepare_and_schedule` | How much should agents do alone? (applying and emailing always wait for you) |
 
 ## Endpoints
-`GET /api/v1/goals` → `{ version, answers }`; `PUT /api/v1/goals` (whole answers, validated) → new version. CSRF on PUT.
+`GET /api/v1/goals` → `{ version, answers, updated_at }` (version 0 and no answers until something is saved); `PUT /api/v1/goals` (whole answers, trimmed, repeats and blanks removed, validated; `400 invalid_goals`) → new version, every save even of the same answers. CSRF on PUT. Operation ids `profile.get_goals` and `profile.update_goals`. Currency is checked against the active ISO 4217 codes; language tags against the BCP 47 shape; lists against their limits (5 roles, 10 places, avoid and must-haves, 100 characters an item).
 
 ## Client
-- Interview route `/goals/interview?step=<key>`: one question per view, Back / Skip / Next, progress dots, Esc or "Finish later" leaves; answers save as you go (`PUT` per step). Starts after the first profile import (offered, not forced) and from the Goals section.
-- Goals section on Profile & goals: each answer as a Notion-style property row, inline edit with the same controls as the interview.
+- Interview route `/goals/interview?step=<key>` (signed in, outside the app frame): one question per view, Back / Skip / Next, a progress bar and "Question n of N", Esc or "Finish later" leaves for Today; answers save as you go (`PUT` per step, only when the answer changed). Past the last question it leaves for Profile & goals. Equity is only asked once there is a cash floor. Offered after a profile import is applied, and started or continued from the Goals section.
+- Goals section on Profile & goals: each answer as a Notion-style property row, inline edit with the same controls as the interview (`GoalQuestion`). New lib/ui compositions: `ListField` (a short list built item by item) and `InlineEdit` (any controls as an in-place editor).
 - 375px + desktop, 4 languages, keyboard: Enter = Next, Shift+Enter in lists adds an item.

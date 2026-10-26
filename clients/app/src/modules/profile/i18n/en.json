@@ -159,5 +159,178 @@
     "onePerLine": "One per line.",
     "charactersLeft": "{{left}} characters left",
     "saveFailed": "Your change couldn’t be saved. Try again."
+  },
+  "goals": {
+    "loading": "Loading your goals…",
+    "loadFailed": "Your goals couldn’t be loaded.",
+    "section": {
+      "title": "Goals",
+      "description": "What you want next. Agents search, rank and tailor with these answers; change one and the next search uses it.",
+      "status": "{{answered}} of {{total}} questions answered",
+      "version": "Version {{version}}",
+      "start": "Start the questions",
+      "continue": "Continue",
+      "offerTitle": "Your profile is saved.",
+      "offerBody": "Want to tell agents what you’re looking for? It’s a few short questions, one at a time. Skip any of them, and stop whenever you like.",
+      "offerStart": "Answer a few questions",
+      "notNow": "Not now"
+    },
+    "interview": {
+      "progress": "Question {{n}} of {{total}}",
+      "optional": "Every question is optional.",
+      "next": "Next",
+      "done": "Done",
+      "skip": "Skip",
+      "back": "Back",
+      "later": "Finish later",
+      "saveFailed": "That answer couldn’t be saved. Try again, or skip it.",
+      "invalidAmount": "Enter a whole amount, like 90000.",
+      "add": "Add",
+      "remove": "Remove {{item}}",
+      "addAnother": "adds another",
+      "limit": "Up to {{max}}.",
+      "loading": "Getting the questions ready…"
+    },
+    "q": {
+      "roles": {
+        "label": "Roles",
+        "title": "What roles do you want next?",
+        "lead": "Name them the way you would search for them.",
+        "field": "Role",
+        "placeholder": "Staff engineer",
+        "empty": "Add the roles you want"
+      },
+      "seniority": {
+        "label": "Levels",
+        "title": "Which levels fit?",
+        "lead": "Pick any that fit.",
+        "empty": "Add the levels that fit"
+      },
+      "work_mode": {
+        "label": "Work mode",
+        "title": "How do you want to work?",
+        "lead": "Pick any that fit.",
+        "empty": "Say how you want to work"
+      },
+      "locations": {
+        "label": "Places",
+        "title": "Where can you work from?",
+        "lead": "Cities, countries or regions.",
+        "field": "Place",
+        "placeholder": "Lisbon",
+        "empty": "Add the places you can work from"
+      },
+      "relocate": {
+        "label": "Moving",
+        "title": "Would you move for the right job?",
+        "lead": "Pick one.",
+        "empty": "Say whether you would move"
+      },
+      "cash_floor": {
+        "label": "Cash floor",
+        "title": "What’s the least you’d take, before tax?",
+        "lead": "Cash only. You can change it any time.",
+        "empty": "Add your cash floor"
+      },
+      "equity_counts": {
+        "label": "Equity",
+        "title": "Does equity count toward that?",
+        "lead": "Pick one.",
+        "empty": "Say whether equity counts"
+      },
+      "company_stage": {
+        "label": "Company",
+        "title": "What kind of company?",
+        "lead": "Pick any that fit.",
+        "empty": "Add the kinds of company"
+      },
+      "avoid": {
+        "label": "Avoid",
+        "title": "Anything you won’t work on?",
+        "lead": "Industries, products, practices.",
+        "field": "Thing to avoid",
+        "placeholder": "Gambling",
+        "empty": "Add what you want to avoid"
+      },
+      "must_have": {
+        "label": "Must have",
+        "title": "What must the job have?",
+        "lead": "What would make you say yes.",
+        "field": "Must-have",
+        "placeholder": "A team that works remotely",
+        "empty": "Add what the job must have"
+      },
+      "languages_for_work": {
+        "label": "Languages",
+        "title": "Which languages can you work in?",
+        "lead": "Pick any that fit.",
+        "empty": "Add the languages you work in"
+      },
+      "autonomy": {
+        "label": "Agents",
+        "title": "How much should agents do alone?",
+        "lead": "Applying and emailing always wait for your approval, whatever you pick.",
+        "empty": "Say how much agents may do"
+      }
+    },
+    "cash": {
+      "amount": "Amount",
+      "currency": "Currency",
+      "period": "Per",
+      "amountPlaceholder": "90000"
+    },
+    "options": {
+      "seniority": {
+        "junior": "Junior",
+        "mid": "Mid-level",
+        "senior": "Senior",
+        "staff": "Staff",
+        "principal": "Principal",
+        "lead": "Lead",
+        "manager": "Manager",
+        "director": "Director",
+        "founding": "Founding"
+      },
+      "work_mode": {
+        "remote": "Remote",
+        "hybrid": "Hybrid",
+        "onsite": "On site"
+      },
+      "relocate": {
+        "no": "No, I’m staying where I am",
+        "within_country": "Yes, within my country",
+        "within_eu": "Yes, within the EU",
+        "anywhere": "Yes, anywhere"
+      },
+      "company_stage": {
+        "early": "Early-stage startup",
+        "growth": "Growing company",
+        "established": "Established company",
+        "public": "Public company",
+        "nonprofit": "Nonprofit or public sector"
+      },
+      "autonomy": {
+        "find_only": {
+          "title": "Find jobs only",
+          "description": "Agents search and rank. Anything else, you ask for."
+        },
+        "prepare": {
+          "title": "Prepare applications",
+          "description": "Agents also tailor your CV and draft cover letters and answers."
+        },
+        "prepare_and_schedule": {
+          "title": "Prepare and schedule",
+          "description": "Agents also draft replies to recruiters and suggest times. You still approve every send."
+        }
+      },
+      "equity": {
+        "yes": "Yes, equity counts",
+        "no": "No, cash only"
+      },
+      "period": {
+        "year": "a year",
+        "month": "a month"
+      }
+    }
   }
 }

@@ -27,7 +27,7 @@ export interface ImportReviewProps {
   /** The profile as it is now. */
   current: Profile;
   /** Applied or discarded: back to the profile. */
-  onDone: () => void;
+  onDone: (outcome: "applied" | "discarded") => void;
   /** The draft is gone: import again. */
   onRestart: () => void;
 }
@@ -76,7 +76,14 @@ export function ImportReview({ id, current, onDone, onRestart }: ImportReviewPro
 
   const { draft: next, dropped } = draft.data;
   const choose = (mode: ApplyMode) => () => {
-    apply.mutate({ id, mode }, { onSuccess: onDone });
+    apply.mutate(
+      { id, mode },
+      {
+        onSuccess: () => {
+          onDone("applied");
+        },
+      },
+    );
   };
   const basics = BASICS.flatMap((key) => {
     const change = compareBasics(key, current.basics, next.basics);
@@ -167,7 +174,11 @@ export function ImportReview({ id, current, onDone, onRestart }: ImportReviewPro
             disabled={busy}
             data-testid="review-discard"
             onClick={() => {
-              discard.mutate(id, { onSuccess: onDone });
+              discard.mutate(id, {
+                onSuccess: () => {
+                  onDone("discarded");
+                },
+              });
             }}
           >
             {t("review.discard")}

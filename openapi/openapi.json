@@ -139,6 +139,293 @@
         ]
       }
     },
+    "/api/v1/opportunities": {
+      "get": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "The pipeline.",
+        "description": "Every opportunity of the signed-in person, newest first, except the\ndismissed ones (\"Not for me\"). Filter by stage, by text in the role,\ncompany or place, or to the new ones.",
+        "operationId": "pipeline.list",
+        "parameters": [
+          {
+            "name": "stage",
+            "in": "query",
+            "description": "Only this stage.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/OpportunityStage"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Only those whose role, company or place contains this.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "new",
+            "in": "query",
+            "description": "Only the new ones (Found, never opened).",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The opportunities.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpportunityList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_query`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Add a job by its link.",
+        "description": "A Greenhouse, Lever or Ashby posting is read from the board's public API\n(title, company, place, pay, description), and that company's board is\nsearched from then on. Any other link becomes an opportunity with the\nlink and the title and company given (typed later if not): the server\nnever fetches it. The same posting twice answers the one already there\n(200).",
+        "operationId": "pipeline.add",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewOpportunity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "That posting was already in the pipeline.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Opportunity"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Added.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Opportunity"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_url`, `invalid_request`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}": {
+      "get": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "An opportunity.",
+        "description": "One of the signed-in person's, dismissed ones included. Anyone else's is\nnot found.",
+        "operationId": "pipeline.get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The opportunity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Opportunity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Change an opportunity.",
+        "description": "Its stage, next step, notes, \"Not for me\" (`dismissed`), or that it was\nopened (no longer new). Title, company and place can be typed only for\none added by a link to a site that is not a job board.",
+        "operationId": "pipeline.update",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpportunityChanges"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The opportunity, changed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Opportunity"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_opportunity`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`not_editable`: its title, company and place come from the job board",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/v1/profile": {
       "get": {
         "tags": [
@@ -492,6 +779,184 @@
           },
           "409": {
             "description": "`import_not_ready`: already applied",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/searches": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Start a search (\"Search now\").",
+        "description": "Reads the job boards, keeps the jobs within the goals' hard limits,\nscores the best 40 against the profile and goals, and adds the good\nmatches as Found; follow it with `GET /api/v1/searches/latest`. At most\n3 a day and one every 15 minutes (the instance may set others), never\npast the spending limits.",
+        "operationId": "sources.start",
+        "responses": {
+          "202": {
+            "description": "Started; it runs in the background.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Search"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`profile_needed`: set up the profile and answer a goals question first; `search_running`: one is already running",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`search_limit_reached`: the detail says when to try again",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`ai_unavailable`: no model is set up; `ai_budget_reached`: a spending limit is reached",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/searches/estimate": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "About what a search would cost.",
+        "description": "The jobs it would likely score (the last search's, at most 40), times\nwhat a batch of ten has cost this person on average, in euros; and what\nthey spent today and this month against their limits. Over €0.05 the\napp asks before searching.",
+        "operationId": "sources.estimate",
+        "responses": {
+          "200": {
+            "description": "The estimate and the spending.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchEstimate"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/searches/latest": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "The latest search.",
+        "description": "The signed-in person's newest search, running or done: how many jobs it\nread, kept, scored and added, why it stopped if it did, and its cost.",
+        "operationId": "sources.latest",
+        "responses": {
+          "200": {
+            "description": "The latest search, or none.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LatestSearch"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/today": {
+      "get": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Today.",
+        "description": "How far the signed-in person is with their profile and goals, how many\nnew matches wait for them, their latest search, and the next step.",
+        "operationId": "pipeline.today",
+        "responses": {
+          "200": {
+            "description": "Where they are.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Today"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1202,6 +1667,15 @@
           }
         }
       },
+      "JobWorkMode": {
+        "type": "string",
+        "description": "How the job is worked.",
+        "enum": [
+          "remote",
+          "hybrid",
+          "onsite"
+        ]
+      },
       "Language": {
         "type": "object",
         "description": "A language they speak.",
@@ -1222,6 +1696,23 @@
           }
         },
         "additionalProperties": false
+      },
+      "LatestSearch": {
+        "type": "object",
+        "description": "The latest search.",
+        "properties": {
+          "search": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Search",
+                "description": "None before the first."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
       },
       "Link": {
         "type": "object",
@@ -1282,6 +1773,380 @@
               "$ref": "#/components/schemas/Provider"
             },
             "description": "The providers that sign them in."
+          }
+        }
+      },
+      "NewOpportunity": {
+        "type": "object",
+        "description": "A job to add by its link.",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "company": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The company, for a link to a site that is not a job board."
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The role, for a link to a site that is not a job board."
+          },
+          "url": {
+            "type": "string",
+            "description": "The posting's address (http or https, up to 2 000 characters)."
+          }
+        },
+        "additionalProperties": false
+      },
+      "NextStep": {
+        "type": "string",
+        "description": "What to do next.",
+        "enum": [
+          "set_up_profile",
+          "answer_goals",
+          "search",
+          "review_matches",
+          "none"
+        ]
+      },
+      "Opportunity": {
+        "type": "object",
+        "description": "An opportunity, whole: what the side peek shows.",
+        "required": [
+          "id",
+          "title",
+          "company",
+          "url",
+          "source",
+          "stage",
+          "new",
+          "created_at",
+          "updated_at",
+          "why",
+          "gaps",
+          "dismissed",
+          "editable"
+        ],
+        "properties": {
+          "company": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The posting's description, as plain text (up to 20 000 characters)."
+          },
+          "dismissed": {
+            "type": "boolean",
+            "description": "\"Not for me\": hidden from the pipeline."
+          },
+          "editable": {
+            "type": "boolean",
+            "description": "Title, company and location can be typed (an opportunity added by a\nlink to a site that is not a job board)."
+          },
+          "gaps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What the profile or goals miss (up to 2)."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where, as the posting says."
+          },
+          "match": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "How well it matches the profile and goals, 0–100; none for one added\nby link.",
+            "minimum": 0
+          },
+          "new": {
+            "type": "boolean",
+            "description": "Found and never opened."
+          },
+          "next_step": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The person's notes."
+          },
+          "posted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the posting was published."
+          },
+          "salary_text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pay, as the posting says."
+          },
+          "source": {
+            "$ref": "#/components/schemas/OpportunitySource"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/OpportunityStage"
+          },
+          "title": {
+            "type": "string",
+            "description": "The role."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "url": {
+            "type": "string",
+            "description": "The posting."
+          },
+          "why": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Why it matches, citing the profile (up to 3)."
+          },
+          "work_mode": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/JobWorkMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "OpportunityChanges": {
+        "type": "object",
+        "description": "What to change; anything left out stays as it is.",
+        "properties": {
+          "company": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The company; only for one added by link to another site."
+          },
+          "dismissed": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "\"Not for me\" (`true`) or back in the pipeline (`false`)."
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where; only for one added by link to another site."
+          },
+          "next_step": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The next step (up to 300 characters); `null` clears it."
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The notes (up to 10 000 characters); `null` clears them."
+          },
+          "opened": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "It was opened: it is no longer new."
+          },
+          "stage": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OpportunityStage",
+                "description": "Move it to this stage."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The role; only for one added by link to another site."
+          }
+        },
+        "additionalProperties": false
+      },
+      "OpportunityList": {
+        "type": "object",
+        "description": "The pipeline.",
+        "required": [
+          "opportunities"
+        ],
+        "properties": {
+          "opportunities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpportunitySummary"
+            },
+            "description": "Newest first; never the dismissed ones."
+          }
+        }
+      },
+      "OpportunitySource": {
+        "type": "string",
+        "description": "Where an opportunity came from.",
+        "enum": [
+          "greenhouse",
+          "lever",
+          "ashby",
+          "arbeitnow",
+          "hn",
+          "link"
+        ]
+      },
+      "OpportunityStage": {
+        "type": "string",
+        "description": "Where an opportunity is.",
+        "enum": [
+          "found",
+          "shortlisted",
+          "applying",
+          "applied",
+          "talking",
+          "interview",
+          "offer",
+          "closed"
+        ]
+      },
+      "OpportunitySummary": {
+        "type": "object",
+        "description": "An opportunity, as the table, the board and the list show it.",
+        "required": [
+          "id",
+          "title",
+          "company",
+          "url",
+          "source",
+          "stage",
+          "new",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "company": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where, as the posting says."
+          },
+          "match": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "How well it matches the profile and goals, 0–100; none for one added\nby link.",
+            "minimum": 0
+          },
+          "new": {
+            "type": "boolean",
+            "description": "Found and never opened."
+          },
+          "next_step": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "salary_text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pay, as the posting says."
+          },
+          "source": {
+            "$ref": "#/components/schemas/OpportunitySource"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/OpportunityStage"
+          },
+          "title": {
+            "type": "string",
+            "description": "The role."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "url": {
+            "type": "string",
+            "description": "The posting."
+          },
+          "work_mode": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/JobWorkMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -1523,6 +2388,143 @@
           "anywhere"
         ]
       },
+      "Search": {
+        "type": "object",
+        "description": "A search.",
+        "required": [
+          "id",
+          "status",
+          "trigger",
+          "started_at",
+          "fetched",
+          "kept",
+          "scored",
+          "added",
+          "cost_eur"
+        ],
+        "properties": {
+          "added": {
+            "type": "integer",
+            "format": "int32",
+            "description": "New opportunities added as Found.",
+            "minimum": 0
+          },
+          "cost_eur": {
+            "type": "number",
+            "format": "double",
+            "description": "What its model calls cost, in euros."
+          },
+          "fetched": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Jobs read from the boards.",
+            "minimum": 0
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kept": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Jobs within the goals' hard limits and not already in the pipeline.",
+            "minimum": 0
+          },
+          "scored": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Jobs scored (by the model now, or before).",
+            "minimum": 0
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SearchStatus"
+          },
+          "stopped": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SearchStop",
+                "description": "Why it stopped early, if it did."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/SearchTrigger"
+          }
+        }
+      },
+      "SearchEstimate": {
+        "type": "object",
+        "description": "About what a search would cost now.",
+        "required": [
+          "jobs",
+          "cost_eur",
+          "confirm",
+          "spend"
+        ],
+        "properties": {
+          "confirm": {
+            "type": "boolean",
+            "description": "Over €0.05: ask before searching."
+          },
+          "cost_eur": {
+            "type": "number",
+            "format": "double",
+            "description": "About what that costs, in euros."
+          },
+          "jobs": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Jobs it would likely score.",
+            "minimum": 0
+          },
+          "spend": {
+            "$ref": "#/components/schemas/Spend"
+          }
+        }
+      },
+      "SearchStatus": {
+        "type": "string",
+        "description": "Where a search is. The same as the search's own (`sources`).",
+        "enum": [
+          "queued",
+          "running",
+          "finished",
+          "failed"
+        ]
+      },
+      "SearchStop": {
+        "type": "string",
+        "description": "Why a search stopped early. The same as the search's own (`sources`).",
+        "enum": [
+          "ai_budget_reached",
+          "ai_unavailable",
+          "ai_failed",
+          "no_profile",
+          "sources_failed"
+        ]
+      },
+      "SearchTrigger": {
+        "type": "string",
+        "description": "What started a search. The same as the search's own (`sources`).",
+        "enum": [
+          "manual",
+          "nightly"
+        ]
+      },
       "Seniority": {
         "type": "string",
         "description": "Which levels fit.",
@@ -1558,6 +2560,191 @@
           }
         },
         "additionalProperties": false
+      },
+      "Spend": {
+        "type": "object",
+        "description": "What was spent on AI, in euros, against the limits.",
+        "required": [
+          "today_eur",
+          "month_eur"
+        ],
+        "properties": {
+          "day_limit_eur": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "None: no daily limit."
+          },
+          "month_eur": {
+            "type": "number",
+            "format": "double"
+          },
+          "month_limit_eur": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "None: no monthly limit."
+          },
+          "today_eur": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "StrengthHint": {
+        "type": "string",
+        "description": "What would make the profile stronger.",
+        "enum": [
+          "add_headline",
+          "add_work",
+          "add_skills"
+        ]
+      },
+      "Today": {
+        "type": "object",
+        "description": "Where the person is.",
+        "required": [
+          "profile",
+          "goals",
+          "new_matches",
+          "next_step"
+        ],
+        "properties": {
+          "goals": {
+            "$ref": "#/components/schemas/TodayGoals"
+          },
+          "latest_search": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TodaySearch",
+                "description": "The latest search, if any."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "new_matches": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Found opportunities never opened.",
+            "minimum": 0
+          },
+          "next_step": {
+            "$ref": "#/components/schemas/NextStep"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/TodayProfile"
+          }
+        }
+      },
+      "TodayGoals": {
+        "type": "object",
+        "description": "The goals, on Today.",
+        "required": [
+          "answered",
+          "total"
+        ],
+        "properties": {
+          "answered": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Questions answered.",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Questions there are.",
+            "minimum": 0
+          }
+        }
+      },
+      "TodayProfile": {
+        "type": "object",
+        "description": "The profile, on Today.",
+        "required": [
+          "done"
+        ],
+        "properties": {
+          "done": {
+            "type": "boolean",
+            "description": "There is a profile with something in it."
+          },
+          "strength_hint": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StrengthHint",
+                "description": "What would make it stronger, if anything."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "TodaySearch": {
+        "type": "object",
+        "description": "The latest search, on Today.",
+        "required": [
+          "id",
+          "status",
+          "trigger",
+          "started_at",
+          "fetched",
+          "added"
+        ],
+        "properties": {
+          "added": {
+            "type": "integer",
+            "format": "int32",
+            "description": "New opportunities it added.",
+            "minimum": 0
+          },
+          "fetched": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Jobs read.",
+            "minimum": 0
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SearchStatus"
+          },
+          "stopped": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SearchStop",
+                "description": "Why it stopped early, if it did."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/SearchTrigger"
+          }
+        }
       },
       "Work": {
         "type": "object",
@@ -1649,6 +2836,14 @@
     {
       "name": "profile",
       "description": "The master profile: what agents know about you. Imported from a LinkedIn data export, a PDF or pasted text as a draft you review, and edited by hand."
+    },
+    {
+      "name": "pipeline",
+      "description": "Every opportunity in one place, from first match to offer: found by a search or added by link, with its stage, match, notes and next step. And Today: where you are and what to do next."
+    },
+    {
+      "name": "sources",
+      "description": "The job search: public job boards (Greenhouse, Lever, Ashby, Arbeitnow, HN Who is hiring) read and scored against your profile and goals, within the spending limits."
     },
     {
       "name": "bff",

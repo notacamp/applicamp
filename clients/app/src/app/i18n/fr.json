@@ -11,15 +11,31 @@
   "today": {
     "title": "Aujourd’hui",
     "lead": "Ce qui vous attend, chaque jour. Les agents travaillent en arrière-plan ; rien ne part en votre nom sans votre accord.",
-    "emptyTitle": "Rien ne vous attend pour l’instant",
-    "emptyBody": "Quand les agents trouvent une offre, préparent une candidature ou rédigent une réponse à un recruteur, elle vous attend ici. Commencez par leur dire qui vous êtes et ce que vous cherchez ensuite.",
-    "setUp": "Configurer votre profil"
+    "loading": "Chargement…",
+    "loadFailed": "Aujourd’hui n’a pas pu être chargé.",
+    "retry": "Réessayer",
+    "setUpTitle": "D’abord, dites aux agents qui vous êtes",
+    "setUpBody": "Quand les agents trouvent une offre, préparent une candidature ou rédigent une réponse à un recruteur, elle vous attend ici. Commencez par leur dire qui vous êtes et ce que vous cherchez ensuite.",
+    "setUp": "Configurer votre profil",
+    "goalsTitle": "Et maintenant, que cherchez-vous ?",
+    "goalsBody": "Quelques questions courtes sur les postes, les lieux et la rémunération que vous visez : les recherches s’y tiennent. {{answered}} sur {{total}} répondues.",
+    "answerGoals": "Répondre à quelques questions",
+    "searchTitle": "Prêt pour une première recherche",
+    "searchBody": "Votre profil et vos objectifs sont prêts. Lancez une recherche sur les sites d’emploi : les bonnes correspondances arrivent dans vos Opportunités comme Trouvées, avec pourquoi elles correspondent et leurs écarts.",
+    "matchesTitle": "Nouvelles correspondances : {{count}}",
+    "matchesBody": "Une recherche a trouvé des offres qui correspondent à votre profil et à vos objectifs. Ouvrez-les, présélectionnez celles qui vous plaisent et dites « Pas pour moi » aux autres.",
+    "reviewMatches": "Les passer en revue",
+    "nothingTitle": "Rien ne vous attend pour l’instant",
+    "nothingBody": "Aucune nouvelle correspondance depuis votre dernier passage. Une autre recherche tourne cette nuit, ou relancez-en une maintenant.",
+    "strength": {
+      "add_headline": "Ajoutez un titre à votre profil : il affine chaque correspondance.",
+      "add_work": "Ajoutez vos postes à votre profil : les correspondances sont évaluées par rapport à eux.",
+      "add_skills": "Ajoutez vos compétences à votre profil : les correspondances sont évaluées par rapport à elles."
+    }
   },
   "pipeline": {
     "title": "Opportunités",
-    "lead": "Chaque opportunité trouvée par les agents ou ajoutée par vous, de la première correspondance à l’offre.",
-    "emptyTitle": "Aucune opportunité pour l’instant",
-    "emptyBody": "Les offres arrivent ici avec leur adéquation à votre profil, leur étape et la prochaine action, pour que rien ne vous échappe."
+    "lead": "Chaque opportunité trouvée par les agents ou ajoutée par vous, de la première correspondance à l’offre."
   },
   "agents": {
     "title": "Agents",

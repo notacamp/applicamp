@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Fact, FactList, Page, Tagged } from "~/lib/ui";
 import { PROVIDER_NAMES, useMe } from "~/modules/identity";
 import { ProfileWorkspace, type Question } from "~/modules/profile";
+import { SpendLine } from "~/modules/sources";
 
 export interface ProfileProps {
   /** The import panel is asked for (`?import=new`). */
@@ -12,7 +13,7 @@ export interface ProfileProps {
   onStartGoals: (question: Question) => void;
 }
 
-/** `/profile`: what agents know about you, and how you sign in. */
+/** `/profile`: what agents know about you, how you sign in, and what the AI cost this month. */
 export function Profile({ importing, onImporting, onStartGoals }: ProfileProps) {
   const { t } = useTranslation();
   const me = useMe();
@@ -33,6 +34,7 @@ export function Profile({ importing, onImporting, onStartGoals }: ProfileProps) 
           </FactList>
         </Tagged>
       )}
+      <SpendLine />
     </Page>
   );
 }

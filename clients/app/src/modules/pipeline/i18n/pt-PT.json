@@ -1,0 +1,101 @@
+{
+  "loading": "A carregar as oportunidades…",
+  "loadFailed": "Não foi possível carregar as oportunidades.",
+  "retry": "Tentar de novo",
+  "untitled": "Função sem nome",
+  "views": {
+    "label": "Vista",
+    "table": "Todas as oportunidades",
+    "board": "Por fase"
+  },
+  "filter": {
+    "search": "Pesquisar nas oportunidades",
+    "stage": "Fase",
+    "allStages": "Todas as fases",
+    "newOnly": "A mostrar apenas as novas correspondências.",
+    "showAll": "Mostrar tudo"
+  },
+  "columns": {
+    "role": "Função",
+    "company": "Empresa",
+    "match": "Correspondência",
+    "stage": "Fase",
+    "source": "Origem",
+    "nextStep": "Próximo passo",
+    "updated": "Atualizada"
+  },
+  "stages": {
+    "found": "Encontrada",
+    "shortlisted": "Pré-selecionada",
+    "applying": "A candidatar",
+    "applied": "Candidatura enviada",
+    "talking": "Em conversa",
+    "interview": "Entrevista",
+    "offer": "Proposta",
+    "closed": "Fechada"
+  },
+  "sources": {
+    "greenhouse": "Greenhouse",
+    "lever": "Lever",
+    "ashby": "Ashby",
+    "arbeitnow": "Arbeitnow",
+    "hn": "HN “Who is hiring”",
+    "link": "Ligação"
+  },
+  "workModes": {
+    "remote": "Remoto",
+    "hybrid": "Híbrido",
+    "onsite": "Presencial"
+  },
+  "empty": {
+    "title": "Ainda não há oportunidades",
+    "body": "As ofertas chegam aqui com o grau de correspondência com o seu perfil, a fase em que estão e o passo seguinte, para que nada escape. Pesquise agora nos sites de emprego ou adicione uma oferta pela ligação.",
+    "filteredTitle": "Nada por aqui",
+    "filteredBody": "Nenhuma oportunidade corresponde a estes filtros."
+  },
+  "board": {
+    "empty": "Nada por aqui"
+  },
+  "new": {
+    "button": "Nova",
+    "title": "Adicionar uma oferta pela ligação",
+    "description": "Cole a ligação de um anúncio. Os anúncios do Greenhouse, Lever e Ashby são lidos automaticamente; para qualquer outro site, escreva a função e a empresa.",
+    "url": "Ligação do anúncio",
+    "add": "Adicionar",
+    "adding": "A adicionar…",
+    "cancel": "Cancelar",
+    "invalid": "Cole uma ligação que comece por https://.",
+    "failed": "Não foi possível adicionar a oferta. Tente de novo."
+  },
+  "peek": {
+    "eyebrow": "Oportunidade",
+    "close": "Fechar",
+    "role": "Função",
+    "addRole": "Escreva a função",
+    "company": "Empresa",
+    "addCompany": "Escreva a empresa",
+    "where": "Onde",
+    "addWhere": "Escreva onde é",
+    "unknown": "Não indicado",
+    "pay": "Remuneração",
+    "match": "Correspondência",
+    "notScored": "Sem avaliação",
+    "stage": "Fase",
+    "source": "Origem",
+    "nextStep": "Próximo passo",
+    "addNextStep": "Adicione o próximo passo",
+    "posted": "Publicada",
+    "why": "Porque corresponde",
+    "gaps": "Lacunas",
+    "notes": "Notas",
+    "addNotes": "Adicione notas só para si",
+    "charactersLeft": "Faltam {{left}} caracteres",
+    "description": "Do anúncio",
+    "open": "Abrir o anúncio",
+    "notForMe": "Não é para mim",
+    "dismissed": "Não é para mim · {{title}}",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "saveFailed": "Não foi possível guardar a alteração. Tente de novo."
+  }
+}

@@ -1,0 +1,75 @@
+[
+  {
+    "additional": "<div>Sample Labs is an equal opportunity employer.</div>",
+    "additionalPlain": "Sample Labs is an equal opportunity employer.",
+    "categories": {
+      "commitment": "Permanent",
+      "department": "Engineering",
+      "location": "Remote - Europe",
+      "team": "Platform",
+      "allLocations": [
+        "Remote - Europe",
+        "Lisbon, Portugal"
+      ]
+    },
+    "createdAt": 1792500000000,
+    "descriptionPlain": "About Sample Labs\n\nSample Labs moves money for small online shops. You will design the ledger behind it.",
+    "description": "<p><strong>About Sample Labs</strong></p><p>Sample Labs moves money for small online shops. You will design the ledger behind it.</p>",
+    "id": "0f3c2a1e-1111-4a6b-9c1d-2e3f4a5b6c7d",
+    "lists": [
+      {
+        "text": "What you will do",
+        "content": "<li>Build and run our payment services.</li><li>Review code and mentor others.</li>"
+      }
+    ],
+    "text": "Staff Software Engineer, Payments",
+    "country": "PT",
+    "workplaceType": "remote",
+    "opening": "<p><strong>About Sample Labs</strong></p>",
+    "openingPlain": "About Sample Labs",
+    "descriptionBody": "<p>Sample Labs moves money for small online shops. You will design the ledger behind it.</p>",
+    "descriptionBodyPlain": "Sample Labs moves money for small online shops. You will design the ledger behind it.",
+    "hostedUrl": "https://jobs.lever.co/samplelabs/0f3c2a1e-1111-4a6b-9c1d-2e3f4a5b6c7d",
+    "applyUrl": "https://jobs.lever.co/samplelabs/0f3c2a1e-1111-4a6b-9c1d-2e3f4a5b6c7d/apply",
+    "salaryDescription": "<div>Pay depends on location.</div>",
+    "salaryDescriptionPlain": "Pay depends on location.",
+    "salaryRange": {
+      "min": 90000,
+      "max": 120000,
+      "currency": "EUR",
+      "interval": "per-year-salary"
+    }
+  },
+  {
+    "additional": "<div>Sample Labs is an equal opportunity employer.</div>",
+    "additionalPlain": "Sample Labs is an equal opportunity employer.",
+    "categories": {
+      "commitment": "Permanent",
+      "department": "Engineering",
+      "location": "Paris, France",
+      "team": "Platform",
+      "allLocations": [
+        "Paris, France"
+      ]
+    },
+    "createdAt": 1791800000000,
+    "descriptionPlain": "About Sample Labs\n\nSample Labs builds the dashboard shops use every day. You will work on its React app.",
+    "description": "<p><strong>About Sample Labs</strong></p><p>Sample Labs builds the dashboard shops use every day. You will work on its React app.</p>",
+    "id": "0f3c2a1e-2222-4a6b-9c1d-2e3f4a5b6c7d",
+    "lists": [
+      {
+        "text": "What you will do",
+        "content": "<li>Build and run our payment services.</li><li>Review code and mentor others.</li>"
+      }
+    ],
+    "text": "Frontend Engineer",
+    "country": "FR",
+    "workplaceType": "hybrid",
+    "opening": "<p><strong>About Sample Labs</strong></p>",
+    "openingPlain": "About Sample Labs",
+    "descriptionBody": "<p>Sample Labs builds the dashboard shops use every day. You will work on its React app.</p>",
+    "descriptionBodyPlain": "Sample Labs builds the dashboard shops use every day. You will work on its React app.",
+    "hostedUrl": "https://jobs.lever.co/samplelabs/0f3c2a1e-2222-4a6b-9c1d-2e3f4a5b6c7d",
+    "applyUrl": "https://jobs.lever.co/samplelabs/0f3c2a1e-2222-4a6b-9c1d-2e3f4a5b6c7d/apply"
+  }
+]

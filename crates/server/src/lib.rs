@@ -12,6 +12,7 @@
 
 pub mod bff;
 pub mod web;
+pub mod wiring;
 
 use std::{convert::Infallible, sync::Arc, time::Instant};
 
@@ -48,25 +49,52 @@ pub struct Composition {
     /// The profile module's AI gateway (its `complete` role reads PDFs and
     /// pasted text).
     pub profile: applicamp_profile::ProfileDeps,
+    /// The pipeline's neighbours (reading pasted links, Today).
+    pub pipeline: applicamp_pipeline::PipelineDeps,
+    /// The sources module: the boards' reader, the AI gateway that scores
+    /// jobs, and its neighbours.
+    pub sources: applicamp_sources::SourcesDeps,
 }
 
 impl Composition {
-    /// From the `APPLICAMP_AI__…` variables. No AI role configured is fine:
-    /// the features that need one say they are unavailable.
+    /// From the `APPLICAMP_AI__…` and `APPLICAMP_SOURCES__…` variables. No AI
+    /// role configured is fine: the features that need one say they are
+    /// unavailable.
     pub fn from_env() -> Result<Self, String> {
         let ai = applicamp_ai::AiConfig::from_env().map_err(|e| e.to_string())?;
-        Self::with_ai(ai)
+        let sources = applicamp_sources::SourcesConfig::from_env()?;
+        Self::with(ai, sources)
     }
 
-    /// Composed over `ai`.
+    /// Composed over `ai`, with the job boards' own APIs.
     pub fn with_ai(ai: applicamp_ai::AiConfig) -> Result<Self, String> {
-        let gateway = if ai.is_configured(applicamp_ai::Role::Complete) {
-            Some(applicamp_ai::Gateway::new(ai).map_err(|e| e.to_string())?)
-        } else {
-            None
+        Self::with(ai, applicamp_sources::SourcesConfig::default())
+    }
+
+    /// Composed over `ai` and `sources`. One gateway serves every module, so
+    /// every model call counts against the same spending limits.
+    pub fn with(
+        ai: applicamp_ai::AiConfig,
+        sources: applicamp_sources::SourcesConfig,
+    ) -> Result<Self, String> {
+        let gateway = applicamp_ai::Gateway::new(ai).map_err(|e| e.to_string())?;
+        let profile_ai = gateway
+            .is_configured(applicamp_ai::Role::Complete)
+            .then(|| gateway.clone());
+        let sources = applicamp_sources::SourcesDeps::new(
+            sources,
+            Some(gateway),
+            std::sync::Arc::new(wiring::SourcesWiring),
+        )?;
+        let pipeline = applicamp_pipeline::PipelineDeps {
+            neighbours: Some(std::sync::Arc::new(wiring::PipelineWiring {
+                sources: sources.clone(),
+            })),
         };
         Ok(Self {
-            profile: applicamp_profile::ProfileDeps { ai: gateway },
+            profile: applicamp_profile::ProfileDeps { ai: profile_ai },
+            pipeline,
+            sources,
         })
     }
 
@@ -91,13 +119,21 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
     vec![
         applicamp_identity::module(),
         applicamp_profile::module(composition.profile.clone()),
+        applicamp_pipeline::module(composition.pipeline.clone()),
+        applicamp_sources::module(composition.sources.clone()),
     ]
 }
 
-/// Every module's background work.
+/// Every module's background work, composed inertly (the kinds there are).
 pub fn registry() -> Result<Registry, Vec<String>> {
+    registry_with(&Composition::default())
+}
+
+/// Every module's background work, composed with `composition`: what the
+/// worker runs.
+pub fn registry_with(composition: &Composition) -> Result<Registry, Vec<String>> {
     Registry::build(
-        modules()
+        modules_with(composition)
             .into_iter()
             .map(|module| (module.name, module.background))
             // The server's own work: the BFF owns the session store.
@@ -133,6 +169,12 @@ pub async fn migrate(db: &PgPool) -> Result<(), sqlx::migrate::MigrateError> {
         (name = "profile", description = "The master profile: what agents know about you. \
             Imported from a LinkedIn data export, a PDF or pasted text as a draft you review, \
             and edited by hand."),
+        (name = "pipeline", description = "Every opportunity in one place, from first match \
+            to offer: found by a search or added by link, with its stage, match, notes and \
+            next step. And Today: where you are and what to do next."),
+        (name = "sources", description = "The job search: public job boards (Greenhouse, \
+            Lever, Ashby, Arbeitnow, HN Who is hiring) read and scored against your profile \
+            and goals, within the spending limits."),
         (name = "bff", description = "The web app's backend-for-frontend: sign-in with a \
             provider, the session cookie, sign-out. Browsers only."),
     ),

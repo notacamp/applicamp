@@ -1,0 +1,36 @@
+[package]
+name = "applicamp-sources"
+description = "Applicamp sources module: reading jobs from public job-board APIs (Greenhouse, Lever, Ashby, Arbeitnow, HN Who is hiring) and the search that scores them against a person's profile and goals, within the spending limits."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+applicamp-ai.workspace = true
+applicamp-kernel.workspace = true
+axum.workspace = true
+chrono.workspace = true
+figment.workspace = true
+regex.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+tokio.workspace = true
+toml.workspace = true
+tracing.workspace = true
+url.workspace = true
+utoipa.workspace = true
+utoipa-axum.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+http-body-util.workspace = true
+tower.workspace = true
+wiremock.workspace = true
+
+[lints]
+workspace = true

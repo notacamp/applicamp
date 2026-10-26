@@ -1,0 +1,45 @@
+{
+  "searchNow": "Rechercher maintenant",
+  "starting": "Démarrage…",
+  "confirm": {
+    "title": "Lancer une recherche sur les sites d’emploi ?",
+    "body": "Cette recherche coûtera environ {{cost}} d’IA pour évaluer environ {{jobs}} offres. On y va ?",
+    "go": "Rechercher",
+    "cancel": "Pas maintenant"
+  },
+  "progress": {
+    "label": "Recherche sur les sites d’emploi",
+    "queued": "Démarrage de la recherche…",
+    "running": "{{fetched}} offres lues · {{scored}} évaluées · {{added}} ajoutées"
+  },
+  "line": {
+    "running": "Recherche en cours sur les sites d’emploi…",
+    "failed": "La dernière recherche a échoué. Réessayez dans un moment.",
+    "counts": "{{fetched}} offres lues, {{added}} retenues",
+    "lastNight": "Cette nuit : {{counts}}",
+    "today": "Aujourd’hui à {{time}} : {{counts}}",
+    "on": "{{date}} : {{counts}}",
+    "cost": "IA {{cost}}"
+  },
+  "stopped": {
+    "ai_budget_reached": "Arrêtée à la limite de dépenses d’IA. Les offres déjà évaluées sont conservées.",
+    "ai_unavailable": "Arrêtée : aucun modèle d’IA n’est configuré pour évaluer les offres.",
+    "ai_failed": "Arrêtée : le modèle d’IA n’a pas répondu. Les offres déjà évaluées sont conservées.",
+    "no_profile": "Arrêtée : configurez d’abord votre profil et vos objectifs.",
+    "sources_failed": "Arrêtée : les sites d’emploi n’ont pas pu être lus."
+  },
+  "errors": {
+    "profile_needed": "Configurez d’abord votre profil et répondez à quelques objectifs : la recherche évalue les offres par rapport à eux.",
+    "search_running": "Une recherche est déjà en cours.",
+    "search_limit_reached": "C’est la limite de recherches pour l’instant : 3 par jour, une toutes les 15 minutes.",
+    "ai_unavailable": "La recherche a besoin d’un modèle d’IA, et aucun n’est configuré ici.",
+    "ai_budget_reached": "La limite de dépenses d’IA est atteinte : aucune recherche ne peut tourner avant sa remise à zéro.",
+    "ai_daily_limit_reached": "Vous avez utilisé l’IA disponible pour aujourd’hui. Réessayez demain.",
+    "ai_failed": "Le modèle d’IA n’a pas répondu. Réessayez dans un instant.",
+    "generic": "La recherche n’a pas pu démarrer. Réessayez."
+  },
+  "spend": {
+    "month": "IA ce mois-ci : {{spent}} sur {{limit}}",
+    "monthNoLimit": "IA ce mois-ci : {{spent}}"
+  }
+}

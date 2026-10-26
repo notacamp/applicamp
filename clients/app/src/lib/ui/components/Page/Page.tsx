@@ -12,14 +12,16 @@ export interface PageProps {
   lead?: string | undefined;
   /** For tests: `data-testid` of the page. */
   testId?: string | undefined;
+  /** A database page (the Pipeline): a wider column for its table and board. */
+  wide?: boolean | undefined;
   children?: ReactNode;
 }
 
 /** A place's page in the app frame: a calm, centred column, like a Notion page. */
-export function Page({ title, eyebrow, lead, testId, children }: PageProps) {
+export function Page({ title, eyebrow, lead, testId, wide = false, children }: PageProps) {
   return (
     <main className={styles["page"]} data-testid={testId}>
-      <div className={styles["column"]}>
+      <div className={styles["column"]} data-wide={wide ? "" : undefined}>
         <header className={styles["head"]}>
           {eyebrow === undefined ? null : <p className={styles["eyebrow"]}>{eyebrow}</p>}
           <Heading level={1} size="hero">

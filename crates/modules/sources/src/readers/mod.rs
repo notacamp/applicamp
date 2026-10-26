@@ -531,7 +531,7 @@ impl Reader {
                     &[],
                 )?;
                 let detail: Option<greenhouse::Detail> = self.get_json(db, &url).await?;
-                detail.map(|detail| greenhouse::job_of_detail(detail, &mut board))
+                detail.and_then(|detail| greenhouse::job_of_detail(detail, &mut board))
             }
             Source::Lever => {
                 let base = if eu {

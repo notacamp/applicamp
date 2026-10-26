@@ -260,9 +260,9 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(again, 1);
-        let known = known(&db, account).await.unwrap();
-        assert_eq!(known.len(), 3);
-        assert!(known.contains(&("greenhouse".to_owned(), "a:2".to_owned())));
+        let have = known(&db, account).await.unwrap();
+        assert_eq!(have.len(), 3);
+        assert!(have.contains(&("greenhouse".to_owned(), "a:2".to_owned())));
         assert!(known(&db, Uuid::now_v7()).await.unwrap().is_empty());
     }
 }

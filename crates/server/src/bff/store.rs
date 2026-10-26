@@ -81,6 +81,15 @@ pub async fn delete(db: &PgPool, token: &str) -> Result<bool, sqlx::Error> {
     Ok(done.rows_affected() > 0)
 }
 
+/// End every session of `account`. How many.
+pub async fn delete_for_account(db: &PgPool, account: Uuid) -> Result<u64, sqlx::Error> {
+    let done = sqlx::query("DELETE FROM bff.sessions WHERE account_id = $1")
+        .bind(account)
+        .execute(db)
+        .await?;
+    Ok(done.rows_affected())
+}
+
 /// Delete ended sessions. How many.
 pub async fn prune(db: &PgPool, now: DateTime<Utc>) -> Result<u64, sqlx::Error> {
     let done = sqlx::query("DELETE FROM bff.sessions WHERE expires_at <= $1")

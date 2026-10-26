@@ -6,7 +6,7 @@
 use std::{io::Write as _, process::ExitCode};
 
 use applicamp_identity::invites::{self, Added};
-use applicamp_kernel::{Config, db};
+use applicamp_kernel::{Config, db, events::EventBus};
 use clap::Subcommand;
 
 use crate::{fail, runtime};
@@ -23,8 +23,9 @@ pub enum InviteCommand {
         #[arg(long)]
         note: Option<String>,
     },
-    /// Take an address off the list. Accounts already created keep their
-    /// ways in.
+    /// Take an address off the list: its account can no longer sign in and
+    /// its sessions end. The account and its data are kept; `invite add`
+    /// restores access.
     Remove {
         /// The address.
         email: String,
@@ -64,6 +65,9 @@ async fn execute(config: &Config, command: InviteCommand) -> Result<Vec<String>,
             .await
             .map_err(|e| format!("could not apply migrations: {e}"))?;
     }
+    let registry = applicamp_server::registry()
+        .map_err(|problems| format!("background work: {}", problems.join("; ")))?;
+    let events = EventBus::new(std::sync::Arc::new(registry));
     let now = chrono::Utc::now();
     let problem = |e: applicamp_kernel::Error| e.to_problem().detail;
     Ok(match command {
@@ -82,9 +86,12 @@ async fn execute(config: &Config, command: InviteCommand) -> Result<Vec<String>,
             }
         }
         InviteCommand::Remove { email } => {
-            if invites::remove(&db, &email).await.map_err(problem)? {
+            if invites::remove(&db, &events, &email)
+                .await
+                .map_err(problem)?
+            {
                 vec![format!(
-                    "removed {} (an account it created keeps its ways in)",
+                    "removed {} (its account, if any, is signed out and kept; `invite add` restores it)",
                     email.trim().to_lowercase()
                 )]
             } else {

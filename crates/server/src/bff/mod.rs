@@ -22,6 +22,8 @@ mod handlers;
 mod oidc;
 pub mod store;
 
+mod revoke;
+
 #[cfg(test)]
 mod tests;
 
@@ -47,6 +49,7 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 
 pub use cookies::{LOGIN_COOKIE, SESSION_COOKIE};
 pub use csrf::CSRF_HEADER;
+pub use revoke::EndSessions;
 
 use self::{cookies::Cookies, oidc::Oidc};
 

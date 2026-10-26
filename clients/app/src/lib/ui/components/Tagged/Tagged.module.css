@@ -1,0 +1,4 @@
+/* A test handle that takes no part in the layout. */
+.tagged {
+  display: contents;
+}

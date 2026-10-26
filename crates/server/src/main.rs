@@ -15,7 +15,7 @@ use std::{
 use applicamp_kernel::{
     AppState, Config, EventBus, crypto::SecretKey, db, jobs::Worker, telemetry,
 };
-use applicamp_server::bff;
+use applicamp_server::{bff, web::Web};
 use clap::{Parser, Subcommand};
 use tokio::sync::watch;
 
@@ -102,11 +102,15 @@ fn serve() -> ExitCode {
         Ok(settings) => settings,
         Err(e) => return fail(&e.to_string()),
     };
+    let web = match config.web_dir.as_deref().map(Web::new).transpose() {
+        Ok(web) => web,
+        Err(e) => return fail(&e.to_string()),
+    };
     let runtime = match runtime() {
         Ok(runtime) => runtime,
         Err(e) => return fail(&e),
     };
-    match runtime.block_on(run(config, secret, &settings)) {
+    match runtime.block_on(run(config, secret, &settings, web)) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             tracing::error!(error = %e, "server failed");
@@ -119,6 +123,7 @@ async fn run(
     config: Config,
     secret: SecretKey,
     settings: &bff::Settings,
+    web: Option<Web>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let registry = Arc::new(
         applicamp_server::registry()
@@ -145,12 +150,15 @@ async fn run(
     if providers.is_empty() {
         tracing::warn!("no sign-in provider is configured: nobody can sign in");
     }
+    if web.is_none() {
+        tracing::info!("APPLICAMP_WEB_DIR is unset: serving the API without the web client");
+    }
 
     let (stop, stopped) = watch::channel(false);
     let worker = tokio::spawn(Worker::new(db.clone(), registry, events).run(stopped.clone()));
     let pruner = tokio::spawn(prune_sessions(state.clone(), stopped));
 
-    let app = applicamp_server::app(state, &bff);
+    let app = applicamp_server::app(state, &bff, web);
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!(%addr, providers = ?providers, version = applicamp_server::VERSION, "listening");
     axum::serve(listener, app)

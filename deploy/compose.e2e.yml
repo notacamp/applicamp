@@ -1,0 +1,54 @@
+# The e2e stack: compose.yml with a fake Campbooks to sign in with
+# (clients/app/scripts/fake-oidc.ts), which approves every sign-in at once.
+# Tests only, never a real instance.
+#
+#   printf 'POSTGRES_PASSWORD=e2e-only\n' > .env
+#   APPLICAMP_IMAGE=applicamp:e2e docker compose -f compose.yml -f compose.e2e.yml up -d
+#   docker compose -f compose.yml -f compose.e2e.yml exec -T server /app/applicamp invite add demo@example.com
+#   E2E_HOST_RULES="MAP fake-oidc 127.0.0.1" pnpm --dir ../clients e2e
+#
+# The browser reaches the fake at fake-oidc:9010 through the published port
+# (the host-resolver rule maps the name to 127.0.0.1); the server reaches it
+# by its service name.
+services:
+  fake-oidc:
+    image: node:22-bookworm-slim
+    # .mts: an ES module wherever it is mounted, with no package.json beside it.
+    command: ["node", "/fake-oidc/fake-oidc.mts"]
+    environment:
+      FAKE_OIDC_HOST: 0.0.0.0
+      FAKE_OIDC_PORT: "9010"
+      FAKE_OIDC_ISSUER: http://fake-oidc:9010
+      FAKE_OIDC_CLIENTS: applicamp-e2e:e2e-only-secret
+      FAKE_OIDC_EMAIL: demo@example.com
+    volumes:
+      - ../clients/app/scripts/fake-oidc.ts:/fake-oidc/fake-oidc.mts:ro
+    ports:
+      - "9010:9010"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:9010/healthz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  server:
+    environment:
+      APPLICAMP_PUBLIC_URL: http://localhost:8080
+      APPLICAMP_OIDC__CAMPBOOKS__ISSUER: http://fake-oidc:9010
+      APPLICAMP_OIDC__CAMPBOOKS__CLIENT_ID: applicamp-e2e
+      # Inline, for the fake only; real secrets are files (deploy/secrets).
+      APPLICAMP_OIDC__CAMPBOOKS__CLIENT_SECRET: e2e-only-secret
+    depends_on:
+      fake-oidc:
+        condition: service_healthy
+    # The image's check, more often, so the stack reports healthy sooner.
+    healthcheck:
+      test: ["CMD", "/app/applicamp", "healthcheck"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 5s

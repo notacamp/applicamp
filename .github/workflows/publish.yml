@@ -52,6 +52,10 @@ jobs:
           context: .
           platforms: ${{ matrix.platform }}
           build-args: GIT_SHA=${{ steps.sha.outputs.short }}
+          # @notacamp/ui from GitHub Packages for the web stage: a BuildKit
+          # secret, never a build arg.
+          secrets: |
+            node_auth_token=${{ secrets.GITHUB_TOKEN }}
           # Provenance is attested on the final multi-arch manifest below;
           # per-platform attestation manifests would leak `unknown/unknown`
           # entries into it.

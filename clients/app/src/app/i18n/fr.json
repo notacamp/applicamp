@@ -1,0 +1,43 @@
+{
+  "appName": "Applicamp",
+  "frame": {
+    "jump": "Chercher ou aller à",
+    "places": "Rubriques"
+  },
+  "commands": {
+    "account": "Compte",
+    "signOut": "Se déconnecter"
+  },
+  "today": {
+    "title": "Aujourd’hui",
+    "lead": "Ce qui vous attend, chaque jour. Les agents travaillent en arrière-plan ; rien ne part en votre nom sans votre accord.",
+    "emptyTitle": "Rien ne vous attend pour l’instant",
+    "emptyBody": "Quand les agents trouvent une offre, préparent une candidature ou rédigent une réponse à un recruteur, elle vous attend ici. Commencez par leur dire qui vous êtes et ce que vous cherchez ensuite.",
+    "setUp": "Configurer votre profil"
+  },
+  "pipeline": {
+    "title": "Opportunités",
+    "lead": "Chaque opportunité trouvée par les agents ou ajoutée par vous, de la première correspondance à l’offre.",
+    "emptyTitle": "Aucune opportunité pour l’instant",
+    "emptyBody": "Les offres arrivent ici avec leur adéquation à votre profil, leur étape et la prochaine action, pour que rien ne vous échappe."
+  },
+  "agents": {
+    "title": "Agents",
+    "lead": "Chaque exécution travaille dans son propre bac à sable, créé pour une tâche et supprimé ensuite.",
+    "emptyTitle": "Aucune exécution pour l’instant",
+    "emptyBody": "Quand une recherche ou une candidature s’exécute, vous pouvez suivre ici ce qu’elle fait, en direct : chaque étape, les sites qu’elle a atteints et ceux qu’on l’a empêchée d’atteindre."
+  },
+  "profile": {
+    "title": "Profil et objectifs",
+    "lead": "Ce que les agents savent de vous. Ils n’utilisent que ce qui est écrit ici, et chaque affirmation d’un CV doit en découler.",
+    "signedInAs": "Connecté en tant que",
+    "waysIn": "Moyens de connexion",
+    "emptyTitle": "Votre profil est vide",
+    "emptyBody": "Bientôt, vous pourrez importer l’export de vos données LinkedIn ou votre CV, puis répondre à quelques questions sur le poste, le lieu et le salaire que vous cherchez ensuite."
+  },
+  "notFound": {
+    "title": "Cette page n’existe pas",
+    "lead": "Le lien est peut-être ancien, ou l’adresse mal saisie.",
+    "home": "Aller à Aujourd’hui"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "appName": "Applicamp",
+  "frame": {
+    "jump": "Buscar o ir a",
+    "places": "Secciones"
+  },
+  "commands": {
+    "account": "Cuenta",
+    "signOut": "Cerrar sesión"
+  },
+  "today": {
+    "title": "Hoy",
+    "lead": "Lo que te espera, cada día. Los agentes trabajan en segundo plano; nada sale en tu nombre sin tu permiso.",
+    "emptyTitle": "Todavía no hay nada para ti",
+    "emptyBody": "Cuando los agentes encuentren una oferta, preparen una candidatura o redacten una respuesta a un reclutador, te esperará aquí. Empieza por contarles quién eres y qué buscas ahora.",
+    "setUp": "Configurar tu perfil"
+  },
+  "pipeline": {
+    "title": "Oportunidades",
+    "lead": "Todas las oportunidades que encuentran los agentes o que añades tú, desde la primera coincidencia hasta la oferta.",
+    "emptyTitle": "Todavía no hay oportunidades",
+    "emptyBody": "Las ofertas llegan aquí con cuánto encajan con tu perfil, su fase y el siguiente paso, para que no se te escape nada."
+  },
+  "agents": {
+    "title": "Agentes",
+    "lead": "Cada ejecución trabaja en su propio sandbox, creado para una tarea y eliminado al terminar.",
+    "emptyTitle": "Todavía no hay ejecuciones",
+    "emptyBody": "Cuando se ejecute una búsqueda o una candidatura, podrás ver aquí lo que hace en tiempo real: cada paso, los sitios a los que accedió y aquellos a los que se le impidió acceder."
+  },
+  "profile": {
+    "title": "Perfil y objetivos",
+    "lead": "Lo que los agentes saben de ti. Solo usan lo que está escrito aquí, y cada afirmación de un CV tiene que salir de aquí.",
+    "signedInAs": "Sesión iniciada como",
+    "waysIn": "Formas de iniciar sesión",
+    "emptyTitle": "Tu perfil está vacío",
+    "emptyBody": "Pronto podrás importar la exportación de datos de LinkedIn o tu CV y responder a unas preguntas sobre el puesto, el lugar y el sueldo que buscas ahora."
+  },
+  "notFound": {
+    "title": "Esta página no existe",
+    "lead": "Puede que el enlace sea antiguo o que la dirección esté mal escrita.",
+    "home": "Ir a Hoy"
+  }
+}

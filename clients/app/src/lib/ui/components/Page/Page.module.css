@@ -1,0 +1,55 @@
+/*
+ * The page beside the sidebar, sized like the package's ReaderPane. Below
+ * 64rem the Shell wraps (the phone header takes a whole row) and a basis of 0
+ * would let the page squeeze onto the header's row with no width at all, so
+ * its basis is --reader-min there: it always starts a row of its own and
+ * shrinks to the screen. From 64rem the Shell is one row and the page takes
+ * what the sidebar leaves.
+ */
+.page {
+  flex: 999 1 var(--reader-min);
+  min-width: 0;
+  background: var(--surface-base);
+}
+
+@media (width >= 64rem) {
+  .page {
+    flex-basis: 0;
+  }
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  width: 100%;
+  max-width: var(--page-width);
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4) var(--space-12);
+}
+
+@media (width >= 48rem) {
+  .column {
+    padding: var(--space-8) var(--space-12) var(--space-12);
+  }
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.eyebrow {
+  color: var(--text-tertiary);
+  font: var(--weight-semibold) var(--text-xs) / var(--leading-none) var(--font-sans);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.lead {
+  max-width: var(--measure);
+  color: var(--text-secondary);
+  font-size: var(--text-lg);
+  line-height: var(--leading-normal);
+}

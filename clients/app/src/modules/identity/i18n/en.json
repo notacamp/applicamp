@@ -1,0 +1,49 @@
+{
+  "signIn": {
+    "title": "Sign in to Applicamp",
+    "lead": "Your job hunt in one place. Agents find jobs and prepare applications; nothing leaves your name until you say so.",
+    "with": "Continue with {{provider}}",
+    "loading": "Loading the ways to sign in…",
+    "unreachableTitle": "Applicamp can’t be reached",
+    "unreachableBody": "Check your connection, then try again.",
+    "retry": "Try again",
+    "noneTitle": "No way to sign in is set up yet",
+    "noneBody": "Whoever runs this Applicamp needs to connect Campbooks or LinkedIn first.",
+    "footer": "Applicamp is invite-only for now.",
+    "errors": {
+      "sign_in_failed": {
+        "title": "That sign-in didn’t work",
+        "body": "Nothing was saved. Try again, or sign in another way."
+      },
+      "provider_unavailable": {
+        "title": "That sign-in service isn’t answering",
+        "body": "Try again in a minute, or sign in another way."
+      }
+    }
+  },
+  "notInvited": {
+    "title": "You’re not on the list yet",
+    "lead": "Applicamp is invite-only for now, and the email you signed in with isn’t on the list. Ask whoever runs this Applicamp to add it, then sign in again.",
+    "back": "Back to sign in",
+    "footer": "No account was created and nothing was saved."
+  },
+  "gate": {
+    "opening": "Opening Applicamp…",
+    "unreachableTitle": "Applicamp can’t be reached",
+    "unreachableLead": "Check your connection, then try again.",
+    "retry": "Try again"
+  },
+  "account": {
+    "label": "Account",
+    "theme": "Theme",
+    "themes": {
+      "system": "System",
+      "light": "Light",
+      "dark": "Dark"
+    },
+    "language": "Language",
+    "signOut": "Sign out",
+    "signingOut": "Signing out…",
+    "signOutFailed": "Couldn’t sign out. Try again."
+  }
+}

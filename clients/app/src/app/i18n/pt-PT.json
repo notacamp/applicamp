@@ -1,0 +1,43 @@
+{
+  "appName": "Applicamp",
+  "frame": {
+    "jump": "Pesquisar ou ir para",
+    "places": "Secções"
+  },
+  "commands": {
+    "account": "Conta",
+    "signOut": "Terminar sessão"
+  },
+  "today": {
+    "title": "Hoje",
+    "lead": "O que espera por si, todos os dias. Os agentes trabalham em segundo plano; nada sai em seu nome sem a sua autorização.",
+    "emptyTitle": "Ainda nada precisa de si",
+    "emptyBody": "Quando os agentes encontrarem uma oferta, prepararem uma candidatura ou escreverem uma resposta a um recrutador, fica aqui à sua espera. Comece por lhes dizer quem é e o que procura a seguir.",
+    "setUp": "Configurar o perfil"
+  },
+  "pipeline": {
+    "title": "Oportunidades",
+    "lead": "Todas as oportunidades que os agentes encontram ou que acrescenta, da primeira correspondência à proposta.",
+    "emptyTitle": "Ainda não há oportunidades",
+    "emptyBody": "As ofertas chegam aqui com o grau de correspondência com o seu perfil, a fase em que estão e o passo seguinte, para que nada escape."
+  },
+  "agents": {
+    "title": "Agentes",
+    "lead": "Cada execução trabalha na sua própria sandbox, criada para uma tarefa e apagada no fim.",
+    "emptyTitle": "Ainda não há execuções",
+    "emptyBody": "Quando uma pesquisa ou uma candidatura estiver a correr, pode ver aqui o que faz, em tempo real: cada passo, os sites a que acedeu e aquilo a que foi impedida de aceder."
+  },
+  "profile": {
+    "title": "Perfil e objetivos",
+    "lead": "O que os agentes sabem sobre si. Usam apenas o que está escrito aqui, e cada afirmação num CV tem de ter origem aqui.",
+    "signedInAs": "Sessão iniciada como",
+    "waysIn": "Formas de entrar",
+    "emptyTitle": "O seu perfil está vazio",
+    "emptyBody": "Em breve poderá importar a exportação de dados do LinkedIn ou o seu CV e responder a algumas perguntas sobre a função, o local e o salário que procura a seguir."
+  },
+  "notFound": {
+    "title": "Esta página não existe",
+    "lead": "A ligação pode ser antiga ou o endereço pode estar mal escrito.",
+    "home": "Ir para Hoje"
+  }
+}

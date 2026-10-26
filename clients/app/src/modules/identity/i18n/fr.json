@@ -1,0 +1,49 @@
+{
+  "signIn": {
+    "title": "Se connecter à Applicamp",
+    "lead": "Votre recherche d’emploi au même endroit. Les agents trouvent des offres et préparent vos candidatures ; rien ne part en votre nom sans votre accord.",
+    "with": "Continuer avec {{provider}}",
+    "loading": "Chargement des moyens de connexion…",
+    "unreachableTitle": "Impossible de joindre Applicamp",
+    "unreachableBody": "Vérifiez votre connexion, puis réessayez.",
+    "retry": "Réessayer",
+    "noneTitle": "Aucun moyen de connexion n’est encore configuré",
+    "noneBody": "La personne qui gère cet Applicamp doit d’abord connecter Campbooks ou LinkedIn.",
+    "footer": "Pour l’instant, Applicamp fonctionne uniquement sur invitation.",
+    "errors": {
+      "sign_in_failed": {
+        "title": "La connexion n’a pas abouti",
+        "body": "Rien n’a été enregistré. Réessayez, ou connectez-vous autrement."
+      },
+      "provider_unavailable": {
+        "title": "Ce service de connexion ne répond pas",
+        "body": "Réessayez dans une minute, ou connectez-vous autrement."
+      }
+    }
+  },
+  "notInvited": {
+    "title": "Vous n’êtes pas encore sur la liste",
+    "lead": "Pour l’instant, Applicamp fonctionne uniquement sur invitation, et l’adresse avec laquelle vous vous êtes connecté n’est pas sur la liste. Demandez à la personne qui gère cet Applicamp de l’ajouter, puis reconnectez-vous.",
+    "back": "Revenir à la connexion",
+    "footer": "Aucun compte n’a été créé et rien n’a été enregistré."
+  },
+  "gate": {
+    "opening": "Ouverture d’Applicamp…",
+    "unreachableTitle": "Impossible de joindre Applicamp",
+    "unreachableLead": "Vérifiez votre connexion, puis réessayez.",
+    "retry": "Réessayer"
+  },
+  "account": {
+    "label": "Compte",
+    "theme": "Thème",
+    "themes": {
+      "system": "Système",
+      "light": "Clair",
+      "dark": "Sombre"
+    },
+    "language": "Langue",
+    "signOut": "Se déconnecter",
+    "signingOut": "Déconnexion…",
+    "signOutFailed": "La déconnexion a échoué. Réessayez."
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "@applicamp/clients",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.3.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @applicamp/app run dev",
+    "build": "pnpm -r run build",
+    "lint": "pnpm -r run lint",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r run test",
+    "e2e": "pnpm --filter @applicamp/app run e2e",
+    "deps:check": "pnpm -r run deps:check",
+    "api:generate": "pnpm -r run api:generate",
+    "api:check": "pnpm -r run api:check",
+    "i18n:check": "pnpm -r run i18n:check",
+    "fake-oidc": "pnpm --filter @applicamp/app run fake-oidc",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "3.9.9",
+    "typescript": "6.0.3"
+  }
+}

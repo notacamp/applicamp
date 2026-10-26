@@ -1,0 +1,80 @@
+/*
+ * Applicamp's token set: a quiet, Notion-like look over @notacamp/ui.
+ *
+ * Imported after @notacamp/ui/tokens.css, it overrides the semantic tokens
+ * the components read (it never styles a component). Light and dark are each
+ * defined once with light-dark(), so `data-theme` on <html> (system, light,
+ * dark) switches them. Text keeps AA contrast on both the page and the
+ * sidebar, and the accent keeps 6:1 against its text, as the package asks.
+ *
+ *   page       white / #191919        sidebar  #f7f7f5 / #202020
+ *   text       #37352f / #e3e2e0      lines    #e9e9e7 / #2f2f2f
+ *   accent     a deep Notion blue (#165fae), #62a8d6 in the dark
+ */
+
+:root {
+  /* System sans, like Notion: no web font to download. */
+  --font-sans:
+    ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji",
+    Arial, sans-serif;
+  --font-display: var(--font-sans);
+  --font-mono: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* Tighter, flatter corners. */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  /* A Notion-wide sidebar and a readable page column. */
+  --sidebar-width: 248px;
+  --page-width: 900px;
+}
+
+:root,
+[data-theme],
+[data-accent] {
+  --surface-base: light-dark(#ffffff, #191919);
+  --surface-raised: light-dark(#ffffff, #202020);
+  --surface-sunken: light-dark(#f7f7f5, #202020);
+  --surface-overlay: light-dark(#ffffff, #252525);
+  --surface-hover: light-dark(rgb(55 53 47 / 0.06), rgb(255 255 255 / 0.055));
+  --surface-selected: light-dark(rgb(55 53 47 / 0.08), rgb(255 255 255 / 0.08));
+  --surface-scrim: light-dark(rgb(15 15 15 / 0.25), rgb(0 0 0 / 0.5));
+
+  --border-subtle: light-dark(#e9e9e7, #2f2f2f);
+  --border-strong: light-dark(#dcdbd8, #3a3a3a);
+  --edge-highlight: light-dark(rgb(255 255 255 / 0.85), rgb(255 255 255 / 0.04));
+
+  /* On white and on the sidebar: ≥ 12, ≥ 6, ≥ 4.7 (AA); disabled is for placeholders only. */
+  --text-primary: light-dark(#37352f, #e3e2e0);
+  --text-secondary: light-dark(#5f5e5b, #c4c3c0);
+  --text-tertiary: light-dark(#6f6e6a, #9b9a97);
+  --text-disabled: light-dark(#a5a29c, #6f6e6b);
+
+  --accent: light-dark(#165fae, #62a8d6);
+  --accent-hover: light-dark(#124f91, #7cb7de);
+  --on-accent: light-dark(#ffffff, #111111);
+  --accent-soft: light-dark(#e7f1fb, #1f3242);
+  --accent-text: light-dark(#165fae, #62a8d6);
+  --highlight: light-dark(rgb(35 131 226 / 0.2), rgb(82 156 202 / 0.32));
+  --focus-ring: var(--accent);
+
+  --danger: light-dark(#c4423d, #e3716b);
+  --danger-soft: light-dark(#ffe2dd, #522e2a);
+  --success: light-dark(#3d7756, #6cad86);
+  --success-soft: light-dark(#dbeddb, #243d30);
+
+  --kbd-bg: var(--surface-sunken);
+  --kbd-fg: var(--text-tertiary);
+  --kbd-border: var(--border-strong);
+
+  --shadow-color: light-dark(rgb(15 15 15 / 0.12), rgb(0 0 0 / 0.55));
+  --shadow-overlay:
+    0 4px 18px var(--shadow-color),
+    0 0 0 1px light-dark(rgb(15 15 15 / 0.05), rgb(255 255 255 / 0.06));
+
+  /* The app's own marks (AppMark): ink on the page, page on the ink. */
+  --mark-bg: var(--text-primary);
+  --mark-fg: var(--surface-base);
+}

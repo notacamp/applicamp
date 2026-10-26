@@ -1,0 +1,49 @@
+{
+  "signIn": {
+    "title": "Entrar no Applicamp",
+    "lead": "A sua procura de emprego num só lugar. Os agentes encontram ofertas e preparam candidaturas; nada sai em seu nome sem a sua autorização.",
+    "with": "Continuar com {{provider}}",
+    "loading": "A carregar as formas de entrar…",
+    "unreachableTitle": "Não foi possível contactar o Applicamp",
+    "unreachableBody": "Verifique a ligação e tente novamente.",
+    "retry": "Tentar novamente",
+    "noneTitle": "Ainda não há nenhuma forma de entrar configurada",
+    "noneBody": "Quem gere este Applicamp tem de ligar primeiro o Campbooks ou o LinkedIn.",
+    "footer": "Por agora, o Applicamp funciona só por convite.",
+    "errors": {
+      "sign_in_failed": {
+        "title": "Não foi possível entrar",
+        "body": "Nada foi guardado. Tente novamente ou entre de outra forma."
+      },
+      "provider_unavailable": {
+        "title": "Esse serviço de autenticação não está a responder",
+        "body": "Tente novamente daqui a um minuto ou entre de outra forma."
+      }
+    }
+  },
+  "notInvited": {
+    "title": "Ainda não está na lista",
+    "lead": "Por agora, o Applicamp funciona só por convite e o email com que entrou não está na lista. Peça a quem gere este Applicamp que o acrescente e depois entre novamente.",
+    "back": "Voltar a entrar",
+    "footer": "Não foi criada nenhuma conta e nada foi guardado."
+  },
+  "gate": {
+    "opening": "A abrir o Applicamp…",
+    "unreachableTitle": "Não foi possível contactar o Applicamp",
+    "unreachableLead": "Verifique a ligação e tente novamente.",
+    "retry": "Tentar novamente"
+  },
+  "account": {
+    "label": "Conta",
+    "theme": "Tema",
+    "themes": {
+      "system": "Sistema",
+      "light": "Claro",
+      "dark": "Escuro"
+    },
+    "language": "Idioma",
+    "signOut": "Terminar sessão",
+    "signingOut": "A terminar sessão…",
+    "signOutFailed": "Não foi possível terminar a sessão. Tente novamente."
+  }
+}

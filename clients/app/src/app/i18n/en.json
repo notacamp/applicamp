@@ -1,0 +1,43 @@
+{
+  "appName": "Applicamp",
+  "frame": {
+    "jump": "Search or jump to",
+    "places": "Places"
+  },
+  "commands": {
+    "account": "Account",
+    "signOut": "Sign out"
+  },
+  "today": {
+    "title": "Today",
+    "lead": "What waits on you, every day. Agents work in the background; nothing leaves your name without your say.",
+    "emptyTitle": "Nothing needs you yet",
+    "emptyBody": "When agents find a job, prepare an application or draft a reply to a recruiter, it waits for you here. Start by telling them who you are and what you want next.",
+    "setUp": "Set up your profile"
+  },
+  "pipeline": {
+    "title": "Pipeline",
+    "lead": "Every opportunity agents find or you add, from first match to offer.",
+    "emptyTitle": "No opportunities yet",
+    "emptyBody": "Jobs land here with how well they match your profile, their stage and the next step, so nothing slips."
+  },
+  "agents": {
+    "title": "Agents",
+    "lead": "Each run works in its own sandbox, made for one job and deleted after.",
+    "emptyTitle": "No runs yet",
+    "emptyBody": "When a search or an application runs, you can watch what it does here as it happens: each step, the sites it reached and anything it was stopped from reaching."
+  },
+  "profile": {
+    "title": "Profile & goals",
+    "lead": "What agents know about you. They use only what is written here, and every claim in a CV must trace back to it.",
+    "signedInAs": "Signed in as",
+    "waysIn": "Ways to sign in",
+    "emptyTitle": "Your profile is empty",
+    "emptyBody": "Soon you can import your LinkedIn data export or your CV, then answer a few questions about the role, the place and the pay you want next."
+  },
+  "notFound": {
+    "title": "This page doesn’t exist",
+    "lead": "The link may be old, or the address mistyped.",
+    "home": "Go to Today"
+  }
+}

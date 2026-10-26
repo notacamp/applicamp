@@ -1,0 +1,11 @@
+{
+  "nav": {
+    "today": "Hoje",
+    "pipeline": "Oportunidades",
+    "agents": "Agentes",
+    "profile": "Perfil e objetivos"
+  },
+  "command": {
+    "open": "Menu de comandos"
+  }
+}

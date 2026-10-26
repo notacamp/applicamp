@@ -1,5 +1,5 @@
 # Keep the build context to what the image build needs: the Rust workspace
-# (crates, migrations) and, with skeleton-client, the web client sources.
+# (crates, migrations) and the web client sources (clients/).
 .git
 .github
 .claude

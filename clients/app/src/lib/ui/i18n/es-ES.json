@@ -1,0 +1,8 @@
+{
+  "search": {
+    "label": "Buscar o ir a"
+  },
+  "commandMenu": {
+    "placeholder": "Ir a una página o ejecutar un comando"
+  }
+}

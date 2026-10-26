@@ -71,6 +71,11 @@ pub struct Config {
     /// The sign-in providers (`APPLICAMP_OIDC__…`).
     #[serde(default)]
     pub oidc: OidcConfig,
+    /// The built web client (`clients/app/dist`) to serve beside the API
+    /// (`APPLICAMP_WEB_DIR`; the image sets `/app/web`). Unset, the server
+    /// answers only the API, the BFF and `/healthz`.
+    #[serde(default)]
+    pub web_dir: Option<PathBuf>,
 }
 
 /// The sign-in providers. One with no client id is not offered.
@@ -144,6 +149,7 @@ impl Config {
             secret_key: None,
             secret_key_file: None,
             oidc: OidcConfig::default(),
+            web_dir: None,
         }
     }
 }

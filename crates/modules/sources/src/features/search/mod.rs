@@ -821,7 +821,7 @@ pub(crate) async fn run(
         .filter(|(_, score)| score.match_score >= KEEP)
         .filter_map(|(job, score)| with_reading(job, &score).map(|job| Scored { job, score }))
         .collect();
-    keep.sort_by(|a, b| b.score.match_score.cmp(&a.score.match_score));
+    keep.sort_by_key(|scored| std::cmp::Reverse(scored.score.match_score));
     keep.truncate(MAX_ADDED);
     let now = deps.clock.now();
     let added = neighbours.add_found(db, events, account, keep, now).await?;

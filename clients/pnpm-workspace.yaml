@@ -1,0 +1,33 @@
+# pnpm 11 reads its settings from this file (not .npmrc, which only says where
+# @notacamp packages come from). The same hardening as Campbooks' clients.
+packages:
+  - app
+
+# Supply-chain hardening ------------------------------------------------------
+# Refuse any version published less than 7 days ago (minutes). Most malicious
+# releases are caught and unpublished within hours; a week of soak time is cheap.
+minimumReleaseAge: 10080
+# Our own packages (@notacamp/ui, the design system) are reviewed where they
+# are built, in notacamp/campbooks, so a fresh release installs at once.
+minimumReleaseAgeExclude:
+  - "@notacamp/*"
+# Fail resolution if a package's newer version lost the provenance/trusted
+# publishing it had before (typical signature of a hijacked maintainer account).
+trustPolicy: no-downgrade
+# Transitive deps may only come from the registry, never git/tarball URLs.
+blockExoticSubdeps: true
+# Lifecycle scripts are denied by default; anything that wants one fails the
+# install until it is reviewed and listed in an `allowBuilds` map.
+strictDepBuilds: true
+engineStrict: true
+# Reviewed false positives of `trustPolicy: no-downgrade` (old releases that
+# simply predate the publisher's provenance setup). Pin exact versions only.
+trustPolicyExclude:
+  - undici-types@6.21.0
+  - semver@6.3.1
+
+peerDependencyRules:
+  allowedVersions:
+    # openapi-typescript 7.x declares `typescript: ^5.x` but only uses the
+    # stable compiler factory API, which TypeScript 6 keeps.
+    openapi-typescript>typescript: "6"

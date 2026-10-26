@@ -1,0 +1,11 @@
+/*
+ * The package's Shell, with the sidebar on the sunken surface (Notion's grey
+ * column beside a white page). The Shell is a div whose sidebar is its <nav>.
+ */
+.frame {
+  display: contents;
+}
+
+.frame > div > nav {
+  background: var(--surface-sunken);
+}

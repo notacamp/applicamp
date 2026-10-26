@@ -13,8 +13,10 @@ name = "applicamp"
 path = "src/main.rs"
 
 [dependencies]
+applicamp-ai.workspace = true
 applicamp-identity.workspace = true
 applicamp-kernel.workspace = true
+applicamp-profile.workspace = true
 axum.workspace = true
 base64.workspace = true
 chrono.workspace = true

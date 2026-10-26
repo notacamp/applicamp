@@ -4,6 +4,7 @@ resolver = "3"
 # manifest), so the platform crates are listed explicitly; modules use a glob.
 members = [
     "crates/kernel",
+    "crates/ai",
     "crates/server",
     "crates/modules/*",
     "crates/xtask",
@@ -22,13 +23,15 @@ publish = false
 [workspace.dependencies]
 # Internal crates
 applicamp-kernel = { path = "crates/kernel" }
+applicamp-ai = { path = "crates/ai" }
 applicamp-server = { path = "crates/server" }
 applicamp-identity = { path = "crates/modules/identity" }
+applicamp-profile = { path = "crates/modules/profile" }
 
 # The same versions and features as Campbooks Next, trimmed to what is used.
 
 # HTTP / async
-axum = { version = "0.8.9", default-features = false, features = ["http1", "http2", "json", "query", "form", "tokio", "tower-log", "tracing", "matched-path"] }
+axum = { version = "0.8.9", default-features = false, features = ["http1", "http2", "json", "query", "form", "multipart", "tokio", "tower-log", "tracing", "matched-path"] }
 tokio = { version = "1.53.2", features = ["macros", "rt-multi-thread", "signal", "net", "sync", "time", "io-util"] }
 tower = { version = "0.5.3", features = ["util"] }
 tower-http = { version = "0.7.1", features = ["request-id", "util", "set-header", "fs"] }
@@ -65,13 +68,22 @@ clap = { version = "4.6.7", features = ["derive", "env"] }
 aws-lc-rs = "1.18.1"
 base64 = "0.22.1"
 
+# Profile import: the LinkedIn data export (a ZIP of CSVs), text from PDFs,
+# and the JSON schema the `complete` model answers in.
+zip = { version = "9.1.1", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+csv = "1.4.0"
+pdf-extract = "0.12.1"
+schemars = "1.2.3"
+
 # Tooling (xtask)
 cargo_metadata = "0.23.1"
 regex = "1.13.1"
 
 # Tests
-# The fake OIDC providers (discovery, JWKS, token endpoint).
+# The fake OIDC providers (discovery, JWKS, token endpoint), the fake model.
 wiremock = "0.6.5"
+# Writes the invented PDFs the profile import reads (pdf-extract's own).
+lopdf = { version = "0.42.0", default-features = false }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

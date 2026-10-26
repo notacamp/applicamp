@@ -1,0 +1,40 @@
+/* The prototype's property rows: 120px labels on phones, 150px beside. */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+  margin: 0;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: start;
+  font-size: var(--text-md);
+}
+
+@media (width >= 48rem) {
+  .row {
+    grid-template-columns: 150px minmax(0, 1fr);
+  }
+}
+
+.label {
+  display: flex;
+  align-items: center;
+  min-height: var(--size-control-md);
+  color: var(--text-tertiary);
+}
+
+.value {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1-5);
+  min-width: 0;
+  min-height: var(--size-control-md);
+  margin: 0;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}

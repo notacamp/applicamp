@@ -64,28 +64,30 @@ export interface StubbedRequest {
   headers: Headers;
 }
 
+/** What a stub answers: always the same, or per request (it may read the body). */
+export type Stub = StubAnswer | ((request: Request) => StubAnswer | Promise<StubAnswer>);
+
 /**
  * Stubs `fetch` with answers keyed by `METHOD /path`. An answer can be a
- * function, called per request. Anything else is a network error.
+ * function, called per request with (a copy of) it. Anything else is a
+ * network error.
  */
-export function stubApi(routes: Record<string, StubAnswer | (() => StubAnswer)>): StubbedRequest[] {
+export function stubApi(routes: Record<string, Stub>): StubbedRequest[] {
   const requests: StubbedRequest[] = [];
-  const fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  const fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const request = input instanceof Request ? input : new Request(input, init);
     const route = `${request.method} ${new URL(request.url).pathname}`;
     requests.push({ route, headers: request.headers });
     const stub = routes[route];
     if (stub === undefined) {
-      return Promise.reject(new TypeError(`Network error: no stub for ${route}`));
+      throw new TypeError(`Network error: no stub for ${route}`);
     }
-    const { status = 200, body } = typeof stub === "function" ? stub() : stub;
+    const { status = 200, body } = typeof stub === "function" ? await stub(request.clone()) : stub;
     if (body === undefined) {
-      return Promise.resolve(new Response(null, { status }));
+      return new Response(null, { status });
     }
     const contentType = status >= 400 ? "application/problem+json" : "application/json";
-    return Promise.resolve(
-      Response.json(body, { status, headers: { "content-type": contentType } }),
-    );
+    return Response.json(body, { status, headers: { "content-type": contentType } });
   };
   vi.stubGlobal("fetch", fetch);
   return requests;

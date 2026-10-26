@@ -31,9 +31,7 @@
     "title": "Perfil y objetivos",
     "lead": "Lo que los agentes saben de ti. Solo usan lo que está escrito aquí, y cada afirmación de un CV tiene que salir de aquí.",
     "signedInAs": "Sesión iniciada como",
-    "waysIn": "Formas de iniciar sesión",
-    "emptyTitle": "Tu perfil está vacío",
-    "emptyBody": "Pronto podrás importar la exportación de datos de LinkedIn o tu CV y responder a unas preguntas sobre el puesto, el lugar y el sueldo que buscas ahora."
+    "waysIn": "Formas de iniciar sesión"
   },
   "notFound": {
     "title": "Esta página no existe",

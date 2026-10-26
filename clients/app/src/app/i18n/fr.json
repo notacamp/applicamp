@@ -31,9 +31,7 @@
     "title": "Profil et objectifs",
     "lead": "Ce que les agents savent de vous. Ils n’utilisent que ce qui est écrit ici, et chaque affirmation d’un CV doit en découler.",
     "signedInAs": "Connecté en tant que",
-    "waysIn": "Moyens de connexion",
-    "emptyTitle": "Votre profil est vide",
-    "emptyBody": "Bientôt, vous pourrez importer l’export de vos données LinkedIn ou votre CV, puis répondre à quelques questions sur le poste, le lieu et le salaire que vous cherchez ensuite."
+    "waysIn": "Moyens de connexion"
   },
   "notFound": {
     "title": "Cette page n’existe pas",

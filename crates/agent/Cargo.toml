@@ -1,0 +1,28 @@
+[package]
+name = "applicamp-agent"
+description = "The Applicamp agent runner: one binary, baked into the sandbox images, that does one run's work through the agent API and exits. Depends on no other Applicamp crate."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "applicamp-agent"
+path = "src/main.rs"
+
+[dependencies]
+clap.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+url.workspace = true
+
+[dev-dependencies]
+wiremock.workspace = true
+
+[lints]
+workspace = true

@@ -13,7 +13,8 @@ export type OpportunitySummary = Schema<"OpportunitySummary">;
 /** One opportunity, whole: why it matches, its gaps, notes, the posting's text. */
 export type Opportunity = Schema<"Opportunity">;
 export type OpportunityStage = Schema<"OpportunityStage">;
-export type OpportunitySource = Schema<"OpportunitySource">;
+/** A job board an opportunity was seen on, credited with a link to the posting there. */
+export type OpportunitySourceLink = Schema<"OpportunitySourceLink">;
 export type JobWorkMode = Schema<"JobWorkMode">;
 /** Why an opportunity is hidden: it fails a hard requirement. */
 export type HiddenReason = Schema<"HiddenReason">;

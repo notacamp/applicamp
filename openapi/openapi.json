@@ -10,6 +10,673 @@
     "version": "0.0.0"
   },
   "paths": {
+    "/api/v1/boards": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "The job boards.",
+        "description": "Every board, approved, waiting for the owner, paused or declined,\nhighest average salary first: the mean of the stated salaries of its\nengineering jobs open to where the person lives (30 days), in euros a\nyear; a country-scoped board with fewer than 10 by its country's typical\npay; no salary data last. With the person's totals per board (7 and 30\ndays) and whether they manage the boards.",
+        "operationId": "sources.boards",
+        "responses": {
+          "200": {
+            "description": "The boards, ranked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/boards/scans": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "What was scanned.",
+        "description": "The person's searches and the discovery runs, newest first, ten a page,\neach with what it scanned on every board: jobs read, passed their\nrequirements, scored by the AI, matched, the AI's cost, or why a board\nwas skipped (its polling limit) or failed; and what a discovery check\nfound. Filter by board or by search.",
+        "operationId": "sources.scans",
+        "parameters": [
+          {
+            "name": "board",
+            "in": "query",
+            "description": "Only this board's lines.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Only this search.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "The page after this one (`next_cursor`).",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of runs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScanPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_query`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/boards/suggestions": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Suggest a job board.",
+        "description": "Its site becomes a candidate, checked in the background (robots rules,\nterms, a feed, a sample), and waits for the owner: nothing is read for\njobs before it is approved. At most 10 a day. The same site twice\nanswers the board already there (200).",
+        "operationId": "sources.suggest_board",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BoardSuggestion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "That site is already a board.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Added as a candidate; the check runs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_url`: a public https site",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`suggestion_limit_reached`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/boards/{id}": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "A job board.",
+        "description": "Its ranking, config, terms and the automatic check (robots rules, the\nterms' sentences, sample jobs, the proposed attribution), and whether it\ncan be approved now.",
+        "operationId": "sources.board",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The board.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The board.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/boards/{id}/approve": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Approve a job board.",
+        "description": "From then on searches read it. Only a candidate or a paused board whose\nconfig reads its kind and whose check (of the feed's host) found robots\nrules that allow the feed. Board owners only.",
+        "operationId": "sources.approve_board",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The board.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Approved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`not_board_owner`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`not_waiting`: it is approved or declined; `config_invalid`; `check_needed`: check its feed's host first; `robots_disallowed`: its robots rules forbid the feed (edit the config to an allowed path)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/boards/{id}/check": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Check a job board again.",
+        "description": "Reads its robots rules (for its feed's host), terms page and a sample of\nits jobs, once each, in the background; the board shows the result.\nBoard owners only.",
+        "operationId": "sources.check_board",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The board.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "The check runs in the background.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`not_board_owner`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/boards/{id}/config": {
+      "put": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Change a job board's config.",
+        "description": "The whole config, validated for the board's kind (unknown keys refused).\nAn approved board's new feed must still be allowed by the robots rules\nits check found. The seed list never overwrites it again. Board owners\nonly.",
+        "operationId": "sources.set_board_config",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The board.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BoardConfigChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Changed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_config`: the detail says what is wrong",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`not_board_owner`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`robots_disallowed`: an approved board's new feed is not allowed by its robots rules",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/boards/{id}/decline": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Decline a job board.",
+        "description": "It is never read, and says why. Board owners only.",
+        "operationId": "sources.decline_board",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The board.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeclineBoard"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Declined.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_request`: a reason of 1 to 500 characters",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`not_board_owner`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/boards/{id}/pause": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Pause a job board.",
+        "description": "Searches stop reading it until it is approved again. Board owners only.",
+        "operationId": "sources.pause_board",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The board.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`not_board_owner`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`not_approved`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/v1/goals": {
       "get": {
         "tags": [
@@ -1310,6 +1977,505 @@
         },
         "additionalProperties": false
       },
+      "BoardConfigChange": {
+        "type": "object",
+        "description": "A board's new config.",
+        "required": [
+          "config"
+        ],
+        "properties": {
+          "config": {
+            "type": "object",
+            "description": "The whole config, validated for the board's kind."
+          }
+        },
+        "additionalProperties": false
+      },
+      "BoardDetail": {
+        "type": "object",
+        "description": "A job board, whole: its check, config and terms.",
+        "required": [
+          "board",
+          "config",
+          "terms",
+          "approvable",
+          "can_manage"
+        ],
+        "properties": {
+          "approvable": {
+            "type": "boolean",
+            "description": "It can be approved now; else `blocked` says why."
+          },
+          "blocked": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`check_needed`, `robots_disallowed`, `config_invalid`, or none."
+          },
+          "board": {
+            "$ref": "#/components/schemas/BoardSummary"
+          },
+          "can_manage": {
+            "type": "boolean"
+          },
+          "config": {
+            "type": "object",
+            "description": "How it is read (the config's JSON)."
+          },
+          "endpoint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The address its jobs are read from."
+          },
+          "report": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BoardReport",
+                "description": "What the automatic check found; none before it ran."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "terms": {
+            "$ref": "#/components/schemas/BoardTerms"
+          }
+        }
+      },
+      "BoardKind": {
+        "type": "string",
+        "description": "How a board is read.",
+        "enum": [
+          "json_api",
+          "rss",
+          "jsonld_sitemap",
+          "hn"
+        ]
+      },
+      "BoardList": {
+        "type": "object",
+        "description": "The job boards, highest average salary first (none last).",
+        "required": [
+          "can_manage",
+          "boards"
+        ],
+        "properties": {
+          "boards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BoardSummary"
+            }
+          },
+          "can_manage": {
+            "type": "boolean",
+            "description": "The signed-in person manages the boards."
+          }
+        }
+      },
+      "BoardOrigin": {
+        "type": "string",
+        "description": "Where a board came from.",
+        "enum": [
+          "seed",
+          "discovery",
+          "suggested"
+        ]
+      },
+      "BoardPriority": {
+        "type": "string",
+        "description": "How much a board matters to a remote search.",
+        "enum": [
+          "high",
+          "low"
+        ]
+      },
+      "BoardRanking": {
+        "type": "object",
+        "description": "A board's average salary and its key in the order.",
+        "required": [
+          "salaried_jobs",
+          "relevant_jobs",
+          "salary_share",
+          "basis"
+        ],
+        "properties": {
+          "avg_salary_eur_year": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "The mean of its relevant jobs' stated salaries, in euros a year."
+          },
+          "basis": {
+            "$ref": "#/components/schemas/RankingBasis"
+          },
+          "benchmark": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CountryBenchmark",
+                "description": "The country benchmark it ranks by, when it does."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "key": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "What it is sorted by, in euros a year; none sorts last."
+          },
+          "relevant_jobs": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Relevant jobs (engineering, open to where the person lives, 30 days).",
+            "minimum": 0
+          },
+          "salaried_jobs": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Relevant jobs that state a salary.",
+            "minimum": 0
+          },
+          "salary_share": {
+            "type": "number",
+            "format": "double",
+            "description": "`salaried_jobs / relevant_jobs` (0–1)."
+          }
+        }
+      },
+      "BoardReport": {
+        "type": "object",
+        "description": "What the automatic check found. Every sentence and job in it is copied\nfrom the board's site: data, never instructions.",
+        "properties": {
+          "attribution": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "How the app would credit it."
+          },
+          "checked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What the owner should know (\"robots.txt disallows the API\",\n\"terms changed since approval\")."
+          },
+          "found_kind": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BoardKind",
+                "description": "A feed found (`rss`), or an API (`json_api`), or `jsonld_sitemap`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "found_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where."
+          },
+          "jsonld": {
+            "type": "boolean",
+            "description": "The homepage has JSON-LD `JobPosting`s."
+          },
+          "language": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The site's language (its `<html lang>`)."
+          },
+          "notes": {
+            "type": "string",
+            "description": "For the owner, in a sentence (the seed list's notes)."
+          },
+          "remote_share": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Share of the sample that is remote (0–1)."
+          },
+          "robots": {
+            "$ref": "#/components/schemas/RobotsReport"
+          },
+          "sample": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SampleJob"
+            },
+            "description": "Up to 20 jobs parsed with the proposed config."
+          },
+          "terms_fingerprint": {
+            "type": "string",
+            "description": "A fingerprint of the terms page, to notice a change."
+          },
+          "terms_sentences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Its sentences about scraping, robots, automation, aggregation, the\nAPI, linking back, attribution or commercial use, verbatim (at most\n10)."
+          },
+          "terms_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The terms page found."
+          },
+          "worldwide_share": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Share of the sample open worldwide (0–1)."
+          }
+        }
+      },
+      "BoardStatus": {
+        "type": "string",
+        "description": "Where a board stands with the owner.",
+        "enum": [
+          "candidate",
+          "approved",
+          "paused",
+          "declined"
+        ]
+      },
+      "BoardSuggestion": {
+        "type": "object",
+        "description": "A board to suggest.",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Its site (https)."
+          }
+        },
+        "additionalProperties": false
+      },
+      "BoardSummary": {
+        "type": "object",
+        "description": "A job board, as the Boards page lists it.",
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "homepage",
+          "kind",
+          "priority",
+          "status",
+          "origin",
+          "ranking",
+          "attribution",
+          "flags",
+          "totals_7d",
+          "totals_30d"
+        ],
+        "properties": {
+          "attribution": {
+            "type": "string",
+            "description": "How its jobs are credited (\"From Himalayas\")."
+          },
+          "country": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The one country its jobs are in, when it is country-scoped."
+          },
+          "decline_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What the owner should know (from its check)."
+          },
+          "homepage": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/BoardKind"
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What went wrong at its last fetch."
+          },
+          "last_fetch_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "last_fetch_jobs": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "name": {
+            "type": "string"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its check's note, for a candidate."
+          },
+          "origin": {
+            "$ref": "#/components/schemas/BoardOrigin"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/BoardPriority",
+            "description": "A label only: the order is the salary ranking."
+          },
+          "ranking": {
+            "$ref": "#/components/schemas/BoardRanking",
+            "description": "Its average salary and its key in the order."
+          },
+          "slug": {
+            "type": "string",
+            "description": "Its stable name: the source its jobs carry."
+          },
+          "status": {
+            "$ref": "#/components/schemas/BoardStatus"
+          },
+          "totals_30d": {
+            "$ref": "#/components/schemas/BoardTotals",
+            "description": "Over the last 30 days."
+          },
+          "totals_7d": {
+            "$ref": "#/components/schemas/BoardTotals",
+            "description": "The person's searches on it over the last 7 days."
+          }
+        }
+      },
+      "BoardTerms": {
+        "type": "object",
+        "description": "What a board's terms ask, and where they say it.",
+        "properties": {
+          "apply_unchanged": {
+            "type": "boolean",
+            "description": "The apply link is used as the board gives it."
+          },
+          "attribution": {
+            "type": "string",
+            "description": "How to credit it (\"Himalayas\")."
+          },
+          "drop_expired": {
+            "type": "boolean",
+            "description": "Jobs past their expiry are taken out of view."
+          },
+          "follow": {
+            "type": "boolean",
+            "description": "That link must be followed (no `nofollow`)."
+          },
+          "link_back": {
+            "type": "boolean",
+            "description": "A link back to the posting on the board is required."
+          },
+          "max_fetches_per_day": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Fetches a day, at most (its polling interval keeps to it).",
+            "minimum": 0
+          },
+          "no_logo": {
+            "type": "boolean",
+            "description": "Its logo is never shown."
+          },
+          "no_redistribution": {
+            "type": "boolean",
+            "description": "Its jobs are never republished elsewhere."
+          },
+          "notes": {
+            "type": "string",
+            "description": "What else matters, in a sentence or two."
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Where the clauses are."
+          }
+        },
+        "additionalProperties": false
+      },
+      "BoardTotals": {
+        "type": "object",
+        "description": "What a board did for the person over some days.",
+        "required": [
+          "read",
+          "matched",
+          "cost_eur"
+        ],
+        "properties": {
+          "cost_eur": {
+            "type": "number",
+            "format": "double",
+            "description": "What the AI cost on its jobs, in euros."
+          },
+          "matched": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Jobs that matched.",
+            "minimum": 0
+          },
+          "read": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Jobs read by their searches.",
+            "minimum": 0
+          }
+        }
+      },
       "CashFloor": {
         "type": "object",
         "description": "The least they would take, before tax.",
@@ -1381,6 +2547,54 @@
           "public",
           "nonprofit"
         ]
+      },
+      "CountryBenchmark": {
+        "type": "object",
+        "description": "A country's typical pay.",
+        "required": [
+          "code",
+          "eur_year",
+          "source",
+          "url",
+          "year"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "ISO 3166-1."
+          },
+          "eur_year": {
+            "type": "number",
+            "format": "double"
+          },
+          "source": {
+            "type": "string",
+            "description": "Where the figure is from, and what it measures."
+          },
+          "url": {
+            "type": "string"
+          },
+          "year": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "DeclineBoard": {
+        "type": "object",
+        "description": "Why a board is declined.",
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "Up to 500 characters."
+          }
+        },
+        "additionalProperties": false
       },
       "Education": {
         "type": "object",
@@ -1885,6 +3099,7 @@
           "company",
           "url",
           "source",
+          "sources",
           "stage",
           "new",
           "created_at",
@@ -1895,6 +3110,13 @@
           "editable"
         ],
         "properties": {
+          "apply_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where to apply: the board's apply link, unchanged; none when the\nposting is the place (`url`)."
+          },
           "company": {
             "type": "string"
           },
@@ -1916,6 +3138,14 @@
           "editable": {
             "type": "boolean",
             "description": "Title, company and location can be typed (an opportunity added by a\nlink to a site that is not a job board)."
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the posting expires, as its board says."
           },
           "facts": {
             "oneOf": [
@@ -1999,7 +3229,22 @@
             "description": "Pay, as the posting says."
           },
           "source": {
-            "$ref": "#/components/schemas/OpportunitySource"
+            "type": "string",
+            "description": "Where it was found (see the summary's `source`)."
+          },
+          "source_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The job board's name, as credited; none for a company board or a\nlink."
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpportunitySourceLink"
+            },
+            "description": "Every job board it was seen on, each with the posting's link there\n(to show, followed, as \"From Himalayas\"); none for a company board\nor a link."
           },
           "stage": {
             "$ref": "#/components/schemas/OpportunityStage"
@@ -2118,17 +3363,33 @@
           }
         }
       },
-      "OpportunitySource": {
-        "type": "string",
-        "description": "Where an opportunity came from.",
-        "enum": [
-          "greenhouse",
-          "lever",
-          "ashby",
-          "arbeitnow",
-          "hn",
-          "link"
-        ]
+      "OpportunitySourceLink": {
+        "type": "object",
+        "description": "A job board an opportunity was seen on, credited with a followed link\nto the posting there (\"From Himalayas\").",
+        "required": [
+          "board",
+          "name",
+          "url",
+          "seen_at"
+        ],
+        "properties": {
+          "board": {
+            "type": "string",
+            "description": "The board's slug."
+          },
+          "name": {
+            "type": "string",
+            "description": "How it is credited."
+          },
+          "seen_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "url": {
+            "type": "string",
+            "description": "The posting on that board."
+          }
+        }
       },
       "OpportunityStage": {
         "type": "string",
@@ -2222,7 +3483,15 @@
             "description": "Pay, as the posting says."
           },
           "source": {
-            "$ref": "#/components/schemas/OpportunitySource"
+            "type": "string",
+            "description": "Where it was found: a job board's slug (`himalayas`), a company\nboard (`greenhouse`, `lever`, `ashby`), `hn`, or `link` (added by\nlink)."
+          },
+          "source_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The job board's name, as credited (\"Himalayas\"); none for a company\nboard or a link."
           },
           "stage": {
             "$ref": "#/components/schemas/OpportunityStage"
@@ -2479,6 +3748,16 @@
           }
         }
       },
+      "RankingBasis": {
+        "type": "string",
+        "description": "What a board's place in the order rests on.",
+        "enum": [
+          "own",
+          "few",
+          "benchmark",
+          "none"
+        ]
+      },
       "Relocate": {
         "type": "string",
         "description": "Whether they would move for the right job.",
@@ -2487,6 +3766,271 @@
           "within_country",
           "within_eu",
           "anywhere"
+        ]
+      },
+      "RobotsReport": {
+        "type": "object",
+        "description": "What a board's robots.txt says to us.",
+        "required": [
+          "found"
+        ],
+        "properties": {
+          "crawl_delay": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Seconds between requests it asks for."
+          },
+          "deciding_rule": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The rule that decided it."
+          },
+          "endpoint_allowed": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Whether the config's endpoint is allowed (at the check)."
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "A fingerprint of the file, to notice a change."
+          },
+          "found": {
+            "type": "boolean",
+            "description": "There is one (a 404 allows everything)."
+          },
+          "host": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The host it was read from (the feed's, else the site's)."
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RobotsRule"
+            },
+            "description": "The rules for `applicamp`, else for `*`."
+          }
+        }
+      },
+      "RobotsRule": {
+        "type": "object",
+        "description": "One robots.txt rule for our user agent.",
+        "required": [
+          "allow",
+          "pattern"
+        ],
+        "properties": {
+          "allow": {
+            "type": "boolean"
+          },
+          "pattern": {
+            "type": "string"
+          }
+        }
+      },
+      "SampleJob": {
+        "type": "object",
+        "description": "A job a check read as a sample.",
+        "required": [
+          "title",
+          "company",
+          "url"
+        ],
+        "properties": {
+          "company": {
+            "type": "string"
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "regions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Who may apply, as the board says."
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "ScanLine": {
+        "type": "object",
+        "description": "One board's line of a run.",
+        "required": [
+          "board_id",
+          "board_slug",
+          "board_name",
+          "outcome",
+          "jobs_read",
+          "passed_requirements",
+          "scored_by_ai",
+          "matched",
+          "ai_cost_eur",
+          "duration_ms"
+        ],
+        "properties": {
+          "ai_cost_eur": {
+            "type": "number",
+            "format": "double"
+          },
+          "board_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "board_name": {
+            "type": "string"
+          },
+          "board_slug": {
+            "type": "string"
+          },
+          "duration_ms": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "error_kind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "jobs_read": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "matched": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Good matches that meet every requirement.",
+            "minimum": 0
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What a discovery check found."
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/ScanOutcome"
+          },
+          "passed_requirements": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Within the person's requirements on the boards' structured fields.",
+            "minimum": 0
+          },
+          "scored_by_ai": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Scored by the AI (now, or before).",
+            "minimum": 0
+          }
+        }
+      },
+      "ScanOutcome": {
+        "type": "string",
+        "description": "How a board's scan went.",
+        "enum": [
+          "read",
+          "skipped_poll_limit",
+          "error",
+          "checked"
+        ]
+      },
+      "ScanPage": {
+        "type": "object",
+        "description": "A page of runs, newest first.",
+        "required": [
+          "runs"
+        ],
+        "properties": {
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Pass as `cursor` for older runs; none on the last page."
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScanRun"
+            }
+          }
+        }
+      },
+      "ScanRun": {
+        "type": "object",
+        "description": "A search or a discovery run, and what it scanned on each board.",
+        "required": [
+          "kind",
+          "id",
+          "at",
+          "cost_eur",
+          "lines"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cost_eur": {
+            "type": "number",
+            "format": "double",
+            "description": "What its AI calls cost, in euros (discovery uses none)."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ScanRunKind"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScanLine"
+            }
+          },
+          "trigger": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SearchTrigger",
+                "description": "A search's trigger; none for discovery."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ScanRunKind": {
+        "type": "string",
+        "description": "What started a run.",
+        "enum": [
+          "search",
+          "discovery"
         ]
       },
       "Search": {
@@ -2951,7 +4495,7 @@
     },
     {
       "name": "sources",
-      "description": "The job search: public job boards (Greenhouse, Lever, Ashby, Arbeitnow, HN Who is hiring) read and scored against your profile and goals, within the spending limits."
+      "description": "The job search: the job boards the owner approved (remote jobs anywhere: Himalayas, Jobicy, Remote OK, Arbeitnow, HN Who is hiring, and the ones a weekly discovery finds), credited and read within their terms, ranked by average salary, and scored against your profile and goals within the spending limits; and what each search scanned."
     },
     {
       "name": "bff",

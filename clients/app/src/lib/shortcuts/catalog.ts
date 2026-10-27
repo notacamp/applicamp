@@ -23,6 +23,13 @@ export const APP_SHORTCUTS = [
     label: "shortcuts:nav.pipeline",
   },
   {
+    id: "nav.boards",
+    keys: "g b",
+    scope: "global",
+    group: "navigation",
+    label: "shortcuts:nav.boards",
+  },
+  {
     id: "nav.agents",
     keys: "g a",
     scope: "global",

@@ -2,6 +2,7 @@
   "nav": {
     "today": "Today",
     "pipeline": "Pipeline",
+    "boards": "Boards",
     "agents": "Agents",
     "profile": "Profile & goals"
   },

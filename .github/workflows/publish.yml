@@ -116,6 +116,13 @@ jobs:
           digest=$(docker buildx imagetools inspect "$REGISTRY_IMAGE:$tag" --format '{{json .Manifest}}' | jq -r .digest)
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
           echo "Published $REGISTRY_IMAGE:$tag and :main → $digest" >> "$GITHUB_STEP_SUMMARY"
+      # Only the Trivy exceptions file: this job publishes what the build jobs
+      # made and needs nothing else from the repository.
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          sparse-checkout: .trivyignore.yaml
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
       - name: Trivy (HIGH/CRITICAL, fixable)
         # Pinned by SHA: this action's tags have been tampered with before.
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0

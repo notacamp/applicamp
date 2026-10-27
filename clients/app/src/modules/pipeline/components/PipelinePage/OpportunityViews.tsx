@@ -10,10 +10,12 @@ import {
   DataTable,
   Label,
   MatchBar,
+  Tagged,
+  Text,
   type DataColumn,
 } from "~/lib/ui";
 
-import { formatShortDate, SOURCE_HUES, STAGE_HUES } from "../../api/labels";
+import { formatShortDate, hiddenReasonText, SOURCE_HUES, STAGE_HUES } from "../../api/labels";
 import { STAGES, type OpportunitySummary } from "../../api/opportunities";
 
 export interface OpportunityViewProps {
@@ -21,6 +23,8 @@ export interface OpportunityViewProps {
   /** The keyboard cursor. */
   selected: string | null;
   onOpen: (row: OpportunitySummary) => void;
+  /** The hidden ones are listed: each says why it is hidden. */
+  hidden?: boolean | undefined;
 }
 
 /** The role, or `untitled` for a link whose role is not typed yet. */
@@ -34,6 +38,20 @@ function companyLine(row: OpportunitySummary): string {
   return location === "" ? row.company : `${row.company} · ${location}`;
 }
 
+/** Why `row` is hidden, as one line; nothing for one in view. */
+function HiddenReasonLine({ row }: { row: OpportunitySummary }) {
+  const { t } = useTranslation("pipeline");
+  const reason = row.hidden_reason ?? null;
+  if (reason === null) {
+    return null;
+  }
+  return (
+    <Tagged testId="pipeline-row-hidden-reason">
+      <Text tone="secondary">{hiddenReasonText(reason, row.region_note, t)}</Text>
+    </Tagged>
+  );
+}
+
 function CardMeta({ row }: { row: OpportunitySummary }) {
   const { t } = useTranslation("pipeline");
   return (
@@ -41,15 +59,27 @@ function CardMeta({ row }: { row: OpportunitySummary }) {
       <MatchBar value={row.match} label={t("columns.match")} />
       <Label hue={STAGE_HUES[row.stage]}>{t(`stages.${row.stage}`)}</Label>
       <Label hue={SOURCE_HUES[row.source]}>{t(`sources.${row.source}`)}</Label>
+      <HiddenReasonLine row={row} />
     </Cluster>
   );
 }
 
-/** The table's columns: role, company, match, stage, source, next step, updated. */
+/**
+ * The table's columns: role, company, match, stage, source, next step (or why it is hidden),
+ * updated.
+ */
 function tableColumns(
   t: TFunction<"pipeline">,
   language: string,
+  hidden: boolean,
 ): DataColumn<OpportunitySummary>[] {
+  const next: DataColumn<OpportunitySummary> = hidden
+    ? {
+        id: "hidden",
+        header: t("columns.hiddenReason"),
+        cell: (row) => <HiddenReasonLine row={row} />,
+      }
+    : { id: "next", header: t("columns.nextStep"), cell: (row) => row.next_step ?? "" };
   return [
     { id: "role", header: t("columns.role"), cell: (row) => titleOf(row, t("untitled")) },
     { id: "company", header: t("columns.company"), cell: (row) => row.company },
@@ -71,7 +101,7 @@ function tableColumns(
       nowrap: true,
       cell: (row) => <Label hue={SOURCE_HUES[row.source]}>{t(`sources.${row.source}`)}</Label>,
     },
-    { id: "next", header: t("columns.nextStep"), cell: (row) => row.next_step ?? "" },
+    next,
     {
       id: "updated",
       header: t("columns.updated"),
@@ -82,9 +112,9 @@ function tableColumns(
 }
 
 /** "All opportunities" as the prototype's table: role, company, match, stage, source, next step, updated. */
-export function OpportunityTable({ rows, selected, onOpen }: OpportunityViewProps) {
+export function OpportunityTable({ rows, selected, onOpen, hidden }: OpportunityViewProps) {
   const { t, i18n } = useTranslation("pipeline");
-  const columns = tableColumns(t, i18n.language);
+  const columns = tableColumns(t, i18n.language, hidden === true);
   return (
     <DataTable
       label={t("views.table")}

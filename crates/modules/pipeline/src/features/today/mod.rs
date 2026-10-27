@@ -158,7 +158,7 @@ pub enum NextStep {
 pub struct Today {
     pub profile: TodayProfile,
     pub goals: TodayGoals,
-    /// Found opportunities never opened.
+    /// Found opportunities never opened (hidden ones not counted).
     pub new_matches: u32,
     /// The latest search, if any.
     pub latest_search: Option<TodaySearch>,
@@ -210,7 +210,8 @@ pub async fn get(
     let latest = neighbours.latest_search(&state.db, account).await?;
     let new_matches: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM pipeline.opportunities
-          WHERE account_id = $1 AND stage = 'found' AND opened_at IS NULL AND NOT dismissed",
+          WHERE account_id = $1 AND stage = 'found' AND opened_at IS NULL AND NOT dismissed
+            AND hidden_reason IS NULL",
     )
     .bind(account)
     .fetch_one(&state.db)

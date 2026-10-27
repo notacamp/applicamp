@@ -13,7 +13,9 @@
     "stage": "Fase",
     "allStages": "Todas as fases",
     "newOnly": "A mostrar apenas as novas correspondências.",
-    "showAll": "Mostrar tudo"
+    "showAll": "Mostrar tudo",
+    "hidden": "Ocultas: não cumprem os teus requisitos",
+    "hiddenOnly": "Estas não cumprem os teus requisitos, por isso estão fora das oportunidades. Nada foi apagado."
   },
   "columns": {
     "role": "Função",
@@ -22,7 +24,8 @@
     "stage": "Fase",
     "source": "Origem",
     "nextStep": "Próximo passo",
-    "updated": "Atualizada"
+    "updated": "Atualizada",
+    "hiddenReason": "Porque está oculta"
   },
   "stages": {
     "found": "Encontrada",
@@ -96,6 +99,28 @@
     "dismissed": "Não é para mim · {{title}}",
     "save": "Guardar",
     "cancel": "Cancelar",
-    "saveFailed": "Não foi possível guardar a alteração. Tente de novo."
+    "saveFailed": "Não foi possível guardar a alteração. Tente de novo.",
+    "requirements": "Os teus requisitos",
+    "hidden": "Oculta: não cumpre os teus requisitos"
+  },
+  "hidden": {
+    "reasons": {
+      "not_remote": "Não é remota, ou não diz",
+      "not_open_to_location": "Não está aberta a onde vives",
+      "language": "Pede uma língua em que não trabalhas",
+      "below_floor": "Paga menos do que o teu mínimo"
+    }
+  },
+  "facts": {
+    "remote": {
+      "yes": "Remota",
+      "no": "Não remota",
+      "unclear": "Não diz se é remota"
+    },
+    "open": {
+      "yes": "Aberta a onde vives",
+      "no": "Não está aberta a onde vives",
+      "unclear": "Não diz a quem está aberta"
+    }
   }
 }

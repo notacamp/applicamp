@@ -110,6 +110,9 @@ async fn lever_and_ashby_postings_are_read(db: PgPool) {
     assert!(!lever[0].description.is_empty());
     assert_eq!(lever[1].work_mode, Some(WorkMode::Hybrid));
     assert_eq!(lever[1].location.as_deref(), Some("Paris, France"));
+    // Lever's `workplaceType` is a structured answer to "remote?".
+    assert_eq!(lever[0].board_remote, Some(true));
+    assert_eq!(lever[1].board_remote, Some(false));
 
     let ashby = reader
         .board(&db, &board(Source::Ashby, "samplelabs"))
@@ -124,6 +127,8 @@ async fn lever_and_ashby_postings_are_read(db: PgPool) {
     );
     assert_eq!(ashby[1].work_mode, Some(WorkMode::Hybrid));
     assert!(ashby[1].posted_at.is_some());
+    assert_eq!(ashby[0].board_remote, Some(true));
+    assert_eq!(ashby[1].board_remote, Some(false));
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -164,6 +169,10 @@ async fn arbeitnow_and_hn_are_read(db: PgPool) {
         "backend-engineer-berlin-100001"
     );
     assert_eq!(arbeitnow.jobs[0].work_mode, Some(WorkMode::Remote));
+    assert_eq!(
+        arbeitnow.jobs[0].board_remote, None,
+        "Arbeitnow's remote flag is never a requirement's evidence"
+    );
     assert_eq!(arbeitnow.jobs[1].work_mode, None, "not remote says nothing");
 
     let hn = reader.hn(&db).await;

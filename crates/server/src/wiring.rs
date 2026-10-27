@@ -8,13 +8,19 @@ use std::collections::HashSet;
 use applicamp_kernel::{BoxFuture, EventBus, Result};
 use applicamp_pipeline::{
     ports::{Posting, ProfileStatus, SearchLine},
-    store::Found,
+    store::{Eligibility, Found, UncheckedRow},
 };
 use applicamp_profile::{
-    goals::{Relocate, WorkMode as GoalWorkMode},
+    goals::{Period, Relocate, WorkMode as GoalWorkMode},
     matching,
 };
-use applicamp_sources::{SourcesDeps, job::WorkMode, matching::MatchInput, ports::Scored};
+use applicamp_sources::{
+    SourcesDeps,
+    job::{Job, Source, WorkMode},
+    matching::MatchInput,
+    ports::{Scored, Unchecked},
+    requirements::{self, Excluded, Facts, Floor, Per, Reach},
+};
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use url::Url;
@@ -54,7 +60,69 @@ fn match_input(m: matching::Matching, now: DateTime<Utc>) -> MatchInput {
             .collect(),
         locations: m.goals.locations.clone(),
         will_not_relocate: m.goals.relocate == Some(Relocate::No),
+        home: m
+            .goals
+            .locations
+            .first()
+            .cloned()
+            .or_else(|| m.profile.basics.location.clone()),
+        relocate: m.goals.relocate.map(|relocate| match relocate {
+            Relocate::No => Reach::No,
+            Relocate::WithinCountry => Reach::WithinCountry,
+            Relocate::WithinEu => Reach::WithinEu,
+            Relocate::Anywhere => Reach::Anywhere,
+        }),
+        languages: {
+            let mut codes: Vec<String> = Vec::new();
+            for tag in matching::work_languages(&m.goals, &m.profile) {
+                if let Some(code) = requirements::language_code(&tag)
+                    && !codes.contains(&code)
+                {
+                    codes.push(code);
+                }
+            }
+            codes
+        },
+        cash_floor: m.goals.cash_floor.as_ref().map(|floor| Floor {
+            amount: f64::from(floor.amount),
+            currency: floor.currency.clone(),
+            per: match floor.period {
+                Period::Year => Per::Year,
+                Period::Month => Per::Month,
+            },
+        }),
     }
+}
+
+/// The facts a search read, as the pipeline keeps them.
+fn eligibility(facts: Facts) -> Eligibility {
+    Eligibility {
+        remote: facts.remote.as_str().to_owned(),
+        open_to_candidate: facts.open_to_candidate.as_str().to_owned(),
+        region_note: facts.region_note,
+        working_languages: facts.working_languages,
+    }
+}
+
+/// An opportunity found before the rules, as a search reads a job.
+fn unchecked(row: UncheckedRow) -> Option<Unchecked> {
+    Some(Unchecked {
+        account: row.account_id,
+        opportunity: row.id,
+        job: Job {
+            source: Source::parse(&row.source)?,
+            source_ref: row.source_ref,
+            title: row.title,
+            company: row.company,
+            location: row.location,
+            work_mode: row.work_mode.as_deref().and_then(WorkMode::parse),
+            board_remote: None,
+            url: row.url,
+            posted_at: row.posted_at,
+            salary_text: row.salary_text,
+            description: row.description.unwrap_or_default(),
+        },
+    })
 }
 
 /// A scored job as the pipeline adds it.
@@ -74,6 +142,7 @@ fn found(scored: Scored) -> Found {
         match_score: score.match_score,
         why: score.why,
         gaps: score.gaps,
+        eligibility: Some(eligibility(score.facts)),
     }
 }
 
@@ -114,6 +183,37 @@ impl applicamp_sources::Neighbours for SourcesWiring {
         let rows: Vec<Found> = found_jobs.into_iter().map(found).collect();
         Box::pin(applicamp_pipeline::store::add_found(
             db, events, account, rows, now,
+        ))
+    }
+
+    fn unchecked<'a>(
+        &'a self,
+        db: &'a PgPool,
+        most: usize,
+    ) -> BoxFuture<'a, Result<Vec<Unchecked>>> {
+        Box::pin(async move {
+            Ok(applicamp_pipeline::store::unchecked(db, most)
+                .await?
+                .into_iter()
+                .filter_map(unchecked)
+                .collect())
+        })
+    }
+
+    fn set_requirements<'a>(
+        &'a self,
+        db: &'a PgPool,
+        account: Uuid,
+        opportunity: Uuid,
+        facts: Facts,
+        hidden: Option<Excluded>,
+    ) -> BoxFuture<'a, Result<bool>> {
+        Box::pin(applicamp_pipeline::store::set_eligibility(
+            db,
+            account,
+            opportunity,
+            eligibility(facts),
+            hidden.map(Excluded::as_str),
         ))
     }
 }
@@ -189,13 +289,10 @@ impl applicamp_pipeline::Neighbours for PipelineWiring {
 #[cfg(test)]
 mod tests {
     use applicamp_profile::{
-        goals::Goals,
-        schema::{Basics, Profile, Work},
+        goals::{CashFloor, Goals},
+        schema::{Basics, Language, Profile, Work},
     };
-    use applicamp_sources::{
-        job::{Job, Source},
-        scoring::Score,
-    };
+    use applicamp_sources::{requirements::Answer, scoring::Score};
 
     use super::*;
 
@@ -208,12 +305,27 @@ mod tests {
                     basics: Basics {
                         name: Some("Alex Demo".into()),
                         label: Some("Engineer".into()),
+                        location: Some("Porto, Portugal".into()),
                         ..Basics::default()
                     },
                     work: vec![Work {
                         position: Some("Senior Engineer".into()),
                         ..Work::default()
                     }],
+                    languages: vec![
+                        Language {
+                            language: "Portuguese".into(),
+                            fluency: Some("Native or bilingual proficiency".into()),
+                        },
+                        Language {
+                            language: "English".into(),
+                            fluency: Some("Full professional proficiency".into()),
+                        },
+                        Language {
+                            language: "German".into(),
+                            fluency: Some("Elementary proficiency".into()),
+                        },
+                    ],
                     ..Profile::default()
                 },
                 profile_updated_at: now,
@@ -222,6 +334,11 @@ mod tests {
                     work_mode: vec![GoalWorkMode::Remote],
                     locations: vec!["Lisbon".into()],
                     relocate: Some(Relocate::No),
+                    cash_floor: Some(CashFloor {
+                        amount: 4_000,
+                        currency: "EUR".into(),
+                        period: Period::Month,
+                    }),
                     ..Goals::default()
                 },
                 goals_version: 4,
@@ -233,6 +350,21 @@ mod tests {
         assert!(input.will_not_relocate);
         assert_eq!(input.titles, ["Engineer", "Senior Engineer"]);
         assert!(!input.profile.to_string().contains("Alex"));
+        // The requirements: where they live (the goals' first place over
+        // the profile's), how far they would move, the languages they work
+        // in (the profile's, at a professional level), the floor.
+        assert_eq!(input.home.as_deref(), Some("Lisbon"));
+        assert_eq!(input.relocate, Some(Reach::No));
+        assert_eq!(input.languages, ["pt", "en"]);
+        assert_eq!(
+            input.cash_floor,
+            Some(Floor {
+                amount: 4_000.0,
+                currency: "EUR".into(),
+                per: Per::Month
+            })
+        );
+        assert!(input.remote_only());
     }
 
     #[test]
@@ -245,6 +377,7 @@ mod tests {
                 company: "Example Co".into(),
                 location: None,
                 work_mode: Some(WorkMode::Hybrid),
+                board_remote: Some(false),
                 url: "https://example.com".into(),
                 posted_at: None,
                 salary_text: None,
@@ -255,6 +388,13 @@ mod tests {
                 why: vec!["Rust".into()],
                 gaps: vec![],
                 read: None,
+                facts: Facts {
+                    remote: Answer::No,
+                    open_to_candidate: Answer::Yes,
+                    region_note: Some("Lisbon office".into()),
+                    working_languages: vec!["en".into()],
+                    salary: None,
+                },
             },
         });
         assert_eq!(found.source, "ashby");
@@ -262,5 +402,9 @@ mod tests {
         assert_eq!(found.description, None);
         assert_eq!(found.match_score, 77);
         assert_eq!(found.why, ["Rust"]);
+        let eligibility = found.eligibility.unwrap();
+        assert_eq!(eligibility.remote, "no");
+        assert_eq!(eligibility.open_to_candidate, "yes");
+        assert_eq!(eligibility.working_languages, ["en"]);
     }
 }

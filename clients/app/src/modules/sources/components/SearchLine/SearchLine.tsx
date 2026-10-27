@@ -9,7 +9,7 @@ import { formatEuros, isRunning, type Search } from "../../api/searches";
 export type SearchSummary = Pick<
   Search,
   "status" | "trigger" | "started_at" | "finished_at" | "fetched" | "added" | "stopped"
-> & { cost_eur?: number | undefined };
+> & { cost_eur?: number | undefined; dropped?: number | undefined };
 
 export interface SearchLineProps {
   search: SearchSummary;
@@ -18,8 +18,8 @@ export interface SearchLineProps {
 }
 
 /**
- * One line about a search: "Last night: 412 jobs read, 9 matched", what it
- * cost, or why it stopped.
+ * One line about a search: "Last night: 412 jobs read, 9 matched, 14 dropped
+ * for your requirements", what it cost, or why it stopped.
  */
 export function SearchLine({ search, testId = "search-line" }: SearchLineProps) {
   const { t, i18n } = useTranslation("sources");
@@ -40,7 +40,15 @@ export function SearchLine({ search, testId = "search-line" }: SearchLineProps) 
   }
   const at = search.finished_at ?? search.started_at;
   const when = formatWhen(at, language);
-  const counts = t("line.counts", { fetched: String(search.fetched), added: String(search.added) });
+  const dropped = search.dropped ?? 0;
+  const counts =
+    dropped > 0
+      ? t("line.countsDropped", {
+          fetched: String(search.fetched),
+          added: String(search.added),
+          dropped: String(dropped),
+        })
+      : t("line.counts", { fetched: String(search.fetched), added: String(search.added) });
   let lead: string;
   if (search.trigger === "nightly" && withinADay(at)) {
     lead = t("line.lastNight", { counts });

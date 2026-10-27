@@ -10,7 +10,8 @@ use wiremock::{
 };
 
 use crate::testkit::{
-    Fake, Harness, completion, config, exampleco, gateway, greenhouse_boards, model_scoring,
+    Fake, Harness, answer_for, completion, config, exampleco, gateway, greenhouse_boards,
+    model_reading_facts, model_scoring, open_facts,
 };
 
 async fn model_calls(model: &MockServer) -> usize {
@@ -52,6 +53,7 @@ async fn search_now_scores_the_jobs_and_adds_the_matches(db: PgPool) {
     assert_eq!(search["kept"], 2);
     assert_eq!(search["scored"], 2);
     assert_eq!(search["added"], 2);
+    assert_eq!(search["dropped"], 0);
     assert_eq!(search["stopped"], Value::Null);
     assert!(search["cost_eur"].as_f64().unwrap() > 0.0);
 
@@ -241,9 +243,7 @@ async fn a_limit_reached_mid_search_keeps_what_was_scored(db: PgPool) {
                 .to_owned();
             let jobs: Vec<Value> = (1..=10)
                 .filter(|i| user.contains(&format!("\"ref\":\"j{i}\"")))
-                .map(
-                    |i| json!({ "ref": format!("j{i}"), "match": 80, "why": ["Rust"], "gaps": [] }),
-                )
+                .map(|i| answer_for(&format!("j{i}"), 80, &open_facts()))
                 .collect();
             ResponseTemplate::new(200).set_body_json(completion(&json!({ "jobs": jobs }), 0.05))
         })
@@ -458,4 +458,183 @@ async fn a_pasted_posting_is_read_and_its_board_added(db: PgPool) {
             .is_none()
     );
     assert_eq!(boards.received_requests().await.unwrap().len(), before);
+}
+
+/// The cases of #19, with invented companies and the postings' wording.
+const REQUIREMENTS_ARBEITNOW: &str =
+    include_str!("../../readers/fixtures/requirements_arbeitnow.json");
+const REQUIREMENTS_GREENHOUSE_LIST: &str =
+    include_str!("../../readers/fixtures/requirements_greenhouse_list.json");
+const REQUIREMENTS_GREENHOUSE_JOBS: &str =
+    include_str!("../../readers/fixtures/requirements_greenhouse_jobs.json");
+
+/// Arbeitnow and a Greenhouse board serving the #19 fixtures.
+async fn requirement_boards() -> MockServer {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/job-board-api"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_raw(REQUIREMENTS_ARBEITNOW, "application/json"),
+        )
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/v1/boards/exampleco/jobs"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_raw(REQUIREMENTS_GREENHOUSE_LIST, "application/json"),
+        )
+        .mount(&server)
+        .await;
+    let details: Vec<Value> = serde_json::from_str(REQUIREMENTS_GREENHOUSE_JOBS).unwrap();
+    for detail in details {
+        let id = detail["id"].as_u64().unwrap();
+        Mock::given(method("GET"))
+            .and(path(format!("/v1/boards/exampleco/jobs/{id}")))
+            .respond_with(ResponseTemplate::new(200).set_body_json(detail))
+            .mount(&server)
+            .await;
+    }
+    server
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn hard_requirements_drop_jobs_whatever_their_score(db: PgPool) {
+    let boards = requirement_boards().await;
+    let model = model_reading_facts().await;
+    let mut settings = config(&boards);
+    settings.enabled = Some(vec!["greenhouse".into(), "arbeitnow".into()]);
+    settings.arbeitnow_url = boards.uri().parse().unwrap();
+    // Someone in Lisbon who works remote only, in English and Portuguese.
+    let h = Harness::new(
+        db,
+        settings,
+        Some(gateway(&model, BudgetConfig::default())),
+        Fake::lisbon_remote_only(),
+    )
+    .await;
+    let (status, _) = h.post("/api/v1/searches").await;
+    assert_eq!(status, StatusCode::ACCEPTED);
+    h.work().await;
+
+    let search = latest(&h).await;
+    assert_eq!(search["status"], "finished", "{search}");
+    assert_eq!(search["fetched"], 4);
+    assert_eq!(search["scored"], 4);
+    // Every one scored 85; only the one open to Lisbon, in English, is added.
+    assert_eq!(search["added"], 1, "{search}");
+    assert_eq!(search["dropped"], 3, "{search}");
+    let added = h.fake.added();
+    assert_eq!(added.len(), 1);
+    assert_eq!(added[0].job.title, "Senior Backend Engineer, Platform");
+    assert_eq!(
+        added[0].score.facts.region_note.as_deref(),
+        Some("Europe"),
+        "its facts go to the pipeline"
+    );
+
+    // The reasons, kept with the scores.
+    let reasons: Vec<(String, Option<String>)> = sqlx::query_as(
+        "SELECT source_ref, excluded_reason FROM sources.scores ORDER BY source_ref",
+    )
+    .fetch_all(&h.db)
+    .await
+    .unwrap();
+    assert_eq!(
+        reasons,
+        [
+            (
+                "backend-entwickler-hamburg-200002".to_owned(),
+                Some("language".to_owned())
+            ),
+            ("exampleco:301".to_owned(), Some("not_remote".to_owned())),
+            ("exampleco:302".to_owned(), None),
+            (
+                "senior-backend-engineer-berlin-200001".to_owned(),
+                Some("not_open_to_location".to_owned())
+            ),
+        ]
+    );
+
+    // One call; the model is told where they live, and that place and
+    // language are facts, not the score.
+    assert_eq!(model_calls(&model).await, 1);
+    let request: Value =
+        serde_json::from_slice(&model.received_requests().await.unwrap()[0].body).unwrap();
+    let user = request["messages"][1]["content"].as_str().unwrap();
+    assert!(
+        user.contains("<candidate_location>\"Lisbon\"</candidate_location>"),
+        "{user}"
+    );
+    assert!(
+        user.contains("Remote-first aus Deutschland oder Österreich"),
+        "{user}"
+    );
+
+    // The next search reads the facts from the cache and drops them again.
+    h.clock.advance(TimeDelta::hours(1));
+    h.post("/api/v1/searches").await;
+    h.work().await;
+    let again = latest(&h).await;
+    assert_eq!(again["dropped"], 3, "{again}");
+    assert_eq!(again["added"], 0, "the one added is known");
+    assert_eq!(model_calls(&model).await, 1, "no second call");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_pay_floor_drops_a_job_paid_less_and_notes_one_that_says_nothing(db: PgPool) {
+    let boards = board_of(2).await;
+    let model = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(|request: &wiremock::Request| {
+            let jobs: Vec<Value> = crate::testkit::postings(request)
+                .iter()
+                .map(|posting| {
+                    let reference = posting["ref"].as_str().unwrap_or("");
+                    let mut facts = open_facts();
+                    if reference == "j1" {
+                        facts["salary"] = json!({
+                            "min": 40_000, "max": 45_000, "currency": "USD", "period": "year"
+                        });
+                    }
+                    answer_for(reference, 90, &facts)
+                })
+                .collect();
+            ResponseTemplate::new(200).set_body_json(completion(&json!({ "jobs": jobs }), 0.0004))
+        })
+        .mount(&model)
+        .await;
+    let fake = Fake::ready();
+    if let Some(input) = fake.input.lock().unwrap().as_mut() {
+        input.cash_floor = Some(crate::requirements::Floor {
+            amount: 45_000.0,
+            currency: "EUR".into(),
+            per: crate::requirements::Per::Year,
+        });
+    }
+    let h = Harness::new(
+        db,
+        config(&boards),
+        Some(gateway(&model, BudgetConfig::default())),
+        fake,
+    )
+    .await;
+    h.post("/api/v1/searches").await;
+    h.work().await;
+    let search = latest(&h).await;
+    // $45 000 is about €41 400 a year: under a €45 000 floor.
+    assert_eq!(search["dropped"], 1, "{search}");
+    assert_eq!(search["added"], 1);
+    let added = h.fake.added();
+    let silent = &added[0];
+    assert_eq!(silent.score.facts.salary, None);
+    assert!(
+        silent
+            .score
+            .gaps
+            .iter()
+            .any(|g| g == crate::requirements::SALARY_NOT_STATED),
+        "{:?}",
+        silent.score.gaps
+    );
 }

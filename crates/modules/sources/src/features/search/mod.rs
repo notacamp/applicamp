@@ -1,6 +1,8 @@
-//! A search: read the boards, drop what breaks the goals' hard limits,
-//! pre-rank, score the rest with the model within the spending limits, and
-//! add the good matches to the pipeline as Found.
+//! A search: read the boards, drop what breaks the goals' hard limits on
+//! the boards' structured fields, pre-rank, score the rest with the model
+//! within the spending limits (the same call reads each posting's
+//! eligibility facts), drop what fails a requirement rule whatever its
+//! score, and add the good matches to the pipeline as Found.
 //!
 //! - `POST /api/v1/searches` starts one ("Search now"): at most
 //!   [`SourcesConfig::manual_per_day`] a day, one every
@@ -35,6 +37,7 @@ use crate::{
     lisbon,
     matching::{self, MatchInput, TOP},
     ports::Scored,
+    requirements::{self, Answer, Excluded, Facts, RULES_VERSION, Salary},
     scoring::{self, BATCH, KEEP, MAX_ADDED, Read, Score},
 };
 
@@ -119,6 +122,9 @@ pub struct Search {
     pub scored: u32,
     /// New opportunities added as Found.
     pub added: u32,
+    /// Jobs scored that fail a requirement (remote only, where they live,
+    /// a language, the pay floor): never added, whatever their score.
+    pub dropped: u32,
     /// Why it stopped early, if it did.
     pub stopped: Option<SearchStop>,
     /// What its model calls cost, in euros.
@@ -168,6 +174,7 @@ pub struct SearchRow {
     pub kept: i32,
     pub scored: i32,
     pub added: i32,
+    pub dropped: i32,
     pub batches: i32,
     pub cost_usd: f64,
     pub error_kind: Option<String>,
@@ -198,6 +205,7 @@ impl SearchRow {
             kept: count(self.kept),
             scored: count(self.scored),
             added: count(self.added),
+            dropped: count(self.dropped),
             stopped: self.error_kind.as_deref().and_then(SearchStop::parse),
             cost_eur: self.cost_usd * usd_to_eur,
         }
@@ -208,7 +216,7 @@ impl SearchRow {
 pub async fn latest_row(db: &PgPool, account: Uuid) -> Result<Option<SearchRow>> {
     Ok(sqlx::query_as(
         "SELECT id, account_id, trigger, status, started_at, finished_at, fetched, kept, scored,
-                added, batches, cost_usd, error_kind
+                added, dropped, batches, cost_usd, error_kind
            FROM sources.searches WHERE account_id = $1
           ORDER BY started_at DESC, id DESC LIMIT 1",
     )
@@ -223,13 +231,13 @@ fn usd_to_eur(deps: &SourcesDeps) -> f64 {
         .map_or(applicamp_ai::DEFAULT_USD_TO_EUR, Gateway::usd_to_eur)
 }
 
-fn configured(deps: &SourcesDeps) -> Option<&Gateway> {
+pub(crate) fn configured(deps: &SourcesDeps) -> Option<&Gateway> {
     deps.ai
         .as_ref()
         .filter(|ai| ai.is_configured(Role::Complete))
 }
 
-async fn spend(
+pub(crate) async fn spend(
     deps: &SourcesDeps,
     db: &PgPool,
     account: Uuid,
@@ -248,7 +256,7 @@ async fn spend(
 }
 
 /// Whether `spend` already reached a limit.
-fn spent_out(spend: &Spend) -> bool {
+pub(crate) fn spent_out(spend: &Spend) -> bool {
     spend.day_limit_eur.is_some_and(|l| spend.today_eur >= l)
         || spend.month_limit_eur.is_some_and(|l| spend.month_eur >= l)
 }
@@ -372,7 +380,7 @@ async fn create(
         "INSERT INTO sources.searches (id, account_id, trigger, status, started_at)
          VALUES ($1, $2, $3, 'queued', $4)
          RETURNING id, account_id, trigger, status, started_at, finished_at, fetched, kept,
-                   scored, added, batches, cost_usd, error_kind",
+                   scored, added, dropped, batches, cost_usd, error_kind",
     )
     .bind(Uuid::now_v7())
     .bind(account)
@@ -514,7 +522,7 @@ impl applicamp_kernel::Job for RunSearch {
 async fn progress(db: &PgPool, id: Uuid, fields: &Progress) -> Result<()> {
     sqlx::query(
         "UPDATE sources.searches
-            SET fetched = $2, kept = $3, scored = $4, batches = $5, cost_usd = $6
+            SET fetched = $2, kept = $3, scored = $4, batches = $5, cost_usd = $6, dropped = $7
           WHERE id = $1",
     )
     .bind(id)
@@ -523,6 +531,7 @@ async fn progress(db: &PgPool, id: Uuid, fields: &Progress) -> Result<()> {
     .bind(i32::try_from(fields.scored).unwrap_or(i32::MAX))
     .bind(i32::try_from(fields.batches).unwrap_or(i32::MAX))
     .bind(fields.cost_usd)
+    .bind(i32::try_from(fields.dropped).unwrap_or(i32::MAX))
     .execute(db)
     .await?;
     Ok(())
@@ -533,6 +542,7 @@ struct Progress {
     fetched: usize,
     kept: usize,
     scored: usize,
+    dropped: usize,
     batches: usize,
     cost_usd: f64,
 }
@@ -577,6 +587,7 @@ async fn finish(
         fetched = fields.fetched,
         kept = fields.kept,
         scored = fields.scored,
+        dropped = fields.dropped,
         batches = fields.batches,
         added,
         cost_usd = fields.cost_usd,
@@ -586,58 +597,83 @@ async fn finish(
     Ok(())
 }
 
-/// Scores already given to `account` for these versions, by job key.
+/// A cached score's row.
+#[derive(sqlx::FromRow)]
+struct CachedRow {
+    source: String,
+    source_ref: String,
+    match_score: i32,
+    why: sqlx::types::Json<Vec<String>>,
+    gaps: sqlx::types::Json<Vec<String>>,
+    read: Option<sqlx::types::Json<Read>>,
+    remote: Option<String>,
+    open_to_candidate: Option<String>,
+    region_note: Option<String>,
+    working_languages: Option<Vec<String>>,
+    salary: Option<sqlx::types::Json<Salary>>,
+}
+
+/// Scores already given to `account` for these versions of the profile,
+/// the goals and the rules, by job key.
 async fn cached_scores(
     db: &PgPool,
     account: Uuid,
     input: &MatchInput,
 ) -> Result<HashMap<(String, String), Score>> {
-    type CachedRow = (
-        String,
-        String,
-        i32,
-        sqlx::types::Json<Vec<String>>,
-        sqlx::types::Json<Vec<String>>,
-        Option<sqlx::types::Json<Read>>,
-    );
     let rows: Vec<CachedRow> = sqlx::query_as(
-        "SELECT source, source_ref, match_score, why, gaps, read FROM sources.scores
-          WHERE account_id = $1 AND profile_version = $2 AND goals_version = $3",
+        "SELECT source, source_ref, match_score, why, gaps, read, remote, open_to_candidate,
+                region_note, working_languages, salary
+           FROM sources.scores
+          WHERE account_id = $1 AND profile_version = $2 AND goals_version = $3
+            AND rules_version = $4",
     )
     .bind(account)
     .bind(&input.profile_version)
     .bind(input.goals_version)
+    .bind(RULES_VERSION)
     .fetch_all(db)
     .await?;
     Ok(rows
         .into_iter()
-        .map(|(source, source_ref, score, why, gaps, read)| {
+        .map(|row| {
+            let answer = |raw: Option<&str>| raw.map_or(Answer::Unclear, Answer::parse);
             (
-                (source, source_ref),
+                (row.source, row.source_ref),
                 Score {
-                    match_score: u8::try_from(score.clamp(0, 100)).unwrap_or(0),
-                    why: why.0,
-                    gaps: gaps.0,
-                    read: read.map(|r| r.0),
+                    match_score: u8::try_from(row.match_score.clamp(0, 100)).unwrap_or(0),
+                    why: row.why.0,
+                    gaps: row.gaps.0,
+                    read: row.read.map(|r| r.0),
+                    facts: Facts {
+                        remote: answer(row.remote.as_deref()),
+                        open_to_candidate: answer(row.open_to_candidate.as_deref()),
+                        region_note: row.region_note,
+                        working_languages: row.working_languages.unwrap_or_default(),
+                        salary: row.salary.map(|s| s.0),
+                    },
                 },
             )
         })
         .collect())
 }
 
+/// Keep `score` (with its facts, and the reason `job` fails a requirement,
+/// if it does) for these versions.
 async fn save_score(
     db: &PgPool,
     account: Uuid,
     input: &MatchInput,
     job: &Job,
     score: &Score,
+    excluded: Option<Excluded>,
     now: DateTime<Utc>,
 ) -> Result<()> {
     sqlx::query(
         "INSERT INTO sources.scores
-            (account_id, source, source_ref, profile_version, goals_version, match_score, why,
-             gaps, read, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            (account_id, source, source_ref, profile_version, goals_version, rules_version,
+             match_score, why, gaps, read, remote, open_to_candidate, region_note,
+             working_languages, salary, excluded_reason, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
          ON CONFLICT DO NOTHING",
     )
     .bind(account)
@@ -645,14 +681,33 @@ async fn save_score(
     .bind(&job.source_ref)
     .bind(&input.profile_version)
     .bind(input.goals_version)
+    .bind(RULES_VERSION)
     .bind(i32::from(score.match_score))
     .bind(sqlx::types::Json(&score.why))
     .bind(sqlx::types::Json(&score.gaps))
     .bind(score.read.as_ref().map(sqlx::types::Json))
+    .bind(score.facts.remote.as_str())
+    .bind(score.facts.open_to_candidate.as_str())
+    .bind(&score.facts.region_note)
+    .bind(&score.facts.working_languages)
+    .bind(score.facts.salary.as_ref().map(sqlx::types::Json))
+    .bind(excluded.map(Excluded::as_str))
     .bind(now)
     .execute(db)
     .await?;
     Ok(())
+}
+
+/// Where `job` is: as the board says, or as the model read a free-text post.
+pub(crate) fn place_of<'a>(job: &'a Job, score: &'a Score) -> Option<&'a str> {
+    if job.needs_reading() {
+        score
+            .read
+            .as_ref()
+            .and_then(|read| read.location.as_deref())
+    } else {
+        job.location.as_deref()
+    }
 }
 
 /// `job` with what the model read from a free-text post; `None` when it is
@@ -687,7 +742,7 @@ pub(crate) async fn run(
 ) -> Result<()> {
     let row: Option<SearchRow> = sqlx::query_as(
         "SELECT id, account_id, trigger, status, started_at, finished_at, fetched, kept, scored,
-                added, batches, cost_usd, error_kind
+                added, dropped, batches, cost_usd, error_kind
            FROM sources.searches WHERE id = $1",
     )
     .bind(id)
@@ -791,7 +846,10 @@ pub(crate) async fn run(
                 done.cost_usd += cost;
                 for (index, score) in scores {
                     let job = &batch[index];
-                    save_score(db, account, &input, job, &score, deps.clock.now()).await?;
+                    let excluded =
+                        requirements::check(&input, &score.facts, place_of(job, &score)).excluded;
+                    save_score(db, account, &input, job, &score, excluded, deps.clock.now())
+                        .await?;
                     scored.push((job.clone(), score));
                 }
                 done.scored = scored.len();
@@ -815,12 +873,24 @@ pub(crate) async fn run(
         }
     }
 
-    // Keep the good ones.
-    let mut keep: Vec<Scored> = scored
-        .into_iter()
-        .filter(|(_, score)| score.match_score >= KEEP)
-        .filter_map(|(job, score)| with_reading(job, &score).map(|job| Scored { job, score }))
-        .collect();
+    // Keep the good ones that meet every requirement: the rules decide on
+    // the facts, never the score.
+    let mut keep: Vec<Scored> = Vec::new();
+    for (job, mut score) in scored {
+        let verdict = requirements::check(&input, &score.facts, place_of(&job, &score));
+        if verdict.excluded.is_some() {
+            done.dropped += 1;
+            continue;
+        }
+        if score.match_score < KEEP {
+            continue;
+        }
+        let Some(job) = with_reading(job, &score) else {
+            continue;
+        };
+        score.gaps.extend(verdict.gaps);
+        keep.push(Scored { job, score });
+    }
     keep.sort_by_key(|scored| std::cmp::Reverse(scored.score.match_score));
     keep.truncate(MAX_ADDED);
     let now = deps.clock.now();

@@ -107,6 +107,11 @@ pub struct Job {
     pub location: Option<String>,
     /// How it is worked, when the board says.
     pub work_mode: Option<WorkMode>,
+    /// Whether a structured board field says it is remote: Ashby's
+    /// `isRemote` / `workplaceType`, Lever's `workplaceType`. `None` where
+    /// the board has no reliable field (Greenhouse, Arbeitnow, whose
+    /// `remote` flag is ignored, HN): the model reads those.
+    pub board_remote: Option<bool>,
     /// The posting's page.
     pub url: String,
     /// When it was published (or last updated, when that is all there is).

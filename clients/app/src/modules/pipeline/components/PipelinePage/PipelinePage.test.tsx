@@ -12,9 +12,27 @@ import { renderWithProviders, stubApi, type Stub } from "../../../../../test/ren
 import { PipelinePage } from "./PipelinePage";
 
 const SECOND = "0190a1b2-0000-7000-8000-000000000002";
+const HIDDEN = "0190a1b2-0000-7000-8000-000000000003";
 
-/** A server holding two opportunities, keeping what the page changes. */
-function fakePipeline(extra: Record<string, Stub> = {}) {
+/** Found before the requirement rules: remote only from Germany or Austria. */
+const hiddenOne = opportunity({
+  id: HIDDEN,
+  title: "Senior Backend Engineer (m/w/d)",
+  company: "Beispiel Software GmbH",
+  location: "Berlin",
+  source: "arbeitnow",
+  new: false,
+  hidden_reason: "not_open_to_location",
+  facts: {
+    remote: "yes",
+    open_to_candidate: "no",
+    region_note: "Germany or Austria only",
+    working_languages: ["en"],
+  },
+});
+
+/** A server holding two opportunities in view (and `more`), keeping what the page changes. */
+function fakePipeline(extra: Record<string, Stub> = {}, more: Opportunity[] = []) {
   const store = new Map<string, Opportunity>([
     [opportunity().id, opportunity()],
     [
@@ -29,14 +47,19 @@ function fakePipeline(extra: Record<string, Stub> = {}) {
         match: null,
       }),
     ],
+    ...more.map((row): [string, Opportunity] => [row.id, row]),
   ]);
   const patches: Record<string, unknown>[] = [];
   const requests = stubApi({
     "GET /api/v1/opportunities": (request) => {
       const query = new URL(request.url).searchParams;
       const stage = query.get("stage");
+      const hidden = query.get("hidden") === "true";
       const rows = [...store.values()].filter(
-        (row) => !row.dismissed && (stage === null || row.stage === stage),
+        (row) =>
+          !row.dismissed &&
+          (stage === null || row.stage === stage) &&
+          (row.hidden_reason !== undefined && row.hidden_reason !== null) === hidden,
       );
       return { body: { opportunities: rows.map((row) => summary(row)) } };
     },
@@ -207,6 +230,42 @@ describe("the pipeline page", () => {
     await waitFor(() => {
       expect(screen.getByTestId("peek")).toHaveAttribute("aria-label", "Staff Engineer");
     });
+  });
+
+  it("lists the ones that don't meet the requirements under Hidden, with the reason and the facts", async () => {
+    fakePipeline({ [`GET /api/v1/opportunities/${HIDDEN}`]: () => ({ body: hiddenOne }) }, [
+      hiddenOne,
+    ]);
+    const user = userEvent.setup();
+    renderPage();
+    const table = await screen.findByTestId("pipeline-table");
+    expect(table).toHaveTextContent("Staff Engineer");
+    expect(table).not.toHaveTextContent("Beispiel Software");
+
+    await user.selectOptions(screen.getByTestId("pipeline-stage-filter"), "hidden");
+    expect(await screen.findByTestId("pipeline-hidden-only")).toHaveTextContent(
+      "Nothing was deleted",
+    );
+    expect(await screen.findByTestId("pipeline-row-hidden-reason")).toHaveTextContent(
+      "Not open to where you live · Germany or Austria only",
+    );
+    expect(screen.getByTestId("pipeline-table")).not.toHaveTextContent("Staff Engineer");
+
+    const [row] = screen.getAllByTestId("pipeline-row-open");
+    if (row === undefined) {
+      throw new TypeError("a row");
+    }
+    await user.click(row);
+    expect(await screen.findByTestId("peek-hidden")).toHaveTextContent("Germany or Austria only");
+    expect(screen.getByTestId("peek-facts")).toHaveTextContent(
+      "Remote · Not open to where you live (Germany or Austria only) · English",
+    );
+
+    // Back to the pipeline.
+    await user.click(screen.getByTestId("peek-close"));
+    await user.click(screen.getByTestId("pipeline-show-in-view"));
+    expect(await screen.findByTestId("pipeline-table")).toHaveTextContent("Staff Engineer");
+    expect(screen.queryByTestId("pipeline-hidden-only")).toBeNull();
   });
 
   it("filters by stage", async () => {

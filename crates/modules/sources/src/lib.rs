@@ -5,11 +5,16 @@
 //!   pasting a posting's link), Arbeitnow, and HN "Who is hiring". Public
 //!   APIs only, never LinkedIn or Indeed (ADR 0006); one client with a
 //!   timeout, a body cap, a per-host pace and a cache.
-//! - **The search** ([`features::search`]): the goals' hard limits, a
-//!   pre-rank without the model, the `complete` model's scores in batches
-//!   of ten (cached per profile and goals version), and the good matches
-//!   added to the pipeline as Found. "Search now" and a nightly search,
-//!   both within the spending limits of `applicamp-ai`.
+//! - **The search** ([`features::search`]): the goals' hard limits on the
+//!   boards' structured fields, a pre-rank without the model, the
+//!   `complete` model's scores and eligibility facts in batches of ten
+//!   (cached per profile, goals and rules version), the requirement rules
+//!   ([`requirements`]) deciding pass or fail on those facts, and the good
+//!   matches that pass added to the pipeline as Found. "Search now" and a
+//!   nightly search, both within the spending limits of `applicamp-ai`.
+//! - **The recheck** ([`features::recheck`]): at start, Found and
+//!   Shortlisted opportunities found before the rules get their facts once,
+//!   and the ones that fail are hidden (never deleted).
 //!
 //! What it needs from other modules (the profile and goals, the pipeline)
 //! are [`ports::Neighbours`], which the server implements; modules never
@@ -26,8 +31,10 @@ pub mod features;
 pub mod job;
 pub mod lisbon;
 pub mod matching;
+pub mod places;
 pub mod ports;
 pub mod readers;
+pub mod requirements;
 pub mod scoring;
 
 use std::sync::Arc;
@@ -114,7 +121,7 @@ impl SourcesDeps {
 
 /// The sources module, composed with `deps`.
 pub fn module(deps: SourcesDeps) -> Module {
-    use features::search;
+    use features::{recheck, search};
     let router = OpenApiRouter::new()
         .routes(routes!(search::start))
         .routes(routes!(search::latest))
@@ -125,23 +132,29 @@ pub fn module(deps: SourcesDeps) -> Module {
         router,
         background: Background::new()
             .job_with::<search::RunSearch, _>(deps.clone())
-            .job_with::<search::Nightly, _>(deps)
+            .job_with::<search::Nightly, _>(deps.clone())
+            .job_with::<recheck::Recheck, _>(deps)
             .publishes::<events::SearchFinished>(),
     }
 }
 
-/// On server start: make `sources.boards` hold the seed list, and schedule
-/// the nightly search (when it is on).
+/// On server start: make `sources.boards` hold the seed list, schedule
+/// the nightly search (when it is on), and check the requirements of
+/// opportunities found before the rules (once each).
 pub async fn start(db: &PgPool, deps: &SourcesDeps) -> Result<(), String> {
     let seed = boards::seed(&deps.config)?;
     let count = boards::sync(db, &seed).await.map_err(|e| e.to_string())?;
     let scheduled = features::search::schedule_nightly(db, deps)
         .await
         .map_err(|e| e.to_string())?;
+    let recheck = features::recheck::schedule(db, deps)
+        .await
+        .map_err(|e| e.to_string())?;
     tracing::info!(
         boards = count,
         nightly = deps.config.nightly(),
         scheduled,
+        recheck,
         "job sources ready"
     );
     Ok(())
@@ -161,6 +174,13 @@ mod tests {
             module(SourcesDeps::default()).background,
         )])
         .unwrap();
-        assert_eq!(registry.kinds(), ["sources.nightly", "sources.search"]);
+        assert_eq!(
+            registry.kinds(),
+            [
+                "sources.nightly",
+                "sources.recheck_requirements",
+                "sources.search"
+            ]
+        );
     }
 }

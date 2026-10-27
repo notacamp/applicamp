@@ -63,8 +63,9 @@ export interface paths {
         /**
          * The pipeline.
          * @description Every opportunity of the signed-in person, newest first, except the
-         *     dismissed ones ("Not for me"). Filter by stage, by text in the role,
-         *     company or place, or to the new ones.
+         *     dismissed ones ("Not for me") and the hidden ones (they fail a hard
+         *     requirement; `hidden=true` lists only those, with the reason). Filter by
+         *     stage, by text in the role, company or place, or to the new ones.
          */
         get: operations["pipeline.list"];
         put?: never;
@@ -506,6 +507,11 @@ export interface components {
             /** @description The degree ("Master's"). */
             studyType?: string | null;
         };
+        /**
+         * @description What a posting says about a fact a requirement is checked on.
+         * @enum {string}
+         */
+        Fact: "yes" | "no" | "unclear";
         /** @description The answers to the goals interview. Nothing is required. */
         Goals: {
             autonomy?: components["schemas"]["Autonomy"] | null;
@@ -552,6 +558,11 @@ export interface components {
             /** @description The server's version. */
             version: string;
         };
+        /**
+         * @description Why an opportunity is hidden: it fails a hard requirement.
+         * @enum {string}
+         */
+        HiddenReason: "not_remote" | "not_open_to_location" | "language" | "below_floor";
         /** @description A draft profile waiting for review. */
         Import: {
             /**
@@ -606,6 +617,20 @@ export interface components {
             kind: components["schemas"]["ImportKind"];
             /** @description The text, for `text` (up to 60 000 characters). */
             text?: string | null;
+        };
+        /**
+         * @description What the posting says about the person's requirements, as their search
+         *     read it: "Remote · open to you · English".
+         */
+        JobFacts: {
+            /** @description Someone where the person lives can do it without moving. */
+            open_to_candidate: components["schemas"]["Fact"];
+            /** @description Where it is open, as the posting says ("Germany or Austria only"). */
+            region_note?: string | null;
+            /** @description It can be done fully remote. */
+            remote: components["schemas"]["Fact"];
+            /** @description The languages it needs, ISO 639-1 (`en`). */
+            working_languages: string[];
         };
         /**
          * @description How the job is worked.
@@ -674,8 +699,10 @@ export interface components {
              *     link to a site that is not a job board).
              */
             editable: boolean;
-            /** @description What the profile or goals miss (up to 2). */
+            facts?: components["schemas"]["JobFacts"] | null;
+            /** @description What the profile or goals miss (up to 3). */
             gaps: string[];
+            hidden_reason?: components["schemas"]["HiddenReason"] | null;
             /** Format: uuid */
             id: string;
             /** @description Where, as the posting says. */
@@ -730,7 +757,10 @@ export interface components {
         };
         /** @description The pipeline. */
         OpportunityList: {
-            /** @description Newest first; never the dismissed ones. */
+            /**
+             * @description Newest first; never the dismissed ones, and the hidden ones only when
+             *     asked for.
+             */
             opportunities: components["schemas"]["OpportunitySummary"][];
         };
         /**
@@ -748,6 +778,7 @@ export interface components {
             company: string;
             /** Format: date-time */
             created_at: string;
+            hidden_reason?: components["schemas"]["HiddenReason"] | null;
             /** Format: uuid */
             id: string;
             /** @description Where, as the posting says. */
@@ -761,6 +792,8 @@ export interface components {
             /** @description Found and never opened. */
             new: boolean;
             next_step?: string | null;
+            /** @description Where it is open, as the posting says, to go with the reason. */
+            region_note?: string | null;
             /** @description Pay, as the posting says. */
             salary_text?: string | null;
             source: components["schemas"]["OpportunitySource"];
@@ -889,6 +922,12 @@ export interface components {
             cost_eur: number;
             /**
              * Format: int32
+             * @description Jobs scored that fail a requirement (remote only, where they live,
+             *     a language, the pay floor): never added, whatever their score.
+             */
+            dropped: number;
+            /**
+             * Format: int32
              * @description Jobs read from the boards.
              */
             fetched: number;
@@ -983,7 +1022,7 @@ export interface components {
             latest_search?: components["schemas"]["TodaySearch"] | null;
             /**
              * Format: int32
-             * @description Found opportunities never opened.
+             * @description Found opportunities never opened (hidden ones not counted).
              */
             new_matches: number;
             next_step: components["schemas"]["NextStep"];
@@ -1170,6 +1209,11 @@ export interface operations {
                 q?: string;
                 /** @description Only the new ones (Found, never opened). */
                 new?: boolean;
+                /**
+                 * @description Only the hidden ones: found before the requirement rules, they fail
+                 *     one. Left out otherwise.
+                 */
+                hidden?: boolean;
             };
             header?: never;
             path?: never;

@@ -19,7 +19,8 @@
     "lastNight": "Last night: {{counts}}",
     "today": "Today at {{time}}: {{counts}}",
     "on": "{{date}}: {{counts}}",
-    "cost": "AI {{cost}}"
+    "cost": "AI {{cost}}",
+    "countsDropped": "{{fetched}} jobs read, {{added}} matched, {{dropped}} dropped for your requirements"
   },
   "stopped": {
     "ai_budget_reached": "Stopped at the AI spending limit. The jobs already scored are kept.",

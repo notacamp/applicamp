@@ -116,7 +116,7 @@ pub struct BoardList {
 pub struct BoardDetail {
     pub board: BoardSummary,
     /// How it is read (the config's JSON).
-    #[schema(value_type = Object)]
+    #[schema(value_type = std::collections::BTreeMap<String, serde_json::Value>)]
     pub config: serde_json::Value,
     pub terms: Terms,
     /// What the automatic check found; none before it ran.
@@ -143,7 +143,7 @@ pub struct DeclineBoard {
 #[serde(deny_unknown_fields)]
 pub struct BoardConfigChange {
     /// The whole config, validated for the board's kind.
-    #[schema(value_type = Object)]
+    #[schema(value_type = std::collections::BTreeMap<String, serde_json::Value>)]
     pub config: serde_json::Value,
 }
 

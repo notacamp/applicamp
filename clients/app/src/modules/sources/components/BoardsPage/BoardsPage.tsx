@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useState, type ReactNode, type SubmitEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -231,7 +231,7 @@ function SuggestBoard() {
   const { t } = useTranslation("sources");
   const suggest = useSuggestBoard();
   const [url, setUrl] = useState("");
-  const submit = (event: FormEvent) => {
+  const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     const value = url.trim();
     if (value === "") {

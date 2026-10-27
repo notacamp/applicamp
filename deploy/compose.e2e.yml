@@ -62,9 +62,14 @@ services:
       APPLICAMP_OIDC__CAMPBOOKS__CLIENT_ID: applicamp-e2e
       # Inline, for the fake only; real secrets are files (deploy/secrets).
       APPLICAMP_OIDC__CAMPBOOKS__CLIENT_SECRET: e2e-only-secret
-      # The job search reads only the fake's one board, and scores with the
-      # fake model; no limit spaces the searches of the two test projects.
-      APPLICAMP_SOURCES__ENABLED: greenhouse
+      # The job search reads only the fake's job boards (one approved, one
+      # waiting for the demo person, who owns the boards; never discovery),
+      # and scores with the fake model; no limit spaces the searches of the
+      # two test projects. The company board stays off, as by default.
+      APPLICAMP_SOURCES__JOB_BOARDS_FILE: /fake-jobs/job_boards.toml
+      APPLICAMP_SOURCES__ALLOW_PRIVATE_HOSTS: "true"
+      APPLICAMP_SOURCES__DISCOVERY: "false"
+      APPLICAMP_SOURCES__BOARD_OWNERS: demo@example.com
       APPLICAMP_SOURCES__GREENHOUSE_URL: http://fake-jobs:9020
       APPLICAMP_SOURCES__BOARDS_FILE: /fake-jobs/boards.toml
       APPLICAMP_SOURCES__CACHE_SECS: "0"
@@ -75,6 +80,7 @@ services:
       APPLICAMP_AI__COMPLETE__MODEL: fake/model
     volumes:
       - ./fake-jobs/boards.toml:/fake-jobs/boards.toml:ro
+      - ./fake-jobs/job_boards.toml:/fake-jobs/job_boards.toml:ro
     depends_on:
       fake-oidc:
         condition: service_healthy

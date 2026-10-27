@@ -1,0 +1,258 @@
+# Typical pay per country, in euros a year: the benchmark a country-scoped
+# board ranks by when it lists fewer than 10 salaries
+# (crates/modules/sources/src/pay.rs). Refreshed yearly.
+#
+# Only figures read from a public source are here; a country without one is
+# left out (its boards rank on their own salaries, or last).
+#
+# Two sources, each row naming its own:
+# - Eurostat, Structure of Earnings Survey 2022 (dataset earn_ses22_28, last
+#   updated 2026-02-09): mean annual gross earnings of professionals (ISCO-08
+#   major group 2), enterprises with 10 or more employees, in euros. Read
+#   2026-10-27.
+# - Stack Overflow Developer Survey 2025, "Salary by developer type": median
+#   annual total compensation of back-end developers, in US dollars, converted
+#   at 0.92 EUR per USD (the fixed table of the salary floor). Read 2026-10-27.
+#
+# The two measure different things (all professionals vs back-end developers):
+# a rough order of countries, never a salary.
+
+[[country]]
+code = "CH"
+eur_year = 120651
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "LU"
+eur_year = 96440
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "IS"
+eur_year = 85196
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "DK"
+eur_year = 76864
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "DE"
+eur_year = 73798
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "NO"
+eur_year = 73485
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "IE"
+eur_year = 70522
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "BE"
+eur_year = 70347
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "AT"
+eur_year = 70309
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "NL"
+eur_year = 67760
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "FI"
+eur_year = 61980
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "SE"
+eur_year = 53504
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "FR"
+eur_year = 52408
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "IT"
+eur_year = 44773
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "ES"
+eur_year = 44075
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "CY"
+eur_year = 41771
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "MT"
+eur_year = 39328
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "SI"
+eur_year = 39084
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "PT"
+eur_year = 36066
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "CZ"
+eur_year = 31297
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "LT"
+eur_year = 30515
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "GR"
+eur_year = 30221
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "EE"
+eur_year = 29883
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "LV"
+eur_year = 27211
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "RO"
+eur_year = 25620
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "SK"
+eur_year = 24639
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "HR"
+eur_year = 24616
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "HU"
+eur_year = 24144
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "PL"
+eur_year = 20939
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "BG"
+eur_year = 18757
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+[[country]]
+code = "RS"
+eur_year = 17305
+source = "Eurostat SES 2022 (earn_ses22_28), professionals, mean"
+url = "https://ec.europa.eu/eurostat/databrowser/view/earn_ses22_28/default/table"
+year = 2022
+
+# Stack Overflow Developer Survey 2025: $175,000, $108,913, $22,086.
+
+[[country]]
+code = "US"
+eur_year = 161000
+source = "Stack Overflow Developer Survey 2025, back-end developers, median (USD 175,000)"
+url = "https://survey.stackoverflow.co/2025/work"
+year = 2025
+
+[[country]]
+code = "GB"
+eur_year = 100200
+source = "Stack Overflow Developer Survey 2025, back-end developers, median (USD 108,913)"
+url = "https://survey.stackoverflow.co/2025/work"
+year = 2025
+
+[[country]]
+code = "IN"
+eur_year = 20319
+source = "Stack Overflow Developer Survey 2025, back-end developers, median (USD 22,086)"
+url = "https://survey.stackoverflow.co/2025/work"
+year = 2025

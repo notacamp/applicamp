@@ -1,8 +1,24 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page } from "@playwright/test";
 
-/** No WCAG 2.1 A/AA violation on the page as it is now. */
+/**
+ * Every finite animation and transition on the page has ended (a side peek
+ * sliding in): colours are checked as they end up, not half-faded.
+ */
+export async function animationsDone(page: Page) {
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((animation) => animation.effect?.getTiming().iterations !== Infinity)
+        .map((animation) => animation.finished.catch(() => null)),
+    ),
+  );
+}
+
+/** No WCAG 2.1 A/AA violation on the page as it is now (once its animations end). */
 export async function expectAccessible(page: Page) {
+  await animationsDone(page);
   const { violations } = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();

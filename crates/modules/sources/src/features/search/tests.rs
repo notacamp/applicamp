@@ -468,11 +468,12 @@ const REQUIREMENTS_GREENHOUSE_LIST: &str =
 const REQUIREMENTS_GREENHOUSE_JOBS: &str =
     include_str!("../../readers/fixtures/requirements_greenhouse_jobs.json");
 
-/// Arbeitnow and a Greenhouse board serving the #19 fixtures.
+/// Arbeitnow (a job board of the registry) and a Greenhouse board serving
+/// the #19 fixtures.
 async fn requirement_boards() -> MockServer {
     let server = MockServer::start().await;
     Mock::given(method("GET"))
-        .and(path("/api/job-board-api"))
+        .and(path("/arbeitnow/api/job-board-api"))
         .respond_with(
             ResponseTemplate::new(200).set_body_raw(REQUIREMENTS_ARBEITNOW, "application/json"),
         )
@@ -504,7 +505,6 @@ async fn hard_requirements_drop_jobs_whatever_their_score(db: PgPool) {
     let model = model_reading_facts().await;
     let mut settings = config(&boards);
     settings.enabled = Some(vec!["greenhouse".into(), "arbeitnow".into()]);
-    settings.arbeitnow_url = boards.uri().parse().unwrap();
     // Someone in Lisbon who works remote only, in English and Portuguese.
     let h = Harness::new(
         db,
@@ -513,6 +513,7 @@ async fn hard_requirements_drop_jobs_whatever_their_score(db: PgPool) {
         Fake::lisbon_remote_only(),
     )
     .await;
+    crate::testkit::seed_fake_boards(&h.db, &boards, &["arbeitnow"]).await;
     let (status, _) = h.post("/api/v1/searches").await;
     assert_eq!(status, StatusCode::ACCEPTED);
     h.work().await;
@@ -636,5 +637,163 @@ async fn a_pay_floor_drops_a_job_paid_less_and_notes_one_that_says_nothing(db: P
             .any(|g| g == crate::requirements::SALARY_NOT_STATED),
         "{:?}",
         silent.score.gaps
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_same_job_on_two_boards_is_one_opportunity_crediting_both(db: PgPool) {
+    let boards = crate::testkit::fake_job_boards().await;
+    let model = model_scoring(82).await;
+    let h = Harness::new(
+        db,
+        crate::testkit::boards_config(),
+        Some(gateway(&model, BudgetConfig::default())),
+        Fake::ready(),
+    )
+    .await;
+    crate::testkit::seed_fake_boards(&h.db, &boards, &["himalayas", "remoteok"]).await;
+    h.post("/api/v1/searches").await;
+    h.work().await;
+    let search = latest(&h).await;
+    assert_eq!(search["status"], "finished", "{search}");
+    // 4 on Himalayas and 2 on Remote OK, one of them the same job.
+    assert_eq!(search["fetched"], 5, "{search}");
+    let added = h.fake.added();
+    let example: Vec<_> = added
+        .iter()
+        .filter(|s| s.job.company == "Example Co")
+        .collect();
+    assert_eq!(example.len(), 1, "one opportunity");
+    let credited: Vec<&str> = example[0]
+        .job
+        .board
+        .as_ref()
+        .unwrap()
+        .links
+        .iter()
+        .map(|l| l.board.as_str())
+        .collect();
+    assert_eq!(credited, ["himalayas", "remoteok"]);
+    // The expired one never reaches the model.
+    assert!(added.iter().all(|s| s.job.company != "Invented Finance"));
+    assert!(
+        !crate::testkit::postings_seen(&model)
+            .await
+            .contains("Invented Finance")
+    );
+
+    // What the search scanned, per board.
+    let (status, page) = h.get("/api/v1/boards/scans").await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    let run = &page["runs"][0];
+    assert_eq!(run["kind"], "search");
+    let line = |slug: &str| {
+        run["lines"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|l| l["board_slug"] == slug)
+            .cloned()
+            .unwrap()
+    };
+    let himalayas = line("himalayas");
+    assert_eq!(himalayas["outcome"], "read");
+    assert_eq!(himalayas["jobs_read"], 4);
+    assert_eq!(
+        himalayas["passed_requirements"], 3,
+        "the expired one is out"
+    );
+    assert_eq!(himalayas["scored_by_ai"], 3);
+    assert_eq!(himalayas["matched"], 3);
+    assert!(himalayas["ai_cost_eur"].as_f64().unwrap() > 0.0);
+    let remoteok = line("remoteok");
+    assert_eq!(remoteok["jobs_read"], 2);
+    assert_eq!(remoteok["matched"], 2);
+
+    // The next search finds Example Co on Jobicy too: it is credited on the
+    // opportunity already there, never added twice.
+    crate::testkit::seed_fake_boards(&h.db, &boards, &["jobicy"]).await;
+    h.clock.advance(TimeDelta::hours(2));
+    h.post("/api/v1/searches").await;
+    h.work().await;
+    let attached = h.fake.attached();
+    assert!(
+        attached
+            .iter()
+            .any(|a| a.links.iter().any(|l| l.board == "jobicy")),
+        "{attached:?}"
+    );
+    assert!(
+        h.fake
+            .added()
+            .iter()
+            .filter(|s| s.job.company == "Example Co")
+            .count()
+            == 1
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_board_within_its_polling_limit_is_not_fetched_and_says_so(db: PgPool) {
+    let boards = crate::testkit::fake_job_boards().await;
+    let model = model_scoring(82).await;
+    let h = Harness::new(
+        db,
+        crate::testkit::boards_config(),
+        Some(gateway(&model, BudgetConfig::default())),
+        Fake::ready(),
+    )
+    .await;
+    // Remotive: at most 4 fetches a day.
+    crate::testkit::seed_fake_boards(&h.db, &boards, &["remotive"]).await;
+    h.post("/api/v1/searches").await;
+    h.work().await;
+    h.clock.advance(TimeDelta::hours(1));
+    h.post("/api/v1/searches").await;
+    h.work().await;
+    assert_eq!(
+        crate::testkit::requests_to(&boards, "/remotive").await,
+        1,
+        "not fetched the second time"
+    );
+    let (_, page) = h.get("/api/v1/boards/scans").await;
+    let runs = page["runs"].as_array().unwrap();
+    assert_eq!(runs.len(), 2);
+    assert_eq!(runs[0]["lines"][0]["outcome"], "skipped_poll_limit");
+    assert_eq!(
+        runs[0]["lines"][0]["jobs_read"], 1,
+        "its cached jobs are used"
+    );
+    assert_eq!(runs[1]["lines"][0]["outcome"], "read");
+    // Filtered by board, and by search.
+    let board = runs[0]["lines"][0]["board_id"].as_str().unwrap().to_owned();
+    let search = runs[1]["id"].as_str().unwrap().to_owned();
+    let (_, only) = h
+        .get(&format!(
+            "/api/v1/boards/scans?board={board}&search={search}"
+        ))
+        .await;
+    assert_eq!(only["runs"].as_array().unwrap().len(), 1);
+    assert_eq!(only["runs"][0]["id"], search.as_str());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn company_boards_are_off_by_default(db: PgPool) {
+    let company = greenhouse_boards().await;
+    let model = model_scoring(82).await;
+    let mut settings = crate::testkit::boards_config();
+    settings.greenhouse_url = company.uri().parse().unwrap();
+    let h = Harness::new(
+        db,
+        settings,
+        Some(gateway(&model, BudgetConfig::default())),
+        Fake::ready(),
+    )
+    .await;
+    h.post("/api/v1/searches").await;
+    h.work().await;
+    assert!(
+        company.received_requests().await.unwrap().is_empty(),
+        "the company boards are kept, not read"
     );
 }

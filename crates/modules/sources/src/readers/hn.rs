@@ -105,6 +105,7 @@ pub fn jobs(comments: Comments, story: &Story) -> Vec<Job> {
             let text = html_to_text(c.comment_text.as_deref()?);
             let first_line: String = text.lines().next()?.chars().take(160).collect();
             Some(Job {
+                board: None,
                 source: Source::Hn,
                 source_ref: c.id.to_string(),
                 title: one_line(Some(&first_line))?,

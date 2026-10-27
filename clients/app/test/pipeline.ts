@@ -32,6 +32,7 @@ export function opportunity(overrides: Partial<Opportunity> = {}): Opportunity {
     posted_at: "2026-10-25T09:00:00Z",
     dismissed: false,
     editable: false,
+    sources: [],
     ...overrides,
   };
 }
@@ -55,6 +56,7 @@ export function summary(whole: Opportunity): OpportunitySummary {
     ...(whole.salary_text === undefined ? {} : { salary_text: whole.salary_text }),
     ...(whole.hidden_reason === undefined ? {} : { hidden_reason: whole.hidden_reason }),
     ...(whole.facts?.region_note === undefined ? {} : { region_note: whole.facts.region_note }),
+    ...(whole.source_name === undefined ? {} : { source_name: whole.source_name }),
   };
 }
 

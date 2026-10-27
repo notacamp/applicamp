@@ -328,3 +328,60 @@ async fn a_match_that_fails_a_requirement_is_hidden_with_its_reason(db: PgPool) 
     let (_, body) = h.get("/api/v1/opportunities?hidden=true&new=true").await;
     assert!(body["opportunities"].as_array().unwrap().is_empty());
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_job_board_is_credited_and_an_expired_job_leaves_the_view(db: PgPool) {
+    let h = Harness::new(db);
+    let link = |board: &str, name: &str| store::SourceLink {
+        board: board.into(),
+        name: name.into(),
+        url: format!("https://{board}.example/jobs/1"),
+    };
+    let current = Found {
+        source: "himalayas".into(),
+        apply_url: Some("https://jobs.example.com/apply/42?utm_source=api".into()),
+        expires_at: Some(Utc::now() + chrono::TimeDelta::days(30)),
+        sources: vec![
+            link("himalayas", "Himalayas"),
+            link("remoteok", "Remote OK"),
+        ],
+        ..found("guid-1", "Staff Engineer")
+    };
+    let expired = Found {
+        source: "himalayas".into(),
+        expires_at: Some(Utc::now() - chrono::TimeDelta::days(1)),
+        sources: vec![link("himalayas", "Himalayas")],
+        ..found("guid-2", "Platform Engineer")
+    };
+    store::add_found(
+        &h.db,
+        &Default::default(),
+        h.account,
+        vec![current, expired],
+        Utc::now(),
+    )
+    .await
+    .unwrap();
+    let (_, body) = h.get("/api/v1/opportunities").await;
+    let list = body["opportunities"].as_array().unwrap();
+    assert_eq!(list.len(), 1, "the expired one is out of view: {body}");
+    assert_eq!(list[0]["source"], "himalayas");
+    assert_eq!(list[0]["source_name"], "Himalayas");
+    let id = list[0]["id"].as_str().unwrap().to_owned();
+    let (status, opportunity) = h.get(&format!("/api/v1/opportunities/{id}")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        opportunity["apply_url"], "https://jobs.example.com/apply/42?utm_source=api",
+        "the board's apply link, unchanged"
+    );
+    let credited: Vec<&str> = opportunity["sources"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(credited.len(), 2);
+    assert!(credited.contains(&"Himalayas") && credited.contains(&"Remote OK"));
+    let (_, today) = h.get("/api/v1/today").await;
+    assert_eq!(today["new_matches"], 1, "{today}");
+}

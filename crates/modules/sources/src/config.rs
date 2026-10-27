@@ -4,15 +4,20 @@
 //!
 //! | Variable | Default |
 //! |---|---|
-//! | `APPLICAMP_SOURCES__ENABLED` | `greenhouse,lever,ashby,arbeitnow,hn` |
+//! | `APPLICAMP_SOURCES__ENABLED` | every approved job board (and company board kind); else the slugs and kinds listed |
+//! | `APPLICAMP_SOURCES__COMPANY_BOARDS` | `false`: the company boards (`boards.toml`) are not searched (kept for #20) |
+//! | `APPLICAMP_SOURCES__JOB_BOARDS_FILE` | the job boards built in (`job_boards.toml`) |
+//! | `APPLICAMP_SOURCES__ALLOW_PRIVATE_HOSTS` | `false`: job boards are read only at public https hosts |
+//! | `APPLICAMP_SOURCES__BOARD_OWNERS` | none: the addresses that may approve, decline, edit and pause boards |
+//! | `APPLICAMP_SOURCES__DISCOVERY` | `true` (weekly) |
+//! | `APPLICAMP_SOURCES__DISCOVERY_LIST_URL` | the CC0 list `emredurukn/awesome-job-boards` |
 //! | `APPLICAMP_SOURCES__GREENHOUSE_URL` | `https://boards-api.greenhouse.io` |
 //! | `APPLICAMP_SOURCES__LEVER_URL` | `https://api.lever.co` |
 //! | `APPLICAMP_SOURCES__LEVER_EU_URL` | `https://api.eu.lever.co` |
 //! | `APPLICAMP_SOURCES__ASHBY_URL` | `https://api.ashbyhq.com` |
-//! | `APPLICAMP_SOURCES__ARBEITNOW_URL` | `https://www.arbeitnow.com` |
 //! | `APPLICAMP_SOURCES__HN_URL` | `https://hn.algolia.com` |
-//! | `APPLICAMP_SOURCES__BOARDS_FILE` | the seed list built in (`boards.toml`) |
-//! | `APPLICAMP_SOURCES__CACHE_SECS` | `21600` (6 hours; `0` never caches) |
+//! | `APPLICAMP_SOURCES__BOARDS_FILE` | the company boards built in (`boards.toml`) |
+//! | `APPLICAMP_SOURCES__CACHE_SECS` | `21600` (6 hours; `0` never caches; job boards keep to their own polling interval) |
 //! | `APPLICAMP_SOURCES__REQUESTS_PER_SECOND` | `2` (per host) |
 //! | `APPLICAMP_SOURCES__MANUAL_PER_DAY` | `3` (`0` for no limit) |
 //! | `APPLICAMP_SOURCES__MANUAL_EVERY_SECS` | `900` (`0` for no spacing) |
@@ -25,14 +30,34 @@ use figment::Figment;
 use serde::{Deserialize, Deserializer};
 use url::Url;
 
-use crate::job::Source;
+use crate::job_boards::is_slug;
 
 /// The sources settings.
 #[derive(Debug, Clone, Deserialize)]
 pub struct SourcesConfig {
-    /// The sources read, comma-separated; unset is all of them.
+    /// The job boards (slugs) and company board kinds read,
+    /// comma-separated; unset is every approved one.
     #[serde(default, deserialize_with = "list")]
     pub enabled: Option<Vec<String>>,
+    /// Search the company boards (Greenhouse, Lever, Ashby) too.
+    #[serde(default, deserialize_with = "flag")]
+    pub company_boards: Option<bool>,
+    /// A job boards list to use instead of the built-in one.
+    #[serde(default)]
+    pub job_boards_file: Option<PathBuf>,
+    /// Read job boards at any http(s) host, private ones too (tests, a demo
+    /// with fake boards).
+    #[serde(default, deserialize_with = "flag")]
+    pub allow_private_hosts: Option<bool>,
+    /// The addresses (lower case) whose accounts manage the job boards.
+    #[serde(default, deserialize_with = "list")]
+    pub board_owners: Option<Vec<String>>,
+    /// Look for new job boards every week.
+    #[serde(default, deserialize_with = "flag")]
+    pub discovery: Option<bool>,
+    /// The list of job boards discovery reads (names and links only).
+    #[serde(default = "discovery_list_url")]
+    pub discovery_list_url: Url,
     /// Greenhouse's job board API.
     #[serde(default = "greenhouse_url")]
     pub greenhouse_url: Url,
@@ -45,9 +70,6 @@ pub struct SourcesConfig {
     /// Ashby's posting API.
     #[serde(default = "ashby_url")]
     pub ashby_url: Url,
-    /// Arbeitnow's job board API.
-    #[serde(default = "arbeitnow_url")]
-    pub arbeitnow_url: Url,
     /// HN's search API (Algolia).
     #[serde(default = "hn_url")]
     pub hn_url: Url,
@@ -75,11 +97,16 @@ impl Default for SourcesConfig {
     fn default() -> Self {
         Self {
             enabled: None,
+            company_boards: None,
+            job_boards_file: None,
+            allow_private_hosts: None,
+            board_owners: None,
+            discovery: None,
+            discovery_list_url: discovery_list_url(),
             greenhouse_url: greenhouse_url(),
             lever_url: lever_url(),
             lever_eu_url: lever_eu_url(),
             ashby_url: ashby_url(),
-            arbeitnow_url: arbeitnow_url(),
             hn_url: hn_url(),
             boards_file: None,
             cache_secs: None,
@@ -107,8 +134,8 @@ fn lever_eu_url() -> Url {
 fn ashby_url() -> Url {
     url("https://api.ashbyhq.com")
 }
-fn arbeitnow_url() -> Url {
-    url("https://www.arbeitnow.com")
+fn discovery_list_url() -> Url {
+    url("https://raw.githubusercontent.com/emredurukn/awesome-job-boards/main/README.md")
 }
 fn hn_url() -> Url {
     url("https://hn.algolia.com")
@@ -128,25 +155,57 @@ impl SourcesConfig {
         let config: Self = figment
             .extract_inner("sources")
             .map_err(|e| format!("APPLICAMP_SOURCES__…: {e}"))?;
-        if let Some(unknown) = config
-            .enabled
+        if let Some(unknown) = config.enabled.iter().flatten().find(|name| !is_slug(name)) {
+            return Err(format!(
+                "APPLICAMP_SOURCES__ENABLED: `{unknown}` is not a job board's slug or a company \
+                 board kind"
+            ));
+        }
+        if let Some(bad) = config
+            .board_owners
             .iter()
             .flatten()
-            .find(|name| Source::parse(name).is_none())
+            .find(|email| !email.contains('@'))
         {
             return Err(format!(
-                "APPLICAMP_SOURCES__ENABLED: `{unknown}` is not one of greenhouse, lever, \
-                 ashby, arbeitnow, hn"
+                "APPLICAMP_SOURCES__BOARD_OWNERS: `{bad}` is not an address"
             ));
         }
         Ok(config)
     }
 
-    /// Whether `source` is read.
-    pub fn is_enabled(&self, source: Source) -> bool {
+    /// Whether the job board `slug` (or the company board kind `slug`) is
+    /// read.
+    pub fn is_enabled(&self, slug: &str) -> bool {
         self.enabled
             .as_ref()
-            .is_none_or(|names| names.iter().any(|name| name == source.as_str()))
+            .is_none_or(|names| names.iter().any(|name| name == slug))
+    }
+
+    /// Whether the company boards are searched (off: kept for watchers, #20).
+    pub fn company_boards(&self) -> bool {
+        self.company_boards.unwrap_or(false)
+    }
+
+    /// Whether job boards may be read at private hosts.
+    pub fn allow_private_hosts(&self) -> bool {
+        self.allow_private_hosts.unwrap_or(false)
+    }
+
+    /// Whether the account with `email` manages the job boards.
+    pub fn is_board_owner(&self, email: &str) -> bool {
+        let email = email.trim().to_ascii_lowercase();
+        !email.is_empty()
+            && self
+                .board_owners
+                .iter()
+                .flatten()
+                .any(|owner| owner.trim().eq_ignore_ascii_case(&email))
+    }
+
+    /// Whether discovery runs every week.
+    pub fn discovery(&self) -> bool {
+        self.discovery.unwrap_or(true)
     }
 
     /// How long a board's answer is reused.
@@ -257,7 +316,14 @@ mod tests {
             config.greenhouse_url.as_str(),
             "https://boards-api.greenhouse.io/"
         );
-        assert!(config.is_enabled(Source::Hn));
+        assert!(config.is_enabled("hn"));
+        assert!(
+            !config.company_boards(),
+            "company boards are off by default"
+        );
+        assert!(!config.allow_private_hosts());
+        assert!(config.discovery());
+        assert!(!config.is_board_owner("owner@example.com"));
         assert_eq!(config.manual_per_day(), Some(3));
         assert_eq!(config.manual_every(), Some(chrono::TimeDelta::minutes(15)));
         assert_eq!(
@@ -270,7 +336,9 @@ mod tests {
     #[test]
     fn settings_are_read_and_zero_lifts_a_limit() {
         let config = load(serde_json::json!({ "sources": {
-            "enabled": "greenhouse, Lever",
+            "enabled": "greenhouse, Lever, himalayas",
+            "company_boards": "true",
+            "board_owners": "Owner@Example.com",
             "greenhouse_url": "http://fake-jobs:9020",
             "cache_secs": "0",
             "manual_per_day": 0,
@@ -278,15 +346,18 @@ mod tests {
             "nightly": "false",
         }}))
         .unwrap();
-        assert!(config.is_enabled(Source::Greenhouse));
-        assert!(config.is_enabled(Source::Lever));
-        assert!(!config.is_enabled(Source::Hn));
+        assert!(config.is_enabled("greenhouse"));
+        assert!(config.is_enabled("lever"));
+        assert!(config.is_enabled("himalayas"));
+        assert!(!config.is_enabled("hn"));
+        assert!(config.company_boards());
+        assert!(config.is_board_owner("owner@example.com"));
         assert_eq!(config.greenhouse_url.as_str(), "http://fake-jobs:9020/");
         assert_eq!(config.cache_ttl(), std::time::Duration::ZERO);
         assert_eq!(config.manual_per_day(), None);
         assert_eq!(config.manual_every(), None);
         assert!(!config.nightly());
-        let err = load(serde_json::json!({ "sources": { "enabled": "linkedin" } })).unwrap_err();
-        assert!(err.contains("linkedin"), "{err}");
+        let err = load(serde_json::json!({ "sources": { "enabled": "Linked In" } })).unwrap_err();
+        assert!(err.contains("linked in"), "{err}");
     }
 }

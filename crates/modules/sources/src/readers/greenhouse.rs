@@ -75,6 +75,7 @@ fn job(detail: Detail, board: &Board) -> Option<Job> {
     let url = one_line(detail.absolute_url.as_deref())?;
     let location = one_line(detail.location.as_ref().and_then(|l| l.name.as_deref()));
     Some(Job {
+        board: None,
         source: Source::Greenhouse,
         source_ref: format!("{}:{}", board.token, detail.id),
         title,

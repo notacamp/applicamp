@@ -13,6 +13,7 @@ import { NotInvitedPage, SIGN_IN_ERRORS, SignInPage, type SignInError } from "~/
 import { QUESTIONS, type Question } from "~/modules/profile";
 
 import { Agents } from "./routes/agents";
+import { Boards } from "./routes/boards";
 import { SignedInFrame } from "./routes/frame";
 import { GoalsInterview } from "./routes/goals-interview";
 import { NotFound } from "./routes/not-found";
@@ -102,6 +103,29 @@ const pipelineRoute = createRoute({
     );
   },
 });
+/** `?tab=scanned` shows what each search scanned; anything else, the boards. */
+const boardsSearch = z.object({ tab: z.literal("scanned") });
+
+const boardsRoute = createRoute({
+  getParentRoute: () => frameRoute,
+  path: "/boards",
+  validateSearch: (search: Record<string, unknown>): { tab?: "scanned" | undefined } => {
+    const parsed = boardsSearch.safeParse(search);
+    return { tab: parsed.success ? parsed.data.tab : undefined };
+  },
+  component: function BoardsRoute() {
+    const search = boardsRoute.useSearch();
+    const navigate = boardsRoute.useNavigate();
+    return (
+      <Boards
+        tab={search.tab ?? "boards"}
+        onTab={(tab) => {
+          void navigate({ search: tab === "scanned" ? { tab } : {}, replace: true });
+        }}
+      />
+    );
+  },
+});
 const agentsRoute = createRoute({
   getParentRoute: () => frameRoute,
   path: "/agents",
@@ -166,7 +190,7 @@ const routeTree = rootRoute.addChildren([
   signInRoute,
   notInvitedRoute,
   interviewRoute,
-  frameRoute.addChildren([todayRoute, pipelineRoute, agentsRoute, profileRoute]),
+  frameRoute.addChildren([todayRoute, pipelineRoute, boardsRoute, agentsRoute, profileRoute]),
 ]);
 
 /** The app's one router (`history` defaults to the browser's; tests pass a memory one). */

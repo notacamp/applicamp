@@ -8,17 +8,17 @@ use std::collections::HashSet;
 use applicamp_kernel::{BoxFuture, EventBus, Result};
 use applicamp_pipeline::{
     ports::{Posting, ProfileStatus, SearchLine},
-    store::{Eligibility, Found, UncheckedRow},
+    store::{self as pipeline_store, Eligibility, Found, UncheckedRow},
 };
 use applicamp_profile::{
     goals::{Period, Relocate, WorkMode as GoalWorkMode},
     matching,
 };
 use applicamp_sources::{
-    SourcesDeps,
-    job::{Job, Source, WorkMode},
+    SourcesDeps, dedupe,
+    job::{BoardJob, Job, Source, SourceLink, WorkMode},
     matching::MatchInput,
-    ports::{Scored, Unchecked},
+    ports::{Attach, KnownLinks, Scored, Unchecked},
     requirements::{self, Excluded, Facts, Floor, Per, Reach},
 };
 use chrono::{DateTime, Utc};
@@ -104,13 +104,25 @@ fn eligibility(facts: Facts) -> Eligibility {
     }
 }
 
-/// An opportunity found before the rules, as a search reads a job.
+/// An opportunity found before the rules, as a search reads a job: a
+/// reader's source, else a job board's.
 fn unchecked(row: UncheckedRow) -> Option<Unchecked> {
+    let (source, board) = match Source::parse(&row.source) {
+        Some(source) => (source, None),
+        None => (
+            Source::Board,
+            Some(BoardJob {
+                slug: row.source.clone(),
+                ..BoardJob::default()
+            }),
+        ),
+    };
     Some(Unchecked {
         account: row.account_id,
         opportunity: row.id,
         job: Job {
-            source: Source::parse(&row.source)?,
+            board,
+            source,
             source_ref: row.source_ref,
             title: row.title,
             company: row.company,
@@ -125,11 +137,31 @@ fn unchecked(row: UncheckedRow) -> Option<Unchecked> {
     })
 }
 
+/// A job board's link as the pipeline keeps it.
+fn link(link: SourceLink) -> pipeline_store::SourceLink {
+    pipeline_store::SourceLink {
+        board: link.board,
+        name: link.name,
+        url: link.url,
+    }
+}
+
 /// A scored job as the pipeline adds it.
 fn found(scored: Scored) -> Found {
     let Scored { job, score } = scored;
+    let canonical_url = dedupe::job_url(&job);
+    let dedupe_key = dedupe::dedupe_key(&job);
+    let source = job.source_name().to_owned();
+    let board = job.board;
     Found {
-        source: job.source.as_str().to_owned(),
+        source,
+        apply_url: board.as_ref().and_then(|b| b.apply_url.clone()),
+        expires_at: board.as_ref().and_then(|b| b.expires_at),
+        canonical_url,
+        dedupe_key,
+        sources: board
+            .map(|b| b.links.into_iter().map(link).collect())
+            .unwrap_or_default(),
         source_ref: job.source_ref,
         title: job.title,
         company: job.company,
@@ -170,6 +202,44 @@ impl applicamp_sources::Neighbours for SourcesWiring {
         account: Uuid,
     ) -> BoxFuture<'a, Result<HashSet<(String, String)>>> {
         Box::pin(applicamp_pipeline::store::known(db, account))
+    }
+
+    fn known_links<'a>(
+        &'a self,
+        db: &'a PgPool,
+        account: Uuid,
+        since: DateTime<Utc>,
+    ) -> BoxFuture<'a, Result<KnownLinks>> {
+        Box::pin(async move {
+            let (urls, keys) = pipeline_store::known_links(db, account, since).await?;
+            Ok(KnownLinks { urls, keys })
+        })
+    }
+
+    fn attach_sources<'a>(
+        &'a self,
+        db: &'a PgPool,
+        account: Uuid,
+        items: Vec<Attach>,
+        now: DateTime<Utc>,
+    ) -> BoxFuture<'a, Result<u32>> {
+        let items = items
+            .into_iter()
+            .map(|item| pipeline_store::Attach {
+                canonical_url: item.canonical_url,
+                dedupe_key: item.dedupe_key,
+                sources: item.links.into_iter().map(link).collect(),
+            })
+            .collect();
+        Box::pin(pipeline_store::attach_sources(db, account, items, now))
+    }
+
+    fn account_email<'a>(
+        &'a self,
+        db: &'a PgPool,
+        account: Uuid,
+    ) -> BoxFuture<'a, Result<Option<String>>> {
+        Box::pin(applicamp_identity::email_of(db, account))
     }
 
     fn add_found<'a>(
@@ -371,6 +441,7 @@ mod tests {
     fn a_scored_job_keeps_its_reasons() {
         let found = found(Scored {
             job: Job {
+                board: None,
                 source: Source::Ashby,
                 source_ref: "a".into(),
                 title: "Staff Engineer".into(),
@@ -398,6 +469,10 @@ mod tests {
             },
         });
         assert_eq!(found.source, "ashby");
+        assert!(
+            found.sources.is_empty(),
+            "a company board credits no job board"
+        );
         assert_eq!(found.work_mode.as_deref(), Some("hybrid"));
         assert_eq!(found.description, None);
         assert_eq!(found.match_score, 77);

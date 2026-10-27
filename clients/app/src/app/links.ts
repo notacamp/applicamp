@@ -5,6 +5,7 @@ import type { MouseEvent } from "react";
 export const PLACES = [
   { id: "today", path: "/", icon: "home", shortcut: "nav.today" },
   { id: "pipeline", path: "/pipeline", icon: "tasks", shortcut: "nav.pipeline" },
+  { id: "boards", path: "/boards", icon: "bullets", shortcut: "nav.boards" },
   { id: "agents", path: "/agents", icon: "hourglass", shortcut: "nav.agents" },
   { id: "profile", path: "/profile", icon: "people", shortcut: "nav.profile" },
 ] as const;

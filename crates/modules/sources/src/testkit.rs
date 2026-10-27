@@ -29,18 +29,29 @@ use tower::ServiceExt as _;
 use uuid::Uuid;
 use wiremock::{
     Mock, MockServer, ResponseTemplate,
-    matchers::{method, path, path_regex},
+    matchers::{method, path, path_regex, query_param, query_param_is_missing},
 };
 
 use crate::{
     SourcesConfig, SourcesDeps,
     job::WorkMode,
+    job_boards::{self, SeedBoard},
     matching::MatchInput,
     module,
-    ports::{Neighbours, Scored, Unchecked},
+    ports::{Attach, KnownLinks, Neighbours, Scored, Unchecked},
     readers::Board,
     requirements::{Excluded, Facts, Reach},
 };
+
+pub(crate) const HIMALAYAS: &str = include_str!("readers/fixtures/boards/himalayas.json");
+pub(crate) const HIMALAYAS_PAGE2: &str =
+    include_str!("readers/fixtures/boards/himalayas_page2.json");
+pub(crate) const JOBICY: &str = include_str!("readers/fixtures/boards/jobicy.json");
+pub(crate) const REMOTEOK: &str = include_str!("readers/fixtures/boards/remoteok.json");
+pub(crate) const ARBEITNOW: &str = include_str!("readers/fixtures/boards/arbeitnow.json");
+pub(crate) const ARBEITNOW_PAGE2: &str =
+    include_str!("readers/fixtures/boards/arbeitnow_page2.json");
+pub(crate) const REMOTIVE: &str = include_str!("readers/fixtures/boards/remotive.json");
 
 pub(crate) const GREENHOUSE_LIST: &str = include_str!("readers/fixtures/greenhouse_list.json");
 pub(crate) const GREENHOUSE_JOB: &str = include_str!("readers/fixtures/greenhouse_job.json");
@@ -65,6 +76,12 @@ pub(crate) struct Fake {
     pub(crate) unchecked: Mutex<Vec<Unchecked>>,
     /// The checks kept: the opportunity, its facts, why it is hidden.
     pub(crate) checked: Mutex<Vec<(Uuid, Facts, Option<Excluded>)>>,
+    /// The pipeline's links and keys, for dedupe across boards.
+    pub(crate) links: Mutex<KnownLinks>,
+    /// Boards credited on opportunities already there.
+    pub(crate) attached: Mutex<Vec<Attach>>,
+    /// The signed-in person's address.
+    pub(crate) email: Mutex<Option<String>>,
 }
 
 impl Fake {
@@ -112,6 +129,15 @@ impl Fake {
     pub(crate) fn checked(&self) -> Vec<(Uuid, Facts, Option<Excluded>)> {
         lock(&self.checked).clone()
     }
+
+    pub(crate) fn attached(&self) -> Vec<Attach> {
+        lock(&self.attached).clone()
+    }
+
+    /// The signed-in person is `email`.
+    pub(crate) fn signed_in_as(&self, email: &str) {
+        *lock(&self.email) = Some(email.to_owned());
+    }
 }
 
 impl Neighbours for Fake {
@@ -139,6 +165,37 @@ impl Neighbours for Fake {
         Box::pin(async move { Ok(known) })
     }
 
+    fn known_links<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        _account: Uuid,
+        _since: DateTime<Utc>,
+    ) -> BoxFuture<'a, Result<KnownLinks>> {
+        let links = lock(&self.links).clone();
+        Box::pin(async move { Ok(links) })
+    }
+
+    fn attach_sources<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        _account: Uuid,
+        items: Vec<Attach>,
+        _now: DateTime<Utc>,
+    ) -> BoxFuture<'a, Result<u32>> {
+        let n = u32::try_from(items.len()).unwrap_or(0);
+        lock(&self.attached).extend(items);
+        Box::pin(async move { Ok(n) })
+    }
+
+    fn account_email<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        _account: Uuid,
+    ) -> BoxFuture<'a, Result<Option<String>>> {
+        let email = lock(&self.email).clone();
+        Box::pin(async move { Ok(email) })
+    }
+
     fn add_found<'a>(
         &'a self,
         _db: &'a PgPool,
@@ -150,9 +207,16 @@ impl Neighbours for Fake {
         let mut added = 0;
         {
             let mut known = lock(&self.known);
+            let mut links = lock(&self.links);
             let mut list = lock(&self.added);
             for scored in found {
                 if known.insert(scored.job.key()) {
+                    if let Some(url) = crate::dedupe::job_url(&scored.job) {
+                        links.urls.insert(url);
+                    }
+                    if let Some(key) = crate::dedupe::dedupe_key(&scored.job) {
+                        links.keys.insert(key);
+                    }
                     list.push(scored);
                     added += 1;
                 }
@@ -191,12 +255,16 @@ impl Neighbours for Fake {
     }
 }
 
-/// Settings for fake boards at `boards` (Greenhouse only), with no cache,
-/// pace or manual limits unless a test sets them.
+/// Settings for fake company boards at `boards` (Greenhouse only, company
+/// boards on), with no cache, pace or manual limits unless a test sets
+/// them.
 pub(crate) fn config(boards: &MockServer) -> SourcesConfig {
     let url = boards.uri().parse().unwrap();
     SourcesConfig {
         enabled: Some(vec!["greenhouse".into()]),
+        company_boards: Some(true),
+        allow_private_hosts: Some(true),
+        discovery: Some(false),
         greenhouse_url: url,
         cache_secs: Some(0),
         requests_per_second: Some(1_000),
@@ -205,6 +273,116 @@ pub(crate) fn config(boards: &MockServer) -> SourcesConfig {
         nightly: Some(false),
         ..SourcesConfig::default()
     }
+}
+
+/// Settings for fake job boards (company boards off, as by default), with
+/// no cache, pace or manual limits; private hosts allowed (the fakes run on
+/// 127.0.0.1).
+pub(crate) fn boards_config() -> SourcesConfig {
+    SourcesConfig {
+        allow_private_hosts: Some(true),
+        discovery: Some(false),
+        cache_secs: Some(0),
+        requests_per_second: Some(1_000),
+        manual_per_day: Some(0),
+        manual_every_secs: Some(0),
+        nightly: Some(false),
+        ..SourcesConfig::default()
+    }
+}
+
+/// The seed list's approved boards `slugs`, read from the fake `server`
+/// (each at `/<slug><its own path>`), as approved boards in the registry.
+pub(crate) async fn seed_fake_boards(db: &PgPool, server: &MockServer, slugs: &[&str]) {
+    let seed: Vec<SeedBoard> = job_boards::parse(job_boards::SEED)
+        .unwrap()
+        .into_iter()
+        .filter(|b| slugs.contains(&b.slug.as_str()))
+        .map(|mut board| {
+            if let Some(endpoint) = &board.config.endpoint {
+                let fake = format!("{}/{}{}", server.uri(), board.slug, endpoint.path());
+                board.config.endpoint = Some(fake.parse().unwrap());
+            }
+            board.config.min_interval_ms = None;
+            board.status = job_boards::Status::Approved;
+            board
+        })
+        .collect();
+    job_boards::sync(db, &seed, today()).await.unwrap();
+}
+
+/// A fake of the first job boards: Himalayas (two pages by cursor), Jobicy,
+/// Remote OK and Arbeitnow (two pages), Remotive, from the recorded
+/// fixtures.
+pub(crate) async fn fake_job_boards() -> MockServer {
+    let server = MockServer::start().await;
+    let json =
+        |body: &'static str| ResponseTemplate::new(200).set_body_raw(body, "application/json");
+    Mock::given(method("GET"))
+        .and(path("/himalayas/jobs/api"))
+        .and(query_param_is_missing("cursor"))
+        .respond_with(json(HIMALAYAS))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/himalayas/jobs/api"))
+        .and(query_param("cursor", "Y3Vyc29yLXBhZ2UtMg"))
+        .respond_with(json(HIMALAYAS_PAGE2))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/jobicy/api/v2/remote-jobs"))
+        .and(query_param("count", "50"))
+        .respond_with(json(JOBICY))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/remoteok/api"))
+        .respond_with(json(REMOTEOK))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/arbeitnow/api/job-board-api"))
+        .and(query_param("remote", "true"))
+        .and(query_param("page", "1"))
+        .respond_with(json(ARBEITNOW))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/arbeitnow/api/job-board-api"))
+        .and(query_param("page", "2"))
+        .respond_with(json(ARBEITNOW_PAGE2))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/remotive/api/remote-jobs"))
+        .respond_with(json(REMOTIVE))
+        .mount(&server)
+        .await;
+    server
+}
+
+/// Every posting the fake model was asked about, as one text.
+pub(crate) async fn postings_seen(model: &MockServer) -> String {
+    model
+        .received_requests()
+        .await
+        .unwrap_or_default()
+        .iter()
+        .map(|r| String::from_utf8_lossy(&r.body).into_owned())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// The requests `server` received for `path_prefix`.
+pub(crate) async fn requests_to(server: &MockServer, path_prefix: &str) -> usize {
+    server
+        .received_requests()
+        .await
+        .unwrap_or_default()
+        .iter()
+        .filter(|r| r.url.path().starts_with(path_prefix))
+        .count()
 }
 
 /// A gateway to `model`, at $1 per million tokens either way, with the

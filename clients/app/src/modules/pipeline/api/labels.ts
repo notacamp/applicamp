@@ -1,8 +1,8 @@
 import type { TFunction } from "i18next";
 
-import type { LabelHue } from "~/lib/ui";
+import { LABEL_HUES, type LabelHue } from "~/lib/ui";
 
-import type { HiddenReason, JobFacts, OpportunitySource, OpportunityStage } from "./opportunities";
+import type { HiddenReason, JobFacts, OpportunityStage, OpportunitySummary } from "./opportunities";
 
 /** Each stage's colour, like a Notion select. */
 export const STAGE_HUES: Record<OpportunityStage, LabelHue> = {
@@ -16,8 +16,16 @@ export const STAGE_HUES: Record<OpportunityStage, LabelHue> = {
   closed: "brown",
 };
 
-/** Each source's colour. */
-export const SOURCE_HUES: Record<OpportunitySource, LabelHue> = {
+/** The sources with a name of their own in every language (company boards, HN, a link). */
+export const NAMED_SOURCES = ["greenhouse", "lever", "ashby", "arbeitnow", "hn", "link"] as const;
+type NamedSource = (typeof NAMED_SOURCES)[number];
+
+function isNamed(source: string): source is NamedSource {
+  return (NAMED_SOURCES as readonly string[]).includes(source);
+}
+
+/** The named sources' colours. */
+const NAMED_HUES: Record<NamedSource, LabelHue> = {
   greenhouse: "green",
   lever: "blue",
   ashby: "purple",
@@ -25,6 +33,31 @@ export const SOURCE_HUES: Record<OpportunitySource, LabelHue> = {
   hn: "orange",
   link: "gray",
 };
+
+/** A source's colour: its own for a named one, else one picked from its slug (never gray). */
+export function sourceHue(source: string): LabelHue {
+  if (isNamed(source)) {
+    return NAMED_HUES[source];
+  }
+  const hues = LABEL_HUES.filter((hue) => hue !== "gray");
+  let sum = 0;
+  for (const char of source) {
+    sum = (sum * 31 + (char.codePointAt(0) ?? 0)) % 9973;
+  }
+  return hues[sum % hues.length] ?? "blue";
+}
+
+/** A source's name: the job board's as credited ("Himalayas"), else its own in the language. */
+export function sourceLabel(
+  row: Pick<OpportunitySummary, "source" | "source_name">,
+  t: TFunction<"pipeline">,
+): string {
+  const name = row.source_name?.trim() ?? "";
+  if (name !== "") {
+    return name;
+  }
+  return isNamed(row.source) ? t(`sources.${row.source}`) : row.source;
+}
 
 /** A day, short: "26 Oct". */
 export function formatShortDate(iso: string, locale: string): string {

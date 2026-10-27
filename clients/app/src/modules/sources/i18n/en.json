@@ -42,5 +42,154 @@
   "spend": {
     "month": "AI this month: {{spent}} of {{limit}}",
     "monthNoLimit": "AI this month: {{spent}}"
+  },
+  "boards": {
+    "tabs": {
+      "label": "Boards view",
+      "boards": "Boards",
+      "scanned": "Scanned"
+    },
+    "loading": "Loading the job boards…",
+    "loadFailed": "The job boards couldn’t be loaded.",
+    "retry": "Try again",
+    "sections": {
+      "approved": {
+        "title": "Approved",
+        "description": "Every search reads these, within their terms. Highest average salary first.",
+        "empty": "No board is approved yet."
+      },
+      "waiting": {
+        "title": "Waiting for you",
+        "description": "Found by the weekly discovery or suggested. Nothing is read from them until they’re approved.",
+        "empty": "Nothing is waiting for you."
+      },
+      "declined": {
+        "title": "Declined",
+        "description": "Never read, each with the reason.",
+        "empty": "No board is declined."
+      }
+    },
+    "status": {
+      "candidate": "Waiting",
+      "approved": "Approved",
+      "paused": "Paused",
+      "declined": "Declined"
+    },
+    "priority": {
+      "high": "Remote-first",
+      "low": "Low priority"
+    },
+    "salary": {
+      "own": "avg {{avg}}/yr · from {{salaried}} of {{relevant}} jobs ({{share}}% state a salary)",
+      "few": "avg {{avg}}/yr · from {{salaried}} of {{relevant}} jobs ({{share}}% state a salary)",
+      "benchmark": "≈ {{pay}}/yr ({{country}} benchmark)",
+      "none": "No salary data",
+      "fewLabel": "Few salaries",
+      "noneLabel": "No salary data"
+    },
+    "flags": "To check: {{n}}",
+    "lastError": "Last read failed: {{error}}",
+    "lastFetch": "Read {{when}}: {{jobs}} jobs · {{matched}} matched this week",
+    "totals": "{{label}}: {{read}} read · {{matched}} matched · AI {{cost}}",
+    "suggest": {
+      "label": "Suggest a board",
+      "button": "Suggest",
+      "done": "{{name}} is waiting for you: its check runs now."
+    },
+    "errors": {
+      "not_board_owner": "Only the instance’s board owners can do that.",
+      "not_waiting": "Only a board waiting for you, or paused, can be approved.",
+      "not_approved": "Only an approved board can be paused.",
+      "check_needed": "Check the board first: its robots rules aren’t known yet.",
+      "robots_disallowed": "The board’s robots rules forbid reading that feed. Edit its config to an allowed path.",
+      "config_invalid": "The board’s config doesn’t read. Edit it first.",
+      "invalid_config": "That config isn’t valid for this board.",
+      "invalid_url": "Paste the board’s address, starting with https://.",
+      "suggestion_limit_reached": "That’s 10 suggestions today. Try again tomorrow.",
+      "generic": "That didn’t work. Try again."
+    }
+  },
+  "board": {
+    "eyebrow": "Job board",
+    "close": "Close",
+    "status": "Status",
+    "salary": "Average salary",
+    "priority": "Priority",
+    "credit": "Credited as",
+    "endpoint": "Read from",
+    "lastFetch": "Last read",
+    "lastFetchValue": "{{when}} · {{jobs}} jobs",
+    "lastError": "Last error",
+    "totals": "Your searches",
+    "days7": "7 days",
+    "days30": "30 days",
+    "flagsTitle": "To check",
+    "homepage": "Open the board",
+    "robots": {
+      "unchecked": "Not checked yet.",
+      "none": "No robots.txt: everything is allowed.",
+      "disallowed": "robots.txt forbids its feed ({{rule}}).",
+      "allowed": "robots.txt allows its feed."
+    },
+    "report": {
+      "title": "What the check found",
+      "found": "Feed or API: {{url}}",
+      "remote": "{{share}} remote",
+      "worldwide": "{{share}} open worldwide",
+      "language": "Site language: {{language}}",
+      "sentences": "From its terms",
+      "sentencesHint": "Copied from the board’s terms page, word for word.",
+      "sample": "Sample jobs"
+    },
+    "terms": {
+      "title": "Its terms",
+      "linkBack": "Link back to each job on the board (followed).",
+      "applyUnchanged": "Apply links are used as the board gives them.",
+      "noRedistribution": "Its jobs are never republished.",
+      "dropExpired": "Expired jobs leave the pipeline.",
+      "noLogo": "Never show its logo.",
+      "maxFetches": "At most {{n}} reads a day."
+    },
+    "blocked": {
+      "check_needed": "Check the board before approving it: its robots rules aren’t known yet.",
+      "robots_disallowed": "Its robots rules forbid this feed. Edit the config to an allowed path.",
+      "config_invalid": "Its config doesn’t read. Edit it before approving."
+    },
+    "manage": {
+      "title": "Your decision",
+      "approve": "Approve",
+      "pause": "Pause",
+      "check": "Check again",
+      "reason": "Why decline it?",
+      "decline": "Decline"
+    },
+    "config": {
+      "label": "Config (JSON)",
+      "hint": "How the board is read: its endpoint, pages, polling interval and field mapping.",
+      "save": "Save config",
+      "notJson": "That isn’t valid JSON.",
+      "notObject": "The config is a JSON object."
+    }
+  },
+  "scanned": {
+    "lead": "What each search and the weekly discovery scanned, board by board.",
+    "filter": "Board",
+    "allBoards": "All boards",
+    "loading": "Loading what was scanned…",
+    "loadFailed": "What was scanned couldn’t be loaded.",
+    "emptyTitle": "Nothing scanned yet",
+    "emptyBody": "After a search, each board it read shows here: jobs read, passed your requirements, scored by AI, matched, and what the AI cost.",
+    "more": "Show older",
+    "today": "Today {{time}}",
+    "discovery": "{{at}} · discovery",
+    "search": "{{at}} · {{kind}} · {{cost}}",
+    "nightlySearch": "nightly search",
+    "manualSearch": "search",
+    "line": {
+      "read": "{{name}}: {{read}} read → {{passed}} passed your requirements → {{scored}} scored by AI → {{matched}} matched · AI {{cost}}",
+      "skipped": "{{name}}: skipped (polling limit), its last answer used: {{read}} read → {{passed}} passed → {{scored}} scored → {{matched}} matched",
+      "error": "{{name}}: couldn’t be read ({{error}})",
+      "checked": "{{name}}: checked · {{note}}"
+    }
   }
 }

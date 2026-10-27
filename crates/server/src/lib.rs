@@ -172,9 +172,11 @@ pub async fn migrate(db: &PgPool) -> Result<(), sqlx::migrate::MigrateError> {
         (name = "pipeline", description = "Every opportunity in one place, from first match \
             to offer: found by a search or added by link, with its stage, match, notes and \
             next step. And Today: where you are and what to do next."),
-        (name = "sources", description = "The job search: public job boards (Greenhouse, \
-            Lever, Ashby, Arbeitnow, HN Who is hiring) read and scored against your profile \
-            and goals, within the spending limits."),
+        (name = "sources", description = "The job search: the job boards the owner approved \
+            (remote jobs anywhere: Himalayas, Jobicy, Remote OK, Arbeitnow, HN Who is hiring, \
+            and the ones a weekly discovery finds), credited and read within their terms, \
+            ranked by average salary, and scored against your profile and goals within the \
+            spending limits; and what each search scanned."),
         (name = "bff", description = "The web app's backend-for-frontend: sign-in with a \
             provider, the session cookie, sign-out. Browsers only."),
     ),

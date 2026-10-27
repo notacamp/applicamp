@@ -340,6 +340,7 @@ mod tests {
 
     fn job(description: &str) -> Job {
         Job {
+            board: None,
             source: Source::Ashby,
             source_ref: "a".into(),
             title: "Staff Engineer".into(),

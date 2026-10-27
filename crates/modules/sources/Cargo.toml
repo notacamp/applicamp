@@ -1,6 +1,6 @@
 [package]
 name = "applicamp-sources"
-description = "Applicamp sources module: reading jobs from public job-board APIs (Greenhouse, Lever, Ashby, Arbeitnow, HN Who is hiring) and the search that scores them against a person's profile and goals, within the spending limits."
+description = "Applicamp sources module: the registry of job boards (approved by the owner, found by a weekly discovery, ranked by average salary), reading them through generic adapters, and the search that scores their jobs against a person's profile and goals, within the spending limits."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

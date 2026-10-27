@@ -101,7 +101,10 @@
     "cancel": "Cancel",
     "saveFailed": "That change couldn’t be saved. Try again.",
     "requirements": "Your requirements",
-    "hidden": "Hidden: it doesn’t meet your requirements"
+    "hidden": "Hidden: it doesn’t meet your requirements",
+    "sources": "Found on",
+    "from": "From {{name}}",
+    "apply": "Apply"
   },
   "hidden": {
     "reasons": {

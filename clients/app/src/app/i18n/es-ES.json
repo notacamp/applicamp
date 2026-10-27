@@ -37,6 +37,10 @@
     "title": "Oportunidades",
     "lead": "Todas las oportunidades que encuentran los agentes o que añades tú, desde la primera coincidencia hasta la oferta."
   },
+  "boards": {
+    "title": "Portales",
+    "lead": "Los portales de empleo que leen las búsquedas, ordenados por los salarios que publican, los nuevos que te esperan y lo que analizó cada búsqueda."
+  },
   "agents": {
     "title": "Agentes",
     "lead": "Cada ejecución trabaja en su propio sandbox, creado para una tarea y eliminado al terminar.",

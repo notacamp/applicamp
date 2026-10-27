@@ -74,6 +74,7 @@ fn job(posting: Posting, board: &Board) -> Option<Job> {
         None => posting.is_remote,
     };
     Some(Job {
+        board: None,
         source: Source::Ashby,
         source_ref: posting.id.to_ascii_lowercase(),
         title: one_line(posting.title.as_deref())?,

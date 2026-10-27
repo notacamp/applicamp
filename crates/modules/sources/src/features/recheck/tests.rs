@@ -15,6 +15,7 @@ use super::{Rechecked, recheck, schedule};
 /// A posting found by a search before the rules, as the pipeline keeps it.
 fn found(id: u32, title: &str, location: &str, description: &str) -> Job {
     Job {
+        board: None,
         source: Source::Arbeitnow,
         source_ref: format!("found-{id}"),
         title: title.into(),

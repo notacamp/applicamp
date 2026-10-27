@@ -42,5 +42,154 @@
   "spend": {
     "month": "IA este mes: {{spent}} de {{limit}}",
     "monthNoLimit": "IA este mes: {{spent}}"
+  },
+  "boards": {
+    "tabs": {
+      "label": "Vista de los portales",
+      "boards": "Portales",
+      "scanned": "Analizado"
+    },
+    "loading": "Cargando los portales de empleo…",
+    "loadFailed": "No se pudieron cargar los portales de empleo.",
+    "retry": "Reintentar",
+    "sections": {
+      "approved": {
+        "title": "Aprobados",
+        "description": "Todas las búsquedas leen estos portales, dentro de sus términos. Primero el salario medio más alto.",
+        "empty": "Todavía no hay portales aprobados."
+      },
+      "waiting": {
+        "title": "Esperándote",
+        "description": "Encontrados por el descubrimiento semanal o sugeridos. No se lee nada de ellos hasta que se aprueban.",
+        "empty": "No hay nada esperándote."
+      },
+      "declined": {
+        "title": "Rechazados",
+        "description": "Nunca se leen, cada uno con su motivo.",
+        "empty": "Ningún portal está rechazado."
+      }
+    },
+    "status": {
+      "candidate": "En espera",
+      "approved": "Aprobado",
+      "paused": "En pausa",
+      "declined": "Rechazado"
+    },
+    "priority": {
+      "high": "Remoto primero",
+      "low": "Prioridad baja"
+    },
+    "salary": {
+      "own": "media {{avg}}/año · de {{salaried}} de {{relevant}} ofertas ({{share}}% indican salario)",
+      "few": "media {{avg}}/año · de {{salaried}} de {{relevant}} ofertas ({{share}}% indican salario)",
+      "benchmark": "≈ {{pay}}/año (referencia de {{country}})",
+      "none": "Sin datos de salario",
+      "fewLabel": "Pocos salarios",
+      "noneLabel": "Sin datos de salario"
+    },
+    "flags": "Por revisar: {{n}}",
+    "lastError": "La última lectura falló: {{error}}",
+    "lastFetch": "Leído {{when}}: {{jobs}} ofertas · {{matched}} coincidencias esta semana",
+    "totals": "{{label}}: {{read}} leídas · {{matched}} coincidencias · IA {{cost}}",
+    "suggest": {
+      "label": "Sugerir un portal",
+      "button": "Sugerir",
+      "done": "{{name}} te está esperando: su revisión está en marcha."
+    },
+    "errors": {
+      "not_board_owner": "Solo los responsables de los portales de esta instancia pueden hacer eso.",
+      "not_waiting": "Solo se puede aprobar un portal en espera o en pausa.",
+      "not_approved": "Solo se puede pausar un portal aprobado.",
+      "check_needed": "Revisa el portal primero: aún no se conocen sus reglas de robots.",
+      "robots_disallowed": "Las reglas de robots del portal prohíben leer ese feed. Cambia su configuración a una ruta permitida.",
+      "config_invalid": "La configuración del portal no se puede leer. Cámbiala primero.",
+      "invalid_config": "Esa configuración no es válida para este portal.",
+      "invalid_url": "Pega la dirección del portal, empezando por https://.",
+      "suggestion_limit_reached": "Ya son 10 sugerencias hoy. Vuelve a intentarlo mañana.",
+      "generic": "No ha funcionado. Vuelve a intentarlo."
+    }
+  },
+  "board": {
+    "eyebrow": "Portal de empleo",
+    "close": "Cerrar",
+    "status": "Estado",
+    "salary": "Salario medio",
+    "priority": "Prioridad",
+    "credit": "Se acredita como",
+    "endpoint": "Se lee de",
+    "lastFetch": "Última lectura",
+    "lastFetchValue": "{{when}} · {{jobs}} ofertas",
+    "lastError": "Último error",
+    "totals": "Tus búsquedas",
+    "days7": "7 días",
+    "days30": "30 días",
+    "flagsTitle": "Por revisar",
+    "homepage": "Abrir el portal",
+    "robots": {
+      "unchecked": "Aún sin revisar.",
+      "none": "Sin robots.txt: todo está permitido.",
+      "disallowed": "El robots.txt prohíbe su feed ({{rule}}).",
+      "allowed": "El robots.txt permite su feed."
+    },
+    "report": {
+      "title": "Qué encontró la revisión",
+      "found": "Feed o API: {{url}}",
+      "remote": "{{share}} en remoto",
+      "worldwide": "{{share}} abiertas a todo el mundo",
+      "language": "Idioma del sitio: {{language}}",
+      "sentences": "De sus términos",
+      "sentencesHint": "Copiado de la página de términos del portal, palabra por palabra.",
+      "sample": "Ofertas de muestra"
+    },
+    "terms": {
+      "title": "Sus términos",
+      "linkBack": "Enlace a cada oferta en el portal (seguido).",
+      "applyUnchanged": "Los enlaces de postulación se usan tal como los da el portal.",
+      "noRedistribution": "Sus ofertas nunca se republican.",
+      "dropExpired": "Las ofertas caducadas salen del pipeline.",
+      "noLogo": "Nunca mostrar su logotipo.",
+      "maxFetches": "Como máximo {{n}} lecturas al día."
+    },
+    "blocked": {
+      "check_needed": "Revisa el portal antes de aprobarlo: aún no se conocen sus reglas de robots.",
+      "robots_disallowed": "Sus reglas de robots prohíben este feed. Cambia la configuración a una ruta permitida.",
+      "config_invalid": "Su configuración no se puede leer. Cámbiala antes de aprobar."
+    },
+    "manage": {
+      "title": "Tu decisión",
+      "approve": "Aprobar",
+      "pause": "Pausar",
+      "check": "Revisar de nuevo",
+      "reason": "¿Por qué rechazarlo?",
+      "decline": "Rechazar"
+    },
+    "config": {
+      "label": "Configuración (JSON)",
+      "hint": "Cómo se lee el portal: su endpoint, sus páginas, el intervalo entre lecturas y el mapeo de los campos.",
+      "save": "Guardar la configuración",
+      "notJson": "Eso no es JSON válido.",
+      "notObject": "La configuración es un objeto JSON."
+    }
+  },
+  "scanned": {
+    "lead": "Qué analizó cada búsqueda y el descubrimiento semanal, portal por portal.",
+    "filter": "Portal",
+    "allBoards": "Todos los portales",
+    "loading": "Cargando lo analizado…",
+    "loadFailed": "No se pudo cargar lo analizado.",
+    "emptyTitle": "Todavía no se ha analizado nada",
+    "emptyBody": "Tras una búsqueda, cada portal leído aparece aquí: ofertas leídas, que cumplen tus requisitos, puntuadas por la IA, coincidencias y lo que costó la IA.",
+    "more": "Mostrar anteriores",
+    "today": "Hoy {{time}}",
+    "discovery": "{{at}} · descubrimiento",
+    "search": "{{at}} · {{kind}} · {{cost}}",
+    "nightlySearch": "búsqueda nocturna",
+    "manualSearch": "búsqueda",
+    "line": {
+      "read": "{{name}}: {{read}} leídas → {{passed}} cumplen tus requisitos → {{scored}} puntuadas por la IA → {{matched}} coincidencias · IA {{cost}}",
+      "skipped": "{{name}}: omitido (límite de lecturas), se usó su última respuesta: {{read}} leídas → {{passed}} cumplen → {{scored}} puntuadas → {{matched}} coincidencias",
+      "error": "{{name}}: no se pudo leer ({{error}})",
+      "checked": "{{name}}: revisado · {{note}}"
+    }
   }
 }

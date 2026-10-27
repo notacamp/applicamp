@@ -1,0 +1,19 @@
+{
+ "data": [],
+ "links": {
+  "first": "https://www.arbeitnow.com/api/job-board-api?remote=true&page=1",
+  "last": null,
+  "prev": null,
+  "next": null
+ },
+ "meta": {
+  "current_page": 2,
+  "current_page_url": "https://www.arbeitnow.com/api/job-board-api?remote=true&page=2",
+  "from": 1,
+  "path": "https://www.arbeitnow.com/api/job-board-api",
+  "per_page": 300,
+  "to": 0,
+  "terms": "This is a free public API for jobs, please do not abuse. By using the API, you agree to the terms of service: https://www.arbeitnow.com/terms",
+  "info": "Jobs are updated every hour and order by the `created_at` timestamp. Use `?page=` to paginate. Read more information here: https://www.arbeitnow.com/blog/job-board-api"
+ }
+}

@@ -151,6 +151,62 @@ describe("the pipeline page", () => {
     });
   });
 
+  it("credits each job board a match was seen on, with its apply link unchanged", async () => {
+    const fromBoards = opportunity({
+      source: "himalayas",
+      source_name: "Himalayas",
+      apply_url: "https://jobs.example.com/apply/42?utm_source=api",
+      sources: [
+        {
+          board: "himalayas",
+          name: "Himalayas",
+          url: "https://himalayas.app/companies/example-co/jobs/staff-engineer",
+          seen_at: "2026-10-26T09:00:00Z",
+        },
+        {
+          board: "remoteok",
+          name: "Remote OK",
+          url: "https://remoteok.com/remote-jobs/staff-engineer-1",
+          seen_at: "2026-10-26T10:00:00Z",
+        },
+      ],
+    });
+    fakePipeline({
+      [`GET /api/v1/opportunities/${fromBoards.id}`]: () => ({ body: fromBoards }),
+      "GET /api/v1/opportunities": () => ({
+        body: {
+          opportunities: [
+            summary(fromBoards),
+            summary(opportunity({ id: SECOND, source: "we-work-remotely" })),
+          ],
+        },
+      }),
+    });
+    const user = userEvent.setup();
+    renderPage();
+    const table = await screen.findByTestId("pipeline-table");
+    expect(table).toHaveTextContent("Himalayas");
+    expect(table).toHaveTextContent("we-work-remotely");
+    const [first] = screen.getAllByTestId("pipeline-row-open");
+    if (first === undefined) {
+      throw new TypeError("a row");
+    }
+    await user.click(first);
+    const links = await screen.findAllByTestId("peek-source-link");
+    expect(links).toHaveLength(2);
+    expect(links[0]).toHaveTextContent("From Himalayas");
+    expect(links[0]).toHaveAttribute(
+      "href",
+      "https://himalayas.app/companies/example-co/jobs/staff-engineer",
+    );
+    expect(links[0]).not.toHaveAttribute("rel", expect.stringContaining("nofollow"));
+    expect(links[1]).toHaveTextContent("From Remote OK");
+    expect(screen.getByTestId("peek-apply")).toHaveAttribute(
+      "href",
+      "https://jobs.example.com/apply/42?utm_source=api",
+    );
+  });
+
   it("moves an opportunity to Shortlisted from the peek", async () => {
     const { patches } = fakePipeline();
     const user = userEvent.setup();

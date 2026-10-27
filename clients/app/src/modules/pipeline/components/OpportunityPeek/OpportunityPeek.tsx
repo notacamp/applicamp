@@ -21,7 +21,13 @@ import {
   useUndoToast,
 } from "~/lib/ui";
 
-import { factsText, formatShortDate, hiddenReasonText, SOURCE_HUES } from "../../api/labels";
+import {
+  factsText,
+  formatShortDate,
+  hiddenReasonText,
+  sourceHue,
+  sourceLabel,
+} from "../../api/labels";
 import {
   STAGES,
   useOpportunity,
@@ -214,7 +220,7 @@ function PeekBody({ opportunity, onClose }: { opportunity: Opportunity; onClose:
           />
         </Property>
         <Property label={t("peek.source")}>
-          <Label hue={SOURCE_HUES[opportunity.source]}>{t(`sources.${opportunity.source}`)}</Label>
+          <Label hue={sourceHue(opportunity.source)}>{sourceLabel(opportunity, t)}</Label>
         </Property>
         <Property label={t("peek.nextStep")}>
           <InlineText
@@ -271,7 +277,40 @@ function PeekBody({ opportunity, onClose }: { opportunity: Opportunity; onClose:
           </Text>
         </Section>
       )}
+      {opportunity.sources.length === 0 ? null : (
+        <Section title={t("peek.sources")} testId="peek-sources">
+          <Cluster>
+            {opportunity.sources.map((source) => (
+              // A followed link to the posting on the board, as its terms ask: no `nofollow`.
+              <ButtonLink
+                key={source.board}
+                variant="ghost"
+                icon="forward"
+                href={source.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="peek-source-link"
+              >
+                {t("peek.from", { name: source.name })}
+              </ButtonLink>
+            ))}
+          </Cluster>
+        </Section>
+      )}
       <Cluster>
+        {opportunity.apply_url === undefined || opportunity.apply_url === null ? null : (
+          // The board's apply link, exactly as it gives it.
+          <ButtonLink
+            variant="primary"
+            icon="forward"
+            href={opportunity.apply_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid="peek-apply"
+          >
+            {t("peek.apply")}
+          </ButtonLink>
+        )}
         <ButtonLink
           variant="secondary"
           icon="forward"

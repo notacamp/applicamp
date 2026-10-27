@@ -1,8 +1,11 @@
-//! A search: read the boards, drop what breaks the goals' hard limits on
-//! the boards' structured fields, pre-rank, score the rest with the model
-//! within the spending limits (the same call reads each posting's
-//! eligibility facts), drop what fails a requirement rule whatever its
-//! score, and add the good matches to the pipeline as Found.
+//! A search: read the approved job boards (and the company boards, when
+//! they are on), merge the same job seen on several boards, credit the
+//! boards of a job already in the pipeline, drop what breaks the goals'
+//! hard limits on the boards' structured fields, pre-rank, score the rest
+//! with the model within the spending limits (the same call reads each
+//! posting's eligibility facts), drop what fails a requirement rule
+//! whatever its score, and add the good matches to the pipeline as Found.
+//! What it scanned on each board is kept for the Scanned view.
 //!
 //! - `POST /api/v1/searches` starts one ("Search now"): at most
 //!   [`SourcesConfig::manual_per_day`] a day, one every
@@ -31,13 +34,15 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{
-    SourcesDeps, boards,
+    SourcesDeps, boards, dedupe,
     events::SearchFinished,
     job::{Job, WorkMode},
-    lisbon,
+    job_boards, lisbon,
     matching::{self, MatchInput, TOP},
-    ports::Scored,
+    ports::{Attach, Scored},
+    readers::{Outcome, Reader, mapping::BoardRef},
     requirements::{self, Answer, Excluded, Facts, RULES_VERSION, Salary},
+    scans::{self, Scan},
     scoring::{self, BATCH, KEEP, MAX_ADDED, Read, Score},
 };
 
@@ -47,6 +52,11 @@ pub const SCORING_TIME: std::time::Duration = std::time::Duration::from_secs(10 
 pub const STALE: TimeDelta = TimeDelta::minutes(30);
 /// Above this estimate (in euros), the app asks before searching.
 pub const CONFIRM_ABOVE_EUR: f64 = 0.05;
+/// A nightly search reads the boards the nightly job read just before it:
+/// a board read this long before the search started counts as read by it.
+pub const NIGHTLY_READ: TimeDelta = TimeDelta::minutes(15);
+/// The same company, role and place within this long is the same job.
+pub const DEDUPE_WINDOW: TimeDelta = TimeDelta::days(30);
 
 /// Where a search is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
@@ -677,7 +687,7 @@ async fn save_score(
          ON CONFLICT DO NOTHING",
     )
     .bind(account)
-    .bind(job.source.as_str())
+    .bind(job.source_name())
     .bind(&job.source_ref)
     .bind(&input.profile_version)
     .bind(input.goals_version)
@@ -733,6 +743,141 @@ fn unique(jobs: Vec<Job>) -> Vec<Job> {
         .collect()
 }
 
+/// How reading one job board went, for the Scanned view.
+#[derive(Debug, Clone)]
+pub(crate) struct Scanned {
+    pub board: BoardRef,
+    pub outcome: Outcome,
+    pub error: Option<String>,
+    pub duration_ms: u32,
+    /// Jobs it listed.
+    pub read: u32,
+}
+
+/// What the sources gave.
+#[derive(Debug, Default)]
+pub(crate) struct Reading {
+    /// Every job once, the same job on several boards merged.
+    pub jobs: Vec<Job>,
+    /// Each job board read.
+    pub boards: Vec<Scanned>,
+    /// Boards (and pages) that could not be read.
+    pub failed: u32,
+}
+
+/// Read the approved job boards, and the company boards when they are on.
+pub(crate) async fn read_sources(
+    deps: &SourcesDeps,
+    reader: &Reader,
+    db: &PgPool,
+    now: DateTime<Utc>,
+    fresh_since: DateTime<Utc>,
+) -> Result<Reading> {
+    let rows = job_boards::approved(db).await?;
+    let mut reading = Reading::default();
+    let mut jobs = Vec::new();
+    for read in reader.job_boards(db, &rows, now, fresh_since).await {
+        if read.outcome == Outcome::Error {
+            reading.failed += 1;
+        }
+        reading.boards.push(Scanned {
+            read: u32::try_from(read.jobs.len()).unwrap_or(u32::MAX),
+            board: read.board,
+            outcome: read.outcome,
+            error: read.error,
+            duration_ms: read.duration_ms,
+        });
+        jobs.extend(read.jobs);
+    }
+    if deps.config.company_boards() {
+        let company = boards::all(db).await?;
+        let fetched = reader.all(db, &company).await;
+        reading.failed += fetched.failed;
+        jobs.extend(fetched.jobs);
+    }
+    reading.jobs = dedupe::merge(unique(jobs));
+    Ok(reading)
+}
+
+/// What one search did on one board.
+#[derive(Debug, Clone, Copy, Default)]
+struct Tally {
+    passed: u32,
+    scored: u32,
+    matched: u32,
+    cost_usd: f64,
+}
+
+/// The job boards `job` was seen on.
+fn boards_of(job: &Job) -> Vec<String> {
+    job.board
+        .as_ref()
+        .map(|b| {
+            let mut slugs: Vec<String> = b.links.iter().map(|l| l.board.clone()).collect();
+            if slugs.is_empty() {
+                slugs.push(b.slug.clone());
+            }
+            slugs
+        })
+        .unwrap_or_default()
+}
+
+fn tally<'a>(
+    tallies: &'a mut HashMap<String, Tally>,
+    job: &Job,
+) -> impl Iterator<Item = &'a mut Tally> {
+    let slugs = boards_of(job);
+    tallies
+        .iter_mut()
+        .filter(move |(slug, _)| slugs.contains(slug))
+        .map(|(_, t)| t)
+}
+
+/// Keep what search `row` scanned on each job board.
+async fn record_scans(
+    deps: &SourcesDeps,
+    db: &PgPool,
+    row: &SearchRow,
+    boards: &[Scanned],
+    tallies: &HashMap<String, Tally>,
+    now: DateTime<Utc>,
+) -> Result<()> {
+    let rate = usd_to_eur(deps);
+    let rows: Vec<Scan> = boards
+        .iter()
+        .map(|scanned| {
+            let t = tallies
+                .get(&scanned.board.slug)
+                .copied()
+                .unwrap_or_default();
+            Scan {
+                board: scanned.board.id,
+                outcome: scanned.outcome.as_str(),
+                jobs_read: scanned.read,
+                passed_requirements: t.passed,
+                scored_by_ai: t.scored,
+                matched: t.matched,
+                ai_cost_eur: t.cost_usd * rate,
+                error_kind: scanned.error.clone(),
+                duration_ms: scanned.duration_ms,
+                note: None,
+            }
+        })
+        .collect();
+    scans::record(
+        db,
+        scans::Run::Search {
+            account: row.account_id,
+            search: row.id,
+        },
+        &rows,
+        now,
+    )
+    .await?;
+    scans::prune(db, now).await?;
+    Ok(())
+}
+
 /// Run search `id` (idempotent: a finished one is left alone).
 pub(crate) async fn run(
     deps: &SourcesDeps,
@@ -779,14 +924,24 @@ pub(crate) async fn run(
     };
 
     // Read the boards.
-    let boards = boards::all(db).await?;
-    let fetched = reader.all(db, &boards).await;
-    let failed = fetched.failed;
-    let jobs = unique(fetched.jobs);
+    let fresh_since = if row.trigger == "nightly" {
+        row.started_at - NIGHTLY_READ
+    } else {
+        row.started_at
+    };
+    let reading = read_sources(deps, reader, db, now, fresh_since).await?;
+    let failed = reading.failed;
+    let scanned = reading.boards;
+    let mut jobs = reading.jobs;
+    let mut tallies: HashMap<String, Tally> = scanned
+        .iter()
+        .map(|s| (s.board.slug.clone(), Tally::default()))
+        .collect();
     done.fetched = jobs.len();
     progress(db, id, &done).await?;
     if jobs.is_empty() && failed > 0 {
         let now = deps.clock.now();
+        record_scans(deps, db, &row, &scanned, &tallies, now).await?;
         return finish(
             db,
             events,
@@ -799,12 +954,47 @@ pub(crate) async fn run(
         .await;
     }
 
-    // The hard limits, then the best 40.
+    // A job already in the pipeline from another board: credit this board
+    // on it, and read it no further.
     let known = neighbours.known_jobs(db, account).await?;
+    let links = neighbours
+        .known_links(db, account, now - DEDUPE_WINDOW)
+        .await?;
+    let mut attach: Vec<Attach> = Vec::new();
+    jobs.retain(|job| {
+        let same = known.contains(&job.key());
+        let url = dedupe::job_url(job);
+        let key = dedupe::dedupe_key(job);
+        let elsewhere = !same
+            && (url.as_ref().is_some_and(|u| links.urls.contains(u))
+                || key.as_ref().is_some_and(|k| links.keys.contains(k)));
+        if let Some(board) = &job.board
+            && (elsewhere || (same && board.links.len() > 1))
+        {
+            attach.push(Attach {
+                canonical_url: url,
+                dedupe_key: key,
+                links: board.links.clone(),
+            });
+        }
+        !(same || elsewhere)
+    });
+    if !attach.is_empty() {
+        neighbours
+            .attach_sources(db, account, attach, deps.clock.now())
+            .await?;
+    }
+
+    // The hard limits, then the best 40.
     let candidates: Vec<Job> = jobs
         .into_iter()
         .filter(|job| matching::hard_limit(job, &input, &known, now).is_none())
         .collect();
+    for job in &candidates {
+        for t in tally(&mut tallies, job) {
+            t.passed += 1;
+        }
+    }
     done.kept = candidates.len();
     let mut top = matching::pre_rank(candidates, &input, now);
     let cached = cached_scores(db, account, &input).await?;
@@ -844,6 +1034,15 @@ pub(crate) async fn run(
             Ok((scores, cost)) => {
                 done.batches += 1;
                 done.cost_usd += cost;
+                // Each job of the batch bears its share, split between the
+                // boards it was seen on. Ten at most: exact as f64.
+                let share = cost / batch.len() as f64;
+                for job in batch {
+                    let boards = boards_of(job).len().max(1) as f64;
+                    for t in tally(&mut tallies, job) {
+                        t.cost_usd += share / boards;
+                    }
+                }
                 for (index, score) in scores {
                     let job = &batch[index];
                     let excluded =
@@ -873,6 +1072,12 @@ pub(crate) async fn run(
         }
     }
 
+    for (job, _) in &scored {
+        for t in tally(&mut tallies, job) {
+            t.scored += 1;
+        }
+    }
+
     // Keep the good ones that meet every requirement: the rules decide on
     // the facts, never the score.
     let mut keep: Vec<Scored> = Vec::new();
@@ -893,7 +1098,13 @@ pub(crate) async fn run(
     }
     keep.sort_by_key(|scored| std::cmp::Reverse(scored.score.match_score));
     keep.truncate(MAX_ADDED);
+    for scored in &keep {
+        for t in tally(&mut tallies, &scored.job) {
+            t.matched += 1;
+        }
+    }
     let now = deps.clock.now();
+    record_scans(deps, db, &row, &scanned, &tallies, now).await?;
     let added = neighbours.add_found(db, events, account, keep, now).await?;
     finish(db, events, &row, &done, added, stopped, now).await
 }
@@ -944,9 +1155,10 @@ async fn nightly(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
     if accounts.is_empty() {
         return Ok(());
     }
-    let boards = boards::all(db).await?;
-    // Read once: the searches it starts read the same answers from the cache.
-    let jobs = unique(reader.all(db, &boards).await.jobs);
+    // Read once: the searches it starts read the same answers from the
+    // cache (within each board's polling interval).
+    let now = deps.clock.now();
+    let jobs = read_sources(deps, reader, db, now, now).await?.jobs;
     let mut started = 0_u32;
     for account in accounts {
         let now = deps.clock.now();

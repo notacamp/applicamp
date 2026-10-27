@@ -101,7 +101,10 @@
     "cancel": "Annuler",
     "saveFailed": "La modification n’a pas pu être enregistrée. Réessayez.",
     "requirements": "Vos critères",
-    "hidden": "Masquée : ne répond pas à vos critères"
+    "hidden": "Masquée : ne répond pas à vos critères",
+    "sources": "Trouvé sur",
+    "from": "Sur {{name}}",
+    "apply": "Postuler"
   },
   "hidden": {
     "reasons": {

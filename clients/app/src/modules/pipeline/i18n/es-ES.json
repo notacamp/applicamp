@@ -101,7 +101,10 @@
     "cancel": "Cancelar",
     "saveFailed": "No se pudo guardar el cambio. Inténtalo de nuevo.",
     "requirements": "Tus requisitos",
-    "hidden": "Oculta: no cumple tus requisitos"
+    "hidden": "Oculta: no cumple tus requisitos",
+    "sources": "Encontrado en",
+    "from": "En {{name}}",
+    "apply": "Postularse"
   },
   "hidden": {
     "reasons": {

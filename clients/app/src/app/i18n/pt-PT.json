@@ -37,6 +37,10 @@
     "title": "Oportunidades",
     "lead": "Todas as oportunidades que os agentes encontram ou que acrescenta, da primeira correspondência à proposta."
   },
+  "boards": {
+    "title": "Portais",
+    "lead": "Os portais de emprego que as pesquisas leem, ordenados pelos salários que anunciam, os novos à sua espera e o que cada pesquisa analisou."
+  },
   "agents": {
     "title": "Agentes",
     "lead": "Cada execução trabalha na sua própria sandbox, criada para uma tarefa e apagada no fim.",

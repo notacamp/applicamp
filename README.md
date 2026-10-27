@@ -1,7 +1,7 @@
 # Applicamp
 
 Job-hunting agents that work in sandboxes. Applicamp knows your profile and
-goals, finds jobs on companies' own job boards, tailors a CV for each one,
+goals, finds remote jobs on public job boards, tailors a CV for each one,
 prepares the application, drafts your recruiter replies, and keeps one
 pipeline so nothing slips. **Nothing goes out under your name until you
 approve it.**

@@ -1,5 +1,6 @@
 //! The readers against recorded answers of each board's API (trimmed, with
-//! invented text), served by a fake board (wiremock).
+//! invented text), served by a fake board (wiremock): the company boards,
+//! HN, and the job boards of the registry through their seed config.
 
 use std::sync::Arc;
 
@@ -15,7 +16,6 @@ use crate::{config::SourcesConfig, job::WorkMode, testkit};
 
 const LEVER: &str = include_str!("fixtures/lever.json");
 const ASHBY: &str = include_str!("fixtures/ashby.json");
-const ARBEITNOW: &str = include_str!("fixtures/arbeitnow.json");
 const HN_STORIES: &str = include_str!("fixtures/hn_stories.json");
 const HN_COMMENTS: &str = include_str!("fixtures/hn_comments.json");
 
@@ -35,7 +35,6 @@ fn reader(server: &MockServer, cache_secs: u64) -> Reader {
         lever_url: url.clone(),
         lever_eu_url: url.clone(),
         ashby_url: url.clone(),
-        arbeitnow_url: url.clone(),
         hn_url: url,
         cache_secs: Some(cache_secs),
         requests_per_second: Some(1_000),
@@ -132,21 +131,8 @@ async fn lever_and_ashby_postings_are_read(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn arbeitnow_and_hn_are_read(db: PgPool) {
+async fn hn_is_read(db: PgPool) {
     let server = MockServer::start().await;
-    Mock::given(method("GET"))
-        .and(path("/api/job-board-api"))
-        .and(query_param("page", "1"))
-        .respond_with(json(ARBEITNOW))
-        .mount(&server)
-        .await;
-    // Page 2 is empty: the reading stops there.
-    Mock::given(method("GET"))
-        .and(path("/api/job-board-api"))
-        .and(query_param("page", "2"))
-        .respond_with(json(r#"{"data": [], "links": {"next": null}}"#))
-        .mount(&server)
-        .await;
     Mock::given(method("GET"))
         .and(path("/api/v1/search_by_date"))
         .and(query_param("tags", "story,author_whoishiring"))
@@ -160,20 +146,6 @@ async fn arbeitnow_and_hn_are_read(db: PgPool) {
         .mount(&server)
         .await;
     let reader = reader(&server, 0);
-
-    let arbeitnow = reader.arbeitnow(&db).await;
-    assert_eq!((arbeitnow.read, arbeitnow.failed), (2, 0));
-    assert_eq!(arbeitnow.jobs.len(), 2);
-    assert_eq!(
-        arbeitnow.jobs[0].source_ref,
-        "backend-engineer-berlin-100001"
-    );
-    assert_eq!(arbeitnow.jobs[0].work_mode, Some(WorkMode::Remote));
-    assert_eq!(
-        arbeitnow.jobs[0].board_remote, None,
-        "Arbeitnow's remote flag is never a requirement's evidence"
-    );
-    assert_eq!(arbeitnow.jobs[1].work_mode, None, "not remote says nothing");
 
     let hn = reader.hn(&db).await;
     assert_eq!(hn.failed, 0);
@@ -290,4 +262,243 @@ fn tokens_are_checked() {
         assert!(!is_token(bad), "{bad}");
     }
     assert!(!is_token(&"a".repeat(101)));
+}
+
+fn board_reader(allow_private: bool) -> Reader {
+    Reader::new(Arc::new(SourcesConfig {
+        allow_private_hosts: Some(allow_private),
+        ..testkit::boards_config()
+    }))
+    .unwrap()
+}
+
+async fn approved_board(db: &PgPool, slug: &str) -> crate::job_boards::BoardRow {
+    crate::job_boards::approved(db)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|b| b.slug == slug)
+        .unwrap()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_first_job_boards_are_read_through_their_config(db: PgPool) {
+    let server = testkit::fake_job_boards().await;
+    testkit::seed_fake_boards(
+        &db,
+        &server,
+        &["himalayas", "jobicy", "remoteok", "arbeitnow"],
+    )
+    .await;
+    let reader = board_reader(true);
+    let now = testkit::today();
+    let read = |slug: &'static str| {
+        let reader = reader.clone();
+        let db = db.clone();
+        async move {
+            let row = approved_board(&db, slug).await;
+            reader.job_board(&db, &row, now, now).await
+        }
+    };
+
+    // Himalayas: two pages by cursor; its link to the job and its apply
+    // link unchanged; its regions; its expiry (its terms drop expired jobs).
+    let himalayas = read("himalayas").await;
+    assert_eq!(himalayas.outcome, Outcome::Read, "{:?}", himalayas.error);
+    assert_eq!(himalayas.jobs.len(), 4);
+    let first = &himalayas.jobs[0];
+    assert_eq!(first.source_name(), "himalayas");
+    assert_eq!(first.title, "Senior Backend Engineer");
+    assert_eq!(first.company, "Example Co");
+    assert_eq!(
+        first.url,
+        "https://himalayas.app/companies/example-co/jobs/senior-backend-engineer"
+    );
+    assert_eq!(first.work_mode, Some(WorkMode::Remote));
+    assert!(first.description.contains("invented software") && !first.description.contains('<'));
+    let on = first.board.as_ref().unwrap();
+    assert_eq!(
+        on.apply_url.as_deref(),
+        Some("https://jobs.example.com/apply/42?utm_source=api")
+    );
+    assert_eq!(on.links[0].name, "Himalayas");
+    let pay = on.pay.clone().unwrap();
+    assert_eq!(
+        (pay.min, pay.max, pay.currency.as_deref()),
+        (Some(120_000.0), Some(150_000.0), Some("USD"))
+    );
+    assert_eq!(
+        himalayas.jobs[1].board.as_ref().unwrap().regions,
+        ["United States"]
+    );
+    assert!(
+        himalayas.jobs[2]
+            .board
+            .as_ref()
+            .unwrap()
+            .expires_at
+            .is_some_and(|at| at < now)
+    );
+    assert_eq!(himalayas.jobs[3].title, "Founding Engineer", "page 2");
+    assert_eq!(testkit::requests_to(&server, "/himalayas").await, 2);
+
+    // Jobicy: regions as text, pay per year.
+    let jobicy = read("jobicy").await;
+    assert_eq!(jobicy.jobs.len(), 2);
+    assert_eq!(jobicy.jobs[0].board.as_ref().unwrap().regions, ["Anywhere"]);
+    assert_eq!(
+        jobicy.jobs[1].board.as_ref().unwrap().regions,
+        ["Germany", "Portugal", "Spain", "UK"]
+    );
+    assert_eq!(
+        jobicy.jobs[0].board.as_ref().unwrap().apply_url.as_deref(),
+        Some(jobicy.jobs[0].url.as_str())
+    );
+
+    // Remote OK: the legal notice is not a job; 0 is no salary.
+    let remoteok = read("remoteok").await;
+    assert_eq!(remoteok.jobs.len(), 2);
+    assert_eq!(
+        remoteok.jobs[0].board.as_ref().unwrap().links[0].name,
+        "Remote OK"
+    );
+    assert_eq!(remoteok.jobs[1].board.as_ref().unwrap().pay, None);
+    assert_eq!(
+        remoteok.jobs[0]
+            .board
+            .as_ref()
+            .unwrap()
+            .pay
+            .as_ref()
+            .unwrap()
+            .currency
+            .as_deref(),
+        Some("USD")
+    );
+
+    // Arbeitnow: remote jobs only, page 2 is the last.
+    let arbeitnow = read("arbeitnow").await;
+    assert_eq!(arbeitnow.jobs.len(), 1);
+    assert_eq!(
+        arbeitnow.jobs[0].source_ref,
+        "senior-backend-engineer-example-co-100001"
+    );
+    assert_eq!(
+        arbeitnow.jobs[0].board_remote, None,
+        "never a requirement's evidence"
+    );
+    assert_eq!(testkit::requests_to(&server, "/arbeitnow").await, 2);
+
+    // What each board did, and what it lists for its average salary.
+    let row = approved_board(&db, "himalayas").await;
+    assert_eq!(row.last_fetch_jobs, Some(4));
+    assert_eq!(row.last_error, None);
+    let listed: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM sources.board_jobs WHERE board_id = $1")
+            .bind(row.id)
+            .fetch_one(&db)
+            .await
+            .unwrap();
+    assert_eq!(listed, 4);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_board_is_not_fetched_twice_within_its_polling_interval(db: PgPool) {
+    let server = testkit::fake_job_boards().await;
+    testkit::seed_fake_boards(&db, &server, &["remoteok"]).await;
+    let reader = board_reader(true);
+    let now = testkit::today();
+    let row = approved_board(&db, "remoteok").await;
+    let first = reader.job_board(&db, &row, now, now).await;
+    assert_eq!(first.outcome, Outcome::Read);
+    let later = now + chrono::TimeDelta::minutes(10);
+    let row = approved_board(&db, "remoteok").await;
+    let again = reader.job_board(&db, &row, later, later).await;
+    assert_eq!(again.outcome, Outcome::SkippedPollLimit);
+    assert_eq!(
+        again.jobs.len(),
+        first.jobs.len(),
+        "its last answer is used"
+    );
+    assert_eq!(testkit::requests_to(&server, "/remoteok").await, 1);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_board_that_asks_to_slow_down_is_left_alone(db: PgPool) {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .respond_with(ResponseTemplate::new(429).insert_header("retry-after", "120"))
+        .mount(&server)
+        .await;
+    testkit::seed_fake_boards(&db, &server, &["jobicy"]).await;
+    let reader = board_reader(true);
+    let now = testkit::today();
+    let row = approved_board(&db, "jobicy").await;
+    let read = reader.job_board(&db, &row, now, now).await;
+    assert_eq!(read.outcome, Outcome::Error);
+    assert_eq!(read.error.as_deref(), Some("rate_limited"));
+    let row = approved_board(&db, "jobicy").await;
+    assert_eq!(
+        row.backoff_until,
+        Some(now + chrono::TimeDelta::seconds(120))
+    );
+    let again = reader.job_board(&db, &row, now, now).await;
+    assert_eq!(again.error.as_deref(), Some("backing_off"));
+    assert_eq!(server.received_requests().await.unwrap().len(), 1);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_private_host_is_never_read(db: PgPool) {
+    let server = testkit::fake_job_boards().await;
+    testkit::seed_fake_boards(&db, &server, &["remoteok"]).await;
+    let reader = board_reader(false);
+    let now = testkit::today();
+    let row = approved_board(&db, "remoteok").await;
+    let read = reader.job_board(&db, &row, now, now).await;
+    assert_eq!(read.error.as_deref(), Some("refused_host"));
+    assert!(server.received_requests().await.unwrap().is_empty());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_feed_board_is_read_by_element(db: PgPool) {
+    let server = MockServer::start().await;
+    let feed = r#"<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel>
+        <item><title>Example Co: Senior Backend Engineer</title><region>Anywhere in the World</region>
+        <link>https://board.example/jobs/1</link><guid>https://board.example/jobs/1</guid>
+        <pubDate>Sat, 24 Oct 2026 08:00:00 +0000</pubDate><description><![CDATA[<p>Invented.</p>]]></description></item>
+        </channel></rss>"#;
+    Mock::given(method("GET"))
+        .and(path("/feed.xml"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(feed, "application/rss+xml"))
+        .mount(&server)
+        .await;
+    let config = serde_json::json!({
+        "endpoint": format!("{}/feed.xml", server.uri()),
+        "remote_only": true,
+        "title_split": { "separator": ": ", "company_first": true },
+        "fields": { "ref": "guid", "title": "title", "url": "link", "regions": "region",
+                    "description": "description", "posted_at": "pubDate" }
+    });
+    sqlx::query(
+        "INSERT INTO sources.job_boards (id, slug, name, homepage, host, kind, priority, status,
+            origin, config, terms, created_at, updated_at)
+         VALUES ($1, 'example-feed', 'Example Feed', 'https://board.example', 'board.example',
+                 'rss', 'high', 'approved', 'seed', $2, '{}', now(), now())",
+    )
+    .bind(uuid::Uuid::now_v7())
+    .bind(sqlx::types::Json(&config))
+    .execute(&db)
+    .await
+    .unwrap();
+    let row = approved_board(&db, "example-feed").await;
+    let now = testkit::today();
+    let read = board_reader(true).job_board(&db, &row, now, now).await;
+    assert_eq!(read.outcome, Outcome::Read, "{:?}", read.error);
+    assert_eq!(read.jobs.len(), 1);
+    assert_eq!(read.jobs[0].company, "Example Co");
+    assert_eq!(read.jobs[0].title, "Senior Backend Engineer");
+    assert_eq!(
+        read.jobs[0].board.as_ref().unwrap().links[0].name,
+        "Example Feed"
+    );
 }

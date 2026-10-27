@@ -26,3 +26,13 @@ SHALL come last.
 #### Scenario: Country boards with few salaries
 - **WHEN** a Swiss board and a Portuguese board each list fewer than 10 salaries
 - **THEN** they are ranked by their countries' typical engineering pay, the Swiss one first, each marked as a country benchmark
+
+### Requirement: See what was scanned
+The Boards page SHALL show, for each search and discovery run, every board
+that was scanned with how many jobs were read, passed the person's
+requirements, were scored by AI and matched, what the AI cost, and why a
+board was skipped or failed.
+
+#### Scenario: After the nightly search
+- **WHEN** the nightly search has run
+- **THEN** the Scanned view lists it with each board's read, passed, scored and matched counts and its AI cost, and a board skipped for its polling limit says so

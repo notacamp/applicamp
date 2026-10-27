@@ -33,5 +33,10 @@ No model calls in discovery by default; an optional model pass to propose a fiel
 ## Client: Boards page
 List by status (Approved, Waiting for you, Declined). A candidate shows the check: endpoint, robots verdict, the terms sentences, sample jobs, proposed attribution — **Approve** / **Decline (with reason)** / **Edit config** (JSON editor for the mapping, validated). Approved boards show last fetch, jobs read, errors, Pause. "Suggest a board" (URL). Pipeline peek shows "From Himalayas ↗" (followed link) for each source.
 
+## Scanned view (owner 2026-10-27: "a view of job boards scanned by AI")
+- `sources.board_scans(id, search_id null, discovery_run_id null, board_id, at, outcome (read|skipped_poll_limit|error|checked), jobs_read, passed_requirements, scored_by_ai, matched, ai_cost_eur, error_kind, duration_ms)`: one row per board per search (and per discovery check). Kept 90 days.
+- The **Boards** page gets a second tab, **Scanned**: newest first, grouped by search ("Today 21:00 · nightly search · €0.012"), one line per board: jobs read → passed your requirements → scored by AI → matched, cost, or "skipped: polling limit" / the error; discovery checks listed with what the check found. Filter by board. Totals for the last 7 / 30 days per board (read, matched, cost) on each board's row in the main tab.
+- Same numbers available in `GET /api/v1/boards/scans?board=&search=&cursor=`.
+
 ## Cost
 Fetching is free; discovery uses no model by default. Search cost unchanged (model only after filters, top 40).

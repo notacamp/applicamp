@@ -455,7 +455,7 @@ pub async fn list(
             AND ($2::text IS NULL OR stage = $2)
             AND ($3::text IS NULL OR title ILIKE $3 OR company ILIKE $3
                  OR coalesce(location, '') ILIKE $3)
-            AND (NOT $4 OR (stage = 'found' AND opened_at IS NULL))
+            AND (NOT $4 OR (stage = 'found' AND opened_at IS NULL AND hidden_reason IS NULL))
             AND (hidden_reason IS NOT NULL) = $5
           ORDER BY created_at DESC, id DESC
           LIMIT 1000"

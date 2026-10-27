@@ -145,7 +145,7 @@
           "pipeline"
         ],
         "summary": "The pipeline.",
-        "description": "Every opportunity of the signed-in person, newest first, except the\ndismissed ones (\"Not for me\"). Filter by stage, by text in the role,\ncompany or place, or to the new ones.",
+        "description": "Every opportunity of the signed-in person, newest first, except the\ndismissed ones (\"Not for me\") and the hidden ones (they fail a hard\nrequirement; `hidden=true` lists only those, with the reason). Filter by\nstage, by text in the role, company or place, or to the new ones.",
         "operationId": "pipeline.list",
         "parameters": [
           {
@@ -170,6 +170,15 @@
             "name": "new",
             "in": "query",
             "description": "Only the new ones (Found, never opened).",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "hidden",
+            "in": "query",
+            "description": "Only the hidden ones: found before the requirement rules, they fail\none. Left out otherwise.",
             "required": false,
             "schema": {
               "type": "boolean"
@@ -1415,6 +1424,15 @@
         },
         "additionalProperties": false
       },
+      "Fact": {
+        "type": "string",
+        "description": "What a posting says about a fact a requirement is checked on.",
+        "enum": [
+          "yes",
+          "no",
+          "unclear"
+        ]
+      },
       "Goals": {
         "type": "object",
         "description": "The answers to the goals interview. Nothing is required.",
@@ -1573,6 +1591,16 @@
           }
         }
       },
+      "HiddenReason": {
+        "type": "string",
+        "description": "Why an opportunity is hidden: it fails a hard requirement.",
+        "enum": [
+          "not_remote",
+          "not_open_to_location",
+          "language",
+          "below_floor"
+        ]
+      },
       "Import": {
         "type": "object",
         "description": "A draft profile waiting for review.",
@@ -1664,6 +1692,39 @@
               "null"
             ],
             "description": "The text, for `text` (up to 60 000 characters)."
+          }
+        }
+      },
+      "JobFacts": {
+        "type": "object",
+        "description": "What the posting says about the person's requirements, as their search\nread it: \"Remote · open to you · English\".",
+        "required": [
+          "remote",
+          "open_to_candidate",
+          "working_languages"
+        ],
+        "properties": {
+          "open_to_candidate": {
+            "$ref": "#/components/schemas/Fact",
+            "description": "Someone where the person lives can do it without moving."
+          },
+          "region_note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where it is open, as the posting says (\"Germany or Austria only\")."
+          },
+          "remote": {
+            "$ref": "#/components/schemas/Fact",
+            "description": "It can be done fully remote."
+          },
+          "working_languages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The languages it needs, ISO 639-1 (`en`)."
           }
         }
       },
@@ -1856,12 +1917,34 @@
             "type": "boolean",
             "description": "Title, company and location can be typed (an opportunity added by a\nlink to a site that is not a job board)."
           },
+          "facts": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/JobFacts",
+                "description": "What the posting says about their requirements; none when never\nchecked (added by link, or found before the rules and not yet\nchecked)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "gaps": {
             "type": "array",
             "items": {
               "type": "string"
             },
-            "description": "What the profile or goals miss (up to 2)."
+            "description": "What the profile or goals miss (up to 3)."
+          },
+          "hidden_reason": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/HiddenReason",
+                "description": "Why it is hidden, if it is: it fails a hard requirement."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "id": {
             "type": "string",
@@ -2031,7 +2114,7 @@
             "items": {
               "$ref": "#/components/schemas/OpportunitySummary"
             },
-            "description": "Newest first; never the dismissed ones."
+            "description": "Newest first; never the dismissed ones, and the hidden ones only when\nasked for."
           }
         }
       },
@@ -2083,6 +2166,17 @@
             "type": "string",
             "format": "date-time"
           },
+          "hidden_reason": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/HiddenReason",
+                "description": "Why it is hidden, if it is: it fails a hard requirement."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "id": {
             "type": "string",
             "format": "uuid"
@@ -2112,6 +2206,13 @@
               "string",
               "null"
             ]
+          },
+          "region_note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where it is open, as the posting says, to go with the reason."
           },
           "salary_text": {
             "type": [
@@ -2400,6 +2501,7 @@
           "kept",
           "scored",
           "added",
+          "dropped",
           "cost_eur"
         ],
         "properties": {
@@ -2413,6 +2515,12 @@
             "type": "number",
             "format": "double",
             "description": "What its model calls cost, in euros."
+          },
+          "dropped": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Jobs scored that fail a requirement (remote only, where they live,\na language, the pay floor): never added, whatever their score.",
+            "minimum": 0
           },
           "fetched": {
             "type": "integer",
@@ -2631,7 +2739,7 @@
           "new_matches": {
             "type": "integer",
             "format": "int32",
-            "description": "Found opportunities never opened.",
+            "description": "Found opportunities never opened (hidden ones not counted).",
             "minimum": 0
           },
           "next_step": {

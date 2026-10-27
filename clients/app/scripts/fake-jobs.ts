@@ -96,7 +96,7 @@ interface Posting {
 
 /** The postings of the last user message's `<jobs>` block. */
 function postingsOf(content: string): Posting[] {
-  const block = content.split("<jobs>")[1]?.split("</jobs>")[0] ?? "[]";
+  const block = content.split("<jobs>", 2)[1]?.split("</jobs>", 1)[0] ?? "[]";
   try {
     const parsed: unknown = JSON.parse(block);
     return Array.isArray(parsed) ? (parsed as Posting[]) : [];

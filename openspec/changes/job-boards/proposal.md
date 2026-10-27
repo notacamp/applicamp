@@ -13,6 +13,8 @@ search read 107 hand-picked company boards plus a German-heavy aggregator.
   type, configured per board, not code per board): **JSON API with a field
   mapping**, **RSS/Atom with a mapping**, and (later) **JSON-LD JobPosting via
   sitemap**. HN "Who is hiring" keeps its LLM extractor.
+- **Remote jobs anywhere** (owner 2026-10-27: "it should look for remote jobs
+  anywhere"), open to where the person lives; no national boards.
 - First boards (research 2026-10-27): **Himalayas, Jobicy, Remotive,
   RemoteOK, Arbeitnow** (remote only), **HN**. Each with its terms honoured
   in config: poll interval, delay, attribution text and link, apply-link

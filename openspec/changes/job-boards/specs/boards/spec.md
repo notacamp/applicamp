@@ -22,3 +22,7 @@ SHALL come last.
 #### Scenario: Two boards
 - **WHEN** one board's relevant jobs average €120k a year and another's €80k
 - **THEN** the first is listed above the second, each with the number of jobs behind its average
+
+#### Scenario: Country boards with few salaries
+- **WHEN** a Swiss board and a Portuguese board each list fewer than 10 salaries
+- **THEN** they are ranked by their countries' typical engineering pay, the Swiss one first, each marked as a country benchmark

@@ -15,6 +15,11 @@ export type Opportunity = Schema<"Opportunity">;
 export type OpportunityStage = Schema<"OpportunityStage">;
 export type OpportunitySource = Schema<"OpportunitySource">;
 export type JobWorkMode = Schema<"JobWorkMode">;
+/** Why an opportunity is hidden: it fails a hard requirement. */
+export type HiddenReason = Schema<"HiddenReason">;
+/** What the posting says about the person's requirements. */
+export type JobFacts = Schema<"JobFacts">;
+export type Fact = Schema<"Fact">;
 /** What can change on an opportunity (`PATCH`). */
 export type OpportunityChanges = Schema<"OpportunityChanges">;
 /** A pasted link, and what the person typed with it. */
@@ -39,6 +44,8 @@ export interface OpportunityFilter {
   q?: string | undefined;
   /** Only Found ones never opened. */
   new?: boolean | undefined;
+  /** Only the hidden ones: found before the requirement rules, they fail one. */
+  hidden?: boolean | undefined;
 }
 
 /** Every pipeline query starts with this key. */
@@ -52,10 +59,14 @@ const listKey = (filter: OpportunityFilter) =>
     filter.stage ?? null,
     filter.q ?? "",
     filter.new ?? false,
+    filter.hidden ?? false,
   ] as const;
 export const opportunityKey = (id: string) => [...PIPELINE_QUERY_KEY, "one", id] as const;
 
-/** The opportunities, newest first (`GET /api/v1/opportunities`); "Not for me" ones are left out. */
+/**
+ * The opportunities, newest first (`GET /api/v1/opportunities`); "Not for me" ones are left out,
+ * and the hidden ones unless asked for.
+ */
 export function opportunitiesQuery(filter: OpportunityFilter) {
   const q = filter.q?.trim();
   return queryOptions({
@@ -68,6 +79,7 @@ export function opportunitiesQuery(filter: OpportunityFilter) {
               ...(filter.stage === undefined ? {} : { stage: filter.stage }),
               ...(q === undefined || q === "" ? {} : { q }),
               ...(filter.new === true ? { new: true } : {}),
+              ...(filter.hidden === true ? { hidden: true } : {}),
             },
           },
           signal,

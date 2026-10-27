@@ -13,7 +13,9 @@
     "stage": "Fase",
     "allStages": "Todas las fases",
     "newOnly": "Solo se muestran las nuevas coincidencias.",
-    "showAll": "Mostrar todo"
+    "showAll": "Mostrar todo",
+    "hidden": "Ocultas: no cumplen tus requisitos",
+    "hiddenOnly": "Estas no cumplen tus requisitos, así que no están en tus oportunidades. No se ha borrado nada."
   },
   "columns": {
     "role": "Puesto",
@@ -22,7 +24,8 @@
     "stage": "Fase",
     "source": "Origen",
     "nextStep": "Siguiente paso",
-    "updated": "Actualizada"
+    "updated": "Actualizada",
+    "hiddenReason": "Por qué está oculta"
   },
   "stages": {
     "found": "Encontrada",
@@ -96,6 +99,28 @@
     "dismissed": "No es para mí · {{title}}",
     "save": "Guardar",
     "cancel": "Cancelar",
-    "saveFailed": "No se pudo guardar el cambio. Inténtalo de nuevo."
+    "saveFailed": "No se pudo guardar el cambio. Inténtalo de nuevo.",
+    "requirements": "Tus requisitos",
+    "hidden": "Oculta: no cumple tus requisitos"
+  },
+  "hidden": {
+    "reasons": {
+      "not_remote": "No es en remoto, o no lo dice",
+      "not_open_to_location": "No está abierta a donde vives",
+      "language": "Pide un idioma en el que no trabajas",
+      "below_floor": "Paga menos que tu mínimo"
+    }
+  },
+  "facts": {
+    "remote": {
+      "yes": "En remoto",
+      "no": "No es en remoto",
+      "unclear": "No dice si es en remoto"
+    },
+    "open": {
+      "yes": "Abierta a donde vives",
+      "no": "No está abierta a donde vives",
+      "unclear": "No dice a quién está abierta"
+    }
   }
 }

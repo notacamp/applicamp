@@ -121,6 +121,7 @@ pub fn job(posting: Posting, board: &Board) -> Option<Job> {
     let url = one_line(posting.hosted_url.as_deref())?;
     let location = one_line(posting.categories.location.as_deref())
         .or_else(|| one_line(Some(&posting.categories.all_locations.join(", "))));
+    let work_mode = posting.workplace_type.as_deref().and_then(WorkMode::parse);
     Some(Job {
         source: Source::Lever,
         description: description(&posting),
@@ -129,7 +130,8 @@ pub fn job(posting: Posting, board: &Board) -> Option<Job> {
         title,
         company: board.company.clone(),
         location,
-        work_mode: posting.workplace_type.as_deref().and_then(WorkMode::parse),
+        work_mode,
+        board_remote: work_mode.map(|mode| mode == WorkMode::Remote),
         url,
         posted_at: posting
             .created_at

@@ -176,6 +176,224 @@ pub async fn accounts_with_goals(db: &PgPool) -> Result<Vec<Uuid>> {
         .collect())
 }
 
+/// Language names as people write them on a profile (English, the app's
+/// languages and the language's own name), folded to lower case without
+/// accents, and their ISO 639-1 codes.
+const LANGUAGE_NAMES: &[(&str, &[&str])] = &[
+    ("en", &["english", "ingles", "anglais", "englisch"]),
+    (
+        "pt",
+        &["portuguese", "portugues", "portugais", "portugiesisch"],
+    ),
+    (
+        "es",
+        &[
+            "spanish",
+            "espanol",
+            "castellano",
+            "espanhol",
+            "espagnol",
+            "spanisch",
+        ],
+    ),
+    ("fr", &["french", "francais", "frances", "franzosisch"]),
+    ("de", &["german", "deutsch", "alemao", "aleman", "allemand"]),
+    ("it", &["italian", "italiano", "italien", "italienisch"]),
+    (
+        "nl",
+        &[
+            "dutch",
+            "nederlands",
+            "holandes",
+            "neerlandais",
+            "niederlandisch",
+            "flemish",
+        ],
+    ),
+    (
+        "pl",
+        &["polish", "polski", "polaco", "polonais", "polnisch"],
+    ),
+    (
+        "sv",
+        &["swedish", "svenska", "sueco", "suedois", "schwedisch"],
+    ),
+    (
+        "da",
+        &["danish", "dansk", "dinamarques", "danois", "danisch"],
+    ),
+    (
+        "no",
+        &["norwegian", "norsk", "noruegues", "norvegien", "norwegisch"],
+    ),
+    (
+        "fi",
+        &["finnish", "suomi", "finlandes", "finnois", "finnisch"],
+    ),
+    (
+        "cs",
+        &["czech", "cestina", "checo", "tcheque", "tschechisch"],
+    ),
+    (
+        "ro",
+        &[
+            "romanian",
+            "romana",
+            "romeno",
+            "rumano",
+            "roumain",
+            "rumanisch",
+        ],
+    ),
+    (
+        "hu",
+        &["hungarian", "magyar", "hungaro", "hongrois", "ungarisch"],
+    ),
+    ("el", &["greek", "grego", "griego", "grec", "griechisch"]),
+    ("ru", &["russian", "russo", "ruso", "russe", "russisch"]),
+    ("uk", &["ukrainian", "ucraniano", "ukrainien", "ukrainisch"]),
+    ("tr", &["turkish", "turco", "turc", "turkisch"]),
+    ("ar", &["arabic", "arabe", "arabisch"]),
+    (
+        "he",
+        &["hebrew", "hebraico", "hebreo", "hebreu", "hebraisch"],
+    ),
+    ("hi", &["hindi"]),
+    (
+        "zh",
+        &[
+            "chinese",
+            "mandarin",
+            "chines",
+            "chino",
+            "chinois",
+            "chinesisch",
+        ],
+    ),
+    ("ja", &["japanese", "japones", "japonais", "japanisch"]),
+    ("ko", &["korean", "coreano", "coreen", "koreanisch"]),
+    ("ca", &["catalan", "catala"]),
+    ("gl", &["galician", "galego", "gallego"]),
+    ("eu", &["basque", "euskara", "basco", "vasco"]),
+];
+
+/// `text` in lower case without accents.
+fn fold(text: &str) -> String {
+    text.to_lowercase()
+        .chars()
+        .map(|c| match c {
+            'á' | 'à' | 'â' | 'ã' | 'ä' => 'a',
+            'ç' => 'c',
+            'é' | 'è' | 'ê' | 'ë' => 'e',
+            'í' | 'ì' | 'î' | 'ï' => 'i',
+            'ñ' => 'n',
+            'ó' | 'ò' | 'ô' | 'õ' | 'ö' => 'o',
+            'ú' | 'ù' | 'û' | 'ü' => 'u',
+            'č' => 'c',
+            'š' => 's',
+            other => other,
+        })
+        .collect()
+}
+
+/// The ISO 639-1 code of a language as a profile names it ("Portuguese",
+/// "Português (Brasil)", "pt"); `None` for one the table does not know.
+pub fn language_code(name: &str) -> Option<&'static str> {
+    let folded = fold(name);
+    let first = folded
+        .split(|c: char| !c.is_alphanumeric())
+        .find(|w| !w.is_empty())?;
+    LANGUAGE_NAMES
+        .iter()
+        .find(|(code, names)| *code == first || names.contains(&first))
+        .map(|(code, _)| *code)
+}
+
+/// Whether a profile's `fluency` is professional or better.
+///
+/// LinkedIn's levels: "Native or bilingual", "Full professional" and
+/// "Professional working" are; "Limited working" and "Elementary" are not.
+/// CEFR: B2, C1 and C2 are; A1 to B1 are not. Words: native, bilingual,
+/// mother tongue, fluent, proficient, advanced, professional are;
+/// limited, elementary, basic, beginner and a plain "intermediate" are not.
+/// A language listed without a fluency counts: they named it.
+pub fn professional(fluency: Option<&str>) -> bool {
+    let Some(fluency) = fluency.map(fold) else {
+        return true;
+    };
+    let words: Vec<&str> = fluency
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .collect();
+    let has = |word: &str| words.contains(&word);
+    if [
+        "limited",
+        "elementary",
+        "basic",
+        "beginner",
+        "a1",
+        "a2",
+        "b1",
+    ]
+    .iter()
+    .any(|w| has(w))
+    {
+        return false;
+    }
+    if [
+        "native",
+        "bilingual",
+        "mother",
+        "fluent",
+        "proficient",
+        "proficiency",
+        "advanced",
+        "professional",
+        "c1",
+        "c2",
+        "b2",
+        "nativo",
+        "nativa",
+        "fluente",
+        "fluide",
+        "courant",
+        "langue",
+        "materna",
+        "avancado",
+        "avanzado",
+        "avance",
+    ]
+    .iter()
+    .any(|w| has(w))
+    {
+        return true;
+    }
+    // "Intermediate", "Conversational" and anything else.
+    words.is_empty()
+}
+
+/// The languages a person works in, as tags: `goals.languages_for_work`,
+/// else the profile's languages spoken at a professional level or better
+/// ([`professional`]), as ISO 639-1 codes ([`language_code`]). Empty when
+/// neither says: no language requirement.
+pub fn work_languages(goals: &Goals, profile: &Profile) -> Vec<String> {
+    if !goals.languages_for_work.is_empty() {
+        return goals.languages_for_work.clone();
+    }
+    let mut codes: Vec<String> = Vec::new();
+    for language in &profile.languages {
+        if !professional(language.fluency.as_deref()) {
+            continue;
+        }
+        if let Some(code) = language_code(&language.language)
+            && !codes.iter().any(|c| c == code)
+        {
+            codes.push(code.to_owned());
+        }
+    }
+    codes
+}
+
 fn cut(text: &str, most: usize) -> String {
     text.chars().take(most).collect()
 }
@@ -244,6 +462,46 @@ mod tests {
     };
 
     use super::*;
+
+    fn speaks(language: &str, fluency: Option<&str>) -> crate::schema::Language {
+        crate::schema::Language {
+            language: language.into(),
+            fluency: fluency.map(Into::into),
+        }
+    }
+
+    #[test]
+    fn work_languages_come_from_the_goals_else_professional_profile_languages() {
+        let profile = Profile {
+            languages: vec![
+                speaks("Português", Some("Native or bilingual proficiency")),
+                speaks("English", Some("Full professional proficiency")),
+                speaks("Spanish", Some("Professional working proficiency")),
+                speaks("German", Some("Elementary proficiency")),
+                speaks("French", Some("Limited working proficiency")),
+                speaks("Italian", Some("B1")),
+                speaks("Dutch", Some("C1")),
+                speaks("Klingon", None),
+                speaks("Catalan", None),
+            ],
+            ..Profile::default()
+        };
+        assert_eq!(
+            work_languages(&Goals::default(), &profile),
+            ["pt", "en", "es", "nl", "ca"]
+        );
+        let goals = Goals {
+            languages_for_work: vec!["en".into(), "pt-PT".into()],
+            ..Goals::default()
+        };
+        assert_eq!(work_languages(&goals, &profile), ["en", "pt-PT"]);
+        assert!(work_languages(&Goals::default(), &Profile::default()).is_empty());
+        assert!(!professional(Some("Intermediate")));
+        assert!(professional(Some("Fluent")));
+        assert!(professional(Some("Langue maternelle")));
+        assert_eq!(language_code("Português (Brasil)"), Some("pt"));
+        assert_eq!(language_code("de"), Some("de"));
+    }
 
     #[test]
     fn answered_questions_are_counted_and_equity_only_with_a_floor() {

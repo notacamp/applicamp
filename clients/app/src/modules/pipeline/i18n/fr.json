@@ -13,7 +13,9 @@
     "stage": "Étape",
     "allStages": "Toutes les étapes",
     "newOnly": "Seules les nouvelles correspondances sont affichées.",
-    "showAll": "Tout afficher"
+    "showAll": "Tout afficher",
+    "hidden": "Masquées : ne répondent pas à vos critères",
+    "hiddenOnly": "Elles ne répondent pas à vos critères : elles sont hors de vos opportunités. Rien n’a été supprimé."
   },
   "columns": {
     "role": "Poste",
@@ -22,7 +24,8 @@
     "stage": "Étape",
     "source": "Source",
     "nextStep": "Prochaine étape",
-    "updated": "Mise à jour"
+    "updated": "Mise à jour",
+    "hiddenReason": "Pourquoi elle est masquée"
   },
   "stages": {
     "found": "Trouvée",
@@ -96,6 +99,28 @@
     "dismissed": "Pas pour moi · {{title}}",
     "save": "Enregistrer",
     "cancel": "Annuler",
-    "saveFailed": "La modification n’a pas pu être enregistrée. Réessayez."
+    "saveFailed": "La modification n’a pas pu être enregistrée. Réessayez.",
+    "requirements": "Vos critères",
+    "hidden": "Masquée : ne répond pas à vos critères"
+  },
+  "hidden": {
+    "reasons": {
+      "not_remote": "Pas en télétravail, ou ne le dit pas",
+      "not_open_to_location": "Pas ouverte là où vous vivez",
+      "language": "Demande une langue dans laquelle vous ne travaillez pas",
+      "below_floor": "Paie moins que votre minimum"
+    }
+  },
+  "facts": {
+    "remote": {
+      "yes": "Télétravail",
+      "no": "Pas en télétravail",
+      "unclear": "Télétravail non précisé"
+    },
+    "open": {
+      "yes": "Ouverte là où vous vivez",
+      "no": "Pas ouverte là où vous vivez",
+      "unclear": "Ne dit pas à qui elle est ouverte"
+    }
   }
 }

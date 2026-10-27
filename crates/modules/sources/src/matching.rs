@@ -2,16 +2,24 @@
 //!
 //! 1. **Hard limits** from the goals' structured answers, on the job's
 //!    structured fields only (never its prose): too old, or clearly in the
-//!    wrong place or the wrong way of working. Anything unclear stays for
-//!    the model.
-//! 2. **Pre-rank** by how much of a wanted role's words the title has, and
-//!    how recent the job is; the top [`TOP`] are scored.
+//!    wrong place or the wrong way of working (Ashby's `isRemote` /
+//!    `workplaceType` and Lever's `workplaceType` for someone who works
+//!    remote only). Anything unclear goes to the model, whose facts the
+//!    requirement rules ([`crate::requirements`]) decide on.
+//! 2. **Pre-rank** by how much of a wanted role's words the title has, how
+//!    recent the job is, and whether its structured location names
+//!    somewhere they can work from (remote, Europe, their places, their
+//!    country); the top [`TOP`] are scored.
 
 use std::collections::HashSet;
 
 use chrono::{DateTime, TimeDelta, Utc};
 
-use crate::job::{Job, WorkMode};
+use crate::{
+    job::{Job, WorkMode},
+    places,
+    requirements::{Floor, Reach},
+};
 
 /// Jobs scored per search, at most.
 pub const TOP: usize = 40;
@@ -40,6 +48,21 @@ pub struct MatchInput {
     pub locations: Vec<String>,
     /// They said they would not move.
     pub will_not_relocate: bool,
+    /// Where they live: the first of `locations`, else the profile's.
+    pub home: Option<String>,
+    /// How far they would move; `None` when not answered.
+    pub relocate: Option<Reach>,
+    /// The languages they work in, ISO 639-1 (`en`); none known: any.
+    pub languages: Vec<String>,
+    /// The least pay they take.
+    pub cash_floor: Option<Floor>,
+}
+
+impl MatchInput {
+    /// They work remote only.
+    pub fn remote_only(&self) -> bool {
+        !self.work_modes.is_empty() && self.work_modes.iter().all(|m| *m == WorkMode::Remote)
+    }
 }
 
 /// Why a job was left out.
@@ -53,6 +76,9 @@ pub enum Out {
     WorkMode,
     /// On site somewhere they cannot be.
     Place,
+    /// They work remote only, and the board's own field says it is not
+    /// remote.
+    NotRemote,
 }
 
 /// Whether `job` breaks a hard limit of `input`, and which; `known` are the
@@ -68,6 +94,9 @@ pub fn hard_limit(
     }
     if job.posted_at.is_some_and(|at| now - at > MAX_AGE) {
         return Some(Out::TooOld);
+    }
+    if input.remote_only() && job.board_remote == Some(false) {
+        return Some(Out::NotRemote);
     }
     let mode = job.work_mode?;
     // Remote suits anyone; an office day suits only who asked for it.
@@ -130,6 +159,42 @@ fn freshness(posted_at: Option<DateTime<Utc>>, now: DateTime<Utc>) -> f64 {
     0.2 * (1.0 - (age / max).min(1.0))
 }
 
+/// Words in a structured location that say it may be open to someone in
+/// Europe.
+const OPEN_WORDS: [&str; 5] = ["remote", "europe", "emea", "eu", "anywhere"];
+
+/// What the pre-rank adds for a location that may suit them.
+const PLACE_FIT: f64 = 0.15;
+
+/// [`PLACE_FIT`] when `location` (the board's field, never the prose) names
+/// remote, Europe, EMEA or the EU, one of their places, or the country
+/// they live in; else 0. A preference only: the rules decide.
+fn place_fit(location: Option<&str>, input: &MatchInput) -> f64 {
+    let Some(location) = location else {
+        return 0.0;
+    };
+    let named = places::words(location);
+    let open = named.iter().any(|w| OPEN_WORDS.contains(&w.as_str()));
+    let theirs = input
+        .locations
+        .iter()
+        .chain(&input.home)
+        .any(|place| places::same_place(location, place));
+    let home_countries: Vec<&str> = input
+        .home
+        .as_deref()
+        .map(places::countries_in)
+        .unwrap_or_default();
+    let country = places::countries_in(location)
+        .iter()
+        .any(|c| home_countries.contains(c));
+    if open || theirs || country {
+        PLACE_FIT
+    } else {
+        0.0
+    }
+}
+
 /// The best [`TOP`] of `jobs` for `input`, best first.
 pub fn pre_rank(jobs: Vec<Job>, input: &MatchInput, now: DateTime<Utc>) -> Vec<Job> {
     let wanted = if input.roles.is_empty() {
@@ -142,7 +207,9 @@ pub fn pre_rank(jobs: Vec<Job>, input: &MatchInput, now: DateTime<Utc>) -> Vec<J
         .into_iter()
         .map(|job| {
             (
-                title_fit(&job.title, &roles) + freshness(job.posted_at, now),
+                title_fit(&job.title, &roles)
+                    + freshness(job.posted_at, now)
+                    + place_fit(job.location.as_deref(), input),
                 job,
             )
         })
@@ -175,6 +242,7 @@ mod tests {
             company: "Example Co".into(),
             location: location.map(Into::into),
             work_mode: mode,
+            board_remote: mode.map(|m| m == WorkMode::Remote),
             url: "https://example.com/job".into(),
             posted_at: Some(now() - TimeDelta::days(days)),
             salary_text: None,
@@ -227,6 +295,30 @@ mod tests {
         );
         // No structured work mode: the model decides.
         assert_eq!(out(&job("Unclear", Some("Berlin"), None, 1)), None);
+        // Remote only: the board's own "not remote" (Ashby's `isRemote:
+        // false` without a workplace type) is enough.
+        let remote_only = MatchInput {
+            work_modes: vec![WorkMode::Remote],
+            ..remote_in_portugal()
+        };
+        let not_remote = Job {
+            board_remote: Some(false),
+            ..job("Desk", Some("Lisbon"), None, 1)
+        };
+        assert_eq!(
+            hard_limit(&not_remote, &remote_only, &known, now()),
+            Some(Out::NotRemote)
+        );
+        assert_eq!(
+            out(&not_remote),
+            None,
+            "someone who also works hybrid keeps it for the model"
+        );
+        let lever_hybrid = job("Hybrid", Some("Lisbon"), Some(WorkMode::Hybrid), 1);
+        assert_eq!(
+            hard_limit(&lever_hybrid, &remote_only, &known, now()),
+            Some(Out::NotRemote)
+        );
         // Willing to move: a place is no limit.
         let movable = MatchInput {
             will_not_relocate: false,
@@ -263,6 +355,29 @@ mod tests {
                 "Engineer",
                 "Accountant"
             ]
+        );
+    }
+
+    #[test]
+    fn locations_that_may_suit_them_come_first_among_equals() {
+        let input = MatchInput {
+            home: Some("Lisbon".into()),
+            locations: vec!["Lisbon".into()],
+            ..remote_in_portugal()
+        };
+        let jobs = vec![
+            job("Staff Engineer", Some("San Francisco"), None, 1),
+            job("Staff Engineer", Some("Remote (EU)"), None, 1),
+            job("Staff Engineer", Some("Porto, Portugal"), None, 1),
+            job("Staff Engineer", Some("Lisbon"), None, 1),
+        ];
+        let ranked: Vec<Option<String>> = pre_rank(jobs, &input, now())
+            .into_iter()
+            .map(|j| j.location)
+            .collect();
+        assert_eq!(
+            ranked.last().cloned().flatten().as_deref(),
+            Some("San Francisco")
         );
     }
 

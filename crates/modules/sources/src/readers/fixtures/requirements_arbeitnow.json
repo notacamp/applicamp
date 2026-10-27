@@ -1,0 +1,43 @@
+{
+  "data": [
+    {
+      "slug": "senior-backend-engineer-berlin-200001",
+      "company_name": "Beispiel Software GmbH",
+      "title": "Senior Backend Engineer (m/w/d)",
+      "description": "<h2><strong>About the role</strong></h2><p>Beispiel Software builds tools for logistics teams. You will design and run our Rust and Postgres services.</p><p><strong>Standort:</strong> Remote-first aus Deutschland oder Österreich</p>",
+      "remote": true,
+      "url": "https://www.arbeitnow.com/jobs/companies/beispiel-software/senior-backend-engineer-berlin-200001",
+      "tags": ["Software Development"],
+      "job_types": ["Permanent employment (unbefristeter arbeitsvertrag)"],
+      "location": "Berlin",
+      "created_at": 1792950000
+    },
+    {
+      "slug": "backend-entwickler-hamburg-200002",
+      "company_name": "Muster Logistik GmbH",
+      "title": "Senior Backend-Entwickler (m/w/d)",
+      "description": "<p>Wir suchen eine erfahrene Backend-Entwicklerin oder einen erfahrenen Backend-Entwickler für unser Plattform-Team. Du arbeitest komplett remote innerhalb der EU.</p><ul><li>Mehrjährige Erfahrung mit Rust oder Go</li><li>Sehr gute Deutschkenntnisse in Wort und Schrift</li></ul>",
+      "remote": true,
+      "url": "https://www.arbeitnow.com/jobs/companies/muster-logistik/backend-entwickler-hamburg-200002",
+      "tags": ["Software Development"],
+      "job_types": ["Permanent employment (unbefristeter arbeitsvertrag)"],
+      "location": "Hamburg",
+      "created_at": 1792950000
+    }
+  ],
+  "links": {
+    "first": "https://www.arbeitnow.com/api/job-board-api?page=1",
+    "last": null,
+    "prev": null,
+    "next": null
+  },
+  "meta": {
+    "current_page": 1,
+    "from": 1,
+    "path": "https://www.arbeitnow.com/api/job-board-api",
+    "per_page": 100,
+    "to": 2,
+    "terms": "This is a free public API for jobs, please do not abuse. By using this API, you agree to the terms and conditions.",
+    "info": "Jobs are updated every hour and order by the newest jobs. Use the page parameter for pagination."
+  }
+}

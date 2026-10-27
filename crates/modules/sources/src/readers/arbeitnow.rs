@@ -61,6 +61,9 @@ pub fn jobs(page: Page) -> Vec<Job> {
                 url: one_line(posting.url.as_deref())?,
                 location: one_line(posting.location.as_deref()),
                 work_mode: (posting.remote == Some(true)).then_some(WorkMode::Remote),
+                // Its `remote` flag is set for jobs remote only within a
+                // country: never a requirement's evidence.
+                board_remote: None,
                 posted_at: posting
                     .created_at
                     .and_then(|secs| DateTime::from_timestamp(secs, 0)),

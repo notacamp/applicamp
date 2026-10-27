@@ -28,7 +28,8 @@ import { OpportunityPeek } from "../OpportunityPeek/OpportunityPeek";
 import { OpportunityBoard, OpportunityCards, OpportunityTable } from "./OpportunityViews";
 
 type View = "table" | "board";
-type StageFilter = OpportunityStage | "all";
+/** A stage, every stage, or the hidden ones (they don't meet the person's requirements). */
+type StageFilter = OpportunityStage | "all" | "hidden";
 
 export interface PipelinePageProps {
   /** Only the new matches (Today's "N new matches"). */
@@ -47,7 +48,8 @@ export interface PipelinePageProps {
  * The Pipeline: every opportunity in one database, as a table ("All
  * opportunities", cards on a phone) or a board by stage; filtered by stage
  * and words; each opening in the side peek. J and K move the cursor, Enter
- * opens it, Escape closes it.
+ * opens it, Escape closes it. The ones that don't meet the person's
+ * requirements are out of view, listed with the reason under "Hidden".
  */
 export function PipelinePage({
   newOnly,
@@ -66,10 +68,12 @@ export function PipelinePage({
   const [cursor, setCursor] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
 
+  const hidden = stage === "hidden";
   const list = useOpportunities({
-    stage: stage === "all" ? undefined : stage,
+    stage: stage === "all" || stage === "hidden" ? undefined : stage,
     q,
     new: newOnly,
+    hidden,
   });
   const rows: readonly OpportunitySummary[] = list.data ?? [];
   // The board reads left to right, column by column; the table top to bottom.
@@ -160,9 +164,9 @@ export function PipelinePage({
   } else if (view === "board") {
     body = <OpportunityBoard rows={rows} selected={cursor} onOpen={openRow} />;
   } else if (narrow) {
-    body = <OpportunityCards rows={rows} selected={cursor} onOpen={openRow} />;
+    body = <OpportunityCards rows={rows} selected={cursor} onOpen={openRow} hidden={hidden} />;
   } else {
-    body = <OpportunityTable rows={rows} selected={cursor} onOpen={openRow} />;
+    body = <OpportunityTable rows={rows} selected={cursor} onOpen={openRow} hidden={hidden} />;
   }
 
   return (
@@ -220,6 +224,7 @@ export function PipelinePage({
           options={[
             { value: "all" as const, label: t("filter.allStages") },
             ...STAGES.map((value) => ({ value, label: t(`stages.${value}`) })),
+            { value: "hidden" as const, label: t("filter.hidden") },
           ]}
           value={stage}
           onChange={setStage}
@@ -237,6 +242,25 @@ export function PipelinePage({
                 data-testid="pipeline-show-all"
                 onClick={() => {
                   onNewOnly(false);
+                }}
+              >
+                {t("filter.showAll")}
+              </Button>
+            }
+          />
+        </Tagged>
+      ) : null}
+      {hidden ? (
+        <Tagged testId="pipeline-hidden-only">
+          <Banner
+            icon="warning"
+            title={t("filter.hiddenOnly")}
+            action={
+              <Button
+                variant="secondary"
+                data-testid="pipeline-show-in-view"
+                onClick={() => {
+                  setStage("all");
                 }}
               >
                 {t("filter.showAll")}

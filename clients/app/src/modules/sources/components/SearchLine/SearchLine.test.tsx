@@ -21,6 +21,13 @@ describe("a search's line", () => {
     );
   });
 
+  it("says how many jobs it dropped for the person's requirements", () => {
+    renderWithProviders(<SearchLine search={search({ dropped: 14 })} testId="dropped" />);
+    expect(screen.getByTestId("dropped")).toHaveTextContent(
+      "412 jobs read, 9 matched, 14 dropped for your requirements",
+    );
+  });
+
   it("says when a search ran, and why it stopped", () => {
     renderWithProviders(
       <SearchLine

@@ -53,6 +53,8 @@ export function summary(whole: Opportunity): OpportunitySummary {
     ...(whole.match === undefined ? {} : { match: whole.match }),
     ...(whole.next_step === undefined ? {} : { next_step: whole.next_step }),
     ...(whole.salary_text === undefined ? {} : { salary_text: whole.salary_text }),
+    ...(whole.hidden_reason === undefined ? {} : { hidden_reason: whole.hidden_reason }),
+    ...(whole.facts?.region_note === undefined ? {} : { region_note: whole.facts.region_note }),
   };
 }
 
@@ -68,6 +70,7 @@ export function search(overrides: Partial<Search> = {}): Search {
     kept: 40,
     scored: 40,
     added: 9,
+    dropped: 0,
     stopped: null,
     cost_eur: 0.012,
     ...overrides,

@@ -1,0 +1,11 @@
+# Narrow, expiring exceptions to the image's Trivy gate (ci.yml and publish.yml).
+# Each entry: the one advisory, why it can't reach Applicamp, and an expiry so
+# the gate goes red again if the base image still hasn't been fixed.
+vulnerabilities:
+  - id: CVE-2026-84782
+    statement: >-
+      libssl3 3.0.20 ships in gcr.io/distroless/cc-debian12 but Applicamp never
+      loads it: TLS is rustls only (no openssl, openssl-sys or native-tls in
+      Cargo.lock). Fixed upstream in 3.0.22; drop this entry when distroless
+      publishes it.
+    expired_at: 2026-11-10

@@ -211,9 +211,10 @@ pub async fn get(
     let new_matches: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM pipeline.opportunities
           WHERE account_id = $1 AND stage = 'found' AND opened_at IS NULL AND NOT dismissed
-            AND hidden_reason IS NULL",
+            AND hidden_reason IS NULL AND (expires_at IS NULL OR expires_at >= $2)",
     )
     .bind(account)
+    .bind(state.clock.now())
     .fetch_one(&state.db)
     .await?;
     let new_matches = u32::try_from(new_matches).unwrap_or(u32::MAX);

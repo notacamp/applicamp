@@ -123,6 +123,7 @@ pub fn job(posting: Posting, board: &Board) -> Option<Job> {
         .or_else(|| one_line(Some(&posting.categories.all_locations.join(", "))));
     let work_mode = posting.workplace_type.as_deref().and_then(WorkMode::parse);
     Some(Job {
+        board: None,
         source: Source::Lever,
         description: description(&posting),
         salary_text: salary(posting.salary_range.as_ref()),

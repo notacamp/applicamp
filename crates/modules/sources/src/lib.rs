@@ -1,12 +1,28 @@
 //! `applicamp-sources`: where jobs come from, and the search.
 //!
-//! - **Readers** ([`readers`]): Greenhouse, Lever and Ashby public job
-//!   boards (the seed list `boards.toml`, plus boards people add by
-//!   pasting a posting's link), Arbeitnow, and HN "Who is hiring". Public
-//!   APIs only, never LinkedIn or Indeed (ADR 0006); one client with a
-//!   timeout, a body cap, a per-host pace and a cache.
-//! - **The search** ([`features::search`]): the goals' hard limits on the
-//!   boards' structured fields, a pre-rank without the model, the
+//! - **Job boards** ([`job_boards`]): a registry of boards, each read
+//!   through its config by one of three generic adapters (a JSON API with a
+//!   field mapping, an RSS or Atom feed, JSON-LD postings through a
+//!   sitemap) or HN's extractor, with its terms honoured (polling interval,
+//!   pace, attribution, unchanged apply links, expiry). Searches read only
+//!   the boards the owner **approved** (Himalayas, Jobicy, Remote OK,
+//!   Arbeitnow and HN first); remote jobs anywhere, open to where the
+//!   person lives. Public APIs and feeds only, never LinkedIn or Indeed
+//!   (ADR 0006).
+//! - **Discovery** ([`features::discovery`]): every week, new boards from a
+//!   CC0 list are checked automatically (robots rules, terms sentences, a
+//!   feed, a sample) and wait on the Boards page ([`features::boards`]),
+//!   ranked by average salary ([`pay`]); nothing is read for jobs before
+//!   approval. Approved boards are re-checked every 6 months.
+//! - **Company boards** ([`readers`]): Greenhouse, Lever and Ashby public
+//!   job boards (the seed list `boards.toml`, plus boards people add by
+//!   pasting a posting's link); off in searches by default
+//!   (`APPLICAMP_SOURCES__COMPANY_BOARDS`), kept for company watchers
+//!   (#20).
+//! - **The search** ([`features::search`]): the same job seen on several
+//!   boards merged into one ([`dedupe`]), crediting each; the goals' hard
+//!   limits on the boards' structured fields (a board's regions too:
+//!   [`regions`]), a pre-rank without the model, the
 //!   `complete` model's scores and eligibility facts in batches of ten
 //!   (cached per profile, goals and rules version), the requirement rules
 //!   ([`requirements`]) deciding pass or fail on those facts, and the good
@@ -20,21 +36,31 @@
 //! are [`ports::Neighbours`], which the server implements; modules never
 //! import each other.
 //!
+//! - **Scanned** ([`scans`]): what each search and discovery run scanned on
+//!   each board, kept 90 days.
+//!
 //! Publishes `sources.search_finished` (ids and counts).
 
 #![forbid(unsafe_code)]
 
 pub mod boards;
 pub mod config;
+pub mod dedupe;
 pub mod events;
 pub mod features;
 pub mod job;
+pub mod job_boards;
 pub mod lisbon;
 pub mod matching;
+pub mod net;
+pub mod pay;
 pub mod places;
 pub mod ports;
 pub mod readers;
+pub mod regions;
 pub mod requirements;
+pub mod robots;
+pub mod scans;
 pub mod scoring;
 
 use std::sync::Arc;
@@ -121,11 +147,20 @@ impl SourcesDeps {
 
 /// The sources module, composed with `deps`.
 pub fn module(deps: SourcesDeps) -> Module {
-    use features::{recheck, search};
+    use features::{boards as board, discovery, recheck, search};
     let router = OpenApiRouter::new()
         .routes(routes!(search::start))
         .routes(routes!(search::latest))
         .routes(routes!(search::estimate))
+        .routes(routes!(board::list))
+        .routes(routes!(board::scanned))
+        .routes(routes!(board::get))
+        .routes(routes!(board::approve))
+        .routes(routes!(board::decline))
+        .routes(routes!(board::pause))
+        .routes(routes!(board::set_config))
+        .routes(routes!(board::check))
+        .routes(routes!(board::suggest))
         .layer(Extension(deps.clone()));
     Module {
         name: NAME,
@@ -133,17 +168,28 @@ pub fn module(deps: SourcesDeps) -> Module {
         background: Background::new()
             .job_with::<search::RunSearch, _>(deps.clone())
             .job_with::<search::Nightly, _>(deps.clone())
-            .job_with::<recheck::Recheck, _>(deps)
+            .job_with::<recheck::Recheck, _>(deps.clone())
+            .job_with::<discovery::Discover, _>(deps.clone())
+            .job_with::<discovery::CheckBoard, _>(deps)
             .publishes::<events::SearchFinished>(),
     }
 }
 
-/// On server start: make `sources.boards` hold the seed list, schedule
-/// the nightly search (when it is on), and check the requirements of
-/// opportunities found before the rules (once each).
+/// On server start: make `sources.boards` hold the company boards' seed
+/// list and the registry the job boards' (new boards added, the owner's
+/// decisions kept), schedule the nightly search and the weekly discovery
+/// (when they are on), and check the requirements of opportunities found
+/// before the rules (once each).
 pub async fn start(db: &PgPool, deps: &SourcesDeps) -> Result<(), String> {
     let seed = boards::seed(&deps.config)?;
     let count = boards::sync(db, &seed).await.map_err(|e| e.to_string())?;
+    let job_seed = job_boards::seed(&deps.config)?;
+    let job_boards = job_boards::sync(db, &job_seed, deps.clock.now())
+        .await
+        .map_err(|e| e.to_string())?;
+    let discovery = features::discovery::schedule(db, deps)
+        .await
+        .map_err(|e| e.to_string())?;
     let scheduled = features::search::schedule_nightly(db, deps)
         .await
         .map_err(|e| e.to_string())?;
@@ -152,6 +198,9 @@ pub async fn start(db: &PgPool, deps: &SourcesDeps) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     tracing::info!(
         boards = count,
+        job_boards,
+        company_boards = deps.config.company_boards(),
+        discovery,
         nightly = deps.config.nightly(),
         scheduled,
         recheck,
@@ -177,6 +226,8 @@ mod tests {
         assert_eq!(
             registry.kinds(),
             [
+                "sources.check_board",
+                "sources.discover_boards",
                 "sources.nightly",
                 "sources.recheck_requirements",
                 "sources.search"

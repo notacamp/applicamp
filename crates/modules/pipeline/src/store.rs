@@ -1,12 +1,15 @@
 //! The pipeline's records, and what other modules may do with them through
-//! the ports the server wires: ask which jobs a person already has, add the
-//! ones a search found (with the facts their requirements were checked
-//! on), and check the requirements of ones found before the rules (hiding,
-//! never deleting, the ones that fail).
+//! the ports the server wires: ask which jobs a person already has (by
+//! source, by link, by company, role and place), add the ones a search
+//! found (with the facts their requirements were checked on, and every job
+//! board they were seen on), credit another board on one already there,
+//! and check the requirements of ones found before the rules (hiding, never
+//! deleting, the ones that fail).
 
 use std::collections::HashSet;
 
 use applicamp_kernel::{EventBus, Result};
+use chrono::TimeDelta;
 use chrono::{DateTime, Utc};
 use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
@@ -31,8 +34,49 @@ pub const MAX_REGION_NOTE: usize = 80;
 /// Languages kept.
 pub const MAX_LANGUAGES: usize = 6;
 
-/// The sources a search reads (a link-added one's is `link`).
-pub const SEARCH_SOURCES: [&str; 5] = ["greenhouse", "lever", "ashby", "arbeitnow", "hn"];
+/// The source of a link-added one.
+pub const LINK: &str = "link";
+/// Job boards credited per opportunity, at most.
+pub const MAX_SOURCES: usize = 20;
+
+/// Whether `source` is one a search may add: a job board's slug or a
+/// reader's name (lower-case letters, digits and `-`, at most 40), never
+/// `link`.
+pub fn is_search_source(source: &str) -> bool {
+    let mut chars = source.chars();
+    source != LINK
+        && source.len() <= 40
+        && chars
+            .next()
+            .is_some_and(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+/// A job board an opportunity was seen on, with the posting's link there.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SourceLink {
+    /// The board's slug.
+    pub board: String,
+    /// How it is credited ("Himalayas").
+    pub name: String,
+    /// The posting on it.
+    pub url: String,
+}
+
+impl SourceLink {
+    /// Checked and trimmed; `None` when it is not a board and a web link.
+    fn tidied(&self) -> Option<Self> {
+        let url = tidy(Some(&self.url), MAX_URL)?;
+        let web = url::Url::parse(&url)
+            .ok()
+            .is_some_and(|u| matches!(u.scheme(), "http" | "https"));
+        (is_search_source(&self.board) && web).then(|| Self {
+            board: self.board.clone(),
+            name: tidy(Some(&self.name), 100).unwrap_or_else(|| self.board.clone()),
+            url,
+        })
+    }
+}
 /// Work modes.
 pub const WORK_MODES: [&str; 3] = ["remote", "hybrid", "onsite"];
 /// What a posting says about a fact.
@@ -130,6 +174,16 @@ pub struct Found {
     pub gaps: Vec<String>,
     /// The facts its requirements were checked on.
     pub eligibility: Option<Eligibility>,
+    /// The board's apply link, unchanged.
+    pub apply_url: Option<String>,
+    /// When it expires (a board whose terms drop expired jobs).
+    pub expires_at: Option<DateTime<Utc>>,
+    /// Its apply link without tracking, to dedupe across boards.
+    pub canonical_url: Option<String>,
+    /// Its company, role and place, to dedupe across boards.
+    pub dedupe_key: Option<String>,
+    /// Every job board it was seen on.
+    pub sources: Vec<SourceLink>,
 }
 
 /// A new opportunity, checked and trimmed, ready to insert.
@@ -149,13 +203,18 @@ pub(crate) struct NewRow {
     pub why: Vec<String>,
     pub gaps: Vec<String>,
     pub eligibility: Option<Eligibility>,
+    pub apply_url: Option<String>,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub canonical_url: Option<String>,
+    pub dedupe_key: Option<String>,
+    pub sources: Vec<SourceLink>,
 }
 
 impl NewRow {
     /// `found` as a row, or `None` when it is not one a search may add (an
     /// unknown source, no reference, title or URL).
     fn of_found(found: Found) -> Option<Self> {
-        if !SEARCH_SOURCES.contains(&found.source.as_str()) {
+        if !is_search_source(&found.source) {
             return None;
         }
         let title = tidy(Some(&found.title), MAX_SHORT)?;
@@ -178,8 +237,46 @@ impl NewRow {
             why: tidy_list(&found.why, MAX_WHY),
             gaps: tidy_list(&found.gaps, MAX_GAPS),
             eligibility: found.eligibility.and_then(Eligibility::tidied),
+            apply_url: tidy(found.apply_url.as_deref(), MAX_URL),
+            expires_at: found.expires_at,
+            canonical_url: tidy(found.canonical_url.as_deref(), MAX_URL),
+            dedupe_key: tidy(found.dedupe_key.as_deref(), 700),
+            sources: found
+                .sources
+                .iter()
+                .filter_map(SourceLink::tidied)
+                .take(MAX_SOURCES)
+                .collect(),
         })
     }
+}
+
+/// Credit `links` on opportunity `id`, each board once (`now` for new ones).
+async fn add_sources(
+    conn: &mut PgConnection,
+    id: Uuid,
+    links: &[SourceLink],
+    now: DateTime<Utc>,
+) -> Result<()> {
+    for link in links
+        .iter()
+        .filter_map(SourceLink::tidied)
+        .take(MAX_SOURCES)
+    {
+        sqlx::query(
+            "INSERT INTO pipeline.opportunity_sources (opportunity_id, board, name, url, seen_at)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (opportunity_id, board) DO NOTHING",
+        )
+        .bind(id)
+        .bind(&link.board)
+        .bind(&link.name)
+        .bind(&link.url)
+        .bind(now)
+        .execute(&mut *conn)
+        .await?;
+    }
+    Ok(())
 }
 
 /// Insert `row` for `account` unless that posting is already in the
@@ -197,9 +294,10 @@ pub(crate) async fn insert(
         "INSERT INTO pipeline.opportunities
             (id, account_id, title, company, location, work_mode, url, source, source_ref,
              posted_at, salary_text, description, match_score, match_why, match_gaps,
-             created_at, updated_at, remote, open_to_candidate, region_note, working_languages)
+             created_at, updated_at, remote, open_to_candidate, region_note, working_languages,
+             apply_url, expires_at, canonical_url, dedupe_key)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $16,
-                 $17, $18, $19, $20)
+                 $17, $18, $19, $20, $21, $22, $23, $24)
          ON CONFLICT (account_id, source, source_ref) DO NOTHING
          RETURNING id",
     )
@@ -223,9 +321,14 @@ pub(crate) async fn insert(
     .bind(eligibility.map(|e| e.open_to_candidate.as_str()))
     .bind(eligibility.and_then(|e| e.region_note.as_deref()))
     .bind(eligibility.map(|e| e.working_languages.clone()))
+    .bind(&row.apply_url)
+    .bind(row.expires_at)
+    .bind(&row.canonical_url)
+    .bind(&row.dedupe_key)
     .fetch_optional(&mut *conn)
     .await?;
     if let Some(opportunity) = id {
+        add_sources(conn, opportunity, &row.sources, now).await?;
         events
             .publish(
                 conn,
@@ -249,6 +352,75 @@ pub async fn known(db: &PgPool, account: Uuid) -> Result<HashSet<(String, String
     .fetch_all(db)
     .await?;
     Ok(rows.into_iter().collect())
+}
+
+/// The links and the company, role and place keys of `account`'s
+/// opportunities (keys only of those added since `since`): a search
+/// credits another board on them instead of adding them again.
+pub async fn known_links(
+    db: &PgPool,
+    account: Uuid,
+    since: DateTime<Utc>,
+) -> Result<(HashSet<String>, HashSet<String>)> {
+    let rows: Vec<(Option<String>, Option<String>, DateTime<Utc>)> = sqlx::query_as(
+        "SELECT canonical_url, dedupe_key, created_at FROM pipeline.opportunities
+          WHERE account_id = $1 AND (canonical_url IS NOT NULL OR dedupe_key IS NOT NULL)",
+    )
+    .bind(account)
+    .fetch_all(db)
+    .await?;
+    let mut urls = HashSet::new();
+    let mut keys = HashSet::new();
+    for (url, key, created_at) in rows {
+        urls.extend(url);
+        if created_at >= since {
+            keys.extend(key);
+        }
+    }
+    Ok((urls, keys))
+}
+
+/// A job seen on another board, to credit on the opportunity it matches.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Attach {
+    pub canonical_url: Option<String>,
+    pub dedupe_key: Option<String>,
+    pub sources: Vec<SourceLink>,
+}
+
+/// Credit each of `items`' boards on `account`'s opportunity it matches
+/// (by link, else by company, role and place within 30 days). How many
+/// matched.
+pub async fn attach_sources(
+    db: &PgPool,
+    account: Uuid,
+    items: Vec<Attach>,
+    now: DateTime<Utc>,
+) -> Result<u32> {
+    let mut tx = db.begin().await?;
+    let mut matched = 0_u32;
+    for item in items {
+        let id: Option<Uuid> = sqlx::query_scalar(
+            "SELECT id FROM pipeline.opportunities
+              WHERE account_id = $1
+                AND (($2::text IS NOT NULL AND canonical_url = $2)
+                     OR ($3::text IS NOT NULL AND dedupe_key = $3 AND created_at >= $4))
+              ORDER BY (canonical_url = $2) DESC NULLS LAST, created_at
+              LIMIT 1",
+        )
+        .bind(account)
+        .bind(&item.canonical_url)
+        .bind(&item.dedupe_key)
+        .bind(now - TimeDelta::days(30))
+        .fetch_optional(&mut *tx)
+        .await?;
+        if let Some(id) = id {
+            add_sources(&mut tx, id, &item.sources, now).await?;
+            matched += 1;
+        }
+    }
+    tx.commit().await?;
+    Ok(matched)
 }
 
 /// Add `found` to `account`'s pipeline as Found, in one transaction, each
@@ -380,6 +552,77 @@ mod tests {
         assert!(unknown.tidied().is_none());
     }
 
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_job_seen_on_another_board_is_credited_not_added(db: PgPool) {
+        let account = Uuid::now_v7();
+        let events = EventBus::default();
+        let now = Utc::now();
+        let link = |board: &str| SourceLink {
+            board: board.into(),
+            name: board.to_uppercase(),
+            url: format!("https://{board}.example/jobs/1"),
+        };
+        let first = Found {
+            source: "himalayas".into(),
+            canonical_url: Some("https://jobs.example.com/apply/42".into()),
+            dedupe_key: Some("example co|staff engineer|".into()),
+            apply_url: Some("https://jobs.example.com/apply/42?utm_source=api".into()),
+            sources: vec![
+                link("himalayas"),
+                link("remoteok"),
+                SourceLink {
+                    board: "evil".into(),
+                    name: "Evil".into(),
+                    url: "javascript:alert(1)".into(),
+                },
+            ],
+            ..found("h:1")
+        };
+        assert_eq!(
+            add_found(&db, &events, account, vec![first], now)
+                .await
+                .unwrap(),
+            1
+        );
+        let (urls, keys) = known_links(&db, account, now - TimeDelta::days(30))
+            .await
+            .unwrap();
+        assert!(urls.contains("https://jobs.example.com/apply/42"));
+        assert!(keys.contains("example co|staff engineer|"));
+        let matched = attach_sources(
+            &db,
+            account,
+            vec![
+                Attach {
+                    canonical_url: None,
+                    dedupe_key: Some("example co|staff engineer|".into()),
+                    sources: vec![link("jobicy"), link("himalayas")],
+                },
+                Attach {
+                    canonical_url: Some("https://elsewhere.example/1".into()),
+                    dedupe_key: None,
+                    sources: vec![link("remotive")],
+                },
+            ],
+            now,
+        )
+        .await
+        .unwrap();
+        assert_eq!(matched, 1);
+        let boards: Vec<String> = sqlx::query_scalar(
+            "SELECT s.board FROM pipeline.opportunity_sources s
+               JOIN pipeline.opportunities o ON o.id = s.opportunity_id
+              WHERE o.account_id = $1 ORDER BY s.board",
+        )
+        .bind(account)
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        assert_eq!(boards, ["himalayas", "jobicy", "remoteok"]);
+        assert!(is_search_source("we-work-remotely") && !is_search_source("link"));
+        assert!(!is_search_source("LinkedIn"));
+    }
+
     #[test]
     fn found_jobs_are_trimmed_and_checked() {
         let row = NewRow::of_found(found("exampleco:1")).unwrap();
@@ -389,7 +632,7 @@ mod tests {
         assert_eq!(row.gaps[0].chars().count(), 200);
         assert_eq!(row.work_mode, None, "an unknown work mode is dropped");
         let unknown = Found {
-            source: "linkedin".into(),
+            source: "Linked In".into(),
             ..found("1")
         };
         assert!(NewRow::of_found(unknown).is_none());

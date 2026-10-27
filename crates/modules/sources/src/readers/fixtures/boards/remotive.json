@@ -1,0 +1,23 @@
+{
+ "00-warning": "Remotive main domain moved to remotive.com !",
+ "0-legal-notice": "Legal warning - Please link back to the URL found on Remotive AND mention Remotive as a source. Jobs displayed are delayed by 24 hours. (Trimmed for tests.)",
+ "job-count": 1,
+ "total-job-count": 1,
+ "jobs": [
+  {
+   "id": 2091001,
+   "url": "https://remotive.com/remote-jobs/software-dev/senior-backend-engineer-2091001",
+   "title": "Senior Backend Engineer",
+   "company_name": "Example Co",
+   "company_logo": "https://remotive.com/job/2091001/logo",
+   "category": "Software Development",
+   "tags": "['rust', 'postgres']",
+   "job_type": "full_time",
+   "publication_date": "2026-10-24T18:40:19",
+   "candidate_required_location": "Europe, UK",
+   "salary": "$120k - $150k",
+   "description": "<h3><strong>About Example Co</strong></h3><p>Example Co builds invented software for invented customers. This text is made up for tests.</p><ul><li>Rust and Postgres</li><li>Fully remote</li></ul>",
+   "company_logo_url": "https://remotive.com/job/2091001/logo"
+  }
+ ]
+}

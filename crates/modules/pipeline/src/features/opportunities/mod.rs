@@ -3,7 +3,12 @@
 //!
 //! Opportunities that fail a hard requirement (found by a search before the
 //! rules, checked once after) are hidden: out of the list, never deleted,
-//! listed on their own with `?hidden=true` with the reason.
+//! listed on their own with `?hidden=true` with the reason. A Found or
+//! Shortlisted one past the expiry its job board gives is out of view too.
+//!
+//! Every opportunity found on job boards credits each board it was seen on,
+//! with a link to the posting there (`sources`); its apply link is the
+//! board's, unchanged.
 
 #[cfg(test)]
 mod tests;
@@ -77,31 +82,17 @@ impl OpportunityStage {
     }
 }
 
-/// Where an opportunity came from.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum OpportunitySource {
-    Greenhouse,
-    Lever,
-    Ashby,
-    Arbeitnow,
-    /// HN "Who is hiring".
-    Hn,
-    /// Added by link, from any site.
-    Link,
-}
-
-impl OpportunitySource {
-    fn parse(raw: &str) -> Self {
-        match raw {
-            "greenhouse" => Self::Greenhouse,
-            "lever" => Self::Lever,
-            "ashby" => Self::Ashby,
-            "arbeitnow" => Self::Arbeitnow,
-            "hn" => Self::Hn,
-            _ => Self::Link,
-        }
-    }
+/// A job board an opportunity was seen on, credited with a followed link
+/// to the posting there ("From Himalayas").
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct OpportunitySourceLink {
+    /// The board's slug.
+    pub board: String,
+    /// How it is credited.
+    pub name: String,
+    /// The posting on that board.
+    pub url: String,
+    pub seen_at: DateTime<Utc>,
 }
 
 /// How the job is worked.
@@ -198,7 +189,13 @@ pub struct OpportunitySummary {
     pub work_mode: Option<JobWorkMode>,
     /// The posting.
     pub url: String,
-    pub source: OpportunitySource,
+    /// Where it was found: a job board's slug (`himalayas`), a company
+    /// board (`greenhouse`, `lever`, `ashby`), `hn`, or `link` (added by
+    /// link).
+    pub source: String,
+    /// The job board's name, as credited ("Himalayas"); none for a company
+    /// board or a link.
+    pub source_name: Option<String>,
     /// How well it matches the profile and goals, 0–100; none for one added
     /// by link.
     #[serde(rename = "match")]
@@ -229,7 +226,20 @@ pub struct Opportunity {
     pub work_mode: Option<JobWorkMode>,
     /// The posting.
     pub url: String,
-    pub source: OpportunitySource,
+    /// Where it was found (see the summary's `source`).
+    pub source: String,
+    /// The job board's name, as credited; none for a company board or a
+    /// link.
+    pub source_name: Option<String>,
+    /// Every job board it was seen on, each with the posting's link there
+    /// (to show, followed, as "From Himalayas"); none for a company board
+    /// or a link.
+    pub sources: Vec<OpportunitySourceLink>,
+    /// Where to apply: the board's apply link, unchanged; none when the
+    /// posting is the place (`url`).
+    pub apply_url: Option<String>,
+    /// When the posting expires, as its board says.
+    pub expires_at: Option<DateTime<Utc>>,
     /// How well it matches the profile and goals, 0–100; none for one added
     /// by link.
     #[serde(rename = "match")]
@@ -300,6 +310,9 @@ pub(crate) struct Row {
     region_note: Option<String>,
     working_languages: Option<Vec<String>>,
     hidden_reason: Option<String>,
+    apply_url: Option<String>,
+    expires_at: Option<DateTime<Utc>>,
+    source_name: Option<String>,
 }
 
 /// The columns a [`Row`] reads, as a literal (queries are static strings).
@@ -308,7 +321,10 @@ macro_rules! columns {
         "id, title, company, location, work_mode, url, source, posted_at, salary_text, \
          description, match_score, match_why, match_gaps, stage, next_step, notes, dismissed, \
          opened_at, created_at, updated_at, remote, open_to_candidate, region_note, \
-         working_languages, hidden_reason"
+         working_languages, hidden_reason, apply_url, expires_at, \
+         (SELECT s.name FROM pipeline.opportunity_sources s \
+           WHERE s.opportunity_id = opportunities.id ORDER BY s.seen_at, s.board LIMIT 1) \
+         AS source_name"
     };
 }
 
@@ -345,7 +361,8 @@ impl Row {
             hidden_reason: self.hidden_reason(),
             id: self.id,
             work_mode: self.work_mode.as_deref().and_then(JobWorkMode::parse),
-            source: OpportunitySource::parse(&self.source),
+            source: self.source,
+            source_name: self.source_name,
             stage: OpportunityStage::parse(&self.stage),
             title: self.title,
             company: self.company,
@@ -359,8 +376,8 @@ impl Row {
         }
     }
 
-    pub(crate) fn opportunity(self) -> Opportunity {
-        let source = OpportunitySource::parse(&self.source);
+    pub(crate) fn opportunity(self, sources: Vec<OpportunitySourceLink>) -> Opportunity {
+        let editable = self.source == store::LINK;
         Opportunity {
             new: self.is_new(),
             match_score: self.match_score(),
@@ -368,7 +385,11 @@ impl Row {
             hidden_reason: self.hidden_reason(),
             id: self.id,
             work_mode: self.work_mode.as_deref().and_then(JobWorkMode::parse),
-            source,
+            source: self.source,
+            source_name: self.source_name,
+            sources,
+            apply_url: self.apply_url,
+            expires_at: self.expires_at,
             stage: OpportunityStage::parse(&self.stage),
             title: self.title,
             company: self.company,
@@ -384,7 +405,7 @@ impl Row {
             notes: self.notes,
             posted_at: self.posted_at,
             dismissed: self.dismissed,
-            editable: source == OpportunitySource::Link,
+            editable,
         }
     }
 }
@@ -457,6 +478,8 @@ pub async fn list(
                  OR coalesce(location, '') ILIKE $3)
             AND (NOT $4 OR (stage = 'found' AND opened_at IS NULL AND hidden_reason IS NULL))
             AND (hidden_reason IS NOT NULL) = $5
+            AND NOT (stage IN ('found', 'shortlisted') AND expires_at IS NOT NULL
+                     AND expires_at < $6)
           ORDER BY created_at DESC, id DESC
           LIMIT 1000"
     ))
@@ -465,6 +488,7 @@ pub async fn list(
     .bind(pattern)
     .bind(query.new.unwrap_or(false))
     .bind(query.hidden.unwrap_or(false))
+    .bind(state.clock.now())
     .fetch_all(&state.db)
     .await?;
     Ok(Json(OpportunityList {
@@ -482,6 +506,26 @@ pub(crate) async fn fetch(db: &sqlx::PgPool, account: Uuid, id: Uuid) -> Result<
     .bind(account)
     .fetch_optional(db)
     .await?)
+}
+
+/// The job boards opportunity `id` was seen on, first seen first.
+pub(crate) async fn sources_of(db: &sqlx::PgPool, id: Uuid) -> Result<Vec<OpportunitySourceLink>> {
+    let rows: Vec<(String, String, String, DateTime<Utc>)> = sqlx::query_as(
+        "SELECT board, name, url, seen_at FROM pipeline.opportunity_sources
+          WHERE opportunity_id = $1 ORDER BY seen_at, board",
+    )
+    .bind(id)
+    .fetch_all(db)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|(board, name, url, seen_at)| OpportunitySourceLink {
+            board,
+            name,
+            url,
+            seen_at,
+        })
+        .collect())
 }
 
 /// An opportunity.
@@ -511,7 +555,8 @@ pub async fn get(
     let row = fetch(&state.db, principal.account_id, id)
         .await?
         .ok_or(Error::NotFound)?;
-    Ok(Json(row.opportunity()))
+    let sources = sources_of(&state.db, row.id).await?;
+    Ok(Json(row.opportunity(sources)))
 }
 
 /// A job to add by its link.
@@ -608,7 +653,7 @@ pub async fn add(
             ..NewRow::default()
         },
         None => NewRow {
-            source: "link".to_owned(),
+            source: store::LINK.to_owned(),
             source_ref: url.to_string(),
             title: tidy(new.title.as_deref(), MAX_SHORT).unwrap_or_default(),
             company: tidy(new.company.as_deref(), MAX_SHORT).unwrap_or_default(),
@@ -639,7 +684,8 @@ pub async fn add(
         .await?
         .ok_or(Error::NotFound)?;
     tracing::info!(opportunity = %id, source = %row.source, "opportunity added by link");
-    Ok((status, Json(row.opportunity())))
+    let sources = sources_of(&state.db, row.id).await?;
+    Ok((status, Json(row.opportunity(sources))))
 }
 
 /// A field that may be set, cleared (`null`) or left out.
@@ -745,7 +791,7 @@ pub async fn update(
     .await?
     .ok_or(Error::NotFound)?;
     let typing = changes.title.is_some() || changes.company.is_some() || changes.location.is_some();
-    if typing && row.source != "link" {
+    if typing && row.source != store::LINK {
         return Err(Error::Conflict(
             "not_editable",
             "This one's role, company and place come from the job board.".to_owned(),
@@ -812,5 +858,6 @@ pub async fn update(
     if changed {
         tracing::info!(opportunity = %id, stage = %stage, dismissed, "opportunity changed");
     }
-    Ok(Json(row.opportunity()))
+    let sources = sources_of(&state.db, row.id).await?;
+    Ok(Json(row.opportunity(sources)))
 }

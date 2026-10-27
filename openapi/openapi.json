@@ -1986,7 +1986,11 @@
         "properties": {
           "config": {
             "type": "object",
-            "description": "The whole config, validated for the board's kind."
+            "description": "The whole config, validated for the board's kind.",
+            "additionalProperties": {},
+            "propertyNames": {
+              "type": "string"
+            }
           }
         },
         "additionalProperties": false
@@ -2021,7 +2025,11 @@
           },
           "config": {
             "type": "object",
-            "description": "How it is read (the config's JSON)."
+            "description": "How it is read (the config's JSON).",
+            "additionalProperties": {},
+            "propertyNames": {
+              "type": "string"
+            }
           },
           "endpoint": {
             "type": [

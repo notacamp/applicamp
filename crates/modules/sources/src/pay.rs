@@ -96,6 +96,7 @@ pub fn eur_per_year(salary: &Salary) -> Option<f64> {
 /// A country's typical pay.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
+#[schema(as = CountryBenchmark)]
 pub struct Benchmark {
     /// ISO 3166-1.
     pub code: String,
@@ -125,6 +126,7 @@ pub static COUNTRIES: LazyLock<Vec<Benchmark>> =
 /// What a board's place in the order rests on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
+#[schema(as = RankingBasis)]
 pub enum Basis {
     /// Its own average, from enough salaries.
     Own,
@@ -138,6 +140,7 @@ pub enum Basis {
 
 /// A board's average salary and its key in the order.
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
+#[schema(as = BoardRanking)]
 pub struct Ranking {
     /// The mean of its relevant jobs' stated salaries, in euros a year.
     pub avg_salary_eur_year: Option<f64>,

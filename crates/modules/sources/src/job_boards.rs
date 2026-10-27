@@ -81,6 +81,7 @@ pub fn host_of(url: &Url) -> Option<String> {
 /// How a board is read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
+#[schema(as = BoardKind)]
 pub enum Kind {
     /// A JSON API, its fields mapped by JSON pointer.
     JsonApi,
@@ -114,6 +115,7 @@ impl Kind {
 /// How much a board matters to a remote search.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
+#[schema(as = BoardPriority)]
 pub enum Priority {
     /// Remote-first, open worldwide.
     High,
@@ -139,6 +141,7 @@ impl Priority {
 /// Where a board stands with the owner.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
+#[schema(as = BoardStatus)]
 pub enum Status {
     /// Waiting for the owner: never read for jobs.
     Candidate,
@@ -175,6 +178,7 @@ impl Status {
 /// Where a board came from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
+#[schema(as = BoardOrigin)]
 pub enum Origin {
     /// The seed list.
     Seed,
@@ -474,6 +478,7 @@ impl BoardConfig {
 /// What a board's terms ask, and where they say it.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
+#[schema(as = BoardTerms)]
 pub struct Terms {
     /// How to credit it ("Himalayas").
     #[serde(default)]
@@ -554,6 +559,7 @@ pub struct SampleJob {
 /// What the automatic check found. Every sentence and job in it is copied
 /// from the board's site: data, never instructions.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema)]
+#[schema(as = BoardReport)]
 pub struct Report {
     pub checked_at: Option<DateTime<Utc>>,
     #[serde(default)]

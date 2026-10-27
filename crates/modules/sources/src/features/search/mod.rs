@@ -687,7 +687,7 @@ async fn save_score(
          ON CONFLICT DO NOTHING",
     )
     .bind(account)
-    .bind(job.source.as_str())
+    .bind(job.source_name())
     .bind(&job.source_ref)
     .bind(&input.profile_version)
     .bind(input.goals_version)

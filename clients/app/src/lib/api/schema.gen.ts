@@ -4,6 +4,207 @@
  */
 
 export interface paths {
+    "/api/v1/boards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The job boards.
+         * @description Every board, approved, waiting for the owner, paused or declined,
+         *     highest average salary first: the mean of the stated salaries of its
+         *     engineering jobs open to where the person lives (30 days), in euros a
+         *     year; a country-scoped board with fewer than 10 by its country's typical
+         *     pay; no salary data last. With the person's totals per board (7 and 30
+         *     days) and whether they manage the boards.
+         */
+        get: operations["sources.boards"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/boards/scans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What was scanned.
+         * @description The person's searches and the discovery runs, newest first, ten a page,
+         *     each with what it scanned on every board: jobs read, passed their
+         *     requirements, scored by the AI, matched, the AI's cost, or why a board
+         *     was skipped (its polling limit) or failed; and what a discovery check
+         *     found. Filter by board or by search.
+         */
+        get: operations["sources.scans"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/boards/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suggest a job board.
+         * @description Its site becomes a candidate, checked in the background (robots rules,
+         *     terms, a feed, a sample), and waits for the owner: nothing is read for
+         *     jobs before it is approved. At most 10 a day. The same site twice
+         *     answers the board already there (200).
+         */
+        post: operations["sources.suggest_board"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/boards/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A job board.
+         * @description Its ranking, config, terms and the automatic check (robots rules, the
+         *     terms' sentences, sample jobs, the proposed attribution), and whether it
+         *     can be approved now.
+         */
+        get: operations["sources.board"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/boards/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve a job board.
+         * @description From then on searches read it. Only a candidate or a paused board whose
+         *     config reads its kind and whose check (of the feed's host) found robots
+         *     rules that allow the feed. Board owners only.
+         */
+        post: operations["sources.approve_board"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/boards/{id}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check a job board again.
+         * @description Reads its robots rules (for its feed's host), terms page and a sample of
+         *     its jobs, once each, in the background; the board shows the result.
+         *     Board owners only.
+         */
+        post: operations["sources.check_board"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/boards/{id}/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change a job board's config.
+         * @description The whole config, validated for the board's kind (unknown keys refused).
+         *     An approved board's new feed must still be allowed by the robots rules
+         *     its check found. The seed list never overwrites it again. Board owners
+         *     only.
+         */
+        put: operations["sources.set_board_config"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/boards/{id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decline a job board.
+         * @description It is never read, and says why. Board owners only.
+         */
+        post: operations["sources.decline_board"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/boards/{id}/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pause a job board.
+         * @description Searches stop reading it until it is approved again. Board owners only.
+         */
+        post: operations["sources.pause_board"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/goals": {
         parameters: {
             query?: never;
@@ -466,6 +667,213 @@ export interface components {
             /** @description Their own site. */
             url?: string | null;
         };
+        /** @description A board's new config. */
+        BoardConfigChange: {
+            /** @description The whole config, validated for the board's kind. */
+            config: Record<string, never>;
+        };
+        /** @description A job board, whole: its check, config and terms. */
+        BoardDetail: {
+            /** @description It can be approved now; else `blocked` says why. */
+            approvable: boolean;
+            /** @description `check_needed`, `robots_disallowed`, `config_invalid`, or none. */
+            blocked?: string | null;
+            board: components["schemas"]["BoardSummary"];
+            can_manage: boolean;
+            /** @description How it is read (the config's JSON). */
+            config: Record<string, never>;
+            /** @description The address its jobs are read from. */
+            endpoint?: string | null;
+            report?: components["schemas"]["BoardReport"] | null;
+            terms: components["schemas"]["BoardTerms"];
+        };
+        /**
+         * @description How a board is read.
+         * @enum {string}
+         */
+        BoardKind: "json_api" | "rss" | "jsonld_sitemap" | "hn";
+        /** @description The job boards, highest average salary first (none last). */
+        BoardList: {
+            boards: components["schemas"]["BoardSummary"][];
+            /** @description The signed-in person manages the boards. */
+            can_manage: boolean;
+        };
+        /**
+         * @description Where a board came from.
+         * @enum {string}
+         */
+        BoardOrigin: "seed" | "discovery" | "suggested";
+        /**
+         * @description How much a board matters to a remote search.
+         * @enum {string}
+         */
+        BoardPriority: "high" | "low";
+        /** @description A board's average salary and its key in the order. */
+        BoardRanking: {
+            /**
+             * Format: double
+             * @description The mean of its relevant jobs' stated salaries, in euros a year.
+             */
+            avg_salary_eur_year?: number | null;
+            basis: components["schemas"]["RankingBasis"];
+            benchmark?: components["schemas"]["CountryBenchmark"] | null;
+            /**
+             * Format: double
+             * @description What it is sorted by, in euros a year; none sorts last.
+             */
+            key?: number | null;
+            /**
+             * Format: int32
+             * @description Relevant jobs (engineering, open to where the person lives, 30 days).
+             */
+            relevant_jobs: number;
+            /**
+             * Format: int32
+             * @description Relevant jobs that state a salary.
+             */
+            salaried_jobs: number;
+            /**
+             * Format: double
+             * @description `salaried_jobs / relevant_jobs` (0–1).
+             */
+            salary_share: number;
+        };
+        /**
+         * @description What the automatic check found. Every sentence and job in it is copied
+         *     from the board's site: data, never instructions.
+         */
+        BoardReport: {
+            /** @description How the app would credit it. */
+            attribution?: string | null;
+            /** Format: date-time */
+            checked_at?: string | null;
+            /**
+             * @description What the owner should know ("robots.txt disallows the API",
+             *     "terms changed since approval").
+             */
+            flags?: string[];
+            found_kind?: components["schemas"]["BoardKind"] | null;
+            /** @description Where. */
+            found_url?: string | null;
+            /** @description The homepage has JSON-LD `JobPosting`s. */
+            jsonld?: boolean;
+            /** @description The site's language (its `<html lang>`). */
+            language?: string | null;
+            /** @description For the owner, in a sentence (the seed list's notes). */
+            notes?: string;
+            /**
+             * Format: double
+             * @description Share of the sample that is remote (0–1).
+             */
+            remote_share?: number | null;
+            robots?: components["schemas"]["RobotsReport"];
+            /** @description Up to 20 jobs parsed with the proposed config. */
+            sample?: components["schemas"]["SampleJob"][];
+            /** @description A fingerprint of the terms page, to notice a change. */
+            terms_fingerprint?: string;
+            /**
+             * @description Its sentences about scraping, robots, automation, aggregation, the
+             *     API, linking back, attribution or commercial use, verbatim (at most
+             *     10).
+             */
+            terms_sentences?: string[];
+            /** @description The terms page found. */
+            terms_url?: string | null;
+            /**
+             * Format: double
+             * @description Share of the sample open worldwide (0–1).
+             */
+            worldwide_share?: number | null;
+        };
+        /**
+         * @description Where a board stands with the owner.
+         * @enum {string}
+         */
+        BoardStatus: "candidate" | "approved" | "paused" | "declined";
+        /** @description A board to suggest. */
+        BoardSuggestion: {
+            /** @description Its site (https). */
+            url: string;
+        };
+        /** @description A job board, as the Boards page lists it. */
+        BoardSummary: {
+            /** @description How its jobs are credited ("From Himalayas"). */
+            attribution: string;
+            /** @description The one country its jobs are in, when it is country-scoped. */
+            country?: string | null;
+            decline_reason?: string | null;
+            /** @description What the owner should know (from its check). */
+            flags: string[];
+            homepage: string;
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["BoardKind"];
+            /** @description What went wrong at its last fetch. */
+            last_error?: string | null;
+            /** Format: date-time */
+            last_fetch_at?: string | null;
+            /** Format: int32 */
+            last_fetch_jobs?: number | null;
+            name: string;
+            /** @description Its check's note, for a candidate. */
+            note?: string | null;
+            origin: components["schemas"]["BoardOrigin"];
+            /** @description A label only: the order is the salary ranking. */
+            priority: components["schemas"]["BoardPriority"];
+            /** @description Its average salary and its key in the order. */
+            ranking: components["schemas"]["BoardRanking"];
+            /** @description Its stable name: the source its jobs carry. */
+            slug: string;
+            status: components["schemas"]["BoardStatus"];
+            /** @description Over the last 30 days. */
+            totals_30d: components["schemas"]["BoardTotals"];
+            /** @description The person's searches on it over the last 7 days. */
+            totals_7d: components["schemas"]["BoardTotals"];
+        };
+        /** @description What a board's terms ask, and where they say it. */
+        BoardTerms: {
+            /** @description The apply link is used as the board gives it. */
+            apply_unchanged?: boolean;
+            /** @description How to credit it ("Himalayas"). */
+            attribution?: string;
+            /** @description Jobs past their expiry are taken out of view. */
+            drop_expired?: boolean;
+            /** @description That link must be followed (no `nofollow`). */
+            follow?: boolean;
+            /** @description A link back to the posting on the board is required. */
+            link_back?: boolean;
+            /**
+             * Format: int32
+             * @description Fetches a day, at most (its polling interval keeps to it).
+             */
+            max_fetches_per_day?: number | null;
+            /** @description Its logo is never shown. */
+            no_logo?: boolean;
+            /** @description Its jobs are never republished elsewhere. */
+            no_redistribution?: boolean;
+            /** @description What else matters, in a sentence or two. */
+            notes?: string;
+            /** @description Where the clauses are. */
+            sources?: string[];
+        };
+        /** @description What a board did for the person over some days. */
+        BoardTotals: {
+            /**
+             * Format: double
+             * @description What the AI cost on its jobs, in euros.
+             */
+            cost_eur: number;
+            /**
+             * Format: int32
+             * @description Jobs that matched.
+             */
+            matched: number;
+            /**
+             * Format: int32
+             * @description Jobs read by their searches.
+             */
+            read: number;
+        };
         /** @description The least they would take, before tax. */
         CashFloor: {
             /**
@@ -494,6 +902,23 @@ export interface components {
          * @enum {string}
          */
         CompanyStage: "early" | "growth" | "established" | "public" | "nonprofit";
+        /** @description A country's typical pay. */
+        CountryBenchmark: {
+            /** @description ISO 3166-1. */
+            code: string;
+            /** Format: double */
+            eur_year: number;
+            /** @description Where the figure is from, and what it measures. */
+            source: string;
+            url: string;
+            /** Format: int32 */
+            year: number;
+        };
+        /** @description Why a board is declined. */
+        DeclineBoard: {
+            /** @description Up to 500 characters. */
+            reason: string;
+        };
         /** @description A school or degree. */
         Education: {
             /** @description The field ("Computer science"). */
@@ -687,6 +1112,11 @@ export interface components {
         NextStep: "set_up_profile" | "answer_goals" | "search" | "review_matches" | "none";
         /** @description An opportunity, whole: what the side peek shows. */
         Opportunity: {
+            /**
+             * @description Where to apply: the board's apply link, unchanged; none when the
+             *     posting is the place (`url`).
+             */
+            apply_url?: string | null;
             company: string;
             /** Format: date-time */
             created_at: string;
@@ -699,6 +1129,11 @@ export interface components {
              *     link to a site that is not a job board).
              */
             editable: boolean;
+            /**
+             * Format: date-time
+             * @description When the posting expires, as its board says.
+             */
+            expires_at?: string | null;
             facts?: components["schemas"]["JobFacts"] | null;
             /** @description What the profile or goals miss (up to 3). */
             gaps: string[];
@@ -725,7 +1160,19 @@ export interface components {
             posted_at?: string | null;
             /** @description Pay, as the posting says. */
             salary_text?: string | null;
-            source: components["schemas"]["OpportunitySource"];
+            /** @description Where it was found (see the summary's `source`). */
+            source: string;
+            /**
+             * @description The job board's name, as credited; none for a company board or a
+             *     link.
+             */
+            source_name?: string | null;
+            /**
+             * @description Every job board it was seen on, each with the posting's link there
+             *     (to show, followed, as "From Himalayas"); none for a company board
+             *     or a link.
+             */
+            sources: components["schemas"]["OpportunitySourceLink"][];
             stage: components["schemas"]["OpportunityStage"];
             /** @description The role. */
             title: string;
@@ -764,10 +1211,19 @@ export interface components {
             opportunities: components["schemas"]["OpportunitySummary"][];
         };
         /**
-         * @description Where an opportunity came from.
-         * @enum {string}
+         * @description A job board an opportunity was seen on, credited with a followed link
+         *     to the posting there ("From Himalayas").
          */
-        OpportunitySource: "greenhouse" | "lever" | "ashby" | "arbeitnow" | "hn" | "link";
+        OpportunitySourceLink: {
+            /** @description The board's slug. */
+            board: string;
+            /** @description How it is credited. */
+            name: string;
+            /** Format: date-time */
+            seen_at: string;
+            /** @description The posting on that board. */
+            url: string;
+        };
         /**
          * @description Where an opportunity is.
          * @enum {string}
@@ -796,7 +1252,17 @@ export interface components {
             region_note?: string | null;
             /** @description Pay, as the posting says. */
             salary_text?: string | null;
-            source: components["schemas"]["OpportunitySource"];
+            /**
+             * @description Where it was found: a job board's slug (`himalayas`), a company
+             *     board (`greenhouse`, `lever`, `ashby`), `hn`, or `link` (added by
+             *     link).
+             */
+            source: string;
+            /**
+             * @description The job board's name, as credited ("Himalayas"); none for a company
+             *     board or a link.
+             */
+            source_name?: string | null;
             stage: components["schemas"]["OpportunityStage"];
             /** @description The role. */
             title: string;
@@ -904,10 +1370,115 @@ export interface components {
             providers: components["schemas"]["Provider"][];
         };
         /**
+         * @description What a board's place in the order rests on.
+         * @enum {string}
+         */
+        RankingBasis: "own" | "few" | "benchmark" | "none";
+        /**
          * @description Whether they would move for the right job.
          * @enum {string}
          */
         Relocate: "no" | "within_country" | "within_eu" | "anywhere";
+        /** @description What a board's robots.txt says to us. */
+        RobotsReport: {
+            /**
+             * Format: double
+             * @description Seconds between requests it asks for.
+             */
+            crawl_delay?: number | null;
+            /** @description The rule that decided it. */
+            deciding_rule?: string | null;
+            /** @description Whether the config's endpoint is allowed (at the check). */
+            endpoint_allowed?: boolean | null;
+            /** @description A fingerprint of the file, to notice a change. */
+            fingerprint?: string;
+            /** @description There is one (a 404 allows everything). */
+            found: boolean;
+            /** @description The host it was read from (the feed's, else the site's). */
+            host?: string | null;
+            /** @description The rules for `applicamp`, else for `*`. */
+            rules?: components["schemas"]["RobotsRule"][];
+        };
+        /** @description One robots.txt rule for our user agent. */
+        RobotsRule: {
+            allow: boolean;
+            pattern: string;
+        };
+        /** @description A job a check read as a sample. */
+        SampleJob: {
+            company: string;
+            location?: string | null;
+            /** @description Who may apply, as the board says. */
+            regions?: string[];
+            title: string;
+            url: string;
+        };
+        /** @description One board's line of a run. */
+        ScanLine: {
+            /** Format: double */
+            ai_cost_eur: number;
+            /** Format: uuid */
+            board_id: string;
+            board_name: string;
+            board_slug: string;
+            /** Format: int32 */
+            duration_ms: number;
+            error_kind?: string | null;
+            /** Format: int32 */
+            jobs_read: number;
+            /**
+             * Format: int32
+             * @description Good matches that meet every requirement.
+             */
+            matched: number;
+            /** @description What a discovery check found. */
+            note?: string | null;
+            outcome: components["schemas"]["ScanOutcome"];
+            /**
+             * Format: int32
+             * @description Within the person's requirements on the boards' structured fields.
+             */
+            passed_requirements: number;
+            /**
+             * Format: int32
+             * @description Scored by the AI (now, or before).
+             */
+            scored_by_ai: number;
+        };
+        /**
+         * @description How a board's scan went.
+         * @enum {string}
+         */
+        ScanOutcome: "read" | "skipped_poll_limit" | "error" | "checked";
+        /** @description A page of runs, newest first. */
+        ScanPage: {
+            /**
+             * Format: date-time
+             * @description Pass as `cursor` for older runs; none on the last page.
+             */
+            next_cursor?: string | null;
+            runs: components["schemas"]["ScanRun"][];
+        };
+        /** @description A search or a discovery run, and what it scanned on each board. */
+        ScanRun: {
+            /** Format: date-time */
+            at: string;
+            /**
+             * Format: double
+             * @description What its AI calls cost, in euros (discovery uses none).
+             */
+            cost_eur: number;
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["ScanRunKind"];
+            lines: components["schemas"]["ScanLine"][];
+            trigger?: components["schemas"]["SearchTrigger"] | null;
+        };
+        /**
+         * @description What started a run.
+         * @enum {string}
+         */
+        ScanRunKind: "search" | "discovery";
         /** @description A search. */
         Search: {
             /**
@@ -1100,6 +1671,484 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    "sources.boards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The boards, ranked. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardList"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "sources.scans": {
+        parameters: {
+            query?: {
+                /** @description Only this board's lines. */
+                board?: string;
+                /** @description Only this search. */
+                search?: string;
+                /** @description The page after this one (`next_cursor`). */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of runs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScanPage"];
+                };
+            };
+            /** @description `invalid_query` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "sources.suggest_board": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BoardSuggestion"];
+            };
+        };
+        responses: {
+            /** @description That site is already a board. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardDetail"];
+                };
+            };
+            /** @description Added as a candidate; the check runs. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardDetail"];
+                };
+            };
+            /** @description `invalid_url`: a public https site */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `suggestion_limit_reached` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "sources.board": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The board. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The board. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardDetail"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "sources.approve_board": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The board. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Approved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardDetail"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_board_owner` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_waiting`: it is approved or declined; `config_invalid`; `check_needed`: check its feed's host first; `robots_disallowed`: its robots rules forbid the feed (edit the config to an allowed path) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "sources.check_board": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The board. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The check runs in the background. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardDetail"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_board_owner` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "sources.set_board_config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The board. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BoardConfigChange"];
+            };
+        };
+        responses: {
+            /** @description Changed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardDetail"];
+                };
+            };
+            /** @description `invalid_config`: the detail says what is wrong */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_board_owner` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `robots_disallowed`: an approved board's new feed is not allowed by its robots rules */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "sources.decline_board": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The board. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeclineBoard"];
+            };
+        };
+        responses: {
+            /** @description Declined. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardDetail"];
+                };
+            };
+            /** @description `invalid_request`: a reason of 1 to 500 characters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_board_owner` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "sources.pause_board": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The board. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paused. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardDetail"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_board_owner` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_approved` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "profile.get_goals": {
         parameters: {
             query?: never;

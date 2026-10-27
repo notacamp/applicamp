@@ -226,7 +226,7 @@ function Manage({ detail }: { detail: BoardDetail }) {
   const action = useBoardAction(board.id);
   const [reason, setReason] = useState("");
   const [config, setConfig] = useState(() => JSON.stringify(detail.config, null, 2));
-  const [configError, setConfigError] = useState<string | undefined>(undefined);
+  const [configError, setConfigError] = useState("");
   const waiting = board.status === "candidate" || board.status === "paused";
   const saveConfig = () => {
     let parsed: unknown;
@@ -240,7 +240,7 @@ function Manage({ detail }: { detail: BoardDetail }) {
       setConfigError(t("board.config.notObject"));
       return;
     }
-    setConfigError(undefined);
+    setConfigError("");
     action.mutate({ kind: "config", config: parsed as Record<string, unknown> });
   };
   const blocked = BLOCKS.find((block) => block === detail.blocked);
@@ -331,7 +331,7 @@ function Manage({ detail }: { detail: BoardDetail }) {
           <TextArea
             label={t("board.config.label")}
             hint={t("board.config.hint")}
-            error={configError}
+            error={configError === "" ? undefined : configError}
             rows={12}
             spellCheck={false}
             value={config}

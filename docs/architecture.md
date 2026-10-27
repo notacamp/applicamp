@@ -13,7 +13,7 @@ flowchart LR
   ORCH -- "gRPC" --> GW["OpenShell gateway"]
   GW --> S1["sandbox: search"]
   GW --> S2["sandbox: apply (Chromium)"]
-  S1 -. "allow-listed hosts" .-> ATS["Greenhouse / Lever / Ashby / Arbeitnow / Adzuna / HN"]
+  S1 -. "allow-listed hosts" .-> ATS["Approved job boards (Himalayas, Jobicy, Remote OK, Arbeitnow, HN…)"]
   S1 -- "agent API, run token" --> API
   S2 -- "agent API, run token" --> API
   GW -- "model router" --> OR["OpenRouter"]

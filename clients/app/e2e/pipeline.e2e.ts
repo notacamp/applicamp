@@ -27,7 +27,10 @@ const PROFILE = {
   projects: [],
 };
 
-/** Goals a search keeps to: the fake board's jobs are remote within Europe. */
+/**
+ * Goals a search keeps to: remote only, from Lisbon (the profile's place). The fake board's jobs
+ * are remote within Europe, but one is remote only from Germany or Austria: it is dropped.
+ */
 const GOALS = { roles: ["Staff engineer"], work_mode: ["remote"] };
 
 test("someone with a profile and goals presses Search now, sees the matches arrive as Found, opens one and shortlists it", async ({
@@ -70,6 +73,10 @@ test("someone with a profile and goals presses Search now, sees the matches arri
   await expect(page.getByTestId("search-line")).toBeVisible();
   await expect(page.getByTestId("search-line")).toContainText(/\d/);
   await expect(page.getByTestId("search-stopped")).toHaveCount(0);
+  // The hard requirements are pass/fail: the Germany-or-Austria-only job is dropped, whatever
+  // its score, and never shows up in the pipeline.
+  await expect(page.getByTestId("search-line")).toContainText("dropped for your requirements");
+  await expect(page.getByText("Staff Engineer (m/w/d)")).toHaveCount(0);
 
   // The matches are Found: a table on a desktop, cards on a phone.
   await page.getByTestId("pipeline-stage-filter").selectOption("found");

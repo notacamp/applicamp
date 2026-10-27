@@ -37,8 +37,9 @@ use crate::{
     job::WorkMode,
     matching::MatchInput,
     module,
-    ports::{Neighbours, Scored},
+    ports::{Neighbours, Scored, Unchecked},
     readers::Board,
+    requirements::{Excluded, Facts, Reach},
 };
 
 pub(crate) const GREENHOUSE_LIST: &str = include_str!("readers/fixtures/greenhouse_list.json");
@@ -60,6 +61,10 @@ pub(crate) struct Fake {
     pub(crate) accounts: Mutex<Vec<Uuid>>,
     pub(crate) known: Mutex<HashSet<(String, String)>>,
     pub(crate) added: Mutex<Vec<Scored>>,
+    /// Opportunities found before the rules, not yet checked.
+    pub(crate) unchecked: Mutex<Vec<Unchecked>>,
+    /// The checks kept: the opportunity, its facts, why it is hidden.
+    pub(crate) checked: Mutex<Vec<(Uuid, Facts, Option<Excluded>)>>,
 }
 
 impl Fake {
@@ -78,8 +83,34 @@ impl Fake {
         Arc::new(fake)
     }
 
+    /// Someone in Lisbon who works remote only, in English and Portuguese,
+    /// and would not move: the owner's goals when #19 was reported.
+    pub(crate) fn lisbon_remote_only() -> Arc<Self> {
+        let fake = Self::default();
+        *lock(&fake.input) = Some(MatchInput {
+            profile_version: "2026-10-01T00:00:00Z".into(),
+            goals_version: 1,
+            profile: json!({ "headline": "Backend engineer", "location": "Lisbon, Portugal" }),
+            goals: json!({ "roles": ["Senior backend engineer"], "work_mode": ["remote"],
+                           "locations": ["Lisbon"], "relocate": "no" }),
+            roles: vec!["Senior backend engineer".into()],
+            work_modes: vec![WorkMode::Remote],
+            locations: vec!["Lisbon".into()],
+            will_not_relocate: true,
+            home: Some("Lisbon".into()),
+            relocate: Some(Reach::No),
+            languages: vec!["en".into(), "pt".into()],
+            ..MatchInput::default()
+        });
+        Arc::new(fake)
+    }
+
     pub(crate) fn added(&self) -> Vec<Scored> {
         lock(&self.added).clone()
+    }
+
+    pub(crate) fn checked(&self) -> Vec<(Uuid, Facts, Option<Excluded>)> {
+        lock(&self.checked).clone()
     }
 }
 
@@ -129,6 +160,35 @@ impl Neighbours for Fake {
         }
         Box::pin(async move { Ok(added) })
     }
+
+    fn unchecked<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        most: usize,
+    ) -> BoxFuture<'a, Result<Vec<Unchecked>>> {
+        let unchecked: Vec<Unchecked> = lock(&self.unchecked).iter().take(most).cloned().collect();
+        Box::pin(async move { Ok(unchecked) })
+    }
+
+    fn set_requirements<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        _account: Uuid,
+        opportunity: Uuid,
+        facts: Facts,
+        hidden: Option<Excluded>,
+    ) -> BoxFuture<'a, Result<bool>> {
+        let set = {
+            let mut unchecked = lock(&self.unchecked);
+            let before = unchecked.len();
+            unchecked.retain(|item| item.opportunity != opportunity);
+            unchecked.len() < before
+        };
+        if set {
+            lock(&self.checked).push((opportunity, facts, hidden));
+        }
+        Box::pin(async move { Ok(set) })
+    }
 }
 
 /// Settings for fake boards at `boards` (Greenhouse only), with no cache,
@@ -177,7 +237,89 @@ pub(crate) fn completion(answer: &Value, cost: f64) -> Value {
     })
 }
 
-/// A fake model scoring every job of a batch `score`.
+/// The facts of a remote job open to anyone in Europe, in English.
+pub(crate) fn open_facts() -> Value {
+    json!({
+        "remote": "yes",
+        "open_to_candidate": "yes",
+        "region_note": "Europe",
+        "working_languages": ["en"],
+        "salary": null,
+    })
+}
+
+/// One job's answer: `match`, a reason, a gap and `facts`.
+pub(crate) fn answer_for(reference: &str, score: u8, facts: &Value) -> Value {
+    let mut item = json!({
+        "ref": reference,
+        "match": score,
+        "why": ["Rust and Postgres, as on your profile"],
+        "gaps": ["Kafka is not on your profile"],
+    });
+    if let (Some(item), Some(facts)) = (item.as_object_mut(), facts.as_object()) {
+        item.extend(facts.clone());
+    }
+    item
+}
+
+/// The postings of a scoring request's `<jobs>` block, by `ref`.
+pub(crate) fn postings(request: &wiremock::Request) -> Vec<Value> {
+    let body: Value = serde_json::from_slice(&request.body).unwrap_or(Value::Null);
+    let user = body["messages"][1]["content"].as_str().unwrap_or("");
+    let block = user
+        .split("<jobs>")
+        .nth(1)
+        .and_then(|rest| rest.split("</jobs>").next())
+        .unwrap_or("[]");
+    serde_json::from_str::<Value>(block.trim())
+        .ok()
+        .and_then(|v| v.as_array().cloned())
+        .unwrap_or_default()
+}
+
+/// A fake model that answers every job 85 and reads the facts the way a
+/// model would from the fixtures' wording: "Remote-first aus Deutschland
+/// oder Österreich" is remote but not open to Lisbon, a posting in German
+/// needs German, a posting that never says remote is unclear, and "fully
+/// remote, anywhere in Europe" is open to them.
+pub(crate) async fn model_reading_facts() -> MockServer {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(|request: &wiremock::Request| {
+            let jobs: Vec<Value> = postings(request)
+                .iter()
+                .map(|posting| {
+                    let text = posting["posting"].as_str().unwrap_or("");
+                    let location = posting["location"].as_str().unwrap_or("");
+                    let facts = if text.contains("Deutschland oder Österreich") {
+                        json!({ "remote": "yes", "open_to_candidate": "no",
+                                "region_note": "Germany or Austria only",
+                                "working_languages": ["en"], "salary": null })
+                    } else if text.contains("Wir suchen") {
+                        json!({ "remote": "yes", "open_to_candidate": "yes", "region_note": "EU",
+                                "working_languages": ["de"], "salary": null })
+                    } else if format!("{text} {location}")
+                        .to_lowercase()
+                        .contains("remote")
+                    {
+                        open_facts()
+                    } else {
+                        json!({ "remote": "unclear", "open_to_candidate": "unclear",
+                                "region_note": "", "working_languages": ["en"], "salary": null })
+                    };
+                    answer_for(posting["ref"].as_str().unwrap_or(""), 85, &facts)
+                })
+                .collect();
+            ResponseTemplate::new(200).set_body_json(completion(&json!({ "jobs": jobs }), 0.000_4))
+        })
+        .mount(&server)
+        .await;
+    server
+}
+
+/// A fake model scoring every job of a batch `score`; every job remote and
+/// open to anyone in Europe, in English.
 pub(crate) async fn model_scoring(score: u8) -> MockServer {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
@@ -190,14 +332,7 @@ pub(crate) async fn model_scoring(score: u8) -> MockServer {
                 .to_owned();
             let jobs: Vec<Value> = (1..=10)
                 .filter(|i| user.contains(&format!("\"ref\":\"j{i}\"")))
-                .map(|i| {
-                    json!({
-                        "ref": format!("j{i}"),
-                        "match": score,
-                        "why": ["Rust and Postgres, as on your profile"],
-                        "gaps": ["Kafka is not on your profile"],
-                    })
-                })
+                .map(|i| answer_for(&format!("j{i}"), score, &open_facts()))
                 .collect();
             ResponseTemplate::new(200).set_body_json(completion(&json!({ "jobs": jobs }), 0.000_4))
         })

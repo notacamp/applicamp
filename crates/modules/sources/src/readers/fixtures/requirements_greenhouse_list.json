@@ -1,0 +1,23 @@
+{
+  "jobs": [
+    {
+      "absolute_url": "https://job-boards.greenhouse.io/exampleco/jobs/301",
+      "id": 301,
+      "location": { "name": "Portugal" },
+      "title": "Senior Backend Engineer, Payments",
+      "updated_at": "2026-10-25T10:00:00-04:00",
+      "first_published": "2026-10-24T09:00:00-04:00",
+      "company_name": "Example Co"
+    },
+    {
+      "absolute_url": "https://job-boards.greenhouse.io/exampleco/jobs/302",
+      "id": 302,
+      "location": { "name": "Remote (EU)" },
+      "title": "Senior Backend Engineer, Platform",
+      "updated_at": "2026-10-25T10:00:00-04:00",
+      "first_published": "2026-10-24T09:00:00-04:00",
+      "company_name": "Example Co"
+    }
+  ],
+  "meta": { "total": 2 }
+}

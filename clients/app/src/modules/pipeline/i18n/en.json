@@ -13,7 +13,9 @@
     "stage": "Stage",
     "allStages": "All stages",
     "newOnly": "Showing the new matches only.",
-    "showAll": "Show everything"
+    "showAll": "Show everything",
+    "hidden": "Hidden: don’t meet your requirements",
+    "hiddenOnly": "These don’t meet your requirements, so they’re out of the pipeline. Nothing was deleted."
   },
   "columns": {
     "role": "Role",
@@ -22,7 +24,8 @@
     "stage": "Stage",
     "source": "Source",
     "nextStep": "Next step",
-    "updated": "Updated"
+    "updated": "Updated",
+    "hiddenReason": "Why it’s hidden"
   },
   "stages": {
     "found": "Found",
@@ -96,6 +99,28 @@
     "dismissed": "Not for me · {{title}}",
     "save": "Save",
     "cancel": "Cancel",
-    "saveFailed": "That change couldn’t be saved. Try again."
+    "saveFailed": "That change couldn’t be saved. Try again.",
+    "requirements": "Your requirements",
+    "hidden": "Hidden: it doesn’t meet your requirements"
+  },
+  "hidden": {
+    "reasons": {
+      "not_remote": "Not remote, or doesn’t say",
+      "not_open_to_location": "Not open to where you live",
+      "language": "Needs a language you don’t work in",
+      "below_floor": "Pays less than your floor"
+    }
+  },
+  "facts": {
+    "remote": {
+      "yes": "Remote",
+      "no": "Not remote",
+      "unclear": "Remote not stated"
+    },
+    "open": {
+      "yes": "Open to where you live",
+      "no": "Not open to where you live",
+      "unclear": "Who it’s open to not stated"
+    }
   }
 }

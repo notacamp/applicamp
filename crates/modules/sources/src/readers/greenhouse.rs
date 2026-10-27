@@ -80,6 +80,7 @@ fn job(detail: Detail, board: &Board) -> Option<Job> {
         title,
         company: one_line(detail.company_name.as_deref()).unwrap_or_else(|| board.company.clone()),
         work_mode: work_mode(location.as_deref()),
+        board_remote: None,
         location,
         url,
         posted_at: when(detail.first_published.as_deref())

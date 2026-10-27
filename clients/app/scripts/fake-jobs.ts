@@ -16,16 +16,27 @@
 //   APPLICAMP_AI__COMPLETE__BASE_URL=http://localhost:9020/v1
 //   APPLICAMP_AI__COMPLETE__MODEL=fake/model
 //
-// Every list of a board answers with three new jobs (new ids each time), so
-// every search finds something new.
+// Every list of a board answers with four new jobs (new ids each time), so
+// every search finds something new. The fourth is remote only from Germany or
+// Austria, in the words of the posting that made #19: the model reads that
+// fact and the search drops it ("… 1 dropped for your requirements") for
+// someone who works remote only from Portugal.
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
 const env = process.env;
 const port = Number(env["FAKE_JOBS_PORT"] ?? "9020");
 const host = env["FAKE_JOBS_HOST"] ?? "127.0.0.1";
 
-/** The invented roles every board lists. */
-const ROLES = ["Staff Engineer", "Founding Engineer", "Platform Engineer"] as const;
+/** The invented roles every board lists; the last is open only to Germany and Austria. */
+const ROLES = [
+  "Staff Engineer",
+  "Founding Engineer",
+  "Platform Engineer",
+  "Staff Engineer (m/w/d)",
+] as const;
+
+/** The role at `index` is the one remote only from Germany or Austria. */
+const DACH = ROLES.length - 1;
 
 let lists = 0;
 
@@ -46,7 +57,7 @@ function job(id: number, title: string): FakeJob {
     title,
     updated_at: now,
     first_published: now,
-    location: { name: "Remote - Europe" },
+    location: { name: title === ROLES[DACH] ? "Berlin" : "Remote - Europe" },
     absolute_url: `https://example.com/jobs/${String(id)}`,
     company_name: "Example Co",
   };
@@ -77,27 +88,61 @@ async function body(request: IncomingMessage): Promise<string> {
   return text;
 }
 
-/** Scores every `"ref":"jN"` of the last user message, as the model would. */
+/** A posting in the scoring request's `<jobs>` block. */
+interface Posting {
+  ref?: string;
+  posting?: string;
+}
+
+/** The postings of the last user message's `<jobs>` block. */
+function postingsOf(content: string): Posting[] {
+  const block = content.split("<jobs>")[1]?.split("</jobs>")[0] ?? "[]";
+  try {
+    const parsed: unknown = JSON.parse(block);
+    return Array.isArray(parsed) ? (parsed as Posting[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** The eligibility facts of a posting, as a model reads them from its words. */
+function factsOf(posting: Posting) {
+  return (posting.posting ?? "").includes("Deutschland oder Österreich")
+    ? {
+        remote: "yes",
+        open_to_candidate: "no",
+        region_note: "Germany or Austria only",
+        working_languages: ["en"],
+        salary: null,
+      }
+    : {
+        remote: "yes",
+        open_to_candidate: "yes",
+        region_note: "Europe",
+        working_languages: ["en"],
+        salary: null,
+      };
+}
+
+/** Scores every posting of the last user message, with its facts, as the model would. */
 async function complete(request: IncomingMessage, response: ServerResponse) {
-  let refs: string[] = [];
+  let postings: Posting[] = [];
   try {
     const parsed = JSON.parse(await body(request)) as {
       messages?: { role?: string; content?: string }[];
     };
     const user = (parsed.messages ?? []).findLast((message) => message.role === "user");
-    const content = user?.content ?? "";
-    refs = [
-      ...new Set([...content.matchAll(/"ref"\s*:\s*"(j\d+)"/g)].map((match) => match[1] ?? "")),
-    ].filter((ref) => ref !== "");
+    postings = postingsOf(user?.content ?? "").filter((posting) => (posting.ref ?? "") !== "");
   } catch {
     json(response, 400, { error: { message: "not JSON" } });
     return;
   }
-  const jobs = refs.map((ref, index) => ({
-    ref,
+  const jobs = postings.map((posting, index) => ({
+    ref: posting.ref,
     match: 90 - ((index * 7) % 21),
     why: ["Your roles name this one", "Remote within Europe, as you asked"],
     gaps: ["The posting asks for on-call duty; your profile does not mention it"],
+    ...factsOf(posting),
   }));
   json(response, 200, {
     id: `fake-${String(Date.now())}`,
@@ -132,10 +177,14 @@ const server = createServer((request, response) => {
   if (method === "GET" && posting !== null) {
     const id = Number(posting[2]);
     const title = ROLES[id % 10] ?? ROLES[0];
+    const where =
+      title === ROLES[DACH]
+        ? "<li>Standort: Remote-first aus Deutschland oder Österreich</li>"
+        : "<li>Remote within Europe</li>";
     json(response, 200, {
       ...job(id, title),
       content: escaped(
-        `<p>Example Co builds invented software for invented customers.</p><ul><li>Work with a small team</li><li>Remote within Europe</li></ul><script>alert("not run")</script>`,
+        `<p>Example Co builds invented software for invented customers.</p><ul><li>Work with a small team</li>${where}</ul><script>alert("not run")</script>`,
       ),
     });
     return;

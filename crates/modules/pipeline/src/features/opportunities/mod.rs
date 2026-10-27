@@ -1,5 +1,9 @@
 //! `/api/v1/opportunities`: the pipeline, its opportunities, adding one by
 //! link, and moving one along (stage, next step, notes, Not for me).
+//!
+//! Opportunities that fail a hard requirement (found by a search before the
+//! rules, checked once after) are hidden: out of the list, never deleted,
+//! listed on their own with `?hidden=true` with the reason.
 
 #[cfg(test)]
 mod tests;
@@ -120,6 +124,68 @@ impl JobWorkMode {
     }
 }
 
+/// What a posting says about a fact a requirement is checked on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Fact {
+    Yes,
+    No,
+    /// It does not say.
+    Unclear,
+}
+
+impl Fact {
+    fn parse(raw: &str) -> Option<Self> {
+        match raw {
+            "yes" => Some(Self::Yes),
+            "no" => Some(Self::No),
+            "unclear" => Some(Self::Unclear),
+            _ => None,
+        }
+    }
+}
+
+/// Why an opportunity is hidden: it fails a hard requirement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum HiddenReason {
+    /// They work remote only, and it is not remote (or does not say).
+    NotRemote,
+    /// It cannot be done from where they live (remote only from elsewhere,
+    /// or in a place they cannot be).
+    NotOpenToLocation,
+    /// It needs a language they did not list.
+    Language,
+    /// Its stated pay is under their floor.
+    BelowFloor,
+}
+
+impl HiddenReason {
+    fn parse(raw: &str) -> Option<Self> {
+        match raw {
+            "not_remote" => Some(Self::NotRemote),
+            "not_open_to_location" => Some(Self::NotOpenToLocation),
+            "language" => Some(Self::Language),
+            "below_floor" => Some(Self::BelowFloor),
+            _ => None,
+        }
+    }
+}
+
+/// What the posting says about the person's requirements, as their search
+/// read it: "Remote · open to you · English".
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct JobFacts {
+    /// It can be done fully remote.
+    pub remote: Fact,
+    /// Someone where the person lives can do it without moving.
+    pub open_to_candidate: Fact,
+    /// Where it is open, as the posting says ("Germany or Austria only").
+    pub region_note: Option<String>,
+    /// The languages it needs, ISO 639-1 (`en`).
+    pub working_languages: Vec<String>,
+}
+
 /// An opportunity, as the table, the board and the list show it.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct OpportunitySummary {
@@ -145,6 +211,10 @@ pub struct OpportunitySummary {
     pub new: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    /// Why it is hidden, if it is: it fails a hard requirement.
+    pub hidden_reason: Option<HiddenReason>,
+    /// Where it is open, as the posting says, to go with the reason.
+    pub region_note: Option<String>,
 }
 
 /// An opportunity, whole: what the side peek shows.
@@ -176,8 +246,14 @@ pub struct Opportunity {
     pub description: Option<String>,
     /// Why it matches, citing the profile (up to 3).
     pub why: Vec<String>,
-    /// What the profile or goals miss (up to 2).
+    /// What the profile or goals miss (up to 3).
     pub gaps: Vec<String>,
+    /// What the posting says about their requirements; none when never
+    /// checked (added by link, or found before the rules and not yet
+    /// checked).
+    pub facts: Option<JobFacts>,
+    /// Why it is hidden, if it is: it fails a hard requirement.
+    pub hidden_reason: Option<HiddenReason>,
     /// The person's notes.
     pub notes: Option<String>,
     /// When the posting was published.
@@ -192,7 +268,8 @@ pub struct Opportunity {
 /// The pipeline.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct OpportunityList {
-    /// Newest first; never the dismissed ones.
+    /// Newest first; never the dismissed ones, and the hidden ones only when
+    /// asked for.
     pub opportunities: Vec<OpportunitySummary>,
 }
 
@@ -218,6 +295,11 @@ pub(crate) struct Row {
     opened_at: Option<DateTime<Utc>>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
+    remote: Option<String>,
+    open_to_candidate: Option<String>,
+    region_note: Option<String>,
+    working_languages: Option<Vec<String>>,
+    hidden_reason: Option<String>,
 }
 
 /// The columns a [`Row`] reads, as a literal (queries are static strings).
@@ -225,13 +307,30 @@ macro_rules! columns {
     () => {
         "id, title, company, location, work_mode, url, source, posted_at, salary_text, \
          description, match_score, match_why, match_gaps, stage, next_step, notes, dismissed, \
-         opened_at, created_at, updated_at"
+         opened_at, created_at, updated_at, remote, open_to_candidate, region_note, \
+         working_languages, hidden_reason"
     };
 }
 
 impl Row {
     fn is_new(&self) -> bool {
-        self.stage == "found" && self.opened_at.is_none() && !self.dismissed
+        self.stage == "found"
+            && self.opened_at.is_none()
+            && !self.dismissed
+            && self.hidden_reason.is_none()
+    }
+
+    fn hidden_reason(&self) -> Option<HiddenReason> {
+        self.hidden_reason.as_deref().and_then(HiddenReason::parse)
+    }
+
+    fn facts(&self) -> Option<JobFacts> {
+        Some(JobFacts {
+            remote: Fact::parse(self.remote.as_deref()?)?,
+            open_to_candidate: Fact::parse(self.open_to_candidate.as_deref()?)?,
+            region_note: self.region_note.clone(),
+            working_languages: self.working_languages.clone().unwrap_or_default(),
+        })
     }
 
     fn match_score(&self) -> Option<u8> {
@@ -243,6 +342,7 @@ impl Row {
         OpportunitySummary {
             new: self.is_new(),
             match_score: self.match_score(),
+            hidden_reason: self.hidden_reason(),
             id: self.id,
             work_mode: self.work_mode.as_deref().and_then(JobWorkMode::parse),
             source: OpportunitySource::parse(&self.source),
@@ -255,6 +355,7 @@ impl Row {
             salary_text: self.salary_text,
             created_at: self.created_at,
             updated_at: self.updated_at,
+            region_note: self.region_note,
         }
     }
 
@@ -263,6 +364,8 @@ impl Row {
         Opportunity {
             new: self.is_new(),
             match_score: self.match_score(),
+            facts: self.facts(),
+            hidden_reason: self.hidden_reason(),
             id: self.id,
             work_mode: self.work_mode.as_deref().and_then(JobWorkMode::parse),
             source,
@@ -297,6 +400,9 @@ pub struct ListQuery {
     pub q: Option<String>,
     /// Only the new ones (Found, never opened).
     pub new: Option<bool>,
+    /// Only the hidden ones: found before the requirement rules, they fail
+    /// one. Left out otherwise.
+    pub hidden: Option<bool>,
 }
 
 /// `text` as a `LIKE` pattern matching it anywhere.
@@ -311,8 +417,9 @@ fn contains_pattern(text: &str) -> String {
 /// The pipeline.
 ///
 /// Every opportunity of the signed-in person, newest first, except the
-/// dismissed ones ("Not for me"). Filter by stage, by text in the role,
-/// company or place, or to the new ones.
+/// dismissed ones ("Not for me") and the hidden ones (they fail a hard
+/// requirement; `hidden=true` lists only those, with the reason). Filter by
+/// stage, by text in the role, company or place, or to the new ones.
 #[utoipa::path(
     get,
     path = "/api/v1/opportunities",
@@ -349,6 +456,7 @@ pub async fn list(
             AND ($3::text IS NULL OR title ILIKE $3 OR company ILIKE $3
                  OR coalesce(location, '') ILIKE $3)
             AND (NOT $4 OR (stage = 'found' AND opened_at IS NULL))
+            AND (hidden_reason IS NOT NULL) = $5
           ORDER BY created_at DESC, id DESC
           LIMIT 1000"
     ))
@@ -356,6 +464,7 @@ pub async fn list(
     .bind(query.stage.map(OpportunityStage::as_str))
     .bind(pattern)
     .bind(query.new.unwrap_or(false))
+    .bind(query.hidden.unwrap_or(false))
     .fetch_all(&state.db)
     .await?;
     Ok(Json(OpportunityList {

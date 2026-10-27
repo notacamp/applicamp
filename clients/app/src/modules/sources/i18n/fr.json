@@ -19,7 +19,8 @@
     "lastNight": "Cette nuit : {{counts}}",
     "today": "Aujourd’hui à {{time}} : {{counts}}",
     "on": "{{date}} : {{counts}}",
-    "cost": "IA {{cost}}"
+    "cost": "IA {{cost}}",
+    "countsDropped": "{{fetched}} offres lues, {{added}} retenues, {{dropped}} écartées selon vos critères"
   },
   "stopped": {
     "ai_budget_reached": "Arrêtée à la limite de dépenses d’IA. Les offres déjà évaluées sont conservées.",

@@ -111,6 +111,7 @@ pub fn jobs(comments: Comments, story: &Story) -> Vec<Job> {
                 company: String::new(),
                 location: None,
                 work_mode: None,
+                board_remote: None,
                 url: format!("https://news.ycombinator.com/item?id={}", c.id),
                 posted_at: c
                     .created_at_i

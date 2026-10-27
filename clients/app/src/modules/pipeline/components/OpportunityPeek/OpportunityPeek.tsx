@@ -21,7 +21,7 @@ import {
   useUndoToast,
 } from "~/lib/ui";
 
-import { formatShortDate, SOURCE_HUES } from "../../api/labels";
+import { factsText, formatShortDate, hiddenReasonText, SOURCE_HUES } from "../../api/labels";
 import {
   STAGES,
   useOpportunity,
@@ -41,9 +41,10 @@ export interface OpportunityPeekProps {
 }
 
 /**
- * One opportunity beside the list: its properties (stage, next step), why
- * it matches and its gaps, the posting's text and link, notes, and Not for
- * me. Opening it once marks a new match seen.
+ * One opportunity beside the list: its properties (stage, next step, what
+ * the posting says about the person's requirements), why it matches and its
+ * gaps, the posting's text and link, notes, and Not for me. One that doesn't
+ * meet the requirements says so. Opening it once marks a new match seen.
  */
 export function OpportunityPeek({ id, onClose }: OpportunityPeekProps) {
   const { t } = useTranslation("pipeline");
@@ -117,8 +118,18 @@ function PeekBody({ opportunity, onClose }: { opportunity: Opportunity; onClose:
     busy: update.isPending,
   };
 
+  const facts = opportunity.facts ?? null;
+  const hiddenReason = opportunity.hidden_reason ?? null;
+
   return (
     <>
+      {hiddenReason === null ? null : (
+        <Tagged testId="peek-hidden">
+          <Banner icon="warning" title={t("peek.hidden")}>
+            {hiddenReasonText(hiddenReason, facts?.region_note, t)}
+          </Banner>
+        </Tagged>
+      )}
       {editable ? (
         <InlineText
           {...textProps}
@@ -177,6 +188,11 @@ function PeekBody({ opportunity, onClose }: { opportunity: Opportunity; onClose:
         </Property>
         {opportunity.salary_text === undefined || opportunity.salary_text === null ? null : (
           <Property label={t("peek.pay")}>{opportunity.salary_text}</Property>
+        )}
+        {facts === null ? null : (
+          <Property label={t("peek.requirements")} testId="peek-facts">
+            {factsText(facts, i18n.language, t)}
+          </Property>
         )}
         <Property label={t("peek.match")}>
           <MatchBar

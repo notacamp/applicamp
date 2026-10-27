@@ -258,3 +258,73 @@ async fn a_link_to_another_site_is_kept_as_a_link(db: PgPool) {
         .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_match_that_fails_a_requirement_is_hidden_with_its_reason(db: PgPool) {
+    let h = Harness::new(db);
+    let kept = Found {
+        eligibility: Some(store::Eligibility {
+            remote: "yes".into(),
+            open_to_candidate: "yes".into(),
+            region_note: Some("EU".into()),
+            working_languages: vec!["en".into()],
+        }),
+        ..found("exampleco:1", "Staff Engineer")
+    };
+    store::add_found(
+        &h.db,
+        &Default::default(),
+        h.account,
+        vec![kept, found("exampleco:2", "Platform Engineer")],
+        Utc::now(),
+    )
+    .await
+    .unwrap();
+    // Found before the rules, then checked: remote only from Germany or Austria.
+    let unchecked = store::unchecked(&h.db, 30).await.unwrap();
+    assert_eq!(unchecked.len(), 1);
+    let hidden_id = unchecked[0].id;
+    store::set_eligibility(
+        &h.db,
+        h.account,
+        hidden_id,
+        store::Eligibility {
+            remote: "yes".into(),
+            open_to_candidate: "no".into(),
+            region_note: Some("Germany or Austria only".into()),
+            working_languages: vec!["en".into()],
+        },
+        Some("not_open_to_location"),
+    )
+    .await
+    .unwrap();
+
+    // Out of the pipeline and of the new matches.
+    let (status, body) = h.get("/api/v1/opportunities").await;
+    assert_eq!(status, StatusCode::OK);
+    let list = body["opportunities"].as_array().unwrap();
+    assert_eq!(list.len(), 1);
+    assert_eq!(list[0]["title"], "Staff Engineer");
+    assert_eq!(list[0]["hidden_reason"], serde_json::Value::Null);
+    let (_, body) = h.get("/api/v1/opportunities?new=true").await;
+    assert_eq!(body["opportunities"].as_array().unwrap().len(), 1);
+
+    // Listed on its own, with the reason.
+    let (status, body) = h.get("/api/v1/opportunities?hidden=true").await;
+    assert_eq!(status, StatusCode::OK);
+    let list = body["opportunities"].as_array().unwrap();
+    assert_eq!(list.len(), 1);
+    assert_eq!(list[0]["hidden_reason"], "not_open_to_location");
+    assert_eq!(list[0]["region_note"], "Germany or Austria only");
+    assert_eq!(list[0]["new"], false);
+
+    // The peek shows the facts.
+    let (status, body) = h.get(&format!("/api/v1/opportunities/{hidden_id}")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["hidden_reason"], "not_open_to_location");
+    assert_eq!(body["facts"]["remote"], "yes");
+    assert_eq!(body["facts"]["open_to_candidate"], "no");
+    assert_eq!(body["facts"]["working_languages"], json!(["en"]));
+    let (_, body) = h.get("/api/v1/opportunities?hidden=true&new=true").await;
+    assert!(body["opportunities"].as_array().unwrap().is_empty());
+}

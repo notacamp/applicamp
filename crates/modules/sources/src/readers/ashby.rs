@@ -68,6 +68,11 @@ fn job(posting: Posting, board: &Board) -> Option<Job> {
         .as_deref()
         .and_then(WorkMode::parse)
         .or_else(|| (posting.is_remote == Some(true)).then_some(WorkMode::Remote));
+    // `workplaceType` when it is set, else the `isRemote` flag.
+    let board_remote = match posting.workplace_type.as_deref().and_then(WorkMode::parse) {
+        Some(mode) => Some(mode == WorkMode::Remote),
+        None => posting.is_remote,
+    };
     Some(Job {
         source: Source::Ashby,
         source_ref: posting.id.to_ascii_lowercase(),
@@ -75,6 +80,7 @@ fn job(posting: Posting, board: &Board) -> Option<Job> {
         company: board.company.clone(),
         location: one_line(posting.location.as_deref()),
         work_mode,
+        board_remote,
         url: one_line(posting.job_url.as_deref())?,
         posted_at: when(posting.published_at.as_deref()),
         salary_text: one_line(
@@ -100,4 +106,38 @@ pub fn jobs(list: List, board: &Board) -> Vec<Job> {
         .into_iter()
         .filter_map(|posting| job(posting, board))
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn board() -> Board {
+        Board {
+            kind: Source::Ashby,
+            token: "exampleco".into(),
+            company: "Example Co".into(),
+            eu: false,
+        }
+    }
+
+    #[test]
+    fn the_remote_fields_are_read() {
+        let list: List = serde_json::from_value(serde_json::json!({ "jobs": [
+            { "id": "A", "title": "One", "jobUrl": "https://example.com/1", "isRemote": false },
+            { "id": "B", "title": "Two", "jobUrl": "https://example.com/2", "isRemote": true },
+            { "id": "C", "title": "Three", "jobUrl": "https://example.com/3",
+              "isRemote": true, "workplaceType": "OnSite" },
+            { "id": "D", "title": "Four", "jobUrl": "https://example.com/4" },
+        ]}))
+        .unwrap();
+        let jobs = jobs(list, &board());
+        let remote: Vec<Option<bool>> = jobs.iter().map(|j| j.board_remote).collect();
+        assert_eq!(remote, [Some(false), Some(true), Some(false), None]);
+        assert_eq!(
+            jobs[0].work_mode, None,
+            "not remote says neither hybrid nor on site"
+        );
+        assert_eq!(jobs[2].work_mode, Some(WorkMode::Onsite));
+    }
 }

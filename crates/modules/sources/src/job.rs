@@ -8,10 +8,15 @@ use std::sync::LazyLock;
 use chrono::{DateTime, Utc};
 use regex::Regex;
 
+use crate::requirements::Salary;
+
 /// Longest description kept, in characters.
 pub const MAX_DESCRIPTION: usize = 20_000;
 
-/// Where jobs are read from.
+/// Where jobs are read from: a company's board on an applicant tracking
+/// system (Greenhouse, Lever, Ashby), HN "Who is hiring", or a job board of
+/// the registry ([`crate::job_boards`]), whose jobs are named after the
+/// board ([`Job::source_name`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Source {
     /// Greenhouse's public job board API.
@@ -20,20 +25,24 @@ pub enum Source {
     Lever,
     /// Ashby's public posting API.
     Ashby,
-    /// Arbeitnow's job board API.
+    /// Arbeitnow, as opportunities found before the job-board registry name
+    /// it; its jobs are now read as the `arbeitnow` job board.
     Arbeitnow,
     /// HN "Who is hiring", through Algolia.
     Hn,
+    /// A job board of the registry, read through its config.
+    Board,
 }
 
 impl Source {
     /// Every source.
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
         Self::Greenhouse,
         Self::Lever,
         Self::Ashby,
         Self::Arbeitnow,
         Self::Hn,
+        Self::Board,
     ];
 
     /// Lower-case name, as configured and stored.
@@ -44,7 +53,13 @@ impl Source {
             Self::Ashby => "ashby",
             Self::Arbeitnow => "arbeitnow",
             Self::Hn => "hn",
+            Self::Board => "board",
         }
+    }
+
+    /// A company board on an applicant tracking system.
+    pub const fn is_company_board(self) -> bool {
+        matches!(self, Self::Greenhouse | Self::Lever | Self::Ashby)
     }
 
     /// The source named `name`.
@@ -91,6 +106,38 @@ impl WorkMode {
     }
 }
 
+/// Where a job was seen on a job board, with the posting's link there: the
+/// app credits every one ("From Himalayas").
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceLink {
+    /// The board's slug.
+    pub board: String,
+    /// The board's name, as its terms ask to credit it.
+    pub name: String,
+    /// The posting on that board.
+    pub url: String,
+}
+
+/// What a job board of the registry says of a job, beyond what every
+/// reader gives.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct BoardJob {
+    /// The board's slug: the job's source.
+    pub slug: String,
+    /// Every board it was seen on (this one first), each with its link.
+    pub links: Vec<SourceLink>,
+    /// The apply link exactly as the board gives it (never rewritten).
+    pub apply_url: Option<String>,
+    /// Who may apply, as the board's structured field says ("United
+    /// States", "Europe", "Anywhere"); empty when the board does not say.
+    pub regions: Vec<String>,
+    /// When the posting expires, for a board whose terms ask to drop
+    /// expired jobs.
+    pub expires_at: Option<DateTime<Utc>>,
+    /// The pay its structured fields state.
+    pub pay: Option<Salary>,
+}
+
 /// A job read from a board.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Job {
@@ -120,12 +167,22 @@ pub struct Job {
     pub salary_text: Option<String>,
     /// Plain text; empty until read for a board whose list leaves it out.
     pub description: String,
+    /// What the job board of the registry it was read on says; `None` for a
+    /// company board.
+    pub board: Option<BoardJob>,
 }
 
 impl Job {
+    /// Its source as stored: the job board's slug, else the reader's name.
+    pub fn source_name(&self) -> &str {
+        self.board
+            .as_ref()
+            .map_or(self.source.as_str(), |board| board.slug.as_str())
+    }
+
     /// Its key: `(source, source_ref)`.
     pub fn key(&self) -> (String, String) {
-        (self.source.as_str().to_owned(), self.source_ref.clone())
+        (self.source_name().to_owned(), self.source_ref.clone())
     }
 
     /// A free-text HN comment: the model reads its company and role.

@@ -1,0 +1,44 @@
+{
+ "comments": "21/08/2026: Cursor pagination is now available and is the preferred way to page through the feed. Pass the nextCursor value from each response back as ?cursor=.",
+ "updatedAt": 1792915200,
+ "offset": 3,
+ "limit": 3,
+ "totalCount": 132774,
+ "nextCursor": null,
+ "jobs": [
+  {
+   "title": "Founding Engineer",
+   "excerpt": "Demo Startup is invented.",
+   "companyName": "Demo Startup",
+   "companySlug": "demo-startup",
+   "companyLogo": "",
+   "employmentType": "Full Time",
+   "minSalary": 90000,
+   "maxSalary": 110000,
+   "salaryPeriod": "annual",
+   "seniority": [
+    "Senior"
+   ],
+   "currency": "EUR",
+   "locationRestrictions": [
+    "Europe"
+   ],
+   "timezoneRestrictions": [
+    0,
+    1,
+    2
+   ],
+   "categories": [
+    "Software-Engineer"
+   ],
+   "parentCategories": [
+    "Engineering"
+   ],
+   "description": "<h3><strong>About Demo Startup</strong></h3><p>Demo Startup builds invented software for invented customers. This text is made up for tests.</p><ul><li>Rust and Postgres</li><li>Fully remote</li></ul>",
+   "pubDate": 1792915200,
+   "expiryDate": 1800000000,
+   "applicationLink": "https://himalayas.app/companies/demo-startup/jobs/founding-engineer?utm_source=api",
+   "guid": "https://himalayas.app/companies/demo-startup/jobs/founding-engineer"
+  }
+ ]
+}

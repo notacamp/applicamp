@@ -37,6 +37,10 @@
     "title": "Opportunités",
     "lead": "Chaque opportunité trouvée par les agents ou ajoutée par vous, de la première correspondance à l’offre."
   },
+  "boards": {
+    "title": "Sites d’emploi",
+    "lead": "Les sites d’emploi que lisent les recherches, classés par les salaires qu’ils affichent, les nouveaux qui vous attendent et ce que chaque recherche a analysé."
+  },
   "agents": {
     "title": "Agents",
     "lead": "Chaque exécution travaille dans son propre bac à sable, créé pour une tâche et supprimé ensuite.",

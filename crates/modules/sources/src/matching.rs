@@ -1,11 +1,14 @@
 //! Choosing which jobs to score, without the model.
 //!
 //! 1. **Hard limits** from the goals' structured answers, on the job's
-//!    structured fields only (never its prose): too old, or clearly in the
-//!    wrong place or the wrong way of working (Ashby's `isRemote` /
-//!    `workplaceType` and Lever's `workplaceType` for someone who works
-//!    remote only). Anything unclear goes to the model, whose facts the
-//!    requirement rules ([`crate::requirements`]) decide on.
+//!    structured fields only (never its prose): too old, expired (a board
+//!    whose terms drop expired jobs), or clearly in the wrong place or the
+//!    wrong way of working (Ashby's `isRemote` / `workplaceType` and
+//!    Lever's `workplaceType` for someone who works remote only; a job
+//!    board's structured regions that exclude the country they live in,
+//!    for someone who works remote only or would not move). Anything
+//!    unclear goes to the model, whose facts the requirement rules
+//!    ([`crate::requirements`]) decide on.
 //! 2. **Pre-rank** by how much of a wanted role's words the title has, how
 //!    recent the job is, and whether its structured location names
 //!    somewhere they can work from (remote, Europe, their places, their
@@ -17,7 +20,7 @@ use chrono::{DateTime, TimeDelta, Utc};
 
 use crate::{
     job::{Job, WorkMode},
-    places,
+    places, regions,
     requirements::{Floor, Reach},
 };
 
@@ -79,6 +82,11 @@ pub enum Out {
     /// They work remote only, and the board's own field says it is not
     /// remote.
     NotRemote,
+    /// Past the expiry its board gives.
+    Expired,
+    /// Its board's regions exclude the country they live in, and they work
+    /// remote only or would not move.
+    Region,
 }
 
 /// Whether `job` breaks a hard limit of `input`, and which; `known` are the
@@ -97,6 +105,18 @@ pub fn hard_limit(
     }
     if input.remote_only() && job.board_remote == Some(false) {
         return Some(Out::NotRemote);
+    }
+    if let Some(board) = &job.board {
+        if board.expires_at.is_some_and(|at| at < now) {
+            return Some(Out::Expired);
+        }
+        let bound = input.remote_only() || input.relocate == Some(Reach::No);
+        if bound
+            && let Some(country) = input.home.as_deref().and_then(regions::country_of)
+            && regions::open_to(&board.regions, country) == Some(false)
+        {
+            return Some(Out::Region);
+        }
     }
     let mode = job.work_mode?;
     // Remote suits anyone; an office day suits only who asked for it.
@@ -236,6 +256,7 @@ mod tests {
 
     fn job(title: &str, location: Option<&str>, mode: Option<WorkMode>, days: i64) -> Job {
         Job {
+            board: None,
             source: Source::Lever,
             source_ref: title.to_lowercase().replace(' ', "-"),
             title: title.into(),
@@ -331,6 +352,49 @@ mod tests {
                 &known,
                 now()
             ),
+            None
+        );
+    }
+
+    #[test]
+    fn a_boards_regions_and_expiry_are_hard_limits() {
+        use crate::job::BoardJob;
+        let on = |regions: &[&str], expired: bool| Job {
+            board: Some(BoardJob {
+                slug: "himalayas".into(),
+                regions: regions.iter().map(|r| (*r).to_owned()).collect(),
+                expires_at: expired.then(|| now() - TimeDelta::days(1)),
+                ..BoardJob::default()
+            }),
+            ..job("Staff Engineer", None, Some(WorkMode::Remote), 1)
+        };
+        let lisbon = MatchInput {
+            work_modes: vec![WorkMode::Remote],
+            home: Some("Lisbon".into()),
+            ..remote_in_portugal()
+        };
+        let known = HashSet::new();
+        let out = |j: &Job| hard_limit(j, &lisbon, &known, now());
+        assert_eq!(out(&on(&["United States"], false)), Some(Out::Region));
+        assert_eq!(out(&on(&["Germany"], false)), Some(Out::Region));
+        assert_eq!(out(&on(&["Europe"], false)), None);
+        assert_eq!(out(&on(&["Anywhere"], false)), None);
+        assert_eq!(out(&on(&[], false)), None, "no regions: the model reads it");
+        assert_eq!(
+            out(&on(&["Atlantis"], false)),
+            None,
+            "not understood: the model"
+        );
+        assert_eq!(out(&on(&["Europe"], true)), Some(Out::Expired));
+        // Someone who would move within the EU keeps a Germany-only job.
+        let mover = MatchInput {
+            work_modes: vec![WorkMode::Remote, WorkMode::Hybrid],
+            relocate: Some(Reach::WithinEu),
+            will_not_relocate: false,
+            ..lisbon
+        };
+        assert_eq!(
+            hard_limit(&on(&["Germany"], false), &mover, &known, now()),
             None
         );
     }

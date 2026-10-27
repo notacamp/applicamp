@@ -1,0 +1,355 @@
+# The job boards Applicamp knows, synced into `sources.job_boards` at start
+# (crates/modules/sources/src/job_boards.rs). Searches read only `approved`
+# boards; `candidate` boards wait for the owner on the Boards page; `declined`
+# ones are never read, and say why.
+#
+# Research of 2026-10-27 (#5): each board's API was read once to record its
+# fields (crates/modules/sources/src/readers/fixtures/boards/), its robots.txt
+# and its API terms. The owner approved the first boards on 2026-10-27:
+# remote jobs anywhere first; national and regional boards are kept as
+# low-priority candidates, never dropped.
+#
+# A status here is only the first one: once in the registry, a board's status
+# is the owner's, and a config the owner edited is never overwritten.
+
+# --- Approved: remote-first, worldwide ---------------------------------------
+
+[[board]]
+slug = "himalayas"
+name = "Himalayas"
+homepage = "https://himalayas.app"
+kind = "json_api"
+priority = "high"
+status = "approved"
+
+[board.config]
+endpoint = "https://himalayas.app/jobs/api"
+items = "/jobs"
+cursor = { param = "cursor", from = "/nextCursor" }
+max_pages = 5
+poll_minutes = 60
+# Under 60 requests a minute.
+min_interval_ms = 1100
+remote_only = true
+
+[board.config.fields]
+ref = "/guid"
+title = "/title"
+company = "/companyName"
+# The job's page on Himalayas: the visible link back.
+url = "/guid"
+apply_url = "/applicationLink"
+regions = "/locationRestrictions"
+description = "/description"
+posted_at = "/pubDate"
+expires_at = "/expiryDate"
+salary_min = "/minSalary"
+salary_max = "/maxSalary"
+salary_currency = "/currency"
+salary_period = "/salaryPeriod"
+
+[board.terms]
+attribution = "Himalayas"
+link_back = true
+follow = true
+apply_unchanged = true
+no_redistribution = true
+drop_expired = true
+notes = "Use applicationLink unchanged and show a visible link to the job on Himalayas. No redistribution of the feed. Remove jobs once expired. Under 60 requests a minute (a free key raises it to 60 a minute, 10 000 a day; none is needed)."
+sources = ["https://himalayas.app/api"]
+
+[[board]]
+slug = "jobicy"
+name = "Jobicy"
+homepage = "https://jobicy.com"
+kind = "json_api"
+priority = "high"
+status = "approved"
+
+[board.config]
+endpoint = "https://jobicy.com/api/v2/remote-jobs"
+query = { count = "50", tag = "engineer" }
+items = "/jobs"
+poll_minutes = 60
+remote_only = true
+
+[board.config.fields]
+ref = "/id"
+title = "/jobTitle"
+company = "/companyName"
+url = "/url"
+# "All application buttons redirect to the original job URL."
+apply_url = "/url"
+regions = "/jobGeo"
+description = "/jobDescription"
+posted_at = "/pubDate"
+salary_min = "/salaryMin"
+salary_max = "/salaryMax"
+salary_currency = "/salaryCurrency"
+salary_period = "/salaryPeriod"
+
+[board.terms]
+attribution = "Jobicy"
+link_back = true
+follow = true
+apply_unchanged = true
+max_fetches_per_day = 24
+notes = "Credit Jobicy with a direct link to the source; apply buttons go to the original job URL. The feed holds the last 7 days only. Poll at most once an hour."
+sources = ["https://jobicy.com/jobs-rss-feed", "https://jobi.cy/apidocs"]
+
+[[board]]
+slug = "remoteok"
+name = "Remote OK"
+homepage = "https://remoteok.com"
+kind = "json_api"
+priority = "high"
+status = "approved"
+
+[board.config]
+endpoint = "https://remoteok.com/api"
+# The answer's first element is the API's legal notice, not a job.
+skip_first = true
+poll_minutes = 60
+# robots.txt: Crawl-delay: 1.
+min_interval_ms = 1000
+remote_only = true
+salary_currency = "USD"
+salary_period = "year"
+
+[board.config.fields]
+ref = "/id"
+title = "/position"
+company = "/company"
+url = "/url"
+apply_url = "/apply_url"
+location = "/location"
+description = "/description"
+posted_at = "/epoch"
+salary_min = "/salary_min"
+salary_max = "/salary_max"
+
+[board.terms]
+attribution = "Remote OK"
+link_back = true
+follow = true
+apply_unchanged = true
+no_logo = true
+notes = "Link back to the job's URL on Remote OK (followed, never nofollow) and mention Remote OK as the source. Never use the Remote OK logo; use the name."
+sources = ["https://remoteok.com/api", "https://remoteok.com/robots.txt"]
+
+[[board]]
+slug = "arbeitnow"
+name = "Arbeitnow"
+homepage = "https://www.arbeitnow.com"
+kind = "json_api"
+priority = "high"
+status = "approved"
+
+[board.config]
+endpoint = "https://www.arbeitnow.com/api/job-board-api"
+query = { remote = "true" }
+items = "/data"
+page_param = "page"
+next = "/links/next"
+max_pages = 5
+poll_minutes = 60
+remote_only = true
+# The query is not a filter: keep only the jobs it marks remote.
+filter = { pointer = "/remote", equals = true }
+
+[board.config.fields]
+ref = "/slug"
+title = "/title"
+company = "/company_name"
+url = "/url"
+apply_url = "/url"
+location = "/location"
+description = "/description"
+posted_at = "/created_at"
+
+[board.terms]
+attribution = "Arbeitnow"
+link_back = true
+follow = true
+apply_unchanged = true
+notes = "Remote jobs only (remote=true, and the job's own remote flag). Hourly at most. Link back to the job on Arbeitnow."
+sources = ["https://www.arbeitnow.com/blog/job-board-api"]
+
+[[board]]
+slug = "hn"
+name = "HN Who is hiring"
+homepage = "https://news.ycombinator.com"
+kind = "hn"
+priority = "high"
+status = "approved"
+
+[board.config]
+poll_minutes = 360
+
+[board.terms]
+attribution = "HN Who is hiring"
+link_back = true
+follow = true
+notes = "The monthly \"Ask HN: Who is hiring?\" thread, read through Algolia's HN search API; each top-level comment is a post the model reads."
+sources = ["https://hn.algolia.com/api"]
+
+# --- Waiting for the owner ----------------------------------------------------
+
+[[board]]
+slug = "remotive"
+name = "Remotive"
+homepage = "https://remotive.com"
+kind = "json_api"
+priority = "high"
+status = "candidate"
+
+[board.config]
+endpoint = "https://remotive.com/api/remote-jobs"
+query = { category = "software-dev" }
+items = "/jobs"
+# At most 4 fetches a day (blocked above 2 a minute).
+poll_minutes = 360
+min_interval_ms = 31000
+remote_only = true
+
+[board.config.fields]
+ref = "/id"
+title = "/title"
+company = "/company_name"
+url = "/url"
+apply_url = "/url"
+regions = "/candidate_required_location"
+description = "/description"
+posted_at = "/publication_date"
+salary_text = "/salary"
+
+[board.terms]
+attribution = "Remotive"
+link_back = true
+follow = true
+apply_unchanged = true
+no_redistribution = true
+max_fetches_per_day = 4
+notes = "Link back to the URL on Remotive and name Remotive as the source. Jobs come 24 hours late (applied by Remotive). Never submit its jobs to third-party sites; never a sign-up funnel. At most 4 fetches a day."
+sources = ["https://remotive.com/api-documentation", "https://remotive.com/robots.txt"]
+
+[board.report]
+notes = "Its API terms invite this use, but its robots.txt disallows /api/* and /*category= for every crawler, so the check blocks approval. See openspec/decisions-needed.md."
+flags = ["robots.txt disallows /api/* and /*category="]
+
+[board.report.robots]
+found = true
+rules = [{ allow = false, pattern = "/api/*" }, { allow = false, pattern = "/*category=" }]
+endpoint_allowed = false
+deciding_rule = "Disallow: /*category="
+fingerprint = ""
+
+[[board]]
+slug = "we-work-remotely"
+name = "We Work Remotely"
+homepage = "https://weworkremotely.com"
+kind = "rss"
+priority = "high"
+status = "candidate"
+
+[board.report]
+notes = "High priority. Its RSS feeds are public, but a person must read its terms of service before it is approved."
+flags = ["terms of service not read yet"]
+
+[[board]]
+slug = "working-nomads"
+name = "Working Nomads"
+homepage = "https://www.workingnomads.com"
+kind = "json_api"
+priority = "high"
+status = "candidate"
+
+[board.report]
+notes = "High priority. Ask Working Nomads for permission before reading its jobs."
+flags = ["ask permission first"]
+
+[[board]]
+slug = "itjobs-pt"
+name = "ITJobs.pt"
+homepage = "https://www.itjobs.pt"
+kind = "json_api"
+priority = "low"
+status = "candidate"
+country = "PT"
+
+[board.report]
+notes = "National (Portugal). Its API needs a free key, asked for by email."
+
+[[board]]
+slug = "net-empregos"
+name = "Net-Empregos"
+homepage = "https://www.net-empregos.com"
+kind = "rss"
+priority = "low"
+status = "candidate"
+country = "PT"
+
+[board.report]
+notes = "National (Portugal), general. It has RSS feeds."
+
+[[board]]
+slug = "adzuna"
+name = "Adzuna"
+homepage = "https://www.adzuna.com"
+kind = "json_api"
+priority = "low"
+status = "candidate"
+
+[board.report]
+notes = "General aggregator. Its API needs a free key and is for personal use only; commercial use needs a licence."
+flags = ["personal use only"]
+
+[[board]]
+slug = "swissdevjobs"
+name = "SwissDevJobs"
+homepage = "https://swissdevjobs.ch"
+kind = "json_api"
+priority = "low"
+status = "candidate"
+country = "CH"
+
+[board.report]
+notes = "National (Switzerland), developer jobs."
+
+# --- Declined -------------------------------------------------------------------
+
+[[board]]
+slug = "landing-jobs"
+name = "Landing.jobs"
+homepage = "https://landing.jobs"
+kind = "json_api"
+priority = "low"
+status = "declined"
+decline_reason = "Its robots.txt disallows /api/ and its terms forbid scraping."
+
+[[board]]
+slug = "the-muse"
+name = "The Muse"
+homepage = "https://www.themuse.com"
+kind = "json_api"
+priority = "low"
+status = "declined"
+decline_reason = "US-centric, and its listings are stale."
+
+[[board]]
+slug = "wellfound"
+name = "Wellfound"
+homepage = "https://wellfound.com"
+kind = "jsonld_sitemap"
+priority = "low"
+status = "declined"
+decline_reason = "Its robots.txt disallows automated reading."
+
+[[board]]
+slug = "dice"
+name = "Dice"
+homepage = "https://www.dice.com"
+kind = "jsonld_sitemap"
+priority = "low"
+status = "declined"
+decline_reason = "Its robots.txt disallows automated reading."

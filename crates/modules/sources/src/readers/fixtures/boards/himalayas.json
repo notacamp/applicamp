@@ -1,0 +1,108 @@
+{
+ "comments": "21/08/2026: Cursor pagination is now available and is the preferred way to page through the feed. Pass the nextCursor value from each response back as ?cursor=.",
+ "updatedAt": 1792915200,
+ "offset": 0,
+ "limit": 3,
+ "totalCount": 132774,
+ "nextCursor": "Y3Vyc29yLXBhZ2UtMg",
+ "jobs": [
+  {
+   "title": "Senior Backend Engineer",
+   "excerpt": "Example Co builds invented software.",
+   "companyName": "Example Co",
+   "companySlug": "example-co",
+   "companyLogo": "https://cdn.example.com/logo.png",
+   "employmentType": "Full Time",
+   "minSalary": 120000,
+   "maxSalary": 150000,
+   "salaryPeriod": "annual",
+   "seniority": [
+    "Senior"
+   ],
+   "currency": "USD",
+   "locationRestrictions": [],
+   "timezoneRestrictions": [],
+   "categories": [
+    "Backend-Engineer",
+    "Software-Engineer"
+   ],
+   "parentCategories": [
+    "Engineering"
+   ],
+   "description": "<h3><strong>About Example Co</strong></h3><p>Example Co builds invented software for invented customers. This text is made up for tests.</p><ul><li>Rust and Postgres</li><li>Fully remote</li></ul>",
+   "pubDate": 1792828800,
+   "expiryDate": 1800000000,
+   "applicationLink": "https://jobs.example.com/apply/42?utm_source=api",
+   "guid": "https://himalayas.app/companies/example-co/jobs/senior-backend-engineer"
+  },
+  {
+   "title": "Staff Platform Engineer",
+   "excerpt": "Sample Labs runs an invented platform.",
+   "companyName": "Sample Labs",
+   "companySlug": "sample-labs",
+   "companyLogo": "",
+   "employmentType": "Full Time",
+   "minSalary": 180000,
+   "maxSalary": 220000,
+   "salaryPeriod": "annual",
+   "seniority": [
+    "Staff"
+   ],
+   "currency": "USD",
+   "locationRestrictions": [
+    "United States"
+   ],
+   "timezoneRestrictions": [
+    -8,
+    -7,
+    -6,
+    -5
+   ],
+   "categories": [
+    "Platform-Engineer"
+   ],
+   "parentCategories": [
+    "Engineering"
+   ],
+   "description": "<h3><strong>About Sample Labs</strong></h3><p>Sample Labs builds invented software for invented customers. This text is made up for tests.</p><ul><li>Rust and Postgres</li><li>Fully remote</li></ul>",
+   "pubDate": 1792656000,
+   "expiryDate": 1800000000,
+   "applicationLink": "https://himalayas.app/companies/sample-labs/jobs/staff-platform-engineer?utm_source=api",
+   "guid": "https://himalayas.app/companies/sample-labs/jobs/staff-platform-engineer"
+  },
+  {
+   "title": "Senior Backend Engineer (Payments)",
+   "excerpt": "Invented Finance moves invented money.",
+   "companyName": "Invented Finance",
+   "companySlug": "invented-finance",
+   "companyLogo": "",
+   "employmentType": "Full Time",
+   "minSalary": 35,
+   "maxSalary": 45,
+   "salaryPeriod": "hourly",
+   "seniority": [
+    "Senior"
+   ],
+   "currency": "USD",
+   "locationRestrictions": [
+    "Germany",
+    "Portugal"
+   ],
+   "timezoneRestrictions": [
+    0,
+    1
+   ],
+   "categories": [
+    "Backend-Engineer"
+   ],
+   "parentCategories": [
+    "Engineering"
+   ],
+   "description": "<h3><strong>About Invented Finance</strong></h3><p>Invented Finance builds invented software for invented customers. This text is made up for tests.</p><ul><li>Rust and Postgres</li><li>Fully remote</li></ul>",
+   "pubDate": 1792483200,
+   "expiryDate": 1792656000,
+   "applicationLink": "https://himalayas.app/companies/invented-finance/jobs/senior-backend-engineer-payments?utm_source=api",
+   "guid": "https://himalayas.app/companies/invented-finance/jobs/senior-backend-engineer-payments"
+  }
+ ]
+}

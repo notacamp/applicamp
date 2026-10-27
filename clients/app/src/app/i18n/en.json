@@ -37,6 +37,10 @@
     "title": "Pipeline",
     "lead": "Every opportunity agents find or you add, from first match to offer."
   },
+  "boards": {
+    "title": "Boards",
+    "lead": "The job boards searches read, ranked by the salaries they list, the new ones waiting for you, and what each search scanned."
+  },
   "agents": {
     "title": "Agents",
     "lead": "Each run works in its own sandbox, made for one job and deleted after.",

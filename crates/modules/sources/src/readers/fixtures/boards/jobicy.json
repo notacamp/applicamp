@@ -1,0 +1,63 @@
+{
+ "apiVersion": "2.2.19",
+ "documentationUrl": "https://jobi.cy/apidocs",
+ "friendlyNotice": "Thanks for using Jobicy API! Please ensure Jobicy is clearly credited with a direct link to the source, and all application buttons redirect to the original job URL provided in this feed. That’s all! You might be building something amazing, we wish you the best of luck!",
+ "jobCount": 2,
+ "lastUpdate": "2026-10-25T05:21:43+00:00",
+ "nextCursor": "QUJDREVG",
+ "hasMore": true,
+ "appliedFilters": {
+  "count": 50,
+  "tag": "engineer"
+ },
+ "statusCode": 200,
+ "success": true,
+ "jobs": [
+  {
+   "id": 157001,
+   "url": "https://jobicy.com/jobs/157001-senior-backend-engineer",
+   "jobSlug": "157001-senior-backend-engineer",
+   "jobTitle": "Senior Backend Engineer",
+   "companyName": "Example Co",
+   "companyLogo": "https://jobicy.com/data/logo.jpg",
+   "jobIndustry": [
+    "Programming"
+   ],
+   "jobType": [
+    "Full-Time"
+   ],
+   "jobGeo": "Anywhere",
+   "jobLevel": "Senior",
+   "jobExcerpt": "Example Co builds invented software.",
+   "jobDescription": "<h3><strong>About Example Co</strong></h3><p>Example Co builds invented software for invented customers. This text is made up for tests.</p><ul><li>Rust and Postgres</li><li>Fully remote</li></ul>",
+   "pubDate": "2026-10-25T05:21:43+00:00",
+   "salaryMin": 115000,
+   "salaryMax": 145000,
+   "salaryCurrency": "USD",
+   "salaryPeriod": "yearly"
+  },
+  {
+   "id": 157002,
+   "url": "https://jobicy.com/jobs/157002-backend-developer",
+   "jobSlug": "157002-backend-developer",
+   "jobTitle": "Senior Rust Engineer",
+   "companyName": "Sample Labs",
+   "companyLogo": "",
+   "jobIndustry": [
+    "Programming"
+   ],
+   "jobType": [
+    "Full-Time"
+   ],
+   "jobGeo": "Germany,  Portugal,  Spain,  UK",
+   "jobLevel": "Senior",
+   "jobExcerpt": "Sample Labs runs an invented platform.",
+   "jobDescription": "<h3><strong>About Sample Labs</strong></h3><p>Sample Labs builds invented software for invented customers. This text is made up for tests.</p><ul><li>Rust and Postgres</li><li>Fully remote</li></ul>",
+   "pubDate": "2026-10-24T09:00:00+00:00",
+   "salaryMin": 85000,
+   "salaryMax": 105000,
+   "salaryCurrency": "EUR",
+   "salaryPeriod": "yearly"
+  }
+ ]
+}

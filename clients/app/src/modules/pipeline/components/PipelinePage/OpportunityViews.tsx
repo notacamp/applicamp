@@ -15,7 +15,13 @@ import {
   type DataColumn,
 } from "~/lib/ui";
 
-import { formatShortDate, hiddenReasonText, SOURCE_HUES, STAGE_HUES } from "../../api/labels";
+import {
+  formatShortDate,
+  hiddenReasonText,
+  sourceHue,
+  sourceLabel,
+  STAGE_HUES,
+} from "../../api/labels";
 import { STAGES, type OpportunitySummary } from "../../api/opportunities";
 
 export interface OpportunityViewProps {
@@ -58,7 +64,7 @@ function CardMeta({ row }: { row: OpportunitySummary }) {
     <Cluster>
       <MatchBar value={row.match} label={t("columns.match")} />
       <Label hue={STAGE_HUES[row.stage]}>{t(`stages.${row.stage}`)}</Label>
-      <Label hue={SOURCE_HUES[row.source]}>{t(`sources.${row.source}`)}</Label>
+      <Label hue={sourceHue(row.source)}>{sourceLabel(row, t)}</Label>
       <HiddenReasonLine row={row} />
     </Cluster>
   );
@@ -99,7 +105,7 @@ function tableColumns(
       id: "source",
       header: t("columns.source"),
       nowrap: true,
-      cell: (row) => <Label hue={SOURCE_HUES[row.source]}>{t(`sources.${row.source}`)}</Label>,
+      cell: (row) => <Label hue={sourceHue(row.source)}>{sourceLabel(row, t)}</Label>,
     },
     next,
     {
@@ -175,7 +181,7 @@ export function OpportunityBoard({ rows, selected, onOpen }: OpportunityViewProp
                 meta={
                   <Cluster>
                     <MatchBar value={row.match} label={t("columns.match")} />
-                    <Label hue={SOURCE_HUES[row.source]}>{t(`sources.${row.source}`)}</Label>
+                    <Label hue={sourceHue(row.source)}>{sourceLabel(row, t)}</Label>
                   </Cluster>
                 }
                 selected={row.id === selected}

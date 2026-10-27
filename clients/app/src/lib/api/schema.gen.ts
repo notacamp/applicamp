@@ -670,7 +670,9 @@ export interface components {
         /** @description A board's new config. */
         BoardConfigChange: {
             /** @description The whole config, validated for the board's kind. */
-            config: Record<string, never>;
+            config: {
+                [key: string]: unknown;
+            };
         };
         /** @description A job board, whole: its check, config and terms. */
         BoardDetail: {
@@ -681,7 +683,9 @@ export interface components {
             board: components["schemas"]["BoardSummary"];
             can_manage: boolean;
             /** @description How it is read (the config's JSON). */
-            config: Record<string, never>;
+            config: {
+                [key: string]: unknown;
+            };
             /** @description The address its jobs are read from. */
             endpoint?: string | null;
             report?: components["schemas"]["BoardReport"] | null;

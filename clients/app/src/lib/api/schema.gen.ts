@@ -369,6 +369,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/profile/drafts/{id}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Throw a draft away.
+         * @description The profile is unchanged. Discarding twice is fine; a kept draft cannot
+         *     be discarded.
+         */
+        post: operations["profile.discard_draft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/drafts/{id}/keep": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Keep a draft.
+         * @description Writes it into the profile as a new profile version whose source is
+         *     `answer`, and marks the question done. `items` may be edited first.
+         *     Refused with 409 `profile_changed` when the profile changed since the
+         *     draft was made.
+         */
+        post: operations["profile.keep_draft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/profile/imports": {
         parameters: {
             query?: never;
@@ -456,6 +500,201 @@ export interface paths {
          *     cannot be discarded.
          */
         post: operations["profile.discard_import"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The questions that would make the profile stronger.
+         * @description The first request for a profile and goals version starts the AI review in
+         *     the background (one model call) and answers 202 `running`; ask again in a
+         *     moment. The review is kept until the profile or goals change by any other
+         *     way than the person's own kept answers. Without a model, or over a
+         *     spending limit, the status says so (`unavailable`, `failed`) and the
+         *     checklist from `GET /api/v1/profile/strength` still works.
+         */
+        get: operations["profile.questions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/questions/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Try the review again after it failed.
+         * @description Only a failed review is started again, and the spending limits still
+         *     apply: over one, it fails again at once without calling the model.
+         */
+        post: operations["profile.review_again"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/questions/{id}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make a draft from an answer.
+         * @description One small model call. The draft may say only what the answer or the
+         *     profile says: a line with a number, a name or a tool that neither
+         *     contains is left out and counted in `dropped`. Nothing is saved until the
+         *     draft is kept. Asking again for the same question replaces the draft.
+         */
+        post: operations["profile.draft_answer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/questions/{id}/skip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Skip a question.
+         * @description It is not asked again for this version of the profile.
+         */
+        post: operations["profile.skip_question"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/skills/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put the skills in a new order.
+         * @description The first three skills drive the job board searches. `names` must be
+         *     the profile's skills exactly, each once; nothing is added or removed.
+         */
+        put: operations["profile.order_skills"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/skills/suggested": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Skills found in the roles.
+         * @description Skills that the person's own position descriptions mention but their
+         *     skills list does not, with the number of positions each is in. Each
+         *     name is checked against the text of the positions (whole words), so
+         *     nothing is suggested that the profile does not say. Uses the same
+         *     review as the questions; 202 while it runs.
+         */
+        get: operations["profile.suggested_skills"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/skills/suggested/{name}/add": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a suggested skill to the profile.
+         * @description It goes at the end of the skills, in the order the person adds them.
+         */
+        post: operations["profile.add_suggested_skill"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/skills/suggested/{name}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Say a suggested skill is not theirs.
+         * @description It is not suggested again, whatever the profile says later.
+         */
+        post: operations["profile.dismiss_suggested_skill"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/strength": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The strength of the signed-in person's profile.
+         * @description Computed from the profile and goals, never by a model. Each part that is
+         *     not full says what to do about it. Reading it never starts a review.
+         */
+        get: operations["profile.strength"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1011,6 +1250,45 @@ export interface components {
             /** @description Up to 500 characters. */
             reason: string;
         };
+        /**
+         * @description What a draft is, and where keeping it writes.
+         * @enum {string}
+         */
+        DraftKind: "highlights" | "label" | "summary" | "education" | "link";
+        /** @description The answer to turn into a draft. */
+        DraftRequest: {
+            /** @description In the person's own words, 1 to 2000 characters. */
+            answer: string;
+        };
+        /** @description A draft, waiting to be kept, edited or discarded. */
+        DraftView: {
+            /**
+             * Format: int32
+             * @description Lines left out because they said something the answer and the profile
+             *     do not (or did not fit).
+             */
+            dropped: number;
+            education?: components["schemas"]["Education"] | null;
+            /**
+             * Format: date-time
+             * @description When the draft is deleted if it is not kept.
+             */
+            expires_at: string;
+            /**
+             * Format: uuid
+             * @description The draft.
+             */
+            id: string;
+            /**
+             * @description The lines of the draft: achievements, the headline, the summary, the
+             *     links; for a school, one line saying it.
+             */
+            items: string[];
+            /** @description What it is. */
+            kind: components["schemas"]["DraftKind"];
+            /** @description The question it answers. */
+            question_id: string;
+        };
         /** @description A school or degree. */
         Education: {
             /** @description The field ("Computer science"). */
@@ -1154,6 +1432,15 @@ export interface components {
          * @enum {string}
          */
         JobWorkMode: "remote" | "hybrid" | "onsite";
+        /** @description What the person keeps: the draft as it is, or edited. */
+        KeepRequest: {
+            education?: components["schemas"]["Education"] | null;
+            /**
+             * @description The lines, possibly edited; the draft's own when left out. Edited
+             *     lines are the person's own words and skip the source check.
+             */
+            items?: string[] | null;
+        };
         /** @description A language they speak. */
         Language: {
             /** @description How well ("Native or bilingual"). */
@@ -1420,10 +1707,15 @@ export interface components {
             work: components["schemas"]["Work"][];
         };
         /**
+         * @description Where to go to make the profile stronger.
+         * @enum {string}
+         */
+        ProfileAction: "improve" | "skills" | "import" | "goals";
+        /**
          * @description Where the profile came from last.
          * @enum {string}
          */
-        ProfileSource: "linkedin_zip" | "pdf" | "text" | "manual";
+        ProfileSource: "linkedin_zip" | "pdf" | "text" | "manual" | "answer";
         /** @description The profile, and what can be imported into it. */
         ProfileView: {
             /**
@@ -1463,6 +1755,56 @@ export interface components {
             /** @description In the order the sign-in page shows them. */
             providers: components["schemas"]["Provider"][];
         };
+        /** @description A question about a gap in the profile. */
+        Question: {
+            context?: components["schemas"]["RoleContext"] | null;
+            /**
+             * Format: int32
+             * @description Points the profile strength would gain if it were answered.
+             */
+            expected_gain: number;
+            /** @description The question's id. */
+            id: string;
+            /** @description The question, at most 160 characters. */
+            question: string;
+            /** @description What it is about. */
+            section: components["schemas"]["QuestionSection"];
+            /** @description Why it matters, at most 140 characters. */
+            why: string;
+        };
+        /**
+         * @description What a question is about, and where its answer goes.
+         * @enum {string}
+         */
+        QuestionSection: "work" | "basics.label" | "basics.summary" | "education" | "links";
+        /** @description The questions that would fill the profile's gaps. */
+        QuestionsView: {
+            /**
+             * Format: int32
+             * @description Questions kept or skipped so far.
+             */
+            answered: number;
+            /** @description The questions still open, the most useful first. */
+            questions: components["schemas"]["Question"][];
+            /**
+             * @description Why it is unavailable or failed: `ai_unavailable`,
+             *     `ai_budget_reached`, `ai_daily_limit_reached`, `ai_failed`; none when
+             *     there is simply no profile.
+             */
+            reason?: string | null;
+            /**
+             * Format: int32
+             * @description The profile strength now.
+             */
+            score: number;
+            /** @description Where the review is. */
+            status: components["schemas"]["ReviewStatus"];
+            /**
+             * Format: int32
+             * @description Questions in the review.
+             */
+            total: number;
+        };
         /**
          * @description What a board's place in the order rests on.
          * @enum {string}
@@ -1473,6 +1815,11 @@ export interface components {
          * @enum {string}
          */
         Relocate: "no" | "within_country" | "within_eu" | "anywhere";
+        /**
+         * @description Where the review is.
+         * @enum {string}
+         */
+        ReviewStatus: "running" | "ready" | "unavailable" | "failed";
         /** @description What a board's robots.txt says to us. */
         RobotsReport: {
             /**
@@ -1497,6 +1844,17 @@ export interface components {
         RobotsRule: {
             allow: boolean;
             pattern: string;
+        };
+        /** @description The position a question is about. */
+        RoleContext: {
+            /** @description Its company. */
+            company?: string | null;
+            /** @description As `start_date`; none while it is their current position. */
+            end_date?: string | null;
+            /** @description Its title. */
+            position?: string | null;
+            /** @description `YYYY`, `YYYY-MM` or `YYYY-MM-DD`. */
+            start_date?: string | null;
         };
         /** @description A job a check read as a sample. */
         SampleJob: {
@@ -1659,6 +2017,11 @@ export interface components {
             /** @description The skill ("PostgreSQL"). */
             name: string;
         };
+        /** @description The skills in the order the person wants them. */
+        SkillOrder: {
+            /** @description Every skill name, once, in the new order. */
+            names: string[];
+        };
         /** @description How well a board's listed engineering jobs fit someone's top skills. */
         SkillsFit: {
             /**
@@ -1694,6 +2057,95 @@ export interface components {
          * @enum {string}
          */
         StrengthHint: "add_headline" | "add_work" | "add_skills";
+        /** @description One part of the score. */
+        StrengthItem: {
+            /**
+             * @description What to do about it, when it is not full: `question:<id>` (an open
+             *     question about it), `skills`, `import`, `goals`, or
+             *     `edit:<section>` (`basics`, `work`, `education`, `languages`).
+             */
+            action?: string | null;
+            /**
+             * Format: int32
+             * @description Points earned.
+             */
+            earned: number;
+            /**
+             * Format: int32
+             * @description What there is: skills listed, recent roles with results, positions…
+             */
+            have: number;
+            /** @description Which part. */
+            key: components["schemas"]["StrengthKey"];
+            /**
+             * Format: int32
+             * @description What there should be for the full weight; 0 when it is a yes or no.
+             */
+            of: number;
+            /** @description Where it is. */
+            state: components["schemas"]["StrengthState"];
+            /**
+             * Format: int32
+             * @description Points it is worth.
+             */
+            weight: number;
+        };
+        /**
+         * @description What the score is made of.
+         * @enum {string}
+         */
+        StrengthKey: "headline" | "summary" | "achievements" | "skills" | "education" | "languages" | "links" | "positions" | "goals";
+        /**
+         * @description Where a part is.
+         * @enum {string}
+         */
+        StrengthState: "ok" | "partial" | "missing";
+        /** @description How strong the profile is. */
+        StrengthView: {
+            /** @description The parts, in checklist order. */
+            items: components["schemas"]["StrengthItem"][];
+            /**
+             * Format: int32
+             * @description Open questions of the review for the current profile; none when
+             *     there is no review (yet).
+             */
+            questions_left?: number | null;
+            /**
+             * Format: int32
+             * @description 0 to 100.
+             */
+            score: number;
+            /** @description At least 80. */
+            strong: boolean;
+            /**
+             * Format: int32
+             * @description Skills the positions mention that the profile does not list; none
+             *     when there is no review (yet).
+             */
+            suggested_skills?: number | null;
+        };
+        /** @description A skill the person's positions mention and their skills list does not. */
+        SuggestedSkill: {
+            /** @description The skill, as the positions write it. */
+            name: string;
+            /**
+             * Format: int32
+             * @description In how many positions it appears.
+             */
+            roles: number;
+        };
+        /** @description Skills found in the person's roles. */
+        SuggestedSkills: {
+            /**
+             * @description Why there are none: `ai_unavailable`, `ai_budget_reached`,
+             *     `ai_daily_limit_reached` or `ai_failed`.
+             */
+            reason?: string | null;
+            /** @description The skills, the most roles first. */
+            skills: components["schemas"]["SuggestedSkill"][];
+            /** @description Where the review is (the same review as the questions'). */
+            status: components["schemas"]["ReviewStatus"];
+        };
         /** @description Where the person is. */
         Today: {
             goals: components["schemas"]["TodayGoals"];
@@ -1703,8 +2155,19 @@ export interface components {
              * @description Found opportunities never opened (hidden ones not counted).
              */
             new_matches: number;
+            next_profile_action?: components["schemas"]["ProfileAction"] | null;
             next_step: components["schemas"]["NextStep"];
             profile: components["schemas"]["TodayProfile"];
+            /**
+             * Format: int32
+             * @description Questions that would make it stronger, when the AI has read it.
+             */
+            profile_questions?: number | null;
+            /**
+             * Format: int32
+             * @description How strong the profile is, 0 to 100 (80 or more is strong).
+             */
+            profile_strength: number;
         };
         /** @description The goals, on Today. */
         TodayGoals: {
@@ -2756,6 +3219,117 @@ export interface operations {
             };
         };
     };
+    "profile.discard_draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The draft. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Discarded. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `draft_not_ready`: already kept */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.keep_draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The draft. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeepRequest"];
+            };
+        };
+        responses: {
+            /** @description The profile, now. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileView"];
+                };
+            };
+            /** @description `invalid_items`; `invalid_profile` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `draft_not_ready`: already kept or discarded; `profile_changed` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "profile.import": {
         parameters: {
             query?: never;
@@ -2950,6 +3524,384 @@ export interface operations {
             };
             /** @description `import_not_ready`: already applied */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The questions (or why there are none). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestionsView"];
+                };
+            };
+            /** @description The review is running. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestionsView"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.review_again": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The questions (or why there are none). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestionsView"];
+                };
+            };
+            /** @description The review is running. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestionsView"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.draft_answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The question. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftRequest"];
+            };
+        };
+        responses: {
+            /** @description The draft. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftView"];
+                };
+            };
+            /** @description `invalid_answer` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: no such open question */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.skip_question": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The question. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Skipped. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.order_skills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkillOrder"];
+            };
+        };
+        responses: {
+            /** @description The profile, with its skills in order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileView"];
+                };
+            };
+            /** @description `invalid_order` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.suggested_skills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The skills. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestedSkills"];
+                };
+            };
+            /** @description The review is running. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestedSkills"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.add_suggested_skill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The skill, as suggested. */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The skills still suggested. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestedSkills"];
+                };
+            };
+            /** @description `invalid_profile` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: not a suggestion */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.dismiss_suggested_skill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The skill, as suggested. */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The skills still suggested. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestedSkills"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: not a suggestion */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.strength": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The strength. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrengthView"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

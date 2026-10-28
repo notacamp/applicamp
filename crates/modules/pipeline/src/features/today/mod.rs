@@ -48,6 +48,32 @@ pub struct TodayProfile {
     pub strength_hint: Option<StrengthHint>,
 }
 
+/// Where to go to make the profile stronger.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ProfileAction {
+    /// The Improve flow: questions about the gaps.
+    Improve,
+    /// Skills found in their roles.
+    Skills,
+    /// Import a fuller profile.
+    Import,
+    /// Answer the goals.
+    Goals,
+}
+
+impl ProfileAction {
+    fn parse(raw: &str) -> Option<Self> {
+        match raw {
+            "improve" => Some(Self::Improve),
+            "skills" => Some(Self::Skills),
+            "import" => Some(Self::Import),
+            "goals" => Some(Self::Goals),
+            _ => None,
+        }
+    }
+}
+
 /// The goals, on Today.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct TodayGoals {
@@ -160,6 +186,13 @@ pub enum NextStep {
 pub struct Today {
     pub profile: TodayProfile,
     pub goals: TodayGoals,
+    /// How strong the profile is, 0 to 100 (80 or more is strong).
+    pub profile_strength: u8,
+    /// Where to go to make it stronger; none once it is strong or while
+    /// there is no profile.
+    pub next_profile_action: Option<ProfileAction>,
+    /// Questions that would make it stronger, when the AI has read it.
+    pub profile_questions: Option<u32>,
     /// Found opportunities never opened (hidden ones not counted).
     pub new_matches: u32,
     /// The latest search, if any.
@@ -234,6 +267,9 @@ pub async fn get(
             answered: status.goals_answered,
             total: status.goals_total,
         },
+        profile_strength: status.strength,
+        next_profile_action: status.next_action.as_deref().and_then(ProfileAction::parse),
+        profile_questions: status.questions_left,
         new_matches,
         latest_search: latest.map(TodaySearch::of),
     }))

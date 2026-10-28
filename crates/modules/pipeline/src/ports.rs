@@ -47,6 +47,13 @@ pub struct ProfileStatus {
     pub goals_answered: u32,
     /// Goals questions there are.
     pub goals_total: u32,
+    /// How strong the profile is, 0 to 100.
+    pub strength: u8,
+    /// Where to go to make it stronger: `improve`, `skills`, `import` or
+    /// `goals`; none once it is strong.
+    pub next_action: Option<String>,
+    /// Open questions of the profile review, when there is one.
+    pub questions_left: Option<u32>,
 }
 
 /// A person's latest search, for Today.

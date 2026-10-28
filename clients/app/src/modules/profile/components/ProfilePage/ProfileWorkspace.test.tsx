@@ -65,7 +65,12 @@ function draftOf(draft: Profile, dropped = 0) {
 function Workspace({ startImporting = false }: { startImporting?: boolean }) {
   const [importing, setImporting] = useState(startImporting);
   return (
-    <ProfileWorkspace importing={importing} onImporting={setImporting} onStartGoals={vi.fn()} />
+    <ProfileWorkspace
+      importing={importing}
+      onImporting={setImporting}
+      onStartGoals={vi.fn()}
+      onAction={vi.fn()}
+    />
   );
 }
 

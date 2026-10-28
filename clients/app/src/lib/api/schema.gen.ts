@@ -913,8 +913,6 @@ export interface components {
             priority: components["schemas"]["BoardPriority"];
             /** @description Its average salary and its key in the order. */
             ranking: components["schemas"]["BoardRanking"];
-            /** @description How well its jobs fit the person's top skills; none without skills
-             *     or listed jobs. */
             skills_fit?: components["schemas"]["SkillsFit"] | null;
             /** @description Its stable name: the source its jobs carry. */
             slug: string;
@@ -923,19 +921,6 @@ export interface components {
             totals_30d: components["schemas"]["BoardTotals"];
             /** @description The person's searches on it over the last 7 days. */
             totals_7d: components["schemas"]["BoardTotals"];
-        };
-        /** @description How well a board's listed engineering jobs fit someone's top skills. */
-        SkillsFit: {
-            /**
-             * Format: int32
-             * @description The jobs it is counted from.
-             */
-            jobs: number;
-            /**
-             * Format: double
-             * @description The share of those jobs that name one of their top skills, 0 to 1.
-             */
-            share: number;
         };
         /** @description What a board's terms ask, and where they say it. */
         BoardTerms: {
@@ -1673,6 +1658,19 @@ export interface components {
             level?: string | null;
             /** @description The skill ("PostgreSQL"). */
             name: string;
+        };
+        /** @description How well a board's listed engineering jobs fit someone's top skills. */
+        SkillsFit: {
+            /**
+             * Format: int32
+             * @description The jobs it is counted from.
+             */
+            jobs: number;
+            /**
+             * Format: double
+             * @description The share of those jobs that name one of their top skills, 0 to 1.
+             */
+            share: number;
         };
         /** @description What was spent on AI, in euros, against the limits. */
         Spend: {

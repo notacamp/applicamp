@@ -816,7 +816,16 @@ async fn a_board_says_how_well_it_fits_your_top_skills(db: PgPool) {
         .unwrap();
     }
     // A job from before the words were kept is not counted.
-    listed(&h.db, id, 1, None).await;
+    sqlx::query(
+        "INSERT INTO sources.board_jobs (board_id, source_ref, title, regions, engineering,
+            posted_at, seen_at)
+         VALUES ($1, 'before-words', 'Engineer', '{}', true, $2, $2)",
+    )
+    .bind(id)
+    .bind(today() - TimeDelta::days(1))
+    .execute(&h.db)
+    .await
+    .unwrap();
 
     let (status, list) = h.get("/api/v1/boards").await;
     assert_eq!(status, StatusCode::OK, "{list}");

@@ -7,6 +7,7 @@ import {
   Button,
   ButtonLink,
   Cluster,
+  Disclosure,
   Label,
   Property,
   PropertyList,
@@ -16,15 +17,21 @@ import {
   Tagged,
   Text,
   TextArea,
+  TextField,
 } from "~/lib/ui";
 
 import {
+  blockerCode,
   boardErrorOf,
+  proposalLines,
   salaryLine,
   totalsLine,
   useBoard,
   useBoardAction,
+  type BoardAction,
   type BoardDetail,
+  type BoardKey,
+  type BoardProposal,
 } from "../../api/boards";
 import { formatWhen } from "../../api/format";
 
@@ -37,8 +44,10 @@ export interface BoardPeekProps {
 /**
  * One board beside the list: its salary ranking, its terms, what its
  * automatic check found (robots rules, the terms' sentences, sample jobs,
- * the proposed attribution), and, for the owner, Approve, Decline (with a
- * reason), Pause, Check again and Edit config.
+ * the proposed attribution), and, for the owner, why it can't be approved
+ * yet, Approve, Decline (with a reason), Pause, Check again, its API key, the
+ * config its check proposes, and the config as JSON under "Advanced". Every
+ * action's error shows beside its button, with what the server said.
  */
 export function BoardPeek({ id, onClose }: BoardPeekProps) {
   const { t } = useTranslation("sources");
@@ -216,8 +225,61 @@ function PeekBody({ detail }: { detail: BoardDetail }) {
   );
 }
 
-/** Why a board cannot be approved yet. */
-const BLOCKS = ["check_needed", "robots_disallowed", "config_invalid"] as const;
+/** An action that failed, beside its button: what it means, and the server's own words. */
+function ActionError({ testId, error }: { testId: string; error: unknown }) {
+  const { t } = useTranslation("sources");
+  const { code, detail } = boardErrorOf(error);
+  return (
+    <Tagged testId={testId}>
+      <Banner tone="danger" icon="warning" role="alert" title={t(`boards.errors.${code}`)}>
+        {detail}
+      </Banner>
+    </Tagged>
+  );
+}
+
+/** Why the board can't be approved yet, each reason in the app's words with what exactly. */
+function Blockers({ detail }: { detail: BoardDetail }) {
+  const { t } = useTranslation("sources");
+  return (
+    <Tagged testId="board-blocked">
+      <Banner icon="warning" title={t("board.blocked.title")}>
+        <Stack gap="sm">
+          {detail.blockers.map((blocker, index) => {
+            const code = blockerCode(blocker);
+            const text = t(`board.blocked.${code}`, {
+              detail: blocker.detail,
+              board: detail.board.name,
+              how: detail.key?.how ?? blocker.detail,
+            });
+            const source = blocker.source ?? null;
+            return (
+              <Tagged key={`${blocker.code}-${String(index)}`} testId={`board-blocker-${code}`}>
+                <Stack gap="sm">
+                  <Text>{text}</Text>
+                  {source === null ? null : (
+                    <Cluster>
+                      <ButtonLink
+                        variant="ghost"
+                        icon="forward"
+                        href={source}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-testid="board-blocker-source"
+                      >
+                        {code === "needs_key" ? t("board.key.get") : t("board.blocked.source")}
+                      </ButtonLink>
+                    </Cluster>
+                  )}
+                </Stack>
+              </Tagged>
+            );
+          })}
+        </Stack>
+      </Banner>
+    </Tagged>
+  );
+}
 
 /** The owner's decisions on a board. */
 function Manage({ detail }: { detail: BoardDetail }) {
@@ -225,43 +287,15 @@ function Manage({ detail }: { detail: BoardDetail }) {
   const { board } = detail;
   const action = useBoardAction(board.id);
   const [reason, setReason] = useState("");
-  const [config, setConfig] = useState(() => JSON.stringify(detail.config, null, 2));
-  const [configError, setConfigError] = useState("");
   const waiting = board.status === "candidate" || board.status === "paused";
-  const saveConfig = () => {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(config);
-    } catch {
-      setConfigError(t("board.config.notJson"));
-      return;
-    }
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-      setConfigError(t("board.config.notObject"));
-      return;
-    }
-    setConfigError("");
-    action.mutate({ kind: "config", config: parsed as Record<string, unknown> });
-  };
-  const blocked = BLOCKS.find((block) => block === detail.blocked);
+  /** The error of `kind`, when it is the action that failed last. */
+  const failed = (...kinds: BoardAction["kind"][]) =>
+    action.isError && action.variables !== undefined && kinds.includes(action.variables.kind);
+  const proposal = detail.report?.proposal ?? null;
   return (
     <Section title={t("board.manage.title")} testId="board-manage">
       <Stack>
-        {action.isError ? (
-          <Tagged testId="board-action-error">
-            <Banner
-              tone="danger"
-              icon="warning"
-              role="alert"
-              title={t(`boards.errors.${boardErrorOf(action.error)}`)}
-            />
-          </Tagged>
-        ) : null}
-        {waiting && blocked !== undefined ? (
-          <Tagged testId="board-blocked">
-            <Text tone="secondary">{t(`board.blocked.${blocked}`)}</Text>
-          </Tagged>
-        ) : null}
+        {waiting && detail.blockers.length > 0 ? <Blockers detail={detail} /> : null}
         <Cluster>
           {waiting ? (
             <Button
@@ -300,6 +334,41 @@ function Manage({ detail }: { detail: BoardDetail }) {
             {t("board.manage.check")}
           </Button>
         </Cluster>
+        {failed("approve") ? (
+          <ActionError testId="board-approve-error" error={action.error} />
+        ) : null}
+        {failed("pause") ? <ActionError testId="board-pause-error" error={action.error} /> : null}
+        {failed("check") ? <ActionError testId="board-check-error" error={action.error} /> : null}
+        {action.isSuccess && action.variables.kind === "check" ? (
+          <Tagged testId="board-check-started">
+            <Text tone="secondary">{t("board.manage.checkStarted")}</Text>
+          </Tagged>
+        ) : null}
+        {detail.key === undefined || detail.key === null ? null : (
+          <KeyForm
+            key={detail.key.set_at ?? "none"}
+            detail={detail}
+            keySpec={detail.key}
+            pending={action.isPending}
+            onSave={(values) => {
+              action.mutate({ kind: "key", values });
+            }}
+            onForget={() => {
+              action.mutate({ kind: "forgetKey" });
+            }}
+            error={failed("key", "forgetKey") ? action.error : null}
+          />
+        )}
+        {proposal === null ? null : (
+          <ProposalView
+            proposal={proposal}
+            pending={action.isPending}
+            onUse={() => {
+              action.mutate({ kind: "proposal", proposal });
+            }}
+            error={failed("proposal") ? action.error : null}
+          />
+        )}
         {board.status === "declined" ? null : (
           <Stack gap="sm">
             <TextArea
@@ -325,33 +394,238 @@ function Manage({ detail }: { detail: BoardDetail }) {
                 {t("board.manage.decline")}
               </Button>
             </Cluster>
+            {failed("decline") ? (
+              <ActionError testId="board-decline-error" error={action.error} />
+            ) : null}
           </Stack>
         )}
-        <Stack gap="sm">
-          <TextArea
-            label={t("board.config.label")}
-            hint={t("board.config.hint")}
-            error={configError === "" ? undefined : configError}
-            rows={12}
-            spellCheck={false}
-            value={config}
-            onChange={(event) => {
-              setConfig(event.target.value);
+        <Disclosure
+          summary={<span data-testid="board-config-advanced">{t("board.config.advanced")}</span>}
+        >
+          <ConfigEditor
+            key={JSON.stringify(detail.config)}
+            config={detail.config}
+            pending={action.isPending}
+            onSave={(config) => {
+              action.mutate({ kind: "config", config });
             }}
-            data-testid="board-config"
+            error={failed("config") ? action.error : null}
           />
-          <Cluster>
-            <Button
-              variant="secondary"
-              disabled={action.isPending}
-              data-testid="board-config-save"
-              onClick={saveConfig}
-            >
-              {t("board.config.save")}
-            </Button>
-          </Cluster>
-        </Stack>
+        </Disclosure>
       </Stack>
     </Section>
+  );
+}
+
+/** The key a board's API needs: how to get one, whether one is set, and a field per parameter. */
+function KeyForm({
+  detail,
+  keySpec,
+  pending,
+  onSave,
+  onForget,
+  error,
+}: {
+  detail: BoardDetail;
+  keySpec: BoardKey;
+  pending: boolean;
+  onSave: (values: Record<string, string>) => void;
+  onForget: () => void;
+  error: unknown;
+}) {
+  const { t, i18n } = useTranslation("sources");
+  const [values, setValues] = useState<Record<string, string>>({});
+  const filled = keySpec.params.every((param) => (values[param] ?? "").trim() !== "");
+  const setAt = keySpec.set_at ?? null;
+  let state = t("board.key.none");
+  if (keySpec.set) {
+    state =
+      setAt === null
+        ? t("board.key.set")
+        : t("board.key.setOn", { when: formatWhen(setAt, i18n.language).text });
+  }
+  return (
+    <Section
+      title={t("board.key.title")}
+      description={t("board.key.how", { board: detail.board.name, how: keySpec.how })}
+      testId="board-key"
+    >
+      <Stack gap="sm">
+        <Tagged testId="board-key-state">
+          <Text tone={keySpec.set ? undefined : "secondary"}>{state}</Text>
+        </Tagged>
+        {keySpec.params.map((param) => (
+          <TextField
+            key={param}
+            label={t("board.key.field", { param })}
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            value={values[param] ?? ""}
+            onChange={(event) => {
+              setValues((current) => ({ ...current, [param]: event.target.value }));
+            }}
+            data-testid={`board-key-${param}`}
+          />
+        ))}
+        <Cluster>
+          <Button
+            variant="secondary"
+            icon="check"
+            disabled={!filled || pending}
+            data-testid="board-key-save"
+            onClick={() => {
+              onSave(
+                Object.fromEntries(
+                  keySpec.params.map((param) => [param, (values[param] ?? "").trim()]),
+                ),
+              );
+            }}
+          >
+            {keySpec.set ? t("board.key.replace") : t("board.key.save")}
+          </Button>
+          <ButtonLink
+            variant="ghost"
+            icon="forward"
+            href={keySpec.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid="board-key-get"
+          >
+            {t("board.key.get")}
+          </ButtonLink>
+          {keySpec.set ? (
+            <Button
+              variant="ghost"
+              icon="close"
+              disabled={pending}
+              data-testid="board-key-forget"
+              onClick={onForget}
+            >
+              {t("board.key.forget")}
+            </Button>
+          ) : null}
+        </Cluster>
+        {error === null ? null : <ActionError testId="board-key-error" error={error} />}
+      </Stack>
+    </Section>
+  );
+}
+
+/** A config the check found, as fields and where each is read from; "Use this config". */
+function ProposalView({
+  proposal,
+  pending,
+  onUse,
+  error,
+}: {
+  proposal: BoardProposal;
+  pending: boolean;
+  onUse: () => void;
+  error: unknown;
+}) {
+  const { t } = useTranslation("sources");
+  const lines = proposalLines(proposal);
+  return (
+    <Section
+      title={t("board.proposal.title")}
+      description={t("board.proposal.description", {
+        kind: t(`board.proposal.kind.${proposal.kind}`),
+      })}
+      testId="board-proposal"
+    >
+      <Stack gap="sm">
+        <PropertyList testId="board-proposal-fields">
+          {lines.address === undefined ? null : (
+            <Property label={t("board.proposal.address")}>{lines.address}</Property>
+          )}
+          {lines.items === undefined ? null : (
+            <Property label={t("board.proposal.items")}>{lines.items}</Property>
+          )}
+          {lines.fields.map(({ field, source }) => (
+            <Property key={field} label={t(`board.proposal.fields.${field}`)}>
+              {source}
+            </Property>
+          ))}
+        </PropertyList>
+        <Cluster>
+          <Button
+            variant="primary"
+            icon="check"
+            disabled={pending}
+            data-testid="board-proposal-use"
+            onClick={onUse}
+          >
+            {t("board.proposal.use")}
+          </Button>
+        </Cluster>
+        {error === null ? null : <ActionError testId="board-proposal-error" error={error} />}
+      </Stack>
+    </Section>
+  );
+}
+
+/** The config as JSON, for the owner who wants to write it by hand; its errors beside Save. */
+function ConfigEditor({
+  config: initial,
+  pending,
+  onSave,
+  error,
+}: {
+  config: BoardDetail["config"];
+  pending: boolean;
+  onSave: (config: Record<string, unknown>) => void;
+  error: unknown;
+}) {
+  const { t } = useTranslation("sources");
+  const [config, setConfig] = useState(() => JSON.stringify(initial, null, 2));
+  const [local, setLocal] = useState("");
+  const save = () => {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(config);
+    } catch {
+      setLocal(t("board.config.notJson"));
+      return;
+    }
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      setLocal(t("board.config.notObject"));
+      return;
+    }
+    setLocal("");
+    onSave(parsed as Record<string, unknown>);
+  };
+  return (
+    <Stack gap="sm">
+      <TextArea
+        label={t("board.config.label")}
+        hint={t("board.config.hint")}
+        rows={12}
+        spellCheck={false}
+        value={config}
+        onChange={(event) => {
+          setConfig(event.target.value);
+        }}
+        data-testid="board-config"
+      />
+      <Cluster>
+        <Button
+          variant="secondary"
+          disabled={pending}
+          data-testid="board-config-save"
+          onClick={save}
+        >
+          {t("board.config.save")}
+        </Button>
+      </Cluster>
+      {local === "" ? null : (
+        <Tagged testId="board-config-error">
+          <Banner tone="danger" icon="warning" role="alert" title={local} />
+        </Tagged>
+      )}
+      {local === "" && error !== null ? (
+        <ActionError testId="board-config-error" error={error} />
+      ) : null}
+    </Stack>
   );
 }

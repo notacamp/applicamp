@@ -106,6 +106,12 @@
       "invalid_config": "Cette configuration n’est pas valide pour ce site.",
       "invalid_url": "Collez l’adresse du site, commençant par https://.",
       "suggestion_limit_reached": "Cela fait 10 suggestions aujourd’hui. Réessayez demain.",
+      "terms_forbid": "Ses conditions interdisent la lecture automatique : il ne peut pas être approuvé.",
+      "needs_key": "Il lui faut d’abord une clé d’API : ajoutez-la ci-dessous.",
+      "no_endpoint": "Il n’a pas encore d’adresse de flux. Vérifiez le site pour en chercher une.",
+      "invalid_key": "Cette clé ne peut pas être utilisée.",
+      "no_key_needed": "Ce site n’a pas besoin de clé.",
+      "kind_locked": "Un site approuvé garde sa façon d’être lu. Mettez-le d’abord en pause.",
       "generic": "Cela n’a pas fonctionné. Réessayez."
     }
   },
@@ -151,9 +157,15 @@
       "maxFetches": "Au plus {{n}} lectures par jour."
     },
     "blocked": {
+      "title": "Pourquoi il ne peut pas encore être approuvé",
       "check_needed": "Vérifiez le site avant de l’approuver : ses règles robots ne sont pas encore connues.",
-      "robots_disallowed": "Ses règles robots interdisent ce flux. Modifiez la configuration vers un chemin autorisé.",
-      "config_invalid": "Sa configuration ne se lit pas. Modifiez-la avant d’approuver."
+      "robots_disallowed": "Ses règles robots interdisent de le lire : {{detail}}",
+      "config_invalid": "Sa configuration ne fonctionne pas : {{detail}}",
+      "terms_forbid": "Ses conditions interdisent la lecture automatique : {{detail}}",
+      "needs_key": "Il faut une clé d’API de {{board}} : {{how}}",
+      "no_endpoint": "Il n’a pas encore d’adresse de flux. La vérification en cherche une et propose une configuration.",
+      "unknown": "Il ne peut pas encore être approuvé : {{detail}}",
+      "source": "Où c’est écrit"
     },
     "manage": {
       "title": "Votre décision",
@@ -161,14 +173,59 @@
       "pause": "Mettre en pause",
       "check": "Vérifier à nouveau",
       "reason": "Pourquoi le refuser ?",
-      "decline": "Refuser"
+      "decline": "Refuser",
+      "checkStarted": "La vérification est en cours. Cette page montrera ce qu’elle trouve dans une minute."
+    },
+    "key": {
+      "title": "Clé d’API",
+      "how": "{{board}} fournit une clé : {{how}}",
+      "get": "Obtenir une clé",
+      "none": "Aucune clé pour l’instant.",
+      "set": "Clé enregistrée.",
+      "setOn": "Clé enregistrée {{when}}.",
+      "field": "Clé ({{param}})",
+      "save": "Enregistrer la clé",
+      "replace": "Remplacer la clé",
+      "forget": "Retirer la clé"
+    },
+    "proposal": {
+      "title": "Configuration proposée",
+      "description": "La vérification a trouvé {{kind}}. Utilisez-la comme configuration du site, ou écrivez-en une sous Avancé.",
+      "address": "Lu depuis",
+      "items": "Offres dans",
+      "use": "Utiliser cette configuration",
+      "kind": {
+        "json_api": "une API JSON",
+        "rss": "un flux RSS",
+        "jsonld_sitemap": "des offres dans son sitemap",
+        "hn": "le fil HN"
+      },
+      "fields": {
+        "title": "Titre",
+        "company": "Entreprise",
+        "url": "Lien",
+        "apply_url": "Lien de candidature",
+        "location": "Lieu",
+        "regions": "Qui peut postuler",
+        "description": "Description",
+        "posted_at": "Publiée",
+        "expires_at": "Expire",
+        "salary_min": "Salaire à partir de",
+        "salary_max": "Salaire jusqu’à",
+        "salary_currency": "Devise",
+        "salary_period": "Période du salaire",
+        "salary_text": "Salaire",
+        "work_mode": "Mode de travail",
+        "ref": "Id"
+      }
     },
     "config": {
       "label": "Configuration (JSON)",
       "hint": "Comment le site est lu : son endpoint, ses pages, l’intervalle entre deux lectures et le mappage des champs.",
       "save": "Enregistrer la configuration",
       "notJson": "Ce n’est pas du JSON valide.",
-      "notObject": "La configuration est un objet JSON."
+      "notObject": "La configuration est un objet JSON.",
+      "advanced": "Avancé : modifier la configuration en JSON"
     }
   },
   "scanned": {

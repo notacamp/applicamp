@@ -106,6 +106,12 @@
       "invalid_config": "That config isn’t valid for this board.",
       "invalid_url": "Paste the board’s address, starting with https://.",
       "suggestion_limit_reached": "That’s 10 suggestions today. Try again tomorrow.",
+      "terms_forbid": "Its terms forbid automated reading, so it can’t be approved.",
+      "needs_key": "It needs an API key first: set one below.",
+      "no_endpoint": "It has no feed address yet. Check the board to look for one.",
+      "invalid_key": "That key can’t be used.",
+      "no_key_needed": "This board doesn’t need a key.",
+      "kind_locked": "An approved board keeps how it is read. Pause it first.",
       "generic": "That didn’t work. Try again."
     }
   },
@@ -151,9 +157,15 @@
       "maxFetches": "At most {{n}} reads a day."
     },
     "blocked": {
+      "title": "Why it can’t be approved yet",
       "check_needed": "Check the board before approving it: its robots rules aren’t known yet.",
-      "robots_disallowed": "Its robots rules forbid this feed. Edit the config to an allowed path.",
-      "config_invalid": "Its config doesn’t read. Edit it before approving."
+      "robots_disallowed": "Its robots rules forbid reading it: {{detail}}",
+      "config_invalid": "Its config doesn’t read: {{detail}}",
+      "terms_forbid": "Its terms forbid automated reading: {{detail}}",
+      "needs_key": "Needs an API key from {{board}}: {{how}}",
+      "no_endpoint": "It has no feed address yet. Check looks for one and proposes a config.",
+      "unknown": "It can’t be approved yet: {{detail}}",
+      "source": "Where it says so"
     },
     "manage": {
       "title": "Your decision",
@@ -161,14 +173,59 @@
       "pause": "Pause",
       "check": "Check again",
       "reason": "Why decline it?",
-      "decline": "Decline"
+      "decline": "Decline",
+      "checkStarted": "The check is running. This page shows what it finds in a minute."
+    },
+    "key": {
+      "title": "API key",
+      "how": "{{board}} gives a key: {{how}}",
+      "get": "Get a key",
+      "none": "No key set yet.",
+      "set": "Key set.",
+      "setOn": "Key set {{when}}.",
+      "field": "Key ({{param}})",
+      "save": "Save key",
+      "replace": "Replace key",
+      "forget": "Remove key"
+    },
+    "proposal": {
+      "title": "Proposed config",
+      "description": "The check found {{kind}}. Use it as the board’s config, or write one under Advanced.",
+      "address": "Read from",
+      "items": "Jobs at",
+      "use": "Use this config",
+      "kind": {
+        "json_api": "a JSON API",
+        "rss": "an RSS feed",
+        "jsonld_sitemap": "job postings through its sitemap",
+        "hn": "HN’s thread"
+      },
+      "fields": {
+        "title": "Title",
+        "company": "Company",
+        "url": "Link",
+        "apply_url": "Apply link",
+        "location": "Location",
+        "regions": "Who may apply",
+        "description": "Description",
+        "posted_at": "Posted",
+        "expires_at": "Expires",
+        "salary_min": "Salary from",
+        "salary_max": "Salary to",
+        "salary_currency": "Currency",
+        "salary_period": "Pay period",
+        "salary_text": "Pay",
+        "work_mode": "Work mode",
+        "ref": "Id"
+      }
     },
     "config": {
       "label": "Config (JSON)",
       "hint": "How the board is read: its endpoint, pages, polling interval and field mapping.",
       "save": "Save config",
       "notJson": "That isn’t valid JSON.",
-      "notObject": "The config is a JSON object."
+      "notObject": "The config is a JSON object.",
+      "advanced": "Advanced: edit the config as JSON"
     }
   },
   "scanned": {

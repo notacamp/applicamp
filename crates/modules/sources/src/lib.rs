@@ -48,6 +48,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod board_keys;
 pub mod boards;
 pub mod config;
 pub mod dedupe;
@@ -75,6 +76,7 @@ use applicamp_ai::Gateway;
 use applicamp_kernel::{
     Module,
     clock::{Clock, SystemClock},
+    crypto::{Cipher, SecretKey},
     jobs::Background,
 };
 use axum::Extension;
@@ -101,6 +103,9 @@ pub struct SourcesDeps {
     pub neighbours: Option<Arc<dyn Neighbours>>,
     /// The time.
     pub clock: Arc<dyn Clock>,
+    /// Seals and opens the boards' API keys ([`board_keys`]); none until
+    /// composed with the instance secret.
+    pub keys: Option<Arc<Cipher>>,
 }
 
 impl Default for SourcesDeps {
@@ -111,6 +116,7 @@ impl Default for SourcesDeps {
             ai: None,
             neighbours: None,
             clock: Arc::new(SystemClock),
+            keys: None,
         }
     }
 }
@@ -122,6 +128,7 @@ impl std::fmt::Debug for SourcesDeps {
             .field("reader", &self.reader.is_some())
             .field("ai", &self.ai.is_some())
             .field("neighbours", &self.neighbours.is_some())
+            .field("keys", &self.keys.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -140,7 +147,18 @@ impl SourcesDeps {
             ai,
             neighbours: Some(neighbours),
             clock: Arc::new(SystemClock),
+            keys: None,
         })
+    }
+
+    /// The same, sealing and opening the boards' API keys with the instance
+    /// `secret` (the reader sends them to their boards).
+    #[must_use]
+    pub fn with_secret(mut self, secret: &SecretKey) -> Self {
+        let keys = Arc::new(board_keys::cipher(secret));
+        self.reader = self.reader.map(|r| r.with_keys(Arc::clone(&keys)));
+        self.keys = Some(keys);
+        self
     }
 
     /// The same, telling time with `clock`.
@@ -166,6 +184,7 @@ pub fn module(deps: SourcesDeps) -> Module {
         .routes(routes!(board::pause))
         .routes(routes!(board::set_config))
         .routes(routes!(board::check))
+        .routes(routes!(board::set_key, board::forget_key))
         .routes(routes!(board::suggest))
         .layer(Extension(deps.clone()));
     Module {
@@ -177,16 +196,18 @@ pub fn module(deps: SourcesDeps) -> Module {
             .job_with::<recheck::Recheck, _>(deps.clone())
             .job_with::<reground::Reground, _>(deps.clone())
             .job_with::<discovery::Discover, _>(deps.clone())
-            .job_with::<discovery::CheckBoard, _>(deps)
+            .job_with::<discovery::CheckBoard, _>(deps.clone())
+            .job_with::<discovery::CheckSeeded, _>(deps)
             .publishes::<events::SearchFinished>(),
     }
 }
 
 /// On server start: make `sources.boards` hold the company boards' seed
 /// list and the registry the job boards' (new boards added, the owner's
-/// decisions kept), schedule the nightly search and the weekly discovery
-/// (when they are on), and check the requirements of opportunities found
-/// before the rules (once each).
+/// decisions kept), check the seeded boards waiting for the owner that were
+/// never checked with their config, schedule the nightly search and the
+/// weekly discovery (when they are on), and check the requirements of
+/// opportunities found before the rules (once each).
 pub async fn start(db: &PgPool, deps: &SourcesDeps) -> Result<(), String> {
     let seed = boards::seed(&deps.config)?;
     let count = boards::sync(db, &seed).await.map_err(|e| e.to_string())?;
@@ -195,6 +216,9 @@ pub async fn start(db: &PgPool, deps: &SourcesDeps) -> Result<(), String> {
         .await
         .map_err(|e| e.to_string())?;
     let discovery = features::discovery::schedule(db, deps)
+        .await
+        .map_err(|e| e.to_string())?;
+    let seeded_checks = features::discovery::schedule_seeded(db, deps)
         .await
         .map_err(|e| e.to_string())?;
     let scheduled = features::search::schedule_nightly(db, deps)
@@ -211,6 +235,7 @@ pub async fn start(db: &PgPool, deps: &SourcesDeps) -> Result<(), String> {
         job_boards,
         company_boards = deps.config.company_boards(),
         discovery,
+        seeded_checks,
         nightly = deps.config.nightly(),
         scheduled,
         recheck,
@@ -238,6 +263,7 @@ mod tests {
             registry.kinds(),
             [
                 "sources.check_board",
+                "sources.check_seeded_boards",
                 "sources.discover_boards",
                 "sources.nightly",
                 "sources.recheck_requirements",

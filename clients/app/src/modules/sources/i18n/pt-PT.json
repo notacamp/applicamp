@@ -91,6 +91,7 @@
     "lastError": "A última leitura falhou: {{error}}",
     "lastFetch": "Lido {{when}}: {{jobs}} ofertas · {{matched}} correspondências esta semana",
     "totals": "{{label}}: {{read}} lidas · {{matched}} correspondências · IA {{cost}}",
+    "fit": "combina com as suas competências {{share}}%",
     "suggest": {
       "label": "Sugerir um portal",
       "button": "Sugerir",
@@ -120,6 +121,8 @@
     "close": "Fechar",
     "status": "Estado",
     "salary": "Salário médio",
+    "fitValue": "combina com as suas competências {{share}}% ({{jobs}} vagas)",
+    "fit": "Adequação às suas competências",
     "priority": "Prioridade",
     "credit": "Creditado como",
     "endpoint": "Lido de",

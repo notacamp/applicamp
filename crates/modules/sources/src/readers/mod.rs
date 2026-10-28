@@ -697,9 +697,22 @@ impl Reader {
         now: DateTime<Utc>,
         fresh_since: DateTime<Utc>,
     ) -> BoardRead {
+        self.job_board_for(db, row, now, fresh_since, &[]).await
+    }
+
+    /// [`Self::job_board`] for someone with `skills`: a board that can
+    /// search by skill is also asked for their top skills, one query each.
+    pub async fn job_board_for(
+        &self,
+        db: &PgPool,
+        row: &BoardRow,
+        now: DateTime<Utc>,
+        fresh_since: DateTime<Utc>,
+        skills: &[String],
+    ) -> BoardRead {
         let started = Instant::now();
         let board = BoardRef::of(row);
-        let result = self.read_board(db, row, &board, now).await;
+        let result = self.read_board(db, row, &board, now, skills).await;
         let duration_ms = u32::try_from(started.elapsed().as_millis()).unwrap_or(u32::MAX);
         let (jobs, outcome, error) = match result {
             Ok((jobs, cached)) => {
@@ -759,13 +772,14 @@ impl Reader {
         rows: &[BoardRow],
         now: DateTime<Utc>,
         fresh_since: DateTime<Utc>,
+        skills: &[String],
     ) -> Vec<BoardRead> {
         let mut reads = Vec::with_capacity(rows.len());
         for row in rows
             .iter()
             .filter(|r| self.inner.config.is_enabled(&r.slug))
         {
-            reads.push(self.job_board(db, row, now, fresh_since).await);
+            reads.push(self.job_board_for(db, row, now, fresh_since, skills).await);
         }
         reads
     }
@@ -777,6 +791,7 @@ impl Reader {
         row: &BoardRow,
         board: &BoardRef,
         now: DateTime<Utc>,
+        skills: &[String],
     ) -> Result<(Vec<Job>, bool), FetchError> {
         if row.backoff_until.is_some_and(|until| until > now) {
             return Err(FetchError::BackingOff);
@@ -786,9 +801,37 @@ impl Reader {
         config.validate(kind).map_err(|_| FetchError::BadConfig)?;
         let secret =
             board_keys::query(self.keys(), row, &config).map_err(|_| FetchError::NeedsKey)?;
-        let ttl = config.poll().to_std().unwrap_or(Duration::from_secs(3_600));
+        let mut ttl = config.poll().to_std().unwrap_or(Duration::from_secs(3_600));
         match kind {
-            Kind::JsonApi => self.json_api(db, &config, board, ttl, &secret).await,
+            Kind::JsonApi => {
+                let stack = config.stack_queries(skills);
+                if let Some(per_day) = row.terms().max_fetches_per_day.filter(|n| *n > 0)
+                    && !stack.is_empty()
+                {
+                    ttl = stack_ttl(ttl, per_day, stack.len());
+                }
+                let (mut jobs, mut cached) =
+                    self.json_api(db, &config, board, ttl, &secret).await?;
+                for value in &stack {
+                    let Some(extra) = config.for_skill(value) else {
+                        break;
+                    };
+                    match self.json_api(db, &extra, board, ttl, &secret).await {
+                        Ok((more, was_cached)) => {
+                            cached &= was_cached;
+                            jobs.extend(more);
+                        }
+                        Err(e) => {
+                            // The plain read stands; ask no more.
+                            tracing::info!(board = %row.slug, error = %e.kind(), "a stack query failed");
+                            break;
+                        }
+                    }
+                }
+                let mut seen = std::collections::HashSet::new();
+                jobs.retain(|job| seen.insert(job.source_ref.clone()));
+                Ok((jobs, cached))
+            }
             Kind::Rss => self.feed(db, &config, board, ttl, &secret).await,
             Kind::JsonldSitemap => self.sitemap(db, &config, row, board, ttl, &secret).await,
             Kind::Hn => {
@@ -1030,6 +1073,31 @@ impl Reader {
     }
 }
 
+/// How long each address of a board is reused when `extra` stack queries
+/// are read besides its plain read, and it allows `per_day` fetches a day:
+/// every address at most this often, so all together stay within the day.
+fn stack_ttl(ttl: Duration, per_day: u32, extra: usize) -> Duration {
+    let addresses = u64::try_from(extra + 1).unwrap_or(u64::MAX);
+    let minutes = (24 * 60 * addresses).div_ceil(u64::from(per_day.max(1)));
+    ttl.max(Duration::from_secs(minutes * 60))
+}
+
+/// The words of `job`'s title, then of its description, each sorted, at
+/// most [`job_boards::LISTED_WORDS`].
+fn listed_words(job: &Job) -> Vec<String> {
+    let title = crate::matching::words(&job.title);
+    let mut rest: Vec<String> = crate::matching::job_words(&job.title, &job.description)
+        .into_iter()
+        .filter(|w| !title.contains(w))
+        .collect();
+    rest.sort();
+    let mut words: Vec<String> = title.into_iter().collect();
+    words.sort();
+    words.extend(rest);
+    words.truncate(job_boards::LISTED_WORDS);
+    words
+}
+
 /// `jobs` as their board's average salary needs them.
 pub fn listed(jobs: &[Job]) -> Vec<ListedJob> {
     jobs.iter()
@@ -1044,6 +1112,7 @@ pub fn listed(jobs: &[Job]) -> Vec<ListedJob> {
                     .and_then(|b| b.pay.as_ref())
                     .and_then(pay::eur_per_year),
                 posted_at: job.posted_at,
+                words: listed_words(job),
             }
         })
         .collect()

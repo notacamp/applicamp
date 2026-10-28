@@ -641,3 +641,101 @@ async fn a_keyed_board_is_read_only_with_its_key_and_the_key_is_kept_nowhere(db:
     let read = other.job_board(&db, &row, now, now).await;
     assert_eq!(read.error.as_deref(), Some("needs_key"));
 }
+
+fn queries(requests: &[wiremock::Request], prefix: &str, param: &str) -> Vec<Option<String>> {
+    requests
+        .iter()
+        .filter(|r| r.url.path().starts_with(prefix))
+        .map(|r| {
+            r.url
+                .query_pairs()
+                .find(|(k, _)| k == param)
+                .map(|(_, v)| v.into_owned())
+        })
+        .collect()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn boards_that_search_by_skill_are_asked_for_the_top_three_skills(db: PgPool) {
+    let server = testkit::fake_job_boards().await;
+    testkit::seed_fake_boards(
+        &db,
+        &server,
+        &["himalayas", "jobicy", "remoteok", "arbeitnow"],
+    )
+    .await;
+    let reader = board_reader(true);
+    let now = testkit::today();
+    let skills: Vec<String> = ["Ruby on Rails", "React", "PostgreSQL", "Rust"]
+        .map(String::from)
+        .into();
+    for slug in ["himalayas", "jobicy", "remoteok", "arbeitnow"] {
+        let row = approved_board(&db, slug).await;
+        let plain = reader.job_board(&db, &row, now, now).await;
+        let stacked = reader.job_board_for(&db, &row, now, now, &skills).await;
+        assert_eq!(
+            stacked.outcome,
+            Outcome::Read,
+            "{slug}: {:?}",
+            stacked.error
+        );
+        // The same fake answers every query: merged without duplicates.
+        assert_eq!(stacked.jobs.len(), plain.jobs.len(), "{slug}");
+    }
+    let seen = server.received_requests().await.unwrap();
+    // Remote OK: its plain read, then its tags (its own spellings).
+    let tags = queries(&seen, "/remoteok", "tag");
+    assert_eq!(
+        tags,
+        [
+            None,
+            Some("ruby".into()),
+            Some("react".into()),
+            Some("postgres".into())
+        ]
+    );
+    // Jobicy: a keyword search; the plain read asks for `engineer`.
+    let tags = queries(&seen, "/jobicy", "tag");
+    assert_eq!(
+        tags,
+        [
+            Some("engineer".into()),
+            Some("rails".into()),
+            Some("react".into()),
+            Some("postgresql".into())
+        ]
+    );
+    // Himalayas: its search address, once per skill, one page each.
+    let search: Vec<_> = queries(&seen, "/himalayas/jobs/api/search", "q");
+    assert_eq!(
+        search,
+        [
+            Some("ruby on rails".into()),
+            Some("react".into()),
+            Some("postgresql".into())
+        ]
+    );
+    // Arbeitnow cannot search by skill: its two pages, as before.
+    assert_eq!(testkit::requests_to(&server, "/arbeitnow").await, 2);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_board_is_read_as_before_without_skills(db: PgPool) {
+    let server = testkit::fake_job_boards().await;
+    testkit::seed_fake_boards(&db, &server, &["remoteok"]).await;
+    let reader = board_reader(true);
+    let now = testkit::today();
+    let row = approved_board(&db, "remoteok").await;
+    let read = reader.job_board_for(&db, &row, now, now, &[]).await;
+    assert_eq!(read.outcome, Outcome::Read);
+    assert_eq!(testkit::requests_to(&server, "/remoteok").await, 1);
+}
+
+#[test]
+fn a_board_with_a_daily_limit_spreads_its_addresses_over_the_day() {
+    let hour = Duration::from_secs(3_600);
+    // Jobicy: 24 fetches a day, the plain read and three queries.
+    assert_eq!(stack_ttl(hour, 24, 3), Duration::from_secs(4 * 3_600));
+    // A roomy limit keeps the polling interval.
+    assert_eq!(stack_ttl(hour, 1_000, 3), hour);
+}

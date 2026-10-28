@@ -87,6 +87,9 @@ describe("the boards page", () => {
     expect(waitingSection).toHaveTextContent("Example Remote");
     expect(waitingSection).toHaveTextContent("Few salaries");
     expect(waitingSection).toHaveTextContent("To check: 1");
+    // How well its jobs fit the person's top skills, beside the salary; none for a board without.
+    expect(waitingSection).toHaveTextContent("fits your skills 40%");
+    expect(approved).not.toHaveTextContent("fits your skills");
     const declinedSection = screen.getByTestId("boards-section-declined");
     expect(declinedSection).toHaveTextContent("No salary data");
     expect(declinedSection).toHaveTextContent("its terms forbid scraping");
@@ -101,6 +104,7 @@ describe("the boards page", () => {
       "You may not scrape this site",
     );
     expect(screen.getByTestId("board-sample")).toHaveTextContent("Senior Backend Engineer");
+    expect(screen.getByTestId("board-fit")).toHaveTextContent("fits your skills 40% (10 jobs)");
     expect(screen.getByTestId("board-attribution")).toHaveTextContent("Example Remote");
     expect(screen.getByTestId("board-terms")).toHaveTextContent("At most 4 reads a day.");
     expect(screen.getByTestId("board-flags")).toHaveTextContent("scraping");

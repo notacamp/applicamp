@@ -291,6 +291,18 @@ const server = createServer((request, response) => {
     });
     return;
   }
+  if (method === "GET" && url.pathname === "/himalayas/jobs/api/search") {
+    // The remote board's keyword search (#28): one job naming the keyword.
+    const keyword = url.searchParams.get("q") ?? "";
+    console.log(`fake-jobs: searched the remote board for "${keyword}"`);
+    json(response, 200, {
+      offset: 0,
+      limit: 20,
+      totalCount: 1,
+      jobs: [remoteJob(7000 + keyword.length, `Senior ${keyword} Engineer`)],
+    });
+    return;
+  }
   if (method === "GET" && url.pathname === "/himalayas/jobs/api") {
     lists += 1;
     const base = Date.now() * 10 + lists;

@@ -17,7 +17,7 @@ const PROFILE = {
     { name: "Example Org", position: "Senior Engineer", startDate: "2020-01", highlights: [] },
   ],
   education: [],
-  skills: [{ name: "Rust" }],
+  skills: [{ name: "Rails" }, { name: "Platform" }, { name: "Rust" }],
   languages: [{ language: "English", fluency: "Full professional" }],
   certificates: [],
   projects: [],
@@ -41,6 +41,8 @@ test("the boards searches read are ranked by salary, a candidate waits with its 
   const approved = page.getByTestId("boards-section-approved");
   await expect(approved).toContainText("Fake Remote Board");
   await expect(approved).toContainText("avg");
+  // Its jobs, asked for by the profile's top skills, say how well they fit them.
+  await expect(approved).toContainText(/fits your skills \d+%/);
   const waiting = page.getByTestId("boards-section-waiting");
   await expect(waiting).toContainText("Fake Waiting Board");
   await expectNoSidewaysScroll(page);

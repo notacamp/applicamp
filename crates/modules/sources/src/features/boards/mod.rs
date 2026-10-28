@@ -43,7 +43,7 @@ use crate::{
         self, Blocker, BoardConfig, BoardRow, KeySpec, Kind, Origin, Priority, Report, Status,
         Terms, host_of,
     },
-    net,
+    matching, net,
     pay::{self, Ranking},
     regions, robots,
     scans::{self, Totals},
@@ -75,6 +75,15 @@ impl From<Totals> for BoardTotals {
     }
 }
 
+/// How well a board's listed engineering jobs fit someone's top skills.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, ToSchema)]
+pub struct SkillsFit {
+    /// The share of those jobs that name one of their top skills, 0 to 1.
+    pub share: f64,
+    /// The jobs it is counted from.
+    pub jobs: u32,
+}
+
 /// A job board, as the Boards page lists it.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct BoardSummary {
@@ -92,6 +101,9 @@ pub struct BoardSummary {
     pub country: Option<String>,
     /// Its average salary and its key in the order.
     pub ranking: Ranking,
+    /// How well its jobs fit the person's top skills; none without skills
+    /// or listed jobs.
+    pub skills_fit: Option<SkillsFit>,
     /// How its jobs are credited ("From Himalayas").
     pub attribution: String,
     pub last_fetch_at: Option<DateTime<Utc>>,
@@ -306,20 +318,64 @@ async fn owner_only(deps: &SourcesDeps, db: &PgPool, account: Uuid) -> Result<()
     }
 }
 
-/// The country where `account` lives, for the salary ranking.
-async fn home_country(
+/// Who is looking: the country where they live (for the salary ranking)
+/// and their top skills (for the fit).
+struct Viewer {
+    home: Option<&'static str>,
+    skills: Vec<String>,
+}
+
+async fn viewer(
     deps: &SourcesDeps,
     db: &PgPool,
     account: Uuid,
     now: DateTime<Utc>,
-) -> Result<Option<&'static str>> {
+) -> Result<Viewer> {
     let input = neighbours(deps)?.matching_input(db, account, now).await?;
-    Ok(input
-        .and_then(|input| input.home)
-        .and_then(|home| regions::country_of(&home)))
+    Ok(Viewer {
+        home: input
+            .as_ref()
+            .and_then(|input| input.home.as_deref())
+            .and_then(regions::country_of),
+        skills: input.map(|input| input.skills).unwrap_or_default(),
+    })
 }
 
-fn summary(row: &BoardRow, ranking: Ranking, totals: Option<&(Totals, Totals)>) -> BoardSummary {
+/// The share of `jobs` (engineering ones with words) that name one of
+/// `skills`' top skills.
+pub fn fit_of(jobs: &[&job_boards::ListedJob], skills: &[String]) -> Option<SkillsFit> {
+    let top = matching::skill_words(&matching::top_skills(skills));
+    if top.is_empty() {
+        return None;
+    }
+    let counted: Vec<&&job_boards::ListedJob> = jobs
+        .iter()
+        .filter(|job| job.engineering && !job.words.is_empty())
+        .collect();
+    if counted.is_empty() {
+        return None;
+    }
+    let fitting = counted
+        .iter()
+        .filter(|job| {
+            let words: std::collections::HashSet<String> = job.words.iter().cloned().collect();
+            top.iter().any(|skill| matching::names_skill(&words, skill))
+        })
+        .count();
+    let total = u32::try_from(counted.len()).unwrap_or(u32::MAX);
+    Some(SkillsFit {
+        // Counts of a few thousand: exact as f64.
+        share: fitting as f64 / counted.len() as f64,
+        jobs: total,
+    })
+}
+
+fn summary(
+    row: &BoardRow,
+    ranking: Ranking,
+    skills_fit: Option<SkillsFit>,
+    totals: Option<&(Totals, Totals)>,
+) -> BoardSummary {
     let report = row.report();
     let (t7, t30) = totals.copied().unwrap_or_default();
     BoardSummary {
@@ -333,6 +389,7 @@ fn summary(row: &BoardRow, ranking: Ranking, totals: Option<&(Totals, Totals)>) 
         origin: row.origin(),
         country: row.country.clone(),
         ranking,
+        skills_fit,
         attribution: row.attribution(),
         last_fetch_at: row.last_fetch_at,
         last_fetch_jobs: count(row.last_fetch_jobs),
@@ -345,13 +402,14 @@ fn summary(row: &BoardRow, ranking: Ranking, totals: Option<&(Totals, Totals)>) 
     }
 }
 
-/// Every board's ranking for someone in `home`.
+/// Every board's ranking and fit for `who`.
 async fn rankings(
     db: &PgPool,
     rows: &[BoardRow],
-    home: Option<&str>,
+    who: &Viewer,
     now: DateTime<Utc>,
-) -> Result<HashMap<Uuid, Ranking>> {
+) -> Result<HashMap<Uuid, (Ranking, Option<SkillsFit>)>> {
+    let home = who.home;
     let listed = job_boards::listed(db, now - TimeDelta::days(30)).await?;
     let mut by_board: HashMap<Uuid, Vec<&job_boards::ListedJob>> = HashMap::new();
     for (board, job) in &listed {
@@ -363,7 +421,10 @@ async fn rankings(
             let jobs = by_board.get(&row.id).map(Vec::as_slice).unwrap_or(&[]);
             (
                 row.id,
-                pay::rank(jobs, home, row.country.as_deref(), &pay::COUNTRIES),
+                (
+                    pay::rank(jobs, home, row.country.as_deref(), &pay::COUNTRIES),
+                    fit_of(jobs, &who.skills),
+                ),
             )
         })
         .collect())
@@ -475,16 +536,21 @@ async fn detail(
     row: BoardRow,
 ) -> Result<BoardDetail> {
     let now = state.clock.now();
-    let home = home_country(deps, &state.db, account, now).await?;
-    let ranking = rankings(&state.db, std::slice::from_ref(&row), home, now)
+    let who = viewer(deps, &state.db, account, now).await?;
+    let (ranking, fit) = rankings(&state.db, std::slice::from_ref(&row), &who, now)
         .await?
         .remove(&row.id)
-        .unwrap_or_else(|| pay::rank(&[], home, row.country.as_deref(), &pay::COUNTRIES));
+        .unwrap_or_else(|| {
+            (
+                pay::rank(&[], who.home, row.country.as_deref(), &pay::COUNTRIES),
+                None,
+            )
+        });
     let totals = scans::totals(&state.db, account, now).await?;
     let config = row.config().ok();
     let blockers = blockers(&row);
     Ok(BoardDetail {
-        board: summary(&row, ranking, totals.get(&row.id)),
+        board: summary(&row, ranking, fit, totals.get(&row.id)),
         endpoint: config
             .as_ref()
             .and_then(|c| row.kind().and_then(|k| c.start(k)))
@@ -549,16 +615,19 @@ pub async fn list(
     let account = principal.account_id;
     let now = state.clock.now();
     let rows = job_boards::all(&state.db).await?;
-    let home = home_country(&deps, &state.db, account, now).await?;
-    let mut rankings = rankings(&state.db, &rows, home, now).await?;
+    let who = viewer(&deps, &state.db, account, now).await?;
+    let mut rankings = rankings(&state.db, &rows, &who, now).await?;
     let totals = scans::totals(&state.db, account, now).await?;
     let mut boards: Vec<BoardSummary> = rows
         .iter()
         .map(|row| {
-            let ranking = rankings
-                .remove(&row.id)
-                .unwrap_or_else(|| pay::rank(&[], home, row.country.as_deref(), &pay::COUNTRIES));
-            summary(row, ranking, totals.get(&row.id))
+            let (ranking, fit) = rankings.remove(&row.id).unwrap_or_else(|| {
+                (
+                    pay::rank(&[], who.home, row.country.as_deref(), &pay::COUNTRIES),
+                    None,
+                )
+            });
+            summary(row, ranking, fit, totals.get(&row.id))
         })
         .collect();
     boards

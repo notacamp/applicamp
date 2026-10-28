@@ -780,11 +780,12 @@ pub(crate) async fn read_sources(
     db: &PgPool,
     now: DateTime<Utc>,
     fresh_since: DateTime<Utc>,
+    skills: &[String],
 ) -> Result<Reading> {
     let rows = job_boards::approved(db).await?;
     let mut reading = Reading::default();
     let mut jobs = Vec::new();
-    for read in reader.job_boards(db, &rows, now, fresh_since).await {
+    for read in reader.job_boards(db, &rows, now, fresh_since, skills).await {
         if read.outcome == Outcome::Error {
             reading.failed += 1;
         }
@@ -937,7 +938,7 @@ pub(crate) async fn run(
     } else {
         row.started_at
     };
-    let reading = read_sources(deps, reader, db, now, fresh_since).await?;
+    let reading = read_sources(deps, reader, db, now, fresh_since, &input.skills).await?;
     let failed = reading.failed;
     let scanned = reading.boards;
     let mut jobs = reading.jobs;
@@ -1169,7 +1170,21 @@ async fn nightly(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
     // Read once: the searches it starts read the same answers from the
     // cache (within each board's polling interval).
     let now = deps.clock.now();
-    let jobs = read_sources(deps, reader, db, now, now).await?.jobs;
+    // Their top skills too, so the stack queries are among what is read
+    // once (everyone's, in order, without repeats).
+    let mut skills: Vec<String> = Vec::new();
+    for account in &accounts {
+        if let Some(input) = neighbours.matching_input(db, *account, now).await? {
+            for skill in matching::top_skills(&input.skills) {
+                if !skills.iter().any(|s| s.eq_ignore_ascii_case(skill)) {
+                    skills.push(skill.to_owned());
+                }
+            }
+        }
+    }
+    let jobs = read_sources(deps, reader, db, now, now, &skills)
+        .await?
+        .jobs;
     let mut started = 0_u32;
     for account in accounts {
         let now = deps.clock.now();

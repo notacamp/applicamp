@@ -20,6 +20,7 @@ import {
 import {
   boardErrorOf,
   salaryLine,
+  skillsFitLine,
   useBoards,
   useSuggestBoard,
   type BoardStatus,
@@ -156,6 +157,7 @@ function BoardsList() {
 function BoardRow({ board, onOpen }: { board: BoardSummary; onOpen: () => void }) {
   const { t, i18n } = useTranslation("sources");
   const salary = salaryLine(board.ranking, i18n.language, t);
+  const fit = skillsFitLine(board, t);
   const meta: ReactNode[] = [];
   if (board.status === "paused") {
     meta.push(
@@ -194,7 +196,7 @@ function BoardRow({ board, onOpen }: { board: BoardSummary; onOpen: () => void }
   return (
     <BoardCard
       title={board.name}
-      subtitle={salary.text}
+      subtitle={fit === null ? salary.text : `${salary.text} · ${fit}`}
       meta={
         <Stack gap="sm">
           <Cluster>{meta}</Cluster>

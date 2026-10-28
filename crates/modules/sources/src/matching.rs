@@ -29,6 +29,56 @@ pub const TOP: usize = 40;
 /// Jobs older than this are left out.
 pub const MAX_AGE: TimeDelta = TimeDelta::days(30);
 
+/// Skills that drive the stack queries, the pre-rank and the fit label.
+pub const TOP_SKILLS: usize = 3;
+
+/// The person's top skills: the first [`TOP_SKILLS`] non-blank entries, in
+/// their order, without repeats (ignoring case).
+pub fn top_skills(skills: &[String]) -> Vec<&str> {
+    let mut top: Vec<&str> = Vec::new();
+    for skill in skills.iter().map(|s| s.trim()).filter(|s| !s.is_empty()) {
+        if top.len() == TOP_SKILLS {
+            break;
+        }
+        if !top.iter().any(|t| t.eq_ignore_ascii_case(skill)) {
+            top.push(skill);
+        }
+    }
+    top
+}
+
+/// A skill's words (`Ruby on Rails` is `ruby` + `rails`).
+pub fn skill_words(skills: &[&str]) -> Vec<HashSet<String>> {
+    skills
+        .iter()
+        .map(|s| words(s))
+        .filter(|w| !w.is_empty())
+        .collect()
+}
+
+/// Whether a text's `words` name the skill `skill` (all its words).
+pub fn names_skill(text_words: &HashSet<String>, skill: &HashSet<String>) -> bool {
+    !skill.is_empty() && skill.iter().all(|w| text_words.contains(w))
+}
+
+/// The words of a job's title and the start of its description.
+pub fn job_words(title: &str, description: &str) -> HashSet<String> {
+    let mut all = words(title);
+    all.extend(words(
+        &description
+            .chars()
+            .take(DESCRIPTION_CHARS)
+            .collect::<String>(),
+    ));
+    all
+}
+
+/// How much of a description names a skill.
+const DESCRIPTION_CHARS: usize = 4_000;
+
+/// What the pre-rank adds when every top skill is named.
+const SKILL_FIT: f64 = 0.3;
+
 /// What a search matches against: the person's profile and goals, as the
 /// profile module gives them (through the server).
 #[derive(Debug, Clone, Default)]
@@ -59,6 +109,8 @@ pub struct MatchInput {
     pub languages: Vec<String>,
     /// The least pay they take.
     pub cash_floor: Option<Floor>,
+    /// The skills on their profile, in their own order (at most 40).
+    pub skills: Vec<String>,
 }
 
 impl MatchInput {
@@ -215,6 +267,17 @@ fn place_fit(location: Option<&str>, input: &MatchInput) -> f64 {
     }
 }
 
+/// [`SKILL_FIT`] times the share of `top` skills `job` names; 0 without any.
+fn skill_fit(job: &Job, top: &[HashSet<String>]) -> f64 {
+    if top.is_empty() {
+        return 0.0;
+    }
+    let text = job_words(&job.title, &job.description);
+    let hits = top.iter().filter(|s| names_skill(&text, s)).count();
+    // Counts of at most three: exact as f64.
+    SKILL_FIT * hits as f64 / top.len() as f64
+}
+
 /// The best [`TOP`] of `jobs` for `input`, best first.
 pub fn pre_rank(jobs: Vec<Job>, input: &MatchInput, now: DateTime<Utc>) -> Vec<Job> {
     let wanted = if input.roles.is_empty() {
@@ -223,13 +286,15 @@ pub fn pre_rank(jobs: Vec<Job>, input: &MatchInput, now: DateTime<Utc>) -> Vec<J
         &input.roles
     };
     let roles: Vec<HashSet<String>> = wanted.iter().map(|r| words(r)).collect();
+    let top = skill_words(&top_skills(&input.skills));
     let mut ranked: Vec<(f64, Job)> = jobs
         .into_iter()
         .map(|job| {
             (
                 title_fit(&job.title, &roles)
                     + freshness(job.posted_at, now)
-                    + place_fit(job.location.as_deref(), input),
+                    + place_fit(job.location.as_deref(), input)
+                    + skill_fit(&job, &top),
                 job,
             )
         })
@@ -451,5 +516,47 @@ mod tests {
             .map(|i| job(&format!("Engineer {i}"), None, None, 1))
             .collect();
         assert_eq!(pre_rank(jobs, &remote_in_portugal(), now()).len(), TOP);
+    }
+
+    #[test]
+    fn the_top_skills_are_the_first_three_in_their_order() {
+        let skills: Vec<String> = [
+            "Ruby on Rails",
+            " ",
+            "ruby on rails",
+            "React",
+            "PostgreSQL",
+            "Go",
+        ]
+        .map(String::from)
+        .into();
+        assert_eq!(
+            top_skills(&skills),
+            ["Ruby on Rails", "React", "PostgreSQL"]
+        );
+        assert!(top_skills(&[]).is_empty());
+    }
+
+    #[test]
+    fn a_job_that_names_the_stack_ranks_above_a_newer_one_that_does_not() {
+        let mut rails = job("Backend Engineer", None, None, 20);
+        rails.description = "You will build our Ruby on Rails monolith.".into();
+        let other = job("Backend Engineer Two", None, None, 1);
+        let input = MatchInput {
+            roles: vec!["Backend Engineer".into()],
+            skills: vec!["Ruby on Rails".into()],
+            ..MatchInput::default()
+        };
+        let ranked = pre_rank(vec![other.clone(), rails.clone()], &input, now());
+        assert_eq!(ranked[0].source_ref, rails.source_ref);
+        // No skills: nothing changes, the fresher one leads.
+        let plain = MatchInput {
+            skills: vec![],
+            ..input
+        };
+        assert_eq!(
+            pre_rank(vec![rails, other.clone()], &plain, now())[0].source_ref,
+            other.source_ref
+        );
     }
 }

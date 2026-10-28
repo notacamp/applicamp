@@ -39,6 +39,9 @@ poll_minutes = 60
 # Under 60 requests a minute.
 min_interval_ms = 1100
 remote_only = true
+# Its keyword search (`q`, 20 jobs a page, no cursor; read 2026-10-28): one
+# page per top skill.
+skill_search = { param = "q", separator = " ", endpoint = "https://himalayas.app/jobs/api/search" }
 
 [board.config.fields]
 ref = "/guid"
@@ -79,7 +82,11 @@ endpoint = "https://jobicy.com/api/v2/remote-jobs"
 query = { count = "50", tag = "engineer" }
 items = "/jobs"
 poll_minutes = 60
+min_interval_ms = 1000
 remote_only = true
+# `tag` is a keyword search of the job's content (read 2026-10-28):
+# `tag=rails` finds 50 jobs, `tag=ruby-on-rails` none.
+skill_search = { param = "tag", separator = " ", aliases = { "ruby on rails" = "rails" } }
 
 [board.config.fields]
 ref = "/id"
@@ -123,6 +130,9 @@ min_interval_ms = 1000
 remote_only = true
 salary_currency = "USD"
 salary_period = "year"
+# `?tag=` filters by its own tags (read 2026-10-28): `ruby`, `react`,
+# `typescript`, `postgres` have jobs, `rails` and `postgresql` none.
+skill_search = { param = "tag", aliases = { "ruby on rails" = "ruby", "rails" = "ruby", "ror" = "ruby", "postgresql" = "postgres", "node.js" = "node", "nodejs" = "node", "react.js" = "react" } }
 
 [board.config.fields]
 ref = "/id"
@@ -465,6 +475,132 @@ sources = ["https://www.themuse.com/developers/api/v2"]
 
 [board.report]
 notes = "Mostly US jobs, and many of its remote listings are old (some from 2025)."
+
+# --- Waiting: boards for a stack (#28) ----------------------------------------
+# Researched 2026-10-28: robots.txt, a GET of the feed, a search for terms. The
+# owner decides; none is approved or declined here.
+
+[[board]]
+slug = "python-org-jobs"
+name = "Python.org Jobs"
+homepage = "https://www.python.org/jobs/"
+kind = "rss"
+priority = "low"
+status = "candidate"
+
+# robots.txt disallows only /~guido/orlijn/ and /webstats/ for everyone.
+[board.config]
+endpoint = "https://www.python.org/jobs/feed/rss/"
+poll_minutes = 360
+title_split = { separator = ", ", company_first = false }
+
+[board.config.fields]
+ref = "guid"
+title = "title"
+url = "link"
+description = "description"
+posted_at = "pubDate"
+
+[board.terms]
+attribution = "Python.org Jobs"
+link_back = true
+follow = true
+notes = "Link back to each job on python.org."
+sources = ["https://www.python.org/jobs/feed/rss/", "https://www.python.org/robots.txt"]
+
+[board.report]
+notes = "Python and Django jobs, many not remote; the jobs' places are in the first line of each description. No terms for reading its feed were found: read python.org's legal page before approving."
+flags = ["terms not read yet"]
+
+[[board]]
+slug = "larajobs"
+name = "LaraJobs"
+homepage = "https://larajobs.com"
+kind = "rss"
+priority = "low"
+status = "candidate"
+
+# robots.txt: `User-agent: *` / `Disallow:` (nothing). The feed holds the last
+# jobs with their company, place and pay.
+[board.config]
+endpoint = "https://larajobs.com/feed"
+poll_minutes = 360
+
+[board.config.fields]
+ref = "guid"
+title = "title"
+company = "job:company"
+url = "link"
+location = "job:location"
+description = "description"
+posted_at = "pubDate"
+salary_text = "job:salary"
+
+[board.terms]
+attribution = "LaraJobs"
+link_back = true
+follow = true
+notes = "Link back to each job on LaraJobs."
+sources = ["https://larajobs.com/feed", "https://larajobs.com/robots.txt"]
+
+[board.report]
+notes = "PHP and Laravel jobs, remote and on site. Its feed has no descriptions yet; no terms page was found: a person reads its site before approving."
+flags = ["terms not found"]
+
+[[board]]
+slug = "golangprojects"
+name = "Golangprojects"
+homepage = "https://www.golangprojects.com"
+kind = "rss"
+priority = "low"
+status = "candidate"
+
+# robots.txt disallows only Yahoo Pipes and AhrefsBot.
+[board.config]
+endpoint = "https://www.golangprojects.com/rss.xml"
+poll_minutes = 360
+title_split = { separator = " @ ", company_first = false }
+
+[board.config.fields]
+ref = "guid"
+title = "title"
+url = "link"
+description = "description"
+
+[board.terms]
+attribution = "Golangprojects"
+link_back = true
+follow = true
+notes = "Link back to each job on Golangprojects."
+sources = ["https://www.golangprojects.com/rss.xml", "https://www.golangprojects.com/robots.txt"]
+
+[board.report]
+notes = "Go jobs only, remote and on site; the description starts with where. Its terms page was not read: a person reads it before approving."
+flags = ["terms not read yet"]
+
+[[board]]
+slug = "ruby-on-remote"
+name = "Ruby on Remote"
+homepage = "https://rubyonremote.com"
+kind = "rss"
+priority = "low"
+status = "candidate"
+
+[board.report]
+notes = "Remote Ruby and Rails jobs. Its robots.txt allows reading, but every feed and API address answered a program with a challenge page (403, 2026-10-28), so no feed address is known. Check looks for one; a person reads its terms before approving."
+flags = ["no feed address", "terms not read yet"]
+
+[[board]]
+slug = "javascript-jobs"
+name = "JavaScript.jobs"
+homepage = "https://javascript.jobs"
+kind = "jsonld_sitemap"
+priority = "low"
+status = "candidate"
+
+[board.report]
+notes = "JavaScript, React and Node jobs, with a page per stack. Its robots.txt allows everything and it has a sitemap, but no feed (404 on /rss and /feed): Check looks for JSON-LD postings. A person reads its terms before approving."
+flags = ["no feed address", "terms not read yet"]
 
 # --- Waiting, with what forbids reading them -----------------------------------
 

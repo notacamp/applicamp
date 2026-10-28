@@ -61,6 +61,18 @@ pub struct KnownLinks {
     pub keys: HashSet<String>,
 }
 
+/// An opportunity a search found whose reasons were never checked against
+/// the profile (found before #27).
+#[derive(Debug, Clone)]
+pub struct Unreasoned {
+    /// Whose.
+    pub account: Uuid,
+    /// The opportunity.
+    pub opportunity: Uuid,
+    /// The reasons it has now.
+    pub why: Vec<String>,
+}
+
 /// The other modules, as a search sees them.
 pub trait Neighbours: Send + Sync + 'static {
     /// What a search for `account` matches against; `None` until they have
@@ -137,5 +149,27 @@ pub trait Neighbours: Send + Sync + 'static {
         opportunity: Uuid,
         facts: Facts,
         hidden: Option<Excluded>,
+    ) -> BoxFuture<'a, Result<bool>>;
+
+    /// Up to `most` Found or Shortlisted opportunities a search found whose
+    /// reasons were never checked, with an id after `after`, by id.
+    fn unreasoned<'a>(
+        &'a self,
+        db: &'a PgPool,
+        after: Uuid,
+        most: usize,
+    ) -> BoxFuture<'a, Result<Vec<Unreasoned>>>;
+
+    /// Keep `why` on `account`'s `opportunity` and mark its reasons checked
+    /// (`updated`: some were stripped); only while it is still Found or
+    /// Shortlisted and unchecked. Nothing else changes; never hidden or
+    /// deleted. Whether it was.
+    fn set_reasons<'a>(
+        &'a self,
+        db: &'a PgPool,
+        account: Uuid,
+        opportunity: Uuid,
+        why: Vec<String>,
+        updated: bool,
     ) -> BoxFuture<'a, Result<bool>>;
 }

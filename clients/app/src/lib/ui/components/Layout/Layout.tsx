@@ -35,13 +35,15 @@ export interface SectionProps {
   children?: ReactNode;
   /** For tests: `data-testid` of the section. */
   testId?: string | undefined;
+  /** The section's address on the page: a link's `#anchor` scrolls to it. */
+  anchor?: string | undefined;
 }
 
 /** A part of a page: a heading, a sentence, an action and what it holds. */
-export function Section({ title, description, action, children, testId }: SectionProps) {
+export function Section({ title, description, action, children, testId, anchor }: SectionProps) {
   const id = useId();
   return (
-    <section className={styles["section"]} aria-labelledby={id} data-testid={testId}>
+    <section id={anchor} className={styles["section"]} aria-labelledby={id} data-testid={testId}>
       <div className={styles["head"]}>
         <Heading level={2} size="title" id={id}>
           {title}

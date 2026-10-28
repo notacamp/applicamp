@@ -5,6 +5,8 @@ import { Page } from "~/lib/ui";
 import { invalidatePipeline, PipelinePage } from "~/modules/pipeline";
 import { SearchNowButton, SearchProgress } from "~/modules/sources";
 
+import { NoSkillsLine } from "../NoSkillsLine";
+
 /** What the Pipeline's address asks for. */
 export interface PipelineSearchParams {
   /** Only the new matches. */
@@ -49,11 +51,14 @@ export function Pipeline({ newOnly, run, onSearch }: PipelineProps) {
           />
         }
         progress={
-          <SearchProgress
-            onFinished={() => {
-              void invalidatePipeline(queryClient);
-            }}
-          />
+          <>
+            <SearchProgress
+              onFinished={() => {
+                void invalidatePipeline(queryClient);
+              }}
+            />
+            <NoSkillsLine testId="pipeline-no-skills" />
+          </>
         }
       />
     </Page>

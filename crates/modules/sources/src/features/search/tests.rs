@@ -11,7 +11,7 @@ use wiremock::{
 
 use crate::testkit::{
     Fake, Harness, answer_for, completion, config, exampleco, gateway, greenhouse_boards,
-    model_reading_facts, model_scoring, open_facts,
+    model_giving, model_reading_facts, model_scoring, open_facts,
 };
 
 async fn model_calls(model: &MockServer) -> usize {
@@ -796,4 +796,142 @@ async fn company_boards_are_off_by_default(db: PgPool) {
         company.received_requests().await.unwrap().is_empty(),
         "the company boards are kept, not read"
     );
+}
+
+/// The reasons of the one score cached, and whether it is marked ungrounded.
+async fn cached_reasons(h: &Harness) -> Vec<(i32, Vec<String>, bool)> {
+    let rows: Vec<(i32, sqlx::types::Json<Vec<String>>, bool)> = sqlx::query_as(
+        "SELECT match_score, why, ungrounded FROM sources.scores ORDER BY source_ref",
+    )
+    .fetch_all(&h.db)
+    .await
+    .unwrap();
+    rows.into_iter().map(|(s, w, u)| (s, w.0, u)).collect()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_model_that_invents_a_stack_for_a_profile_without_skills_is_not_believed(db: PgPool) {
+    let boards = greenhouse_boards().await;
+    let model = model_giving(88, &["Full-stack TypeScript matches profile"]).await;
+    let h = Harness::new(
+        db,
+        config(&boards),
+        Some(gateway(&model, BudgetConfig::default())),
+        Fake::no_skills(),
+    )
+    .await;
+    h.post("/api/v1/searches").await;
+    h.work().await;
+
+    let search = latest(&h).await;
+    assert_eq!(search["status"], "finished", "{search}");
+    assert_eq!(search["scored"], 2);
+    assert_eq!(search["added"], 0, "no reason is left: nothing is added");
+    assert!(h.fake.added().is_empty());
+    // Held below the bar, marked, and counted as not grounded.
+    let cached = cached_reasons(&h).await;
+    assert_eq!(cached.len(), 2);
+    for (score, why, ungrounded) in cached {
+        assert_eq!(score, i32::from(crate::scoring::KEEP) - 1);
+        assert!(why.is_empty(), "{why:?}");
+        assert!(ungrounded);
+    }
+    let (not_grounded,): (i32,) = sqlx::query_as("SELECT not_grounded FROM sources.searches")
+        .fetch_one(&h.db)
+        .await
+        .unwrap();
+    assert_eq!(not_grounded, 2);
+    // The model was told what the profile does not contain.
+    let request: Value =
+        serde_json::from_slice(&model.received_requests().await.unwrap()[0].body).unwrap();
+    let user = request["messages"][1]["content"].as_str().unwrap();
+    assert!(
+        user.contains("No skills are listed. Do not infer a technology stack."),
+        "{user}"
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_reason_the_profile_supports_is_kept(db: PgPool) {
+    let boards = greenhouse_boards().await;
+    let model = model_giving(88, &["Rails experience matches"]).await;
+    let h = Harness::new(
+        db,
+        config(&boards),
+        Some(gateway(&model, BudgetConfig::default())),
+        Fake::ruby_rails(),
+    )
+    .await;
+    h.post("/api/v1/searches").await;
+    h.work().await;
+
+    assert_eq!(latest(&h).await["added"], 2);
+    let added = h.fake.added();
+    assert_eq!(added.len(), 2);
+    assert_eq!(added[0].score.why, ["Rails experience matches"]);
+    assert!(!added[0].score.ungrounded);
+    let request: Value =
+        serde_json::from_slice(&model.received_requests().await.unwrap()[0].body).unwrap();
+    let user = request["messages"][1]["content"].as_str().unwrap();
+    assert!(!user.contains("No skills are listed"), "{user}");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn only_the_invented_reason_is_dropped_when_another_is_supported(db: PgPool) {
+    let boards = greenhouse_boards().await;
+    let model = model_giving(
+        88,
+        &["Rails experience matches", "Deep TypeScript expertise"],
+    )
+    .await;
+    let h = Harness::new(
+        db,
+        config(&boards),
+        Some(gateway(&model, BudgetConfig::default())),
+        Fake::ruby_rails(),
+    )
+    .await;
+    h.post("/api/v1/searches").await;
+    h.work().await;
+
+    let added = h.fake.added();
+    assert_eq!(added.len(), 2, "the score stands on the reason that holds");
+    assert_eq!(added[0].score.why, ["Rails experience matches"]);
+    assert_eq!(added[0].score.match_score, 88);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn scores_cached_before_the_rules_version_are_scored_again(db: PgPool) {
+    let boards = greenhouse_boards().await;
+    let model = model_scoring(50).await;
+    let h = Harness::new(
+        db,
+        config(&boards),
+        Some(gateway(&model, BudgetConfig::default())),
+        Fake::ready(),
+    )
+    .await;
+    h.post("/api/v1/searches").await;
+    h.work().await;
+    assert_eq!(model_calls(&model).await, 1);
+    let (version,): (i32,) = sqlx::query_as("SELECT DISTINCT rules_version FROM sources.scores")
+        .fetch_one(&h.db)
+        .await
+        .unwrap();
+    assert_eq!(version, crate::requirements::RULES_VERSION);
+    assert!(version >= 2, "reasons are grounded from version 2");
+
+    // The same scores as the old rules cached them: asked again, once.
+    sqlx::query("UPDATE sources.scores SET rules_version = 1")
+        .execute(&h.db)
+        .await
+        .unwrap();
+    h.clock.advance(TimeDelta::hours(1));
+    h.post("/api/v1/searches").await;
+    h.work().await;
+    assert_eq!(model_calls(&model).await, 2);
+    h.clock.advance(TimeDelta::hours(1));
+    h.post("/api/v1/searches").await;
+    h.work().await;
+    assert_eq!(model_calls(&model).await, 2, "and cached again");
 }

@@ -207,6 +207,21 @@ describe("the pipeline page", () => {
     );
   });
 
+  it("says Reasons updated when the reasons the profile never supported were stripped", async () => {
+    fakePipeline({}, [opportunity({ reasons_updated: true, why: [] })]);
+    const user = userEvent.setup();
+    renderPage();
+
+    const [first] = await screen.findAllByTestId("pipeline-row-open");
+    if (first === undefined) {
+      throw new TypeError("a row");
+    }
+    await user.click(first);
+    expect(await screen.findByTestId("peek-reasons-updated")).toHaveTextContent("Reasons updated");
+    expect(screen.queryByTestId("peek-why")).toBeNull();
+    expect(screen.getByTestId("peek")).toBeInTheDocument();
+  });
+
   it("moves an opportunity to Shortlisted from the peek", async () => {
     const { patches } = fakePipeline();
     const user = userEvent.setup();
@@ -395,6 +410,7 @@ describe("the pipeline page", () => {
       salary_text: null,
       posted_at: null,
       new: false,
+      reasons_updated: false,
       editable: true,
     });
     fakePipeline({

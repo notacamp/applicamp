@@ -17,6 +17,7 @@ fn status(profile_done: bool, goals_answered: u32) -> ProfileStatus {
     ProfileStatus {
         profile_done,
         strength_hint: None,
+        no_skills: false,
         goals_answered,
         goals_total: 11,
     }
@@ -42,6 +43,7 @@ async fn profile_and_goals_done_before_any_search_offers_search_now(db: PgPool) 
     let fake = Arc::new(Fake::default());
     *fake.status.lock().unwrap() = ProfileStatus {
         strength_hint: Some("add_skills".into()),
+        no_skills: true,
         ..status(true, 3)
     };
     let h = Harness::as_account(db, Uuid::now_v7(), Arc::clone(&fake));
@@ -50,6 +52,7 @@ async fn profile_and_goals_done_before_any_search_offers_search_now(db: PgPool) 
     assert_eq!(body["next_step"], "search");
     assert_eq!(body["profile"]["done"], true);
     assert_eq!(body["profile"]["strength_hint"], "add_skills");
+    assert_eq!(body["profile"]["no_skills"], true);
     assert_eq!(body["goals"]["answered"], 3);
     assert_eq!(body["goals"]["total"], 11);
     assert_eq!(body["latest_search"], serde_json::Value::Null);

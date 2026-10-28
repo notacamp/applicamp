@@ -38,7 +38,7 @@ use crate::{
     job_boards::{self, SeedBoard},
     matching::MatchInput,
     module,
-    ports::{Attach, KnownLinks, Neighbours, Scored, Unchecked},
+    ports::{Attach, KnownLinks, Neighbours, Scored, Unchecked, Unreasoned},
     readers::Board,
     requirements::{Excluded, Facts, Reach},
 };
@@ -76,6 +76,11 @@ pub(crate) struct Fake {
     pub(crate) unchecked: Mutex<Vec<Unchecked>>,
     /// The checks kept: the opportunity, its facts, why it is hidden.
     pub(crate) checked: Mutex<Vec<(Uuid, Facts, Option<Excluded>)>>,
+    /// Opportunities found before the reason check, not yet checked.
+    pub(crate) unreasoned: Mutex<Vec<Unreasoned>>,
+    /// The reasons kept by the one-off: the opportunity, its reasons, whether
+    /// some were stripped.
+    pub(crate) reasoned: Mutex<Vec<(Uuid, Vec<String>, bool)>>,
     /// The pipeline's links and keys, for dedupe across boards.
     pub(crate) links: Mutex<KnownLinks>,
     /// Boards credited on opportunities already there.
@@ -100,6 +105,37 @@ impl Fake {
         Arc::new(fake)
     }
 
+    /// Someone whose profile lists no skills and names no technology: the
+    /// owner's when #27 was reported.
+    pub(crate) fn no_skills() -> Arc<Self> {
+        let fake = Self::default();
+        *lock(&fake.input) = Some(MatchInput {
+            profile_version: "2026-10-01T00:00:00Z".into(),
+            goals_version: 1,
+            profile: json!({ "headline": null, "skills": [], "positions": [] }),
+            goals: json!({ "roles": ["Senior backend engineer"], "work_mode": ["remote"] }),
+            roles: vec!["Senior backend engineer".into()],
+            work_modes: vec![WorkMode::Remote],
+            ..MatchInput::default()
+        });
+        Arc::new(fake)
+    }
+
+    /// Someone who lists Ruby and Rails.
+    pub(crate) fn ruby_rails() -> Arc<Self> {
+        let fake = Self::default();
+        *lock(&fake.input) = Some(MatchInput {
+            profile_version: "2026-10-01T00:00:00Z".into(),
+            goals_version: 1,
+            profile: json!({ "headline": "Backend engineer", "skills": ["Ruby", "Rails"] }),
+            goals: json!({ "roles": ["Senior backend engineer"], "work_mode": ["remote"] }),
+            roles: vec!["Senior backend engineer".into()],
+            work_modes: vec![WorkMode::Remote],
+            ..MatchInput::default()
+        });
+        Arc::new(fake)
+    }
+
     /// Someone in Lisbon who works remote only, in English and Portuguese,
     /// and would not move: the owner's goals when #19 was reported.
     pub(crate) fn lisbon_remote_only() -> Arc<Self> {
@@ -107,7 +143,8 @@ impl Fake {
         *lock(&fake.input) = Some(MatchInput {
             profile_version: "2026-10-01T00:00:00Z".into(),
             goals_version: 1,
-            profile: json!({ "headline": "Backend engineer", "location": "Lisbon, Portugal" }),
+            profile: json!({ "headline": "Backend engineer", "location": "Lisbon, Portugal",
+                             "skills": ["Rust", "Postgres"] }),
             goals: json!({ "roles": ["Senior backend engineer"], "work_mode": ["remote"],
                            "locations": ["Lisbon"], "relocate": "no" }),
             roles: vec!["Senior backend engineer".into()],
@@ -128,6 +165,10 @@ impl Fake {
 
     pub(crate) fn checked(&self) -> Vec<(Uuid, Facts, Option<Excluded>)> {
         lock(&self.checked).clone()
+    }
+
+    pub(crate) fn reasoned(&self) -> Vec<(Uuid, Vec<String>, bool)> {
+        lock(&self.reasoned).clone()
     }
 
     pub(crate) fn attached(&self) -> Vec<Attach> {
@@ -250,6 +291,42 @@ impl Neighbours for Fake {
         };
         if set {
             lock(&self.checked).push((opportunity, facts, hidden));
+        }
+        Box::pin(async move { Ok(set) })
+    }
+
+    fn unreasoned<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        after: Uuid,
+        most: usize,
+    ) -> BoxFuture<'a, Result<Vec<Unreasoned>>> {
+        let mut items: Vec<Unreasoned> = lock(&self.unreasoned)
+            .iter()
+            .filter(|item| item.opportunity > after)
+            .cloned()
+            .collect();
+        items.sort_by_key(|item| item.opportunity);
+        items.truncate(most);
+        Box::pin(async move { Ok(items) })
+    }
+
+    fn set_reasons<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        _account: Uuid,
+        opportunity: Uuid,
+        why: Vec<String>,
+        updated: bool,
+    ) -> BoxFuture<'a, Result<bool>> {
+        let set = {
+            let mut unreasoned = lock(&self.unreasoned);
+            let before = unreasoned.len();
+            unreasoned.retain(|item| item.opportunity != opportunity);
+            unreasoned.len() < before
+        };
+        if set {
+            lock(&self.reasoned).push((opportunity, why, updated));
         }
         Box::pin(async move { Ok(set) })
     }
@@ -487,6 +564,34 @@ pub(crate) async fn model_reading_facts() -> MockServer {
                                 "region_note": "", "working_languages": ["en"], "salary": null })
                     };
                     answer_for(posting["ref"].as_str().unwrap_or(""), 85, &facts)
+                })
+                .collect();
+            ResponseTemplate::new(200).set_body_json(completion(&json!({ "jobs": jobs }), 0.000_4))
+        })
+        .mount(&server)
+        .await;
+    server
+}
+
+/// A fake model that scores every job of a batch `score` and gives
+/// `reasons` as why, whatever the profile says (the one that invents).
+pub(crate) async fn model_giving(score: u8, reasons: &[&str]) -> MockServer {
+    let reasons: Vec<String> = reasons.iter().map(|r| (*r).to_owned()).collect();
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(move |request: &wiremock::Request| {
+            let body: Value = serde_json::from_slice(&request.body).unwrap_or(Value::Null);
+            let user = body["messages"][1]["content"]
+                .as_str()
+                .unwrap_or("")
+                .to_owned();
+            let jobs: Vec<Value> = (1..=10)
+                .filter(|i| user.contains(&format!("\"ref\":\"j{i}\"")))
+                .map(|i| {
+                    let mut item = answer_for(&format!("j{i}"), score, &open_facts());
+                    item["why"] = json!(reasons);
+                    item
                 })
                 .collect();
             ResponseTemplate::new(200).set_body_json(completion(&json!({ "jobs": jobs }), 0.000_4))

@@ -18,6 +18,7 @@ pub mod ids;
 pub mod jobs;
 pub mod module;
 pub mod state;
+pub mod tech;
 pub mod telemetry;
 
 pub use config::Config;

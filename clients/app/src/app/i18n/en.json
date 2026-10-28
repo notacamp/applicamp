@@ -33,6 +33,10 @@
       "add_skills": "Add your skills to your profile: matches are scored against them."
     }
   },
+  "noSkills": {
+    "line": "Your profile lists no skills yet. Add them for better matches.",
+    "action": "Go to Skills"
+  },
   "pipeline": {
     "title": "Pipeline",
     "lead": "Every opportunity agents find or you add, from first match to offer."

@@ -250,6 +250,11 @@ function PeekBody({ opportunity, onClose }: { opportunity: Opportunity; onClose:
           <Bullets items={opportunity.why} />
         </Section>
       )}
+      {opportunity.reasons_updated ? (
+        <Tagged testId="peek-reasons-updated">
+          <Text tone="secondary">{t("peek.reasonsUpdated")}</Text>
+        </Tagged>
+      ) : null}
       {opportunity.gaps.length === 0 ? null : (
         <Section title={t("peek.gaps")} testId="peek-gaps">
           <Bullets items={opportunity.gaps} />

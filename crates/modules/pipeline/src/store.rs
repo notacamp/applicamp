@@ -514,6 +514,62 @@ pub async fn set_eligibility(
     Ok(done.rows_affected() == 1)
 }
 
+/// An opportunity a search found whose reasons were never checked against
+/// the profile (found before #27).
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct UnreasonedRow {
+    pub id: Uuid,
+    pub account_id: Uuid,
+    /// The reasons it has now.
+    pub why: sqlx::types::Json<Vec<String>>,
+}
+
+/// Up to `most` Found or Shortlisted opportunities a search found, whose
+/// reasons were never checked, with an id after `after` (oldest id first,
+/// so a pass over them ends). Dismissed and hidden ones too: nothing is
+/// shown that the profile never supported.
+pub async fn unreasoned(db: &PgPool, after: Uuid, most: usize) -> Result<Vec<UnreasonedRow>> {
+    Ok(sqlx::query_as(
+        "SELECT id, account_id, match_why AS why
+           FROM pipeline.opportunities
+          WHERE NOT reasons_checked AND stage IN ('found', 'shortlisted')
+            AND match_score IS NOT NULL AND source <> 'link' AND id > $1
+          ORDER BY id
+          LIMIT $2",
+    )
+    .bind(after)
+    .bind(i64::try_from(most).unwrap_or(i64::MAX))
+    .fetch_all(db)
+    .await?)
+}
+
+/// Keep `why` (the reasons the profile supports) on `account`'s opportunity
+/// `id` and mark its reasons checked; `updated` when some were stripped,
+/// which the peek says. Only while it is still Found or Shortlisted and
+/// unchecked. Nothing else changes, and nothing is deleted or hidden.
+/// Whether it was kept.
+pub async fn set_reasons(
+    db: &PgPool,
+    account: Uuid,
+    id: Uuid,
+    why: &[String],
+    updated: bool,
+) -> Result<bool> {
+    let done = sqlx::query(
+        "UPDATE pipeline.opportunities
+            SET match_why = $3, reasons_checked = true, reasons_updated = $4
+          WHERE id = $1 AND account_id = $2 AND stage IN ('found', 'shortlisted')
+            AND NOT reasons_checked",
+    )
+    .bind(id)
+    .bind(account)
+    .bind(sqlx::types::Json(why))
+    .bind(updated)
+    .execute(db)
+    .await?;
+    Ok(done.rows_affected() == 1)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -772,5 +828,53 @@ mod tests {
         .unwrap();
         assert_eq!(count, 5, "nothing deleted");
         assert_eq!(hidden.as_deref(), Some("not_open_to_location"));
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn reasons_found_before_the_check_are_stripped_once_and_nothing_is_hidden(db: PgPool) {
+        let account = Uuid::now_v7();
+        let events = EventBus::default();
+        let now = Utc::now();
+        add_found(&db, &events, account, vec![found("a:1")], now)
+            .await
+            .unwrap();
+        // As a row from before the check: unchecked, with an invented reason.
+        sqlx::query(
+            "UPDATE pipeline.opportunities
+                SET reasons_checked = false,
+                    match_why = '[\"Full-stack TypeScript matches profile\", \"Remote\"]'",
+        )
+        .execute(&db)
+        .await
+        .unwrap();
+        let rows = unreasoned(&db, Uuid::nil(), 100).await.unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].why.0.len(), 2);
+        let id = rows[0].id;
+        assert!(unreasoned(&db, id, 100).await.unwrap().is_empty(), "keyset");
+        assert!(
+            set_reasons(&db, account, id, &["Remote".to_owned()], true)
+                .await
+                .unwrap()
+        );
+        // Once: never again, and not someone else's.
+        assert!(!set_reasons(&db, account, id, &[], true).await.unwrap());
+        assert!(unreasoned(&db, Uuid::nil(), 100).await.unwrap().is_empty());
+        let (why, updated, hidden, count): (
+            sqlx::types::Json<Vec<String>>,
+            bool,
+            Option<String>,
+            i64,
+        ) = sqlx::query_as(
+            "SELECT match_why, reasons_updated, hidden_reason,
+                        (SELECT count(*) FROM pipeline.opportunities) FROM pipeline.opportunities",
+        )
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(why.0, ["Remote"]);
+        assert!(updated);
+        assert_eq!(hidden, None, "never hidden");
+        assert_eq!(count, 1, "never deleted");
     }
 }

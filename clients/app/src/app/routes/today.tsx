@@ -8,6 +8,7 @@ import { useToday, type Today as TodayState } from "~/modules/pipeline";
 import { SearchLine, SearchNowButton } from "~/modules/sources";
 
 import { useImportLink } from "../links";
+import { NoSkillsLine } from "../NoSkillsLine";
 
 /** An in-app link: a real `href` (a new tab with ⌘), else `go` without a reload. */
 function inAppLink(href: string, go: () => void) {
@@ -189,7 +190,10 @@ function TodayBody({ state }: { state: TodayState }) {
     <Stack>
       {step}
       {latest === null ? null : <SearchLine search={latest} testId="today-latest-search" />}
-      {hint === null || state.next_step === "set_up_profile" ? null : (
+      {state.next_step === "set_up_profile" ? null : <NoSkillsLine testId="today-no-skills" />}
+      {hint === null ||
+      state.next_step === "set_up_profile" ||
+      (state.profile.no_skills && hint === "add_skills") ? null : (
         <Tagged testId="today-strength-hint">
           <Text tone="secondary">{t(`today.strength.${hint}`)}</Text>
         </Tagged>

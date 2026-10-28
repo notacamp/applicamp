@@ -41,6 +41,8 @@ pub struct ProfileStatus {
     pub profile_done: bool,
     /// What would make it stronger: `add_headline`, `add_work`, `add_skills`.
     pub strength_hint: Option<String>,
+    /// The profile lists no skills and its text names no technology.
+    pub no_skills: bool,
     /// Goals questions answered.
     pub goals_answered: u32,
     /// Goals questions there are.

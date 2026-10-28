@@ -46,6 +46,8 @@ pub struct Status {
     pub profile_done: bool,
     /// What would make it stronger.
     pub strength_hint: Option<StrengthHint>,
+    /// It lists no skills and its text names no technology ([`no_stack`]).
+    pub no_skills: bool,
     /// Goals questions answered.
     pub goals_answered: u32,
     /// Goals questions there are.
@@ -104,6 +106,30 @@ pub fn strength_hint(profile: &Profile) -> Option<StrengthHint> {
     }
 }
 
+/// Every string a JSON value holds (never its keys).
+fn strings(value: &Value, out: &mut Vec<String>) {
+    match value {
+        Value::String(s) => out.push(s.clone()),
+        Value::Array(items) => items.iter().for_each(|v| strings(v, out)),
+        Value::Object(map) => map.values().for_each(|v| strings(v, out)),
+        _ => {}
+    }
+}
+
+/// Whether `profile` says nothing about a stack: it lists no skills, and
+/// nothing a search sends to the model ([`summary`]) names a technology.
+/// Matches cannot cite a stack the profile does not have.
+pub fn no_stack(profile: &Profile) -> bool {
+    if !profile.skills.is_empty() {
+        return false;
+    }
+    let mut texts = Vec::new();
+    strings(&summary(profile, DateTime::UNIX_EPOCH), &mut texts);
+    !texts
+        .iter()
+        .any(|text| applicamp_kernel::tech::mentions(text))
+}
+
 async fn profile_of(db: &PgPool, account: Uuid) -> Result<Option<(Profile, DateTime<Utc>)>> {
     let row: Option<(sqlx::types::Json<Profile>, DateTime<Utc>)> =
         sqlx::query_as("SELECT data, updated_at FROM profile.profiles WHERE account_id = $1")
@@ -134,6 +160,7 @@ pub async fn status(db: &PgPool, account: Uuid) -> Result<Status> {
     Ok(Status {
         profile_done: profile.is_some(),
         strength_hint: profile.as_ref().and_then(strength_hint),
+        no_skills: profile.as_ref().is_some_and(no_stack),
         goals_answered,
         goals_total,
     })
@@ -548,5 +575,33 @@ mod tests {
         assert!(summary.contains("Senior Engineer"), "{summary}");
         assert!(summary.contains("\"years_working\":8"), "{summary}");
         assert_eq!(strength_hint(&profile), Some(StrengthHint::AddSkills));
+    }
+
+    #[test]
+    fn a_profile_with_no_skills_and_no_stack_words_has_no_stack() {
+        let bare = Profile {
+            basics: Basics {
+                label: Some("Product and operations lead".into()),
+                ..Basics::default()
+            },
+            work: vec![Work {
+                name: Some("Example Org".into()),
+                position: Some("Head of Operations".into()),
+                summary: Some("Ran the roadmap and led a team of five.".into()),
+                ..Work::default()
+            }],
+            ..Profile::default()
+        };
+        assert!(no_stack(&bare));
+        // A skill, or a stack word in a position, is a stack.
+        let mut skilled = bare.clone();
+        skilled.skills.push(Skill {
+            name: "Ruby".into(),
+            level: None,
+        });
+        assert!(!no_stack(&skilled));
+        let mut said = bare;
+        said.work[0].summary = Some("Built the billing platform in Rails.".into());
+        assert!(!no_stack(&said));
     }
 }

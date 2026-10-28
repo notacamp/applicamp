@@ -1162,6 +1162,8 @@ export interface components {
              * @description When the posting was published.
              */
             posted_at?: string | null;
+            /** @description Some of its reasons were stripped: they claimed things the profile never says. */
+            reasons_updated: boolean;
             /** @description Pay, as the posting says. */
             salary_text?: string | null;
             /** @description Where it was found (see the summary's `source`). */
@@ -1620,6 +1622,8 @@ export interface components {
         TodayProfile: {
             /** @description There is a profile with something in it. */
             done: boolean;
+            /** @description It lists no skills and names no technology: matches cannot cite a stack. */
+            no_skills: boolean;
             strength_hint?: components["schemas"]["StrengthHint"] | null;
         };
         /** @description The latest search, on Today. */

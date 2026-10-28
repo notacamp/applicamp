@@ -31,6 +31,11 @@
 //! - **The recheck** ([`features::recheck`]): at start, Found and
 //!   Shortlisted opportunities found before the rules get their facts once,
 //!   and the ones that fail are hidden (never deleted).
+//! - **The reason check** ([`grounding`], [`features::reground`]): a match
+//!   reason may say only what the profile and goals say; the ones that
+//!   claim more are dropped. At start, Found and Shortlisted opportunities
+//!   found before the check get their reasons checked once (reasons
+//!   stripped, never hidden or deleted).
 //!
 //! What it needs from other modules (the profile and goals, the pipeline)
 //! are [`ports::Neighbours`], which the server implements; modules never
@@ -48,6 +53,7 @@ pub mod config;
 pub mod dedupe;
 pub mod events;
 pub mod features;
+pub mod grounding;
 pub mod job;
 pub mod job_boards;
 pub mod lisbon;
@@ -147,7 +153,7 @@ impl SourcesDeps {
 
 /// The sources module, composed with `deps`.
 pub fn module(deps: SourcesDeps) -> Module {
-    use features::{boards as board, discovery, recheck, search};
+    use features::{boards as board, discovery, recheck, reground, search};
     let router = OpenApiRouter::new()
         .routes(routes!(search::start))
         .routes(routes!(search::latest))
@@ -169,6 +175,7 @@ pub fn module(deps: SourcesDeps) -> Module {
             .job_with::<search::RunSearch, _>(deps.clone())
             .job_with::<search::Nightly, _>(deps.clone())
             .job_with::<recheck::Recheck, _>(deps.clone())
+            .job_with::<reground::Reground, _>(deps.clone())
             .job_with::<discovery::Discover, _>(deps.clone())
             .job_with::<discovery::CheckBoard, _>(deps)
             .publishes::<events::SearchFinished>(),
@@ -196,6 +203,9 @@ pub async fn start(db: &PgPool, deps: &SourcesDeps) -> Result<(), String> {
     let recheck = features::recheck::schedule(db, deps)
         .await
         .map_err(|e| e.to_string())?;
+    let reground = features::reground::schedule(db, deps)
+        .await
+        .map_err(|e| e.to_string())?;
     tracing::info!(
         boards = count,
         job_boards,
@@ -204,6 +214,7 @@ pub async fn start(db: &PgPool, deps: &SourcesDeps) -> Result<(), String> {
         nightly = deps.config.nightly(),
         scheduled,
         recheck,
+        reground,
         "job sources ready"
     );
     Ok(())
@@ -230,6 +241,7 @@ mod tests {
                 "sources.discover_boards",
                 "sources.nightly",
                 "sources.recheck_requirements",
+                "sources.reground_reasons",
                 "sources.search"
             ]
         );

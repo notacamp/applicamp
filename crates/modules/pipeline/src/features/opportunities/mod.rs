@@ -258,6 +258,8 @@ pub struct Opportunity {
     pub why: Vec<String>,
     /// What the profile or goals miss (up to 3).
     pub gaps: Vec<String>,
+    /// Some of its reasons were stripped: they claimed things the profile never says.
+    pub reasons_updated: bool,
     /// What the posting says about their requirements; none when never
     /// checked (added by link, or found before the rules and not yet
     /// checked).
@@ -298,6 +300,7 @@ pub(crate) struct Row {
     match_score: Option<i32>,
     match_why: sqlx::types::Json<Vec<String>>,
     match_gaps: sqlx::types::Json<Vec<String>>,
+    reasons_updated: bool,
     stage: String,
     next_step: Option<String>,
     notes: Option<String>,
@@ -319,8 +322,8 @@ pub(crate) struct Row {
 macro_rules! columns {
     () => {
         "id, title, company, location, work_mode, url, source, posted_at, salary_text, \
-         description, match_score, match_why, match_gaps, stage, next_step, notes, dismissed, \
-         opened_at, created_at, updated_at, remote, open_to_candidate, region_note, \
+         description, match_score, match_why, match_gaps, reasons_updated, stage, next_step, notes, \
+         dismissed, opened_at, created_at, updated_at, remote, open_to_candidate, region_note, \
          working_languages, hidden_reason, apply_url, expires_at, \
          (SELECT s.name FROM pipeline.opportunity_sources s \
            WHERE s.opportunity_id = opportunities.id ORDER BY s.seen_at, s.board LIMIT 1) \
@@ -402,6 +405,7 @@ impl Row {
             description: self.description,
             why: self.match_why.0,
             gaps: self.match_gaps.0,
+            reasons_updated: self.reasons_updated,
             notes: self.notes,
             posted_at: self.posted_at,
             dismissed: self.dismissed,

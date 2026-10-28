@@ -34,8 +34,10 @@ use serde::{Deserialize, Serialize};
 use crate::{job::WorkMode, matching::MatchInput, places};
 
 /// The rules' version. Scores are cached per version: a change to what the
-/// model is asked re-asks it, once per job.
-pub const RULES_VERSION: i32 = 1;
+/// model is asked re-asks it, once per job. 2: reasons must be grounded in
+/// the profile (#27): scores cached with reasons the profile never
+/// supported are asked again.
+pub const RULES_VERSION: i32 = 2;
 
 /// The gap a job without a stated salary gets, when there is a floor.
 pub const SALARY_NOT_STATED: &str = "Salary not stated";

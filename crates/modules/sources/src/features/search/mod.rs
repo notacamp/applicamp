@@ -532,7 +532,8 @@ impl applicamp_kernel::Job for RunSearch {
 async fn progress(db: &PgPool, id: Uuid, fields: &Progress) -> Result<()> {
     sqlx::query(
         "UPDATE sources.searches
-            SET fetched = $2, kept = $3, scored = $4, batches = $5, cost_usd = $6, dropped = $7
+            SET fetched = $2, kept = $3, scored = $4, batches = $5, cost_usd = $6, dropped = $7,
+                not_grounded = $8
           WHERE id = $1",
     )
     .bind(id)
@@ -542,6 +543,7 @@ async fn progress(db: &PgPool, id: Uuid, fields: &Progress) -> Result<()> {
     .bind(i32::try_from(fields.batches).unwrap_or(i32::MAX))
     .bind(fields.cost_usd)
     .bind(i32::try_from(fields.dropped).unwrap_or(i32::MAX))
+    .bind(i32::try_from(fields.not_grounded).unwrap_or(i32::MAX))
     .execute(db)
     .await?;
     Ok(())
@@ -553,6 +555,8 @@ struct Progress {
     kept: usize,
     scored: usize,
     dropped: usize,
+    /// Jobs whose every reason claimed something the profile does not say.
+    not_grounded: usize,
     batches: usize,
     cost_usd: f64,
 }
@@ -598,6 +602,7 @@ async fn finish(
         kept = fields.kept,
         scored = fields.scored,
         dropped = fields.dropped,
+        not_grounded = fields.not_grounded,
         batches = fields.batches,
         added,
         cost_usd = fields.cost_usd,
@@ -621,6 +626,7 @@ struct CachedRow {
     region_note: Option<String>,
     working_languages: Option<Vec<String>>,
     salary: Option<sqlx::types::Json<Salary>>,
+    ungrounded: bool,
 }
 
 /// Scores already given to `account` for these versions of the profile,
@@ -632,7 +638,7 @@ async fn cached_scores(
 ) -> Result<HashMap<(String, String), Score>> {
     let rows: Vec<CachedRow> = sqlx::query_as(
         "SELECT source, source_ref, match_score, why, gaps, read, remote, open_to_candidate,
-                region_note, working_languages, salary
+                region_note, working_languages, salary, ungrounded
            FROM sources.scores
           WHERE account_id = $1 AND profile_version = $2 AND goals_version = $3
             AND rules_version = $4",
@@ -661,6 +667,7 @@ async fn cached_scores(
                         working_languages: row.working_languages.unwrap_or_default(),
                         salary: row.salary.map(|s| s.0),
                     },
+                    ungrounded: row.ungrounded,
                 },
             )
         })
@@ -682,8 +689,8 @@ async fn save_score(
         "INSERT INTO sources.scores
             (account_id, source, source_ref, profile_version, goals_version, rules_version,
              match_score, why, gaps, read, remote, open_to_candidate, region_note,
-             working_languages, salary, excluded_reason, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+             working_languages, salary, excluded_reason, created_at, ungrounded)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
          ON CONFLICT DO NOTHING",
     )
     .bind(account)
@@ -703,6 +710,7 @@ async fn save_score(
     .bind(score.facts.salary.as_ref().map(sqlx::types::Json))
     .bind(excluded.map(Excluded::as_str))
     .bind(now)
+    .bind(score.ungrounded)
     .execute(db)
     .await?;
     Ok(())
@@ -1086,6 +1094,9 @@ pub(crate) async fn run(
         if verdict.excluded.is_some() {
             done.dropped += 1;
             continue;
+        }
+        if score.ungrounded {
+            done.not_grounded += 1;
         }
         if score.match_score < KEEP {
             continue;

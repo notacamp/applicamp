@@ -33,6 +33,10 @@
       "add_skills": "Añade tus habilidades a tu perfil: las coincidencias se valoran según ellas."
     }
   },
+  "noSkills": {
+    "line": "Tu perfil aún no lista habilidades. Añádelas para obtener mejores coincidencias.",
+    "action": "Ir a las habilidades"
+  },
   "pipeline": {
     "title": "Oportunidades",
     "lead": "Todas las oportunidades que encuentran los agentes o que añades tú, desde la primera coincidencia hasta la oferta."

@@ -42,6 +42,8 @@ impl StrengthHint {
 pub struct TodayProfile {
     /// There is a profile with something in it.
     pub done: bool,
+    /// It lists no skills and names no technology: matches cannot cite a stack.
+    pub no_skills: bool,
     /// What would make it stronger, if anything.
     pub strength_hint: Option<StrengthHint>,
 }
@@ -222,6 +224,7 @@ pub async fn get(
         next_step: next_step(&status, latest.is_some(), new_matches),
         profile: TodayProfile {
             done: status.profile_done,
+            no_skills: status.no_skills,
             strength_hint: status
                 .strength_hint
                 .as_deref()

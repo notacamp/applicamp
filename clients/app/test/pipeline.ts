@@ -28,6 +28,7 @@ export function opportunity(overrides: Partial<Opportunity> = {}): Opportunity {
     description: "Example Co builds invented software for invented customers.",
     why: ["Your roles name this one", "Remote within Europe, as you asked"],
     gaps: ["On-call duty is not on your profile"],
+    reasons_updated: false,
     notes: null,
     posted_at: "2026-10-25T09:00:00Z",
     dismissed: false,
@@ -96,7 +97,7 @@ export function estimate(overrides: Partial<SearchEstimate> = {}): SearchEstimat
 export function todayAnswer(nextStep: Today["next_step"], overrides: Partial<Today> = {}): Today {
   const early = nextStep === "set_up_profile" || nextStep === "answer_goals";
   return {
-    profile: { done: nextStep !== "set_up_profile", strength_hint: null },
+    profile: { done: nextStep !== "set_up_profile", no_skills: false, strength_hint: null },
     goals: { answered: early ? 0 : 3, total: 11 },
     new_matches: nextStep === "review_matches" ? 9 : 0,
     latest_search: null,

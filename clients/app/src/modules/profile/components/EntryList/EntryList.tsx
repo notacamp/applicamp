@@ -237,7 +237,7 @@ export function EntryList({ list, entries, onChange, busy }: EntryListProps) {
   );
 
   return (
-    <Section title={t(`sections.${list}`)} action={add} testId={testId}>
+    <Section title={t(`sections.${list}`)} action={add} testId={testId} anchor={list}>
       {entries.length === 0 && editing === null ? (
         <Tagged testId={`${testId}-empty`}>
           <Button

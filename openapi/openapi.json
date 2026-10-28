@@ -3114,6 +3114,7 @@
           "updated_at",
           "why",
           "gaps",
+          "reasons_updated",
           "dismissed",
           "editable"
         ],
@@ -3228,6 +3229,10 @@
             ],
             "format": "date-time",
             "description": "When the posting was published."
+          },
+          "reasons_updated": {
+            "type": "boolean",
+            "description": "Some of its reasons were stripped: they claimed things the profile never says."
           },
           "salary_text": {
             "type": [
@@ -4328,12 +4333,17 @@
         "type": "object",
         "description": "The profile, on Today.",
         "required": [
-          "done"
+          "done",
+          "no_skills"
         ],
         "properties": {
           "done": {
             "type": "boolean",
             "description": "There is a profile with something in it."
+          },
+          "no_skills": {
+            "type": "boolean",
+            "description": "It lists no skills and names no technology: matches cannot cite a stack."
           },
           "strength_hint": {
             "oneOf": [

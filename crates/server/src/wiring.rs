@@ -18,7 +18,7 @@ use applicamp_sources::{
     SourcesDeps, dedupe,
     job::{BoardJob, Job, Source, SourceLink, WorkMode},
     matching::MatchInput,
-    ports::{Attach, KnownLinks, Scored, Unchecked},
+    ports::{Attach, KnownLinks, Scored, Unchecked, Unreasoned},
     requirements::{self, Excluded, Facts, Floor, Per, Reach},
 };
 use chrono::{DateTime, Utc};
@@ -286,6 +286,38 @@ impl applicamp_sources::Neighbours for SourcesWiring {
             hidden.map(Excluded::as_str),
         ))
     }
+
+    fn unreasoned<'a>(
+        &'a self,
+        db: &'a PgPool,
+        after: Uuid,
+        most: usize,
+    ) -> BoxFuture<'a, Result<Vec<Unreasoned>>> {
+        Box::pin(async move {
+            Ok(applicamp_pipeline::store::unreasoned(db, after, most)
+                .await?
+                .into_iter()
+                .map(|row| Unreasoned {
+                    account: row.account_id,
+                    opportunity: row.id,
+                    why: row.why.0,
+                })
+                .collect())
+        })
+    }
+
+    fn set_reasons<'a>(
+        &'a self,
+        db: &'a PgPool,
+        account: Uuid,
+        opportunity: Uuid,
+        why: Vec<String>,
+        updated: bool,
+    ) -> BoxFuture<'a, Result<bool>> {
+        Box::pin(async move {
+            applicamp_pipeline::store::set_reasons(db, account, opportunity, &why, updated).await
+        })
+    }
 }
 
 /// What the pipeline asks of the sources and the profile.
@@ -329,6 +361,7 @@ impl applicamp_pipeline::Neighbours for PipelineWiring {
             Ok(ProfileStatus {
                 profile_done: status.profile_done,
                 strength_hint: status.strength_hint.map(|h| h.as_str().to_owned()),
+                no_skills: status.no_skills,
                 goals_answered: status.goals_answered,
                 goals_total: status.goals_total,
             })
@@ -466,6 +499,7 @@ mod tests {
                     working_languages: vec!["en".into()],
                     salary: None,
                 },
+                ungrounded: false,
             },
         });
         assert_eq!(found.source, "ashby");

@@ -31,7 +31,11 @@ describe("Today", () => {
 
   it("offers Search now, not the profile, once the profile and goals are done", async () => {
     const requests = signedIn(
-      { body: todayAnswer("search", { profile: { done: true, strength_hint: "add_skills" } }) },
+      {
+        body: todayAnswer("search", {
+          profile: { done: true, no_skills: false, strength_hint: "add_skills" },
+        }),
+      },
       { "POST /api/v1/searches": { status: 202, body: search({ status: "queued" }) } },
     );
     const user = userEvent.setup();
@@ -43,6 +47,46 @@ describe("Today", () => {
     await waitFor(() => {
       expect(requests.map(({ route }) => route)).toContain("POST /api/v1/searches");
     });
+  });
+
+  it("says the profile lists no skills yet on Today, instead of the generic hint", async () => {
+    signedIn({
+      body: todayAnswer("search", {
+        profile: { done: true, no_skills: true, strength_hint: "add_skills" },
+      }),
+    });
+    renderApp("/");
+    const line = await screen.findByTestId("today-no-skills");
+    expect(line).toHaveTextContent(
+      "Your profile lists no skills yet. Add them for better matches.",
+    );
+    expect(screen.getByTestId("no-skills-link")).toHaveAttribute("href", "/profile#skills");
+    expect(screen.queryByTestId("today-strength-hint")).toBeNull();
+  });
+
+  it("says it on the Pipeline's search line too, linking to Skills", async () => {
+    signedIn({
+      body: todayAnswer("search", {
+        profile: { done: true, no_skills: true, strength_hint: "add_skills" },
+      }),
+    });
+    const user = userEvent.setup();
+    const { router } = renderApp("/pipeline");
+    expect(await screen.findByTestId("pipeline-no-skills")).toHaveTextContent(
+      "Your profile lists no skills yet",
+    );
+    await user.click(screen.getByTestId("no-skills-link"));
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe("/profile");
+    });
+    expect(router.state.location.hash).toBe("skills");
+  });
+
+  it("says nothing about skills when the profile lists some", async () => {
+    signedIn({ body: todayAnswer("search") });
+    renderApp("/");
+    await screen.findByTestId("today-search");
+    expect(screen.queryByTestId("today-no-skills")).toBeNull();
   });
 
   it("points to the new matches, with the latest search's line", async () => {

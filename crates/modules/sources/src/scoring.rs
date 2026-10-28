@@ -17,6 +17,7 @@ use applicamp_ai::{Caller, ChatRequest, Gateway, Message, ResponseFormat};
 use serde_json::{Value, json};
 
 use crate::{
+    grounding::Source,
     job::{Job, WorkMode, one_line},
     matching::MatchInput,
     requirements::{Answer, Facts, Salary, language_code},
@@ -70,6 +71,10 @@ pub struct Score {
     pub read: Option<Read>,
     /// The eligibility facts it read (unclear where it gave none).
     pub facts: Facts,
+    /// Every reason it gave claimed something the profile does not say, so
+    /// all were dropped and the match held below [`KEEP`]
+    /// ([`crate::grounding`]).
+    pub ungrounded: bool,
 }
 
 const INSTRUCTIONS: &str = "You score job postings for one person's job search: how well each \
@@ -99,8 +104,14 @@ Austria only\", \"EU\", \"anywhere\"); \"\" when it does not say.\n\
 language the posting is written in.\n\
 - `salary`: the pay the posting states: `min` and `max` as numbers, `currency` (ISO 4217), \
 `period` (year, month, week, day or hour); null when it states none.\n\
-- `why`: up to 3 short reasons (at most 15 words each) that cite their profile or goals.\n\
-- `gaps`: up to 2 short things the job asks for that their profile or goals do not have.\n\
+- `why`: up to 3 short reasons (at most 15 words each) that cite facts written in <profile> or \
+<goals>. A reason may name a technology, framework, language, company, job title, place or number \
+only when <profile> or <goals> contains it. Never infer their stack or experience from the job, \
+and never from the role they want: if the profile does not say it, it is not a reason. Give fewer \
+reasons, or none, when little is written. <not_in_profile> lists what the profile does not \
+contain.\n\
+- `gaps`: up to 2 short things the job asks for that their profile or goals do not have; these \
+may name the posting's requirements freely.\n\
 - Answer once for every job, by its `ref`.\n\
 - A job with \"read\": true is a free-text post: also give its `company`, `title`, `location`, \
 `work_mode` (remote, hybrid or onsite) and `salary_text` when the post says them. If it is not \
@@ -165,6 +176,34 @@ fn excerpt(text: &str) -> String {
     text.chars().take(EXCERPT).collect()
 }
 
+/// What the profile does not contain, as sentences for the model.
+fn not_in_profile(input: &MatchInput) -> String {
+    let empty = |key: &str| match input.profile.get(key) {
+        None | Some(Value::Null) => true,
+        Some(Value::Array(items)) => items.is_empty(),
+        Some(Value::String(text)) => text.trim().is_empty(),
+        Some(_) => false,
+    };
+    let mut lines: Vec<&str> = Vec::new();
+    if empty("skills") {
+        lines.push("No skills are listed. Do not infer a technology stack.");
+    }
+    if !Source::of(&[&input.profile, &input.goals], &[]).names_a_technology() {
+        lines.push("The profile and goals name no technology, language or framework.");
+    }
+    if empty("positions") {
+        lines.push("No positions are listed.");
+    }
+    if empty("headline") {
+        lines.push("There is no headline.");
+    }
+    if lines.is_empty() {
+        "Nothing is missing; still cite only what is written above.".to_owned()
+    } else {
+        lines.join("\n")
+    }
+}
+
 /// The request scoring `jobs` (at most [`BATCH`]) for `input`.
 pub fn request(input: &MatchInput, jobs: &[&Job]) -> ChatRequest {
     let postings: Vec<Value> = jobs
@@ -188,9 +227,11 @@ pub fn request(input: &MatchInput, jobs: &[&Job]) -> ChatRequest {
         .collect();
     let user = format!(
         "<profile>\n{}\n</profile>\n<goals>\n{}\n</goals>\n\
+         <not_in_profile>\n{}\n</not_in_profile>\n\
          <candidate_location>{}</candidate_location>\n<jobs>\n{}\n</jobs>",
         input.profile,
         input.goals,
+        not_in_profile(input),
         input.home.as_deref().map_or_else(
             || "not known".to_owned(),
             |home| Value::String(home.to_owned()).to_string()
@@ -312,6 +353,7 @@ pub fn parse(answer: &Value, count: usize) -> Vec<(usize, Score)> {
                 gaps: texts(item.get("gaps"), GAPS),
                 read: (read != Read::default()).then_some(read),
                 facts: facts(item),
+                ungrounded: false,
             },
         ));
     }
@@ -329,7 +371,34 @@ pub async fn score(
 ) -> Result<(Vec<(usize, Score)>, f64), applicamp_ai::Error> {
     let answer = ai.complete(caller, request(input, jobs)).await?;
     let value: Value = answer.json()?;
-    Ok((parse(&value, jobs.len()), answer.cost_usd.unwrap_or(0.0)))
+    let source = source_of(input);
+    let mut scores = parse(&value, jobs.len());
+    for (_, score) in &mut scores {
+        ground(&source, score);
+    }
+    Ok((scores, answer.cost_usd.unwrap_or(0.0)))
+}
+
+/// What the person's profile and goals say, for the reason check.
+pub fn source_of(input: &MatchInput) -> Source {
+    Source::of(
+        &[&input.profile, &input.goals],
+        &[input.home.as_deref().unwrap_or_default()],
+    )
+}
+
+/// Hold `score`'s reasons to what `source` says: a reason that claims
+/// something it does not is dropped. When the model gave reasons and every
+/// one failed, nothing supports the match: it is held below [`KEEP`] and
+/// marked [`Score::ungrounded`].
+pub fn ground(source: &Source, score: &mut Score) {
+    let given = score.why.len();
+    let (kept, _) = source.keep(std::mem::take(&mut score.why));
+    score.why = kept;
+    if given > 0 && score.why.is_empty() {
+        score.ungrounded = true;
+        score.match_score = score.match_score.min(KEEP - 1);
+    }
 }
 
 #[cfg(test)]
@@ -440,5 +509,85 @@ mod tests {
         assert_eq!(second.open_to_candidate, Answer::Yes);
         assert_eq!(second.region_note, None);
         assert_eq!(second.salary, None, "no number is no salary");
+    }
+
+    fn scored(match_score: u8, why: &[&str]) -> Score {
+        Score {
+            match_score,
+            why: why.iter().map(|r| (*r).to_owned()).collect(),
+            gaps: vec!["Kafka is not on your profile".into()],
+            read: None,
+            facts: Facts::default(),
+            ungrounded: false,
+        }
+    }
+
+    fn with_profile(profile: Value) -> MatchInput {
+        MatchInput {
+            profile,
+            goals: json!({ "roles": ["Senior backend engineer"] }),
+            ..MatchInput::default()
+        }
+    }
+
+    #[test]
+    fn the_prompt_says_what_the_profile_does_not_contain() {
+        let bare = with_profile(json!({ "headline": null, "skills": [], "positions": [] }));
+        let jobs = [job("Build things.")];
+        let refs: Vec<&Job> = jobs.iter().collect();
+        let user = &request(&bare, &refs).messages[1].content;
+        for line in [
+            "No skills are listed. Do not infer a technology stack.",
+            "name no technology",
+            "No positions are listed.",
+            "There is no headline.",
+        ] {
+            assert!(user.contains(line), "{line}: {user}");
+        }
+        let system = &request(&bare, &refs).messages[0].content;
+        assert!(
+            system.contains("only when <profile> or <goals> contains it"),
+            "{system}"
+        );
+        let full = with_profile(json!({ "headline": "Backend engineer", "skills": ["Ruby"],
+            "positions": [{ "title": "Engineer" }] }));
+        let user = &request(&full, &refs).messages[1].content;
+        assert!(!user.contains("No skills are listed"), "{user}");
+    }
+
+    #[test]
+    fn an_invented_reason_is_dropped_and_the_others_stand() {
+        let source = source_of(&with_profile(json!({ "skills": ["Ruby", "Rails"] })));
+        let mut score = scored(
+            88,
+            &[
+                "Rails experience matches",
+                "Full-stack TypeScript matches profile",
+            ],
+        );
+        ground(&source, &mut score);
+        assert_eq!(score.why, ["Rails experience matches"]);
+        assert_eq!(score.match_score, 88);
+        assert!(!score.ungrounded);
+        assert_eq!(score.gaps.len(), 1, "gaps come from the posting");
+    }
+
+    #[test]
+    fn when_every_reason_is_invented_the_match_is_held_below_the_bar() {
+        let source = source_of(&with_profile(json!({ "skills": [] })));
+        let mut score = scored(90, &["Full-stack TypeScript matches profile"]);
+        ground(&source, &mut score);
+        assert!(score.why.is_empty());
+        assert!(score.ungrounded);
+        assert_eq!(score.match_score, KEEP - 1);
+        // A low score stays as it is.
+        let mut low = scored(30, &["Deep TypeScript expertise"]);
+        ground(&source, &mut low);
+        assert_eq!(low.match_score, 30);
+        // No reasons given at all: nothing to ground.
+        let mut none = scored(90, &[]);
+        ground(&source, &mut none);
+        assert!(!none.ungrounded);
+        assert_eq!(none.match_score, 90);
     }
 }

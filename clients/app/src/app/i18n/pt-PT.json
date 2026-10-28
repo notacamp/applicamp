@@ -33,6 +33,10 @@
       "add_skills": "Acrescente as suas competências ao perfil: as correspondências são avaliadas com base nelas."
     }
   },
+  "noSkills": {
+    "line": "O seu perfil ainda não lista competências. Acrescente-as para obter melhores correspondências.",
+    "action": "Ir para as competências"
+  },
   "pipeline": {
     "title": "Oportunidades",
     "lead": "Todas as oportunidades que os agentes encontram ou que acrescenta, da primeira correspondência à proposta."

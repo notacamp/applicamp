@@ -182,10 +182,15 @@ impl Harness {
 /// A gateway to `server`'s fake model, capped at `daily_tokens`.
 pub(crate) fn gateway(server: &MockServer, daily_tokens: Option<u64>) -> Gateway {
     Gateway::new(AiConfig {
-        complete: Some(ProviderConfig::new(
+        complete: Some(
+            ProviderConfig::new(
             format!("{}/v1", server.uri()).parse().unwrap(),
             "test/model",
-        )),
+        )
+        // Priced like a cheap model, as the real one is: an unpriced model
+        // is assumed dear, and two long calls would cross the daily limit.
+        .with_price(0.15, 0.5),
+        ),
         daily_tokens,
         ..AiConfig::default()
     })

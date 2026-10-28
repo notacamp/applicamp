@@ -152,6 +152,21 @@ pub fn link(raw: &str) -> Option<String> {
         .then(|| url.to_string().chars().take(2_000).collect())
 }
 
+/// `raw`, a relative link or an id (`517003`, `Example-Co-Engineer`), read
+/// against `base`; only a link on `base`'s own host.
+pub fn relative_link(base: &Url, raw: &str) -> Option<String> {
+    let raw = raw.trim();
+    if raw.is_empty() || Url::parse(raw).is_ok() {
+        // Empty, or absolute (and not the web: `link` refused it).
+        return None;
+    }
+    let url = base.join(raw).ok()?;
+    if url.host_str() != base.host_str() {
+        return None;
+    }
+    link(url.as_str())
+}
+
 fn short(text: Option<String>) -> Option<String> {
     one_line(text.as_deref()).map(|t| t.chars().take(SHORT).collect())
 }
@@ -180,7 +195,15 @@ fn pay_text(pay: &Salary) -> String {
 pub fn job_of(item: &impl Item, config: &BoardConfig, board: &BoardRef) -> Option<Job> {
     let f = &config.fields;
     let get = |field: &Option<String>| field.as_deref().and_then(|p| item.raw(p));
-    let url = link(&get(&f.url)?)?;
+    let link_of = |raw: &str| {
+        link(raw).or_else(|| {
+            config
+                .link_base
+                .as_ref()
+                .and_then(|base| relative_link(base, raw))
+        })
+    };
+    let url = link_of(&get(&f.url)?)?;
     let mut title = short(get(&f.title))?;
     let mut company = short(get(&f.company)).unwrap_or_default();
     if let Some(split) = &config.title_split
@@ -239,7 +262,11 @@ pub fn job_of(item: &impl Item, config: &BoardConfig, board: &BoardRef) -> Optio
         title,
         company,
         location,
-        work_mode: config.remote_only.then_some(WorkMode::Remote),
+        work_mode: if config.remote_only {
+            Some(WorkMode::Remote)
+        } else {
+            get(&f.work_mode).as_deref().and_then(WorkMode::parse)
+        },
         // A board's "remote" is never a requirement's evidence: the model
         // reads whether it is open to where the person lives.
         board_remote: None,
@@ -256,7 +283,7 @@ pub fn job_of(item: &impl Item, config: &BoardConfig, board: &BoardRef) -> Optio
                 name: board.name.clone(),
                 url: url.clone(),
             }],
-            apply_url: get(&f.apply_url).as_deref().and_then(link),
+            apply_url: get(&f.apply_url).as_deref().and_then(link_of),
             regions,
             expires_at,
             pay,
@@ -362,5 +389,51 @@ mod tests {
         // No link, or a link that is not the web: no job.
         let bad = json!({ "title": "X", "url": "javascript:alert(1)" });
         assert!(job_of(&bad, &config, &board).is_none());
+    }
+
+    #[test]
+    fn a_relative_link_is_read_against_the_link_base() {
+        let config = BoardConfig {
+            link_base: Some("https://board.example/jobs/".parse().unwrap()),
+            salary_currency: Some("CHF".into()),
+            salary_period: Some("year".into()),
+            fields: Fields {
+                reference: Some("/_id".into()),
+                title: Some("/name".into()),
+                company: Some("/company".into()),
+                url: Some("/jobUrl".into()),
+                salary_min: Some("/annualSalaryFrom".into()),
+                salary_max: Some("/annualSalaryTo".into()),
+                work_mode: Some("/workplace".into()),
+                ..Fields::default()
+            },
+            ..BoardConfig::default()
+        };
+        let board = BoardRef {
+            id: Uuid::nil(),
+            slug: "swissdevjobs".into(),
+            name: "SwissDevJobs".into(),
+            drop_expired: false,
+        };
+        let item = json!({
+            "_id": "a1", "name": "Backend Engineer", "company": "Example AG",
+            "jobUrl": "Example-AG-Backend-Engineer", "annualSalaryFrom": 100000,
+            "annualSalaryTo": 120000, "workplace": "hybrid",
+        });
+        let job = job_of(&item, &config, &board).unwrap();
+        assert_eq!(
+            job.url,
+            "https://board.example/jobs/Example-AG-Backend-Engineer"
+        );
+        assert_eq!(job.work_mode, Some(WorkMode::Hybrid));
+        assert_eq!(
+            job.salary_text.as_deref(),
+            Some("CHF 100000–120000 per year")
+        );
+        // A relative link never leads to another host or scheme.
+        for raw in ["//evil.example/x", "javascript:alert(1)"] {
+            let item = json!({ "name": "X", "jobUrl": raw });
+            assert!(job_of(&item, &config, &board).is_none(), "{raw}");
+        }
     }
 }

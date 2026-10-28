@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<rss version="2.0" xmlns:dc="https://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Net-Empregos</title>
+    <link>https://www.net-empregos.com/</link>
+    <description>Net-Empregos - Ultimas Ofertas de Emprego</description>
+    <language>pt-pt</language>
+    <item>
+      <title><![CDATA[Programador Backend (Rust) - Lisboa]]></title>
+      <dc:creator><![CDATA[Exemplo Tecnologia Lda.]]></dc:creator>
+      <link>https://www.net-empregos.com/90000001/programador-backend-rust-lisboa/</link>
+      <description><![CDATA[&lt;b&gt;Empresa: &lt;/b&gt;Exemplo Tecnologia Lda.&lt;br&gt;&lt;b&gt;Categoria: &lt;/b&gt;Informática ( Programação )&lt;br&gt;&lt;b&gt;Zona: &lt;/b&gt; Lisboa&lt;br&gt;&lt;b&gt;Descrição: &lt;/b&gt;Procuramos um programador para uma equipa inventada.]]></description>
+      <pubDate>Tue, 27 Oct 2026 20:24:38 GMT</pubDate>
+      <guid>https://www.net-empregos.com/90000001/programador-backend-rust-lisboa/</guid>
+    </item>
+    <item>
+      <title><![CDATA[Técnico de Suporte Informático - Porto]]></title>
+      <dc:creator><![CDATA[Amostra Serviços S.A.]]></dc:creator>
+      <link>https://www.net-empregos.com/90000002/tecnico-de-suporte-informatico-porto/</link>
+      <description><![CDATA[&lt;b&gt;Empresa: &lt;/b&gt;Amostra Serviços S.A.&lt;br&gt;&lt;b&gt;Zona: &lt;/b&gt; Porto&lt;br&gt;&lt;b&gt;Descrição: &lt;/b&gt;Função inventada para testes.]]></description>
+      <pubDate>Tue, 27 Oct 2026 18:02:11 GMT</pubDate>
+      <guid>https://www.net-empregos.com/90000002/tecnico-de-suporte-informatico-porto/</guid>
+    </item>
+  </channel>
+</rss>

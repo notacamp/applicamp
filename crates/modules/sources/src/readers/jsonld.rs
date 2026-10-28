@@ -45,6 +45,7 @@ pub fn fields() -> Fields {
         salary_currency: Some("/baseSalary/currency".into()),
         salary_period: Some("/baseSalary/value/unitText".into()),
         salary_text: None,
+        work_mode: None,
     }
 }
 

@@ -7,7 +7,7 @@ import {
 } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 
-import { api, CSRF_HEADERS, problemCode, unwrap, type Schema } from "~/lib/api";
+import { api, CSRF_HEADERS, problemCode, problemDetail, unwrap, type Schema } from "~/lib/api";
 
 import { formatEuros } from "./searches";
 
@@ -20,6 +20,13 @@ export type BoardDetail = Schema<"BoardDetail">;
 export type BoardStatus = Schema<"BoardStatus">;
 export type BoardRanking = Schema<"BoardRanking">;
 export type BoardReport = Schema<"BoardReport">;
+export type BoardKind = Schema<"BoardKind">;
+/** What stands between a board and its approval, with what exactly. */
+export type BoardBlocker = Schema<"BoardBlocker">;
+/** A config a board's check proposes. */
+export type BoardProposal = Schema<"BoardProposal">;
+/** The API key a board needs: how to get one and whether it is set (never the key). */
+export type BoardKey = Schema<"BoardKey">;
 /** A search or a discovery run, and what it scanned on each board. */
 export type ScanRun = Schema<"ScanRun">;
 export type ScanLine = Schema<"ScanLine">;
@@ -78,7 +85,10 @@ export type BoardAction =
   | { kind: "pause" }
   | { kind: "check" }
   | { kind: "decline"; reason: string }
-  | { kind: "config"; config: Record<string, unknown> };
+  | { kind: "config"; config: Record<string, unknown> }
+  | { kind: "proposal"; proposal: BoardProposal }
+  | { kind: "key"; values: Record<string, string> }
+  | { kind: "forgetKey" };
 
 async function act(id: string, action: BoardAction): Promise<BoardDetail> {
   const path = { params: { path: { id } }, headers: CSRF_HEADERS };
@@ -102,10 +112,30 @@ async function act(id: string, action: BoardAction): Promise<BoardDetail> {
         await api.PUT("/api/v1/boards/{id}/config", { ...path, body: { config: action.config } }),
       );
     }
+    case "proposal": {
+      return unwrap(
+        await api.PUT("/api/v1/boards/{id}/config", {
+          ...path,
+          body: { config: action.proposal.config, kind: action.proposal.kind },
+        }),
+      );
+    }
+    case "key": {
+      return unwrap(
+        await api.PUT("/api/v1/boards/{id}/key", { ...path, body: { values: action.values } }),
+      );
+    }
+    case "forgetKey": {
+      return unwrap(await api.DELETE("/api/v1/boards/{id}/key", path));
+    }
   }
 }
 
-/** Approve, decline, pause, check or edit a board; the lists follow. */
+/**
+ * Approve, decline, pause, check or edit a board, use its proposed config, set or remove its
+ * key; the lists follow. `variables.kind` says which action an error belongs to, so it is shown
+ * beside that action's button.
+ */
 export function useBoardAction(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -142,15 +172,92 @@ export const BOARD_ERRORS = [
   "invalid_config",
   "invalid_url",
   "suggestion_limit_reached",
+  "terms_forbid",
+  "needs_key",
+  "no_endpoint",
+  "invalid_key",
+  "no_key_needed",
+  "kind_locked",
 ] as const;
-export type BoardError = (typeof BOARD_ERRORS)[number] | "generic";
+export type BoardErrorCode = (typeof BOARD_ERRORS)[number] | "generic";
+
+/** An action that failed: the message to translate, and the server's own words about it. */
+export interface BoardError {
+  code: BoardErrorCode;
+  /** The problem's `detail` (which field, which rule), in English; none when it said nothing. */
+  detail: string | undefined;
+}
 
 /** What to say about an action that failed. */
 export function boardErrorOf(error: unknown): BoardError {
   const code = problemCode(error);
-  return code !== undefined && (BOARD_ERRORS as readonly string[]).includes(code)
-    ? (code as BoardError)
-    : "generic";
+  return {
+    code:
+      code !== undefined && (BOARD_ERRORS as readonly string[]).includes(code)
+        ? (code as BoardErrorCode)
+        : "generic",
+    detail: problemDetail(error),
+  };
+}
+
+/** The reasons a board can't be approved that the app words itself; any other shows its detail. */
+export const BLOCKER_CODES = [
+  "terms_forbid",
+  "robots_disallowed",
+  "needs_key",
+  "no_endpoint",
+  "config_invalid",
+  "check_needed",
+] as const;
+export type BlockerCode = (typeof BLOCKER_CODES)[number] | "unknown";
+
+/** A blocker's code as the app words it: "unknown" for one this client doesn't know. */
+export function blockerCode(blocker: BoardBlocker): BlockerCode {
+  return (BLOCKER_CODES as readonly string[]).includes(blocker.code)
+    ? (blocker.code as BlockerCode)
+    : "unknown";
+}
+
+/** The fields a proposal maps, in a readable order, each with where it is read from. */
+export const PROPOSAL_FIELDS = [
+  "title",
+  "company",
+  "url",
+  "apply_url",
+  "location",
+  "regions",
+  "description",
+  "posted_at",
+  "expires_at",
+  "salary_min",
+  "salary_max",
+  "salary_currency",
+  "salary_period",
+  "salary_text",
+  "work_mode",
+  "ref",
+] as const;
+
+/**
+ * A proposal as lines a person reads: where the jobs are read from, then each field and its
+ * source in the answer ("Title ← /jobTitle"). JSON-LD postings map schema.org's fields.
+ */
+export function proposalLines(proposal: BoardProposal): {
+  address: string | undefined;
+  items: string | undefined;
+  fields: { field: (typeof PROPOSAL_FIELDS)[number]; source: string }[];
+} {
+  const config = proposal.config as Record<string, unknown>;
+  const text = (value: unknown) => (typeof value === "string" && value !== "" ? value : undefined);
+  const mapped = (config["fields"] ?? {}) as Record<string, unknown>;
+  return {
+    address: text(config["endpoint"]) ?? text(config["sitemap"]),
+    items: text(config["items"]) ?? text(config["job_path"]),
+    fields: PROPOSAL_FIELDS.flatMap((field) => {
+      const source = text(mapped[field]);
+      return source === undefined ? [] : [{ field, source }];
+    }),
+  };
 }
 
 /** A sum of euros a year, rounded to thousands: "€118k". */

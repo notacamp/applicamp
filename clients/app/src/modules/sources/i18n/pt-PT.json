@@ -106,6 +106,12 @@
       "invalid_config": "Essa configuração não é válida para este portal.",
       "invalid_url": "Cole o endereço do portal, a começar por https://.",
       "suggestion_limit_reached": "Já são 10 sugestões hoje. Tente de novo amanhã.",
+      "terms_forbid": "Os termos do portal proíbem a leitura automática, por isso não pode ser aprovado.",
+      "needs_key": "Precisa primeiro de uma chave de API: defina-a abaixo.",
+      "no_endpoint": "Ainda não tem endereço de feed. Verifique o portal para procurar um.",
+      "invalid_key": "Essa chave não pode ser usada.",
+      "no_key_needed": "Este portal não precisa de chave.",
+      "kind_locked": "Um portal aprovado mantém a forma como é lido. Pause-o primeiro.",
       "generic": "Não resultou. Tente de novo."
     }
   },
@@ -151,9 +157,15 @@
       "maxFetches": "No máximo {{n}} leituras por dia."
     },
     "blocked": {
+      "title": "Porque ainda não pode ser aprovado",
       "check_needed": "Verifique o portal antes de o aprovar: as regras do robots ainda não são conhecidas.",
-      "robots_disallowed": "As regras do robots proíbem este feed. Altere a configuração para um caminho permitido.",
-      "config_invalid": "A configuração não se lê. Altere-a antes de aprovar."
+      "robots_disallowed": "As regras do robots proíbem lê-lo: {{detail}}",
+      "config_invalid": "A configuração não funciona: {{detail}}",
+      "terms_forbid": "Os termos proíbem a leitura automática: {{detail}}",
+      "needs_key": "Precisa de uma chave de API de {{board}}: {{how}}",
+      "no_endpoint": "Ainda não tem endereço de feed. A verificação procura um e propõe uma configuração.",
+      "unknown": "Ainda não pode ser aprovado: {{detail}}",
+      "source": "Onde o diz"
     },
     "manage": {
       "title": "A sua decisão",
@@ -161,14 +173,59 @@
       "pause": "Pausar",
       "check": "Verificar de novo",
       "reason": "Porquê recusar?",
-      "decline": "Recusar"
+      "decline": "Recusar",
+      "checkStarted": "A verificação está a correr. Esta página mostra o que encontrar dentro de um minuto."
+    },
+    "key": {
+      "title": "Chave de API",
+      "how": "{{board}} dá uma chave: {{how}}",
+      "get": "Obter uma chave",
+      "none": "Ainda não há chave.",
+      "set": "Chave definida.",
+      "setOn": "Chave definida {{when}}.",
+      "field": "Chave ({{param}})",
+      "save": "Guardar chave",
+      "replace": "Substituir chave",
+      "forget": "Remover chave"
+    },
+    "proposal": {
+      "title": "Configuração proposta",
+      "description": "A verificação encontrou {{kind}}. Use-a como configuração do portal, ou escreva uma em Avançado.",
+      "address": "Lido de",
+      "items": "Ofertas em",
+      "use": "Usar esta configuração",
+      "kind": {
+        "json_api": "uma API JSON",
+        "rss": "um feed RSS",
+        "jsonld_sitemap": "ofertas no seu sitemap",
+        "hn": "o tópico do HN"
+      },
+      "fields": {
+        "title": "Título",
+        "company": "Empresa",
+        "url": "Ligação",
+        "apply_url": "Ligação de candidatura",
+        "location": "Local",
+        "regions": "Quem se pode candidatar",
+        "description": "Descrição",
+        "posted_at": "Publicada",
+        "expires_at": "Expira",
+        "salary_min": "Salário desde",
+        "salary_max": "Salário até",
+        "salary_currency": "Moeda",
+        "salary_period": "Período do salário",
+        "salary_text": "Salário",
+        "work_mode": "Modo de trabalho",
+        "ref": "Id"
+      }
     },
     "config": {
       "label": "Configuração (JSON)",
       "hint": "Como o portal é lido: o endpoint, as páginas, o intervalo entre leituras e o mapeamento dos campos.",
       "save": "Guardar configuração",
       "notJson": "Isso não é JSON válido.",
-      "notObject": "A configuração é um objeto JSON."
+      "notObject": "A configuração é um objeto JSON.",
+      "advanced": "Avançado: editar a configuração em JSON"
     }
   },
   "scanned": {

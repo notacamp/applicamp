@@ -103,6 +103,45 @@ export function declined(): BoardSummary {
   });
 }
 
+/** What a board's check found. */
+export function checkReport(
+  summary: BoardSummary,
+  overrides: Partial<Schema<"BoardReport">> = {},
+): Schema<"BoardReport"> {
+  return {
+    checked_at: "2026-10-26T04:00:00Z",
+    robots: {
+      host: "remote.example",
+      found: true,
+      rules: [{ allow: false, pattern: "/private" }],
+      endpoint_allowed: true,
+      fingerprint: "x",
+    },
+    terms_url: "https://remote.example/terms",
+    terms_sentences: ["You may not scrape this site with automated tools."],
+    terms_fingerprint: "y",
+    found_kind: "rss",
+    found_url: "https://remote.example/feed.xml",
+    jsonld: false,
+    sample: [
+      {
+        title: "Senior Backend Engineer",
+        company: "Example Co",
+        location: "Anywhere",
+        url: "https://remote.example/jobs/1",
+        regions: ["Anywhere"],
+      },
+    ],
+    remote_share: 1,
+    worldwide_share: 0.5,
+    language: "en",
+    attribution: summary.attribution,
+    flags: summary.flags,
+    notes: summary.note ?? "",
+    ...overrides,
+  };
+}
+
 /** A board, whole. */
 export function detail(summary: BoardSummary, overrides: Partial<BoardDetail> = {}): BoardDetail {
   return {
@@ -123,40 +162,24 @@ export function detail(summary: BoardSummary, overrides: Partial<BoardDetail> = 
       notes: "Credit it with a link back.",
       sources: [],
     },
-    report: {
-      checked_at: "2026-10-26T04:00:00Z",
-      robots: {
-        host: "remote.example",
-        found: true,
-        rules: [{ allow: false, pattern: "/private" }],
-        endpoint_allowed: true,
-        fingerprint: "x",
-      },
-      terms_url: "https://remote.example/terms",
-      terms_sentences: ["You may not scrape this site with automated tools."],
-      terms_fingerprint: "y",
-      found_kind: "rss",
-      found_url: "https://remote.example/feed.xml",
-      jsonld: false,
-      sample: [
-        {
-          title: "Senior Backend Engineer",
-          company: "Example Co",
-          location: "Anywhere",
-          url: "https://remote.example/jobs/1",
-          regions: ["Anywhere"],
-        },
-      ],
-      remote_share: 1,
-      worldwide_share: 0.5,
-      language: "en",
-      attribution: summary.attribution,
-      flags: summary.flags,
-      notes: summary.note ?? "",
-    },
+    report: checkReport(summary),
     endpoint: "https://remote.example/feed.xml",
     approvable: summary.status === "candidate",
+    blockers: [],
+    key: null,
     can_manage: true,
+    ...overrides,
+  };
+}
+
+/** A board's key as the server describes it (never the key). */
+export function boardKey(overrides: Partial<Schema<"BoardKey">> = {}): Schema<"BoardKey"> {
+  return {
+    params: ["api_key"],
+    how: "Enter your email on its API page and it sends a free key at once.",
+    url: "https://keys.example/api",
+    set: false,
+    set_at: null,
     ...overrides,
   };
 }

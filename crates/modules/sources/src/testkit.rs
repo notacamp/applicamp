@@ -671,7 +671,8 @@ impl Harness {
         let neighbours: Arc<dyn Neighbours> = fake.clone();
         let deps = SourcesDeps::new(config, ai, neighbours)
             .unwrap()
-            .with_clock(clock.clone());
+            .with_clock(clock.clone())
+            .with_secret(&SecretKey::from_bytes([7; 32]));
         crate::boards::sync(&db, &[exampleco()]).await.unwrap();
         let state = AppState::new(
             db.clone(),

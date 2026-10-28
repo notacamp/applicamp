@@ -502,3 +502,142 @@ async fn a_feed_board_is_read_by_element(db: PgPool) {
         "Example Feed"
     );
 }
+
+const SWISSDEVJOBS: &str = include_str!("fixtures/boards/swissdevjobs.json");
+const NET_EMPREGOS: &[u8] = include_bytes!("fixtures/boards/net_empregos.xml");
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_national_boards_are_read_through_their_seed_config(db: PgPool) {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/swissdevjobs/api/jobsLight"))
+        .respond_with(json(SWISSDEVJOBS))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/net-empregos/rss.asp"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_raw(NET_EMPREGOS, "application/xml; charset=iso-8859-1"),
+        )
+        .mount(&server)
+        .await;
+    testkit::seed_fake_boards(&db, &server, &["swissdevjobs", "net-empregos"]).await;
+    let reader = board_reader(true);
+    let now = testkit::today();
+
+    // SwissDevJobs: every job in one answer, its page under /jobs/ on the
+    // board, where it is worked, its pay in francs a year.
+    let row = approved_board(&db, "swissdevjobs").await;
+    let read = reader.job_board(&db, &row, now, now).await;
+    assert_eq!(read.outcome, Outcome::Read, "{:?}", read.error);
+    assert_eq!(read.jobs.len(), 3);
+    let first = &read.jobs[0];
+    assert_eq!(first.title, "Senior Backend Engineer (Rust)");
+    assert_eq!(first.company, "Example AG");
+    assert_eq!(
+        first.url,
+        "https://swissdevjobs.ch/jobs/Example-AG-Senior-Backend-Engineer"
+    );
+    assert_eq!(first.location.as_deref(), Some("Zürich"));
+    assert_eq!(first.work_mode, Some(WorkMode::Hybrid));
+    assert_eq!(read.jobs[1].work_mode, Some(WorkMode::Remote));
+    assert_eq!(read.jobs[2].work_mode, Some(WorkMode::Onsite));
+    assert!(first.posted_at.is_some());
+    let pay = first.board.as_ref().unwrap().pay.clone().unwrap();
+    assert_eq!(
+        (
+            pay.min,
+            pay.max,
+            pay.currency.as_deref(),
+            pay.period.as_deref()
+        ),
+        (Some(120_000.0), Some(140_000.0), Some("CHF"), Some("year"))
+    );
+
+    // Net-Empregos: an ISO-8859-1 feed, its company in `dc:creator`.
+    let row = approved_board(&db, "net-empregos").await;
+    let read = reader.job_board(&db, &row, now, now).await;
+    assert_eq!(read.outcome, Outcome::Read, "{:?}", read.error);
+    assert_eq!(read.jobs.len(), 2);
+    assert_eq!(read.jobs[1].title, "Técnico de Suporte Informático - Porto");
+    assert_eq!(read.jobs[1].company, "Amostra Serviços S.A.");
+    assert_eq!(
+        read.jobs[0].url,
+        "https://www.net-empregos.com/90000001/programador-backend-rust-lisboa/"
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_keyed_board_is_read_only_with_its_key_and_the_key_is_kept_nowhere(db: PgPool) {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/itjobs-pt/job/list.json"))
+        .and(query_param("api_key", "test-key-1"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "total": 1,
+            "results": [{
+                "id": 4242, "title": "Backend Developer", "company": { "name": "Exemplo Lda" },
+                "body": "<p>Invented.</p>", "publishedAt": "2026-10-27 10:00:00",
+                "locations": [{ "name": "Lisboa" }]
+            }]
+        })))
+        .mount(&server)
+        .await;
+    testkit::seed_fake_boards(&db, &server, &["itjobs-pt"]).await;
+    let secret = applicamp_kernel::crypto::SecretKey::from_bytes([3; 32]);
+    let keys = Arc::new(crate::board_keys::cipher(&secret));
+    let reader = Reader::new(Arc::new(SourcesConfig {
+        cache_secs: Some(3_600),
+        ..testkit::boards_config()
+    }))
+    .unwrap()
+    .with_keys(Arc::clone(&keys));
+    let now = testkit::today();
+
+    // No key: never asked.
+    let row = approved_board(&db, "itjobs-pt").await;
+    let read = reader.job_board(&db, &row, now, now).await;
+    assert_eq!(read.error.as_deref(), Some("needs_key"));
+    assert!(server.received_requests().await.unwrap().is_empty());
+
+    // With its key: read, the key in the request only.
+    let values = [("api_key".to_owned(), "test-key-1".to_owned())].into();
+    let sealed = crate::board_keys::seal(&keys, row.id, &values);
+    let host = Url::parse(&server.uri())
+        .unwrap()
+        .host_str()
+        .unwrap()
+        .to_owned();
+    sqlx::query("UPDATE sources.job_boards SET api_key = $2, api_key_host = $3 WHERE id = $1")
+        .bind(row.id)
+        .bind(sealed)
+        .bind(host)
+        .execute(&db)
+        .await
+        .unwrap();
+    let row = approved_board(&db, "itjobs-pt").await;
+    let read = reader.job_board(&db, &row, now, now).await;
+    assert_eq!(read.outcome, Outcome::Read, "{:?}", read.error);
+    assert_eq!(read.jobs.len(), 1);
+    assert_eq!(read.jobs[0].url, "https://www.itjobs.pt/oferta/4242");
+    assert_eq!(read.jobs[0].company, "Exemplo Lda");
+    let cached: Vec<String> = sqlx::query_scalar("SELECT url FROM sources.cache")
+        .fetch_all(&db)
+        .await
+        .unwrap();
+    assert!(!cached.is_empty(), "the answer is cached");
+    assert!(
+        cached.iter().all(|url| !url.contains("test-key-1")),
+        "{cached:?}"
+    );
+
+    // Another secret cannot open it: not read.
+    let other = Reader::new(Arc::new(testkit::boards_config()))
+        .unwrap()
+        .with_keys(Arc::new(crate::board_keys::cipher(
+            &applicamp_kernel::crypto::SecretKey::from_bytes([4; 32]),
+        )));
+    let read = other.job_board(&db, &row, now, now).await;
+    assert_eq!(read.error.as_deref(), Some("needs_key"));
+}

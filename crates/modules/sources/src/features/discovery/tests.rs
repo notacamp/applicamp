@@ -2,7 +2,7 @@ use chrono::{TimeZone as _, Utc};
 use sqlx::PgPool;
 use wiremock::{
     Mock, MockServer, ResponseTemplate,
-    matchers::{method, path},
+    matchers::{method, path, path_regex},
 };
 
 use super::*;
@@ -242,4 +242,149 @@ async fn approved_boards_are_rechecked_and_changes_flagged(db: PgPool) {
             .await
             .unwrap();
     assert_eq!(run, (Some("list_unreachable".to_owned()), 1));
+}
+
+/// A board straight into the registry from the seed list (so its config is
+/// never replaced by a check), with no config, its site at `site`.
+async fn seeded_without_config(db: &PgPool, site: &MockServer, kind: &str) -> Uuid {
+    let id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO sources.job_boards (id, slug, name, homepage, host, kind, priority, status,
+            origin, config, terms, created_at, updated_at)
+         VALUES ($1, 'feed-site', 'Feed Site', $2, '127.0.0.1', $3, 'low', 'candidate', 'seed',
+                 '{\"fields\": {}}', '{}', now(), now())",
+    )
+    .bind(id)
+    .bind(format!("{}/", site.uri()))
+    .bind(kind)
+    .execute(db)
+    .await
+    .unwrap();
+    id
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_board_without_a_config_gets_one_proposed_from_its_rss_link(db: PgPool) {
+    let site = a_board_site().await;
+    let fake = Fake::ready();
+    fake.signed_in_as("owner@example.com");
+    let h = Harness::new(
+        db,
+        crate::SourcesConfig {
+            board_owners: Some(vec!["owner@example.com".into()]),
+            ..boards_config()
+        },
+        None,
+        fake,
+    )
+    .await;
+    let id = seeded_without_config(&h.db, &site, "json_api").await;
+    let (_, before) = h.get(&format!("/api/v1/boards/{id}")).await;
+    assert_eq!(before["blocked"], "no_endpoint", "{before}");
+
+    check_one(&h.deps, &h.db, id).await.unwrap();
+    let row = job_boards::get(&h.db, id).await.unwrap().unwrap();
+    assert_eq!(
+        row.config.0,
+        serde_json::json!({ "fields": {} }),
+        "a seed's config stays"
+    );
+    let report = row.report().unwrap();
+    let proposal = report.proposal.clone().unwrap();
+    assert_eq!(proposal.kind, Kind::Rss);
+    assert!(
+        proposal.config["endpoint"]
+            .as_str()
+            .unwrap()
+            .ends_with("/feed.xml")
+    );
+    assert_eq!(proposal.config["fields"]["title"], "title");
+    assert_eq!(report.sample.len(), 3);
+    assert_eq!(requests_to(&site, "/feed.xml").await, 1);
+
+    // "Use this config": the proposal, its kind with it; then approvable.
+    let request = axum::http::Request::builder()
+        .method("PUT")
+        .uri(format!("/api/v1/boards/{id}/config"))
+        .header("content-type", "application/json")
+        .body(axum::body::Body::from(
+            serde_json::json!({ "config": proposal.config, "kind": "rss" }).to_string(),
+        ))
+        .unwrap();
+    let (status, detail) = h.send(request).await;
+    assert_eq!(status, axum::http::StatusCode::OK, "{detail}");
+    assert_eq!(detail["board"]["kind"], "rss");
+    assert!(detail["report"]["proposal"].is_null(), "used");
+    assert_eq!(detail["approvable"], true, "{detail}");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_site_with_postings_in_its_sitemap_gets_a_sitemap_config_proposed(db: PgPool) {
+    let site = MockServer::start().await;
+    let page =
+        |body: String, kind: &str| ResponseTemplate::new(200).set_body_raw(body.into_bytes(), kind);
+    Mock::given(method("GET"))
+        .and(path("/robots.txt"))
+        .respond_with(page(
+            "User-agent: *\nDisallow: /admin/\n".into(),
+            "text/plain",
+        ))
+        .mount(&site)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/"))
+        .respond_with(page(
+            "<html lang=\"en\"><body>Jobs.</body></html>".into(),
+            "text/html",
+        ))
+        .mount(&site)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/sitemap.xml"))
+        .respond_with(page(
+            format!(
+                "<urlset><url><loc>{0}/about</loc></url><url><loc>{0}/jobs/1-engineer</loc></url>\
+                 <url><loc>{0}/jobs/2-designer</loc></url></urlset>",
+                site.uri()
+            ),
+            "application/xml",
+        ))
+        .mount(&site)
+        .await;
+    Mock::given(method("GET"))
+        .and(path_regex(r"^/jobs/\d-[a-z]+$"))
+        .respond_with(page(
+            r#"<html><script type="application/ld+json">{"@type": "JobPosting",
+               "title": "Staff Engineer", "hiringOrganization": {"name": "Example Co"},
+               "datePosted": "2026-10-26"}</script></html>"#
+                .into(),
+            "text/html",
+        ))
+        .mount(&site)
+        .await;
+    let h = Harness::new(db, boards_config(), None, Fake::ready()).await;
+    let id = seeded_without_config(&h.db, &site, "jsonld_sitemap").await;
+    check_one(&h.deps, &h.db, id).await.unwrap();
+    let report = job_boards::get(&h.db, id)
+        .await
+        .unwrap()
+        .unwrap()
+        .report()
+        .unwrap();
+    let proposal = report.proposal.unwrap();
+    assert_eq!(proposal.kind, Kind::JsonldSitemap);
+    assert!(
+        proposal.config["sitemap"]
+            .as_str()
+            .unwrap()
+            .ends_with("/sitemap.xml")
+    );
+    assert_eq!(proposal.config["job_path"], "/jobs/");
+    assert_eq!(report.sample.len(), 2);
+    assert_eq!(report.sample[0].title, "Staff Engineer");
+    // The probes were each asked once; the page that is no posting never.
+    for probe in PROBES {
+        assert!(requests_to(&site, probe).await <= 1, "{probe}");
+    }
+    assert_eq!(requests_to(&site, "/about").await, 0);
 }

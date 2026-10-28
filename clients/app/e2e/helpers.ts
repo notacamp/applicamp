@@ -91,3 +91,22 @@ export function latestSearchStatus(page: Page) {
     return answer.search?.status ?? null;
   });
 }
+
+/** A job board as the API details it, found by its slug (`null` when there is none). */
+export function boardBySlug(page: Page, slug: string) {
+  return page.evaluate(async (slug) => {
+    const list = (await (await fetch("/api/v1/boards")).json()) as {
+      boards: { id: string; slug: string }[];
+    };
+    const board = list.boards.find((candidate) => candidate.slug === slug);
+    if (board === undefined) {
+      return null;
+    }
+    return (await (await fetch(`/api/v1/boards/${board.id}`)).json()) as {
+      board: { id: string };
+      approvable: boolean;
+      blocked: string | null;
+      report: { proposal?: unknown } | null;
+    };
+  }, slug);
+}

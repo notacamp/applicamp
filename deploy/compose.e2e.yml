@@ -40,6 +40,15 @@ services:
   fake-jobs:
     image: node:22-bookworm-slim
     command: ["node", "/fake-jobs/fake-jobs.mts"]
+    # The waiting boards' sites (deploy/fake-jobs/job_boards.toml), each at
+    # its own host name, so each has its own robots rules and registry row.
+    networks:
+      default:
+        aliases:
+          - seeded-board.test
+          - keyed-board.test
+          - feed-site-desktop.test
+          - feed-site-phone.test
     environment:
       FAKE_JOBS_HOST: 0.0.0.0
       FAKE_JOBS_PORT: "9020"
@@ -62,8 +71,9 @@ services:
       APPLICAMP_OIDC__CAMPBOOKS__CLIENT_ID: applicamp-e2e
       # Inline, for the fake only; real secrets are files (deploy/secrets).
       APPLICAMP_OIDC__CAMPBOOKS__CLIENT_SECRET: e2e-only-secret
-      # The job search reads only the fake's job boards (one approved, one
-      # waiting for the demo person, who owns the boards; never discovery),
+      # The job search reads only the fake's job boards (one approved, the
+      # others waiting for the demo person, who owns the boards; never
+      # discovery; the waiting ones are checked at start),
       # and scores with the fake model; no limit spaces the searches of the
       # two test projects. The company board stays off, as by default.
       APPLICAMP_SOURCES__JOB_BOARDS_FILE: /fake-jobs/job_boards.toml

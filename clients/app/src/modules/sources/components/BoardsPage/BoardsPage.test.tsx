@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   board,
+  boardKey,
+  checkReport,
   declined,
   detail,
   discoveryRun,
@@ -119,15 +121,18 @@ describe("the boards page", () => {
     await screen.findByTestId("board-manage");
 
     // A config that isn't JSON, or isn't an object, never leaves the page.
+    await user.click(screen.getByTestId("board-config-advanced"));
     const config = screen.getByTestId("board-config");
     await user.clear(config);
     await user.type(config, "not json");
     await user.click(screen.getByTestId("board-config-save"));
-    expect(screen.getByTestId("board-manage")).toHaveTextContent("That isn’t valid JSON.");
+    expect(screen.getByTestId("board-config-error")).toHaveTextContent("That isn’t valid JSON.");
     await user.clear(config);
     await user.type(config, "[[1]");
     await user.click(screen.getByTestId("board-config-save"));
-    expect(screen.getByTestId("board-manage")).toHaveTextContent("The config is a JSON object.");
+    expect(screen.getByTestId("board-config-error")).toHaveTextContent(
+      "The config is a JSON object.",
+    );
     await user.clear(config);
     await user.type(config, '{{"poll_minutes": 120}');
     await user.click(screen.getByTestId("board-config-save"));
@@ -180,26 +185,192 @@ describe("the boards page", () => {
         body: detail(waiting(), {
           approvable: false,
           blocked: "robots_disallowed",
+          blockers: [
+            {
+              code: "robots_disallowed",
+              detail: "robots.txt forbids /feed.xml (Disallow: /feed)",
+              source: "https://remote.example/robots.txt",
+            },
+          ],
           can_manage: true,
         }),
       }),
       [`POST /api/v1/boards/${WAITING}/check`]: {
         status: 403,
-        body: { type: "about:blank", title: "Forbidden", status: 403, code: "not_board_owner" },
+        body: {
+          type: "about:blank",
+          title: "Forbidden",
+          status: 403,
+          code: "not_board_owner",
+          detail: "You may not do this.",
+        },
       },
     });
     renderPage();
     const user = userEvent.setup();
     const waitingSection = await screen.findByTestId("boards-section-waiting");
     await user.click(within(waitingSection).getByTestId("boards-row"));
-    expect(await screen.findByTestId("board-blocked")).toHaveTextContent(
-      "Its robots rules forbid this feed.",
+    expect(await screen.findByTestId("board-blocker-robots_disallowed")).toHaveTextContent(
+      "Its robots rules forbid reading it: robots.txt forbids /feed.xml (Disallow: /feed)",
+    );
+    expect(screen.getByTestId("board-blocker-source")).toHaveAttribute(
+      "href",
+      "https://remote.example/robots.txt",
     );
     expect(screen.getByTestId("board-approve")).toBeDisabled();
     await user.click(screen.getByTestId("board-check"));
-    expect(await screen.findByTestId("board-action-error")).toHaveTextContent(
-      "Only the instance’s board owners can do that.",
+    const error = await screen.findByTestId("board-check-error");
+    expect(error).toHaveTextContent("Only the instance’s board owners can do that.");
+    expect(error).toHaveTextContent("You may not do this.");
+    expect(screen.queryByTestId("board-approve-error")).toBeNull();
+  });
+
+  it("names every reason a board can't be approved, one it doesn't know by its detail", async () => {
+    fakeBoards(true, {
+      [`GET /api/v1/boards/${WAITING}`]: () => ({
+        body: detail(waiting(), {
+          approvable: false,
+          blocked: "terms_forbid",
+          blockers: [
+            {
+              code: "terms_forbid",
+              detail: "You may not scrape this site.",
+              source: "https://remote.example/terms",
+            },
+            { code: "needs_key", detail: "Needs an API key from Example Remote." },
+            { code: "no_endpoint", detail: "It has no feed or API address yet." },
+            { code: "a_new_reason", detail: "Something new stands in the way." },
+          ],
+          key: boardKey(),
+          can_manage: true,
+        }),
+      }),
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const waitingSection = await screen.findByTestId("boards-section-waiting");
+    await user.click(within(waitingSection).getByTestId("boards-row"));
+    expect(await screen.findByTestId("board-blocker-terms_forbid")).toHaveTextContent(
+      "Its terms forbid automated reading: You may not scrape this site.",
     );
+    expect(screen.getByTestId("board-blocker-needs_key")).toHaveTextContent(
+      "Needs an API key from Example Remote: Enter your email on its API page",
+    );
+    expect(screen.getByTestId("board-blocker-no_endpoint")).toHaveTextContent(
+      "It has no feed address yet.",
+    );
+    expect(screen.getByTestId("board-blocker-unknown")).toHaveTextContent(
+      "It can’t be approved yet: Something new stands in the way.",
+    );
+    expect(screen.getByTestId("board-approve")).toBeDisabled();
+  });
+
+  it("shows an action's error beside its button, with what the server said", async () => {
+    fakeBoards(true, {
+      [`GET /api/v1/boards/${WAITING}`]: () => ({
+        body: detail(waiting(), { approvable: true, can_manage: true }),
+      }),
+      [`POST /api/v1/boards/${WAITING}/approve`]: {
+        status: 409,
+        body: {
+          type: "about:blank",
+          title: "Conflict",
+          status: 409,
+          code: "check_needed",
+          detail: "The robots rules of remote.example are not known yet: check the board.",
+        },
+      },
+      [`PUT /api/v1/boards/${WAITING}/config`]: {
+        status: 400,
+        body: {
+          type: "about:blank",
+          title: "Bad Request",
+          status: 400,
+          code: "invalid_config",
+          detail: '`max_pages`: invalid type: string "five", expected u32',
+        },
+      },
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const waitingSection = await screen.findByTestId("boards-section-waiting");
+    await user.click(within(waitingSection).getByTestId("boards-row"));
+    const approve = await screen.findByTestId("board-approve");
+    await waitFor(() => {
+      expect(approve).toBeEnabled();
+    });
+    await user.click(approve);
+    const approveError = await screen.findByTestId("board-approve-error");
+    expect(approveError).toHaveTextContent("Check the board first");
+    expect(approveError).toHaveTextContent("The robots rules of remote.example are not known yet");
+
+    await user.click(screen.getByTestId("board-config-advanced"));
+    const config = screen.getByTestId("board-config");
+    await user.clear(config);
+    await user.type(config, '{{"max_pages": "five"}');
+    await user.click(screen.getByTestId("board-config-save"));
+    const configError = await screen.findByTestId("board-config-error");
+    expect(configError).toHaveTextContent("That config isn’t valid for this board.");
+    expect(configError).toHaveTextContent("`max_pages`: invalid type");
+    expect(screen.queryByTestId("board-approve-error")).toBeNull();
+  });
+
+  it("takes a board's key without ever showing it, and uses the config its check proposes", async () => {
+    const keyed: unknown[] = [];
+    const proposed = detail(waiting(), {
+      approvable: false,
+      blocked: "needs_key",
+      blockers: [{ code: "needs_key", detail: "Needs an API key from Example Remote." }],
+      key: boardKey(),
+      can_manage: true,
+      report: checkReport(waiting(), {
+        proposal: {
+          kind: "rss",
+          config: {
+            endpoint: "https://remote.example/feed.xml",
+            fields: { title: "title", url: "link", company: "dc:creator" },
+          },
+        },
+      }),
+    });
+    const { posted } = fakeBoards(true, {
+      [`GET /api/v1/boards/${WAITING}`]: () => ({ body: proposed }),
+      [`PUT /api/v1/boards/${WAITING}/key`]: async (request) => {
+        keyed.push(JSON.parse(await request.text()));
+        return { body: proposed };
+      },
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const waitingSection = await screen.findByTestId("boards-section-waiting");
+    await user.click(within(waitingSection).getByTestId("boards-row"));
+    expect(await screen.findByTestId("board-key-state")).toHaveTextContent("No key set yet.");
+    expect(screen.getByTestId("board-key")).toHaveTextContent("Enter your email on its API page");
+    expect(screen.getByTestId("board-key-save")).toBeDisabled();
+    const field = screen.getByTestId("board-key-api_key");
+    expect(field).toHaveAttribute("type", "password");
+    await user.type(field, " k-123 ");
+    await user.click(screen.getByTestId("board-key-save"));
+    await waitFor(() => {
+      expect(keyed).toEqual([{ values: { api_key: "k-123" } }]);
+    });
+
+    // The proposal, as fields and where each is read from.
+    const fields = screen.getByTestId("board-proposal-fields");
+    expect(fields).toHaveTextContent("https://remote.example/feed.xml");
+    expect(fields).toHaveTextContent("Company");
+    expect(fields).toHaveTextContent("dc:creator");
+    expect(screen.getByTestId("board-proposal")).toHaveTextContent("The check found an RSS feed.");
+    await user.click(screen.getByTestId("board-proposal-use"));
+    await waitFor(() => {
+      expect(posted.find((p) => p.route.endsWith("/config"))?.body).toEqual({
+        config: {
+          endpoint: "https://remote.example/feed.xml",
+          fields: { title: "title", url: "link", company: "dc:creator" },
+        },
+        kind: "rss",
+      });
+    });
   });
 
   it("pauses an approved board", async () => {

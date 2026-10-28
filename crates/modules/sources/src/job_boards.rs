@@ -283,6 +283,26 @@ pub struct Fields {
     /// Pay as written, when the board has no numbers.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub salary_text: Option<String>,
+    /// How the job is worked (`remote`, `hybrid`, `office`), when the board
+    /// says per job.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub work_mode: Option<String>,
+}
+
+/// A board whose API needs a key: where it goes and how the owner gets one.
+/// The key itself is never in the config: the owner sets it on the board's
+/// page, and it is stored sealed with the instance secret.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = BoardKeySpec)]
+pub struct KeySpec {
+    /// The query parameters the key is sent in (`api_key`; Adzuna's
+    /// `app_id` and `app_key`).
+    pub params: Vec<String>,
+    /// How to get one, in a sentence.
+    pub how: String,
+    /// Where.
+    pub url: Url,
 }
 
 /// How to read a board. Validated ([`BoardConfig::validate`]) before it is
@@ -345,7 +365,17 @@ pub struct BoardConfig {
     /// Only sitemap URLs whose path starts with this are postings.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub job_path: Option<String>,
+    /// A relative link (a job's `url` or `apply_url`, or an id) is read
+    /// against this address (`https://swissdevjobs.ch/jobs/`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub link_base: Option<Url>,
+    /// The board's API needs a key ([`KeySpec`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key: Option<KeySpec>,
 }
+
+/// The longest key parameter name, and the most parameters a key has.
+pub const KEY_PARAMS: (usize, usize) = (50, 3);
 
 fn pointer_ok(pointer: &str) -> bool {
     pointer.is_empty() || pointer.starts_with('/')
@@ -387,9 +417,14 @@ impl BoardConfig {
         }
     }
 
-    /// Whether this config can read a board of `kind`; what is wrong if not.
+    /// Whether this config can read a board of `kind`; what is wrong if not,
+    /// naming the field (`` `fields.url` is required ``).
     pub fn validate(&self, kind: Kind) -> std::result::Result<(), String> {
-        for (name, url) in [("endpoint", &self.endpoint), ("sitemap", &self.sitemap)] {
+        for (name, url) in [
+            ("endpoint", &self.endpoint),
+            ("sitemap", &self.sitemap),
+            ("link_base", &self.link_base),
+        ] {
             if let Some(url) = url
                 && !web_url(url)
             {
@@ -398,10 +433,10 @@ impl BoardConfig {
         }
         match kind {
             Kind::JsonApi | Kind::Rss if self.endpoint.is_none() => {
-                return Err("`endpoint` is required".to_owned());
+                return Err("`endpoint` is required: the address of its API or feed".to_owned());
             }
             Kind::JsonldSitemap if self.sitemap.is_none() => {
-                return Err("`sitemap` is required".to_owned());
+                return Err("`sitemap` is required: the address of its sitemap".to_owned());
             }
             _ => {}
         }
@@ -428,42 +463,60 @@ impl BoardConfig {
         if kind == Kind::JsonApi {
             let f = &self.fields;
             let pointers = [
-                &self.items,
-                &self.next,
-                &f.reference,
-                &f.title,
-                &f.company,
-                &f.url,
-                &f.apply_url,
-                &f.location,
-                &f.regions,
-                &f.description,
-                &f.posted_at,
-                &f.expires_at,
-                &f.salary_min,
-                &f.salary_max,
-                &f.salary_currency,
-                &f.salary_period,
-                &f.salary_text,
+                ("items", &self.items),
+                ("next", &self.next),
+                ("fields.ref", &f.reference),
+                ("fields.title", &f.title),
+                ("fields.company", &f.company),
+                ("fields.url", &f.url),
+                ("fields.apply_url", &f.apply_url),
+                ("fields.location", &f.location),
+                ("fields.regions", &f.regions),
+                ("fields.description", &f.description),
+                ("fields.posted_at", &f.posted_at),
+                ("fields.expires_at", &f.expires_at),
+                ("fields.salary_min", &f.salary_min),
+                ("fields.salary_max", &f.salary_max),
+                ("fields.salary_currency", &f.salary_currency),
+                ("fields.salary_period", &f.salary_period),
+                ("fields.salary_text", &f.salary_text),
+                ("fields.work_mode", &f.work_mode),
             ];
-            if pointers.into_iter().flatten().any(|p| !pointer_ok(p))
-                || self.cursor.as_ref().is_some_and(|c| !pointer_ok(&c.from))
-                || self
-                    .filter
-                    .as_ref()
-                    .is_some_and(|f| !pointer_ok(&f.pointer))
+            if let Some((name, _)) = pointers
+                .iter()
+                .find(|(_, p)| p.as_deref().is_some_and(|p| !pointer_ok(p)))
             {
-                return Err("every field of a JSON API is a JSON pointer (`/title`)".to_owned());
+                return Err(format!(
+                    "`{name}` must be a JSON pointer, starting with `/` (`/title`)"
+                ));
+            }
+            if self.cursor.as_ref().is_some_and(|c| !pointer_ok(&c.from)) {
+                return Err("`cursor.from` must be a JSON pointer, starting with `/`".to_owned());
+            }
+            if self
+                .filter
+                .as_ref()
+                .is_some_and(|f| !pointer_ok(&f.pointer))
+            {
+                return Err("`filter.pointer` must be a JSON pointer, starting with `/`".to_owned());
             }
         }
-        if matches!(kind, Kind::JsonApi | Kind::Rss)
-            && (self.fields.title.is_none() || self.fields.url.is_none())
-        {
-            return Err("`fields.title` and `fields.url` are required".to_owned());
+        if matches!(kind, Kind::JsonApi | Kind::Rss) {
+            if self.fields.title.is_none() {
+                return Err("`fields.title` is required: where each job's title is".to_owned());
+            }
+            if self.fields.url.is_none() {
+                return Err("`fields.url` is required: where each job's link is".to_owned());
+            }
         }
         for (key, value) in &self.query {
-            if key.is_empty() || key.len() > 50 || value.len() > 200 {
-                return Err("a `query` parameter is empty or too long".to_owned());
+            if key.is_empty() || key.len() > 50 {
+                return Err("a `query` parameter's name is empty or too long".to_owned());
+            }
+            if value.len() > 200 {
+                return Err(format!(
+                    "`query.{key}` is too long (200 characters at most)"
+                ));
             }
         }
         if let Some(currency) = &self.salary_currency
@@ -471,8 +524,85 @@ impl BoardConfig {
         {
             return Err("`salary_currency` is a 3-letter code (`USD`)".to_owned());
         }
+        if let Some(key) = &self.key {
+            if key.params.is_empty() || key.params.len() > KEY_PARAMS.1 {
+                return Err(format!(
+                    "`key.params` names 1 to {} parameters",
+                    KEY_PARAMS.1
+                ));
+            }
+            if let Some(param) = key.params.iter().find(|p| {
+                p.is_empty()
+                    || p.len() > KEY_PARAMS.0
+                    || !p
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+            }) {
+                return Err(format!(
+                    "`key.params`: `{param}` is not a parameter name (letters, digits, `_`, `-`)"
+                ));
+            }
+            if let Some(param) = key.params.iter().find(|p| self.query.contains_key(*p)) {
+                return Err(format!(
+                    "`query.{param}` is the key's parameter: the key is never written in the config"
+                ));
+            }
+            if key.how.trim().is_empty() || key.how.chars().count() > 300 {
+                return Err("`key.how` says how to get a key, in up to 300 characters".to_owned());
+            }
+            if !web_url(&key.url) {
+                return Err("`key.url` must be an http(s) address".to_owned());
+            }
+        }
         Ok(())
     }
+
+    /// The config `value` holds; what is wrong if it does not read, naming
+    /// the key (`` `max_pages`: invalid type… ``, `` `evil` is not a config
+    /// key ``).
+    pub fn from_json(value: serde_json::Value) -> std::result::Result<Self, String> {
+        let serde_json::Value::Object(map) = value else {
+            return Err("the config is a JSON object (`{ \"endpoint\": … }`)".to_owned());
+        };
+        match serde_json::from_value::<Self>(serde_json::Value::Object(map.clone())) {
+            Ok(config) => Ok(config),
+            Err(whole) => Err(locate::<Self>(&map, "")
+                .or_else(|| {
+                    map.get("fields")
+                        .and_then(serde_json::Value::as_object)
+                        .and_then(|fields| locate::<Fields>(fields, "fields."))
+                })
+                .unwrap_or_else(|| whole.to_string())),
+        }
+    }
+}
+
+/// The first key of `map` that `T` cannot read on its own, with why.
+fn locate<T: serde::de::DeserializeOwned>(
+    map: &serde_json::Map<String, serde_json::Value>,
+    prefix: &str,
+) -> Option<String> {
+    map.iter().find_map(|(key, value)| {
+        if prefix.is_empty() && key == "fields" && value.is_object() {
+            // Its own keys are located one by one.
+            let alone = serde_json::json!({ "fields": {} });
+            return serde_json::from_value::<T>(alone)
+                .err()
+                .map(|e| e.to_string());
+        }
+        let alone = serde_json::Value::Object([(key.clone(), value.clone())].into_iter().collect());
+        serde_json::from_value::<T>(alone).err().map(|e| {
+            let text = e.to_string();
+            if text.starts_with("unknown field") {
+                format!("`{prefix}{key}` is not a config key")
+            } else {
+                // serde's own words, without the position in a text it
+                // never saw.
+                let why = text.split(" at line ").next().unwrap_or(&text).to_owned();
+                format!("`{prefix}{key}`: {why}")
+            }
+        })
+    })
 }
 
 /// What a board's terms ask, and where they say it.
@@ -606,7 +736,45 @@ pub struct Report {
     /// For the owner, in a sentence (the seed list's notes).
     #[serde(default)]
     pub notes: String,
+    /// A config the check found for a board without a usable one: the
+    /// owner may use it ("Use this config"); never applied by itself to a
+    /// seeded or edited board.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proposal: Option<Proposal>,
+    /// A fingerprint of the config the check read with: a seeded board
+    /// whose config changed since is checked again at start.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub config_fingerprint: String,
 }
+
+/// A config a check proposes, and the kind it reads.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[schema(as = BoardProposal)]
+pub struct Proposal {
+    pub kind: Kind,
+    /// The config's JSON, as `PUT …/config` takes it.
+    #[schema(value_type = std::collections::BTreeMap<String, serde_json::Value>)]
+    pub config: serde_json::Value,
+}
+
+/// Why a board cannot be approved yet.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = BoardBlocker)]
+pub struct Blocker {
+    /// `terms_forbid`, `robots_disallowed`, `needs_key`, `no_endpoint`,
+    /// `config_invalid`, `check_needed`; clients translate the ones they
+    /// know and show `detail` for any other.
+    pub code: String,
+    /// What exactly, in English: the terms' sentence, the rule, the field.
+    pub detail: String,
+    /// Where it says so (the terms page, robots.txt).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+}
+
+/// The blockers a seed list may state: facts the research found.
+pub const SEED_BLOCKERS: [&str; 2] = ["terms_forbid", "robots_disallowed"];
 
 /// A board as stored.
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -633,6 +801,13 @@ pub struct BoardRow {
     pub last_error: Option<String>,
     pub backoff_until: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
+    /// What the research found that forbids reading it ([`Blocker`]s).
+    pub blockers: sqlx::types::Json<serde_json::Value>,
+    /// Its API key, sealed with the instance secret; never sent to a client.
+    pub api_key: Option<Vec<u8>>,
+    /// The host the key was set for: it is sent nowhere else.
+    pub api_key_host: Option<String>,
+    pub api_key_set_at: Option<DateTime<Utc>>,
 }
 
 /// The columns a [`BoardRow`] reads.
@@ -640,7 +815,8 @@ macro_rules! board_columns {
     () => {
         "id, slug, name, homepage, host, kind, priority, status, origin, country, config, \
          config_edited, terms, report, decline_reason, approved_at, recheck_after, last_fetch_at, \
-         last_fetch_jobs, last_error, backoff_until, created_at"
+         last_fetch_jobs, last_error, backoff_until, created_at, blockers, api_key, api_key_host, \
+         api_key_set_at"
     };
 }
 pub(crate) use board_columns;
@@ -680,6 +856,26 @@ impl BoardRow {
             .and_then(|r| serde_json::from_value(r.0.clone()).ok())
     }
 
+    /// What the research found that forbids reading it.
+    pub fn blockers(&self) -> Vec<Blocker> {
+        serde_json::from_value(self.blockers.0.clone()).unwrap_or_default()
+    }
+
+    /// Its config, if it reads a board of its kind (and has an address to
+    /// read, unless it is HN).
+    pub fn usable_config(&self) -> Option<BoardConfig> {
+        let kind = self.kind()?;
+        let config = self.config().ok()?;
+        (config.validate(kind).is_ok() && (kind == Kind::Hn || config.start(kind).is_some()))
+            .then_some(config)
+    }
+
+    /// Whether a key is set for the host `config` reads.
+    pub fn key_set_for(&self, config: &BoardConfig) -> bool {
+        let host = self.kind().and_then(|k| config.start(k)).and_then(host_of);
+        self.api_key.is_some() && host.is_some() && self.api_key_host == host
+    }
+
     /// How its jobs are credited.
     pub fn attribution(&self) -> String {
         let terms = self.terms();
@@ -703,6 +899,9 @@ pub struct SeedBoard {
     pub status: Status,
     #[serde(default)]
     pub country: Option<String>,
+    /// Older lists declined boards with a reason; a seed never declines (only
+    /// an owner does): such a board waits as a candidate, the reason its
+    /// note.
     #[serde(default)]
     pub decline_reason: Option<String>,
     #[serde(default)]
@@ -711,6 +910,10 @@ pub struct SeedBoard {
     pub terms: Terms,
     #[serde(default)]
     pub report: Option<Report>,
+    /// Facts that forbid reading it (`terms_forbid`, `robots_disallowed`):
+    /// shown, and they block approval.
+    #[serde(default)]
+    pub blockers: Vec<Blocker>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -721,10 +924,22 @@ struct SeedFile {
 }
 
 /// The boards of a seed list. Every slug is a slug and unique, every
-/// approved board's config reads its kind, a declined one says why; the
-/// first that is not is the error.
+/// approved board's config reads its kind, every blocker is one a seed may
+/// state; the first that is not is the error. A seed never declines a
+/// board: one listed as declined waits as a candidate, its reason a note.
 pub fn parse(toml_text: &str) -> std::result::Result<Vec<SeedBoard>, String> {
-    let file: SeedFile = toml::from_str(toml_text).map_err(|e| format!("job boards list: {e}"))?;
+    let mut file: SeedFile =
+        toml::from_str(toml_text).map_err(|e| format!("job boards list: {e}"))?;
+    for board in &mut file.board {
+        if board.status == Status::Declined {
+            board.status = Status::Candidate;
+            let reason = board.decline_reason.take().unwrap_or_default();
+            let report = board.report.get_or_insert_with(Report::default);
+            if report.notes.trim().is_empty() {
+                report.notes = reason;
+            }
+        }
+    }
     let mut seen: Vec<String> = Vec::new();
     let mut hosts: Vec<String> = Vec::new();
     for board in &file.board {
@@ -749,10 +964,25 @@ pub fn parse(toml_text: &str) -> std::result::Result<Vec<SeedBoard>, String> {
         {
             return Err(at("`country` is a 2-letter code (`PT`)"));
         }
-        if board.status == Status::Declined
-            && board.decline_reason.as_deref().is_none_or(str::is_empty)
+        if let Some(blocker) = board
+            .blockers
+            .iter()
+            .find(|b| !SEED_BLOCKERS.contains(&b.code.as_str()) || b.detail.trim().is_empty())
         {
-            return Err(at("a declined board says why (`decline_reason`)"));
+            return Err(at(&format!(
+                "blocker `{}`: a seed states only {} with a detail",
+                blocker.code,
+                SEED_BLOCKERS.join(" or ")
+            )));
+        }
+        if let Some(config_error) = board
+            .config
+            .key
+            .is_some()
+            .then(|| board.config.validate(board.kind).err())
+            .flatten()
+        {
+            return Err(at(&config_error));
         }
         if matches!(board.status, Status::Approved | Status::Paused) {
             board.config.validate(board.kind).map_err(|e| at(&e))?;
@@ -775,10 +1005,11 @@ pub fn seed(config: &SourcesConfig) -> std::result::Result<Vec<SeedBoard>, Strin
 }
 
 /// Make the registry hold `seed`: new boards added (with their status),
-/// known ones refreshed (name, site, kind, priority, country, terms, and
-/// config unless the owner edited it). A board's status, approval and
-/// reason stay the owner's. A seed board whose site another board already
-/// has is skipped. How many seed boards are in the registry.
+/// known ones refreshed (name, site, kind, priority, country, terms, the
+/// research's blockers and notes, and config unless the owner edited it). A
+/// board's status, approval and reason stay the owner's. A seed board whose
+/// site another board already has is skipped. How many seed boards are in
+/// the registry.
 pub async fn sync(db: &PgPool, seed: &[SeedBoard], now: DateTime<Utc>) -> Result<usize> {
     let mut count = 0;
     for board in seed {
@@ -795,11 +1026,23 @@ pub async fn sync(db: &PgPool, seed: &[SeedBoard], now: DateTime<Utc>) -> Result
             .map(serde_json::to_value)
             .transpose()
             .map_err(applicamp_kernel::Error::internal)?;
+        let notes = board
+            .report
+            .as_ref()
+            .map(|r| r.notes.trim().to_owned())
+            .filter(|n| !n.is_empty());
+        let blockers =
+            serde_json::to_value(&board.blockers).map_err(applicamp_kernel::Error::internal)?;
         let updated = sqlx::query(
             "UPDATE sources.job_boards
                 SET name = $2, homepage = $3, kind = $4, priority = $5, country = $6,
                     terms = $7, config = CASE WHEN config_edited THEN config ELSE $8 END,
-                    report = coalesce(report, $9), updated_at = $10
+                    report = CASE
+                        WHEN report IS NULL THEN $9
+                        WHEN $12::text IS NULL THEN report
+                        ELSE jsonb_set(report, '{notes}', to_jsonb($12::text))
+                    END,
+                    blockers = $13, updated_at = $10
               WHERE slug = $1 AND host = $11",
         )
         .bind(&board.slug)
@@ -813,6 +1056,8 @@ pub async fn sync(db: &PgPool, seed: &[SeedBoard], now: DateTime<Utc>) -> Result
         .bind(report.as_ref().map(sqlx::types::Json))
         .bind(now)
         .bind(&host)
+        .bind(notes.as_deref())
+        .bind(sqlx::types::Json(&blockers))
         .execute(db)
         .await?;
         if updated.rows_affected() == 1 {
@@ -823,7 +1068,7 @@ pub async fn sync(db: &PgPool, seed: &[SeedBoard], now: DateTime<Utc>) -> Result
         let inserted = sqlx::query(
             "INSERT INTO sources.job_boards
                 (id, slug, name, homepage, host, kind, priority, status, origin, country, config,
-                 terms, report, decline_reason, approved_at, created_at, updated_at)
+                 terms, report, blockers, approved_at, created_at, updated_at)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'seed', $9, $10, $11, $12, $13, $14, $15, $15)
              ON CONFLICT DO NOTHING",
         )
@@ -839,7 +1084,7 @@ pub async fn sync(db: &PgPool, seed: &[SeedBoard], now: DateTime<Utc>) -> Result
         .bind(sqlx::types::Json(&config))
         .bind(sqlx::types::Json(&terms))
         .bind(report.as_ref().map(sqlx::types::Json))
-        .bind(&board.decline_reason)
+        .bind(sqlx::types::Json(&blockers))
         .bind(approved.then_some(now))
         .bind(now)
         .execute(db)
@@ -1026,11 +1271,56 @@ mod tests {
         for slug in ["himalayas", "jobicy", "remoteok", "arbeitnow", "hn"] {
             assert_eq!(status(slug), Some(Status::Approved), "{slug}");
         }
-        for slug in ["landing-jobs", "the-muse", "wellfound", "dice"] {
-            assert_eq!(status(slug), Some(Status::Declined), "{slug}");
-        }
-        for slug in ["we-work-remotely", "working-nomads", "remotive"] {
+        // Only an owner declines: the seed list declines nothing.
+        assert!(boards.iter().all(|b| b.status != Status::Declined));
+        for slug in [
+            "we-work-remotely",
+            "working-nomads",
+            "remotive",
+            "landing-jobs",
+            "the-muse",
+            "wellfound",
+            "dice",
+        ] {
             assert_eq!(status(slug), Some(Status::Candidate), "{slug}");
+        }
+        let by = |slug: &str| boards.iter().find(|b| b.slug == slug).unwrap();
+        // Facts block approval; an opinion is a note.
+        let codes = |slug: &str| -> Vec<String> {
+            by(slug).blockers.iter().map(|b| b.code.clone()).collect()
+        };
+        assert_eq!(codes("landing-jobs"), ["terms_forbid", "robots_disallowed"]);
+        assert_eq!(codes("wellfound"), ["robots_disallowed", "terms_forbid"]);
+        assert_eq!(codes("dice"), ["robots_disallowed", "terms_forbid"]);
+        assert!(
+            by("landing-jobs").blockers[0]
+                .detail
+                .contains("scrape or copy the Platform")
+        );
+        assert!(codes("the-muse").is_empty());
+        assert!(
+            by("the-muse")
+                .report
+                .as_ref()
+                .unwrap()
+                .notes
+                .contains("Mostly US")
+        );
+        // Verified endpoints read; keyed boards say how to get a key.
+        for slug in [
+            "swissdevjobs",
+            "net-empregos",
+            "the-muse",
+            "itjobs-pt",
+            "adzuna",
+        ] {
+            let board = by(slug);
+            board.config.validate(board.kind).unwrap();
+        }
+        assert!(by("swissdevjobs").config.link_base.is_some());
+        for slug in ["itjobs-pt", "adzuna"] {
+            let key = by(slug).config.key.clone().unwrap();
+            assert!(!key.how.is_empty() && !key.params.is_empty(), "{slug}");
         }
         // National and regional boards: kept, low priority.
         for slug in ["itjobs-pt", "net-empregos", "adzuna", "swissdevjobs"] {
@@ -1091,6 +1381,105 @@ mod tests {
     }
 
     #[test]
+    fn a_config_that_does_not_read_names_the_field() {
+        let error = |value: serde_json::Value| BoardConfig::from_json(value).unwrap_err();
+        assert_eq!(
+            error(serde_json::json!({ "endpoint": "https://x.example", "evil": 1 })),
+            "`evil` is not a config key"
+        );
+        let wrong = error(serde_json::json!({ "max_pages": "five" }));
+        assert!(wrong.starts_with("`max_pages`: invalid type"), "{wrong}");
+        let wrong = error(serde_json::json!({ "fields": { "title": 5 } }));
+        assert!(wrong.starts_with("`fields.title`: invalid type"), "{wrong}");
+        assert_eq!(
+            error(serde_json::json!({ "fields": { "salary": "/pay" } })),
+            "`fields.salary` is not a config key"
+        );
+        let wrong = error(serde_json::json!({ "key": { "params": ["api_key"] } }));
+        assert!(wrong.contains("`key`") && wrong.contains("how"), "{wrong}");
+        assert!(error(serde_json::json!([1])).contains("JSON object"));
+
+        // What validation says names the field too.
+        let endpoint_only = BoardConfig::from_json(serde_json::json!({
+            "endpoint": "https://x.example/api", "fields": { "title": "/title" }
+        }))
+        .unwrap();
+        assert_eq!(
+            endpoint_only.validate(Kind::JsonApi).unwrap_err(),
+            "`fields.url` is required: where each job's link is"
+        );
+        assert!(
+            BoardConfig::default()
+                .validate(Kind::Rss)
+                .unwrap_err()
+                .starts_with("`endpoint` is required")
+        );
+        let not_pointer = BoardConfig::from_json(serde_json::json!({
+            "endpoint": "https://x.example/api",
+            "fields": { "title": "/title", "url": "/url", "company": "company" }
+        }))
+        .unwrap();
+        assert!(
+            not_pointer
+                .validate(Kind::JsonApi)
+                .unwrap_err()
+                .starts_with("`fields.company` must be a JSON pointer")
+        );
+    }
+
+    #[test]
+    fn a_key_is_named_never_written() {
+        let keyed = |key: serde_json::Value, query: serde_json::Value| {
+            BoardConfig::from_json(serde_json::json!({
+                "endpoint": "https://api.example/jobs",
+                "query": query,
+                "fields": { "title": "/title", "url": "/url" },
+                "key": key,
+            }))
+            .unwrap()
+            .validate(Kind::JsonApi)
+        };
+        let how = "Ask for one by email.";
+        let url = "https://api.example/keys";
+        assert!(
+            keyed(
+                serde_json::json!({ "params": ["api_key"], "how": how, "url": url }),
+                serde_json::json!({})
+            )
+            .is_ok()
+        );
+        assert!(
+            keyed(
+                serde_json::json!({ "params": ["api_key"], "how": how, "url": url }),
+                serde_json::json!({ "api_key": "written-here" })
+            )
+            .unwrap_err()
+            .contains("never written in the config")
+        );
+        assert!(
+            keyed(
+                serde_json::json!({ "params": [], "how": how, "url": url }),
+                serde_json::json!({})
+            )
+            .is_err()
+        );
+        assert!(
+            keyed(
+                serde_json::json!({ "params": ["a b"], "how": how, "url": url }),
+                serde_json::json!({})
+            )
+            .is_err()
+        );
+        assert!(
+            keyed(
+                serde_json::json!({ "params": ["k"], "how": "", "url": url }),
+                serde_json::json!({})
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
     fn slugs_and_hosts() {
         assert_eq!(
             slug_of("We Work Remotely").as_deref(),
@@ -1112,7 +1501,17 @@ mod tests {
             )
         };
         assert!(parse(&board("status = \"candidate\"")).is_ok());
-        assert!(parse(&board("status = \"declined\"")).is_err(), "no reason");
+        // An older list's declined board waits, its reason a note.
+        let declined = parse(&board("status = \"declined\"\ndecline_reason = \"Stale.\"")).unwrap();
+        assert_eq!(declined[0].status, Status::Candidate);
+        assert_eq!(declined[0].report.as_ref().unwrap().notes, "Stale.");
+        assert!(
+            parse(&board(
+                "status = \"candidate\"\n[[board.blockers]]\ncode = \"needs_key\"\ndetail = \"x\""
+            ))
+            .is_err(),
+            "a seed states facts only"
+        );
         assert!(
             parse(&board("status = \"approved\"")).is_err(),
             "no endpoint"

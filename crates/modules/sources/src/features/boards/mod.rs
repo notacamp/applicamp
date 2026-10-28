@@ -6,9 +6,14 @@
 //!   searches and of discovery; and may suggest a board (it becomes a
 //!   candidate, checked at once, never read before it is approved).
 //! - The board owners (`APPLICAMP_SOURCES__BOARD_OWNERS`) approve, decline,
-//!   pause, edit a board's config and re-run its check. Approving needs a
-//!   check of the board's host whose robots rules allow its feed; anyone
-//!   else is refused (403 `not_board_owner`).
+//!   pause, edit a board's config (or use the one its check proposes), set
+//!   its API key and re-run its check; anyone else is refused (403
+//!   `not_board_owner`). Only an owner declines a board.
+//! - Approving needs every blocker gone ([`blockers`]): the research's facts
+//!   (its terms forbid automated reading, its robots rules disallow the job
+//!   pages), a key the board needs, an address and a config that reads, and
+//!   a check of the feed's host whose robots rules allow it. A board that
+//!   cannot be approved always says why, each blocker with its detail.
 
 #[cfg(test)]
 mod tests;
@@ -32,10 +37,11 @@ use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use crate::{
-    SourcesDeps,
+    SourcesDeps, board_keys,
     features::{discovery::CheckBoard, search::SearchTrigger},
     job_boards::{
-        self, BoardConfig, BoardRow, Kind, Origin, Priority, Report, Status, Terms, host_of,
+        self, Blocker, BoardConfig, BoardRow, KeySpec, Kind, Origin, Priority, Report, Status,
+        Terms, host_of,
     },
     net,
     pay::{self, Ranking},
@@ -123,11 +129,32 @@ pub struct BoardDetail {
     pub report: Option<Report>,
     /// The address its jobs are read from.
     pub endpoint: Option<String>,
-    /// It can be approved now; else `blocked` says why.
+    /// It can be approved now; else `blockers` say why.
     pub approvable: bool,
-    /// `check_needed`, `robots_disallowed`, `config_invalid`, or none.
+    /// The first blocker's code (`terms_forbid`, `robots_disallowed`,
+    /// `needs_key`, `no_endpoint`, `config_invalid`, `check_needed`), or
+    /// none.
     pub blocked: Option<String>,
+    /// Everything that stands between the board and its approval, in order,
+    /// each with its detail; empty when it can be approved.
+    pub blockers: Vec<Blocker>,
+    /// The API key its config says it needs: how to get one, and whether it
+    /// is set. Never the key.
+    pub key: Option<BoardKey>,
     pub can_manage: bool,
+}
+
+/// A board's API key, as a client sees it: never the key itself.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct BoardKey {
+    /// The parameters it is sent in (one field each).
+    pub params: Vec<String>,
+    /// How to get one.
+    pub how: String,
+    pub url: String,
+    /// A key is set for the host its config reads.
+    pub set: bool,
+    pub set_at: Option<DateTime<Utc>>,
 }
 
 /// Why a board is declined.
@@ -145,6 +172,18 @@ pub struct BoardConfigChange {
     /// The whole config, validated for the board's kind.
     #[schema(value_type = std::collections::BTreeMap<String, serde_json::Value>)]
     pub config: serde_json::Value,
+    /// A new kind for it (a proposal that found a feed on an API board);
+    /// its kind stays when left out.
+    #[serde(default)]
+    pub kind: Option<Kind>,
+}
+
+/// A board's API key: one value per parameter its config names.
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct BoardKeyChange {
+    /// Parameter → value (`{ "api_key": "…" }`).
+    pub values: std::collections::BTreeMap<String, String>,
 }
 
 /// A board to suggest.
@@ -330,33 +369,103 @@ async fn rankings(
         .collect())
 }
 
-/// Whether `row` can be approved now; why not if not.
-fn approvable(row: &BoardRow) -> std::result::Result<(), &'static str> {
+fn blocker(code: &str, detail: impl Into<String>, source: Option<String>) -> Blocker {
+    Blocker {
+        code: code.to_owned(),
+        detail: detail.into(),
+        source,
+    }
+}
+
+/// Everything that keeps `row` from being approved, in order: the
+/// research's facts (its terms, its robots rules), a key it needs, an
+/// address to read, a config that reads, a check of the feed's host, and
+/// that host's robots rules. Empty when it can be approved.
+pub fn blockers(row: &BoardRow) -> Vec<Blocker> {
+    let mut found = row.blockers();
     let Some(kind) = row.kind() else {
-        return Err("config_invalid");
+        found.push(blocker(
+            "config_invalid",
+            format!("`{}` is not a kind of board", row.kind),
+            None,
+        ));
+        return found;
     };
-    let Ok(config) = row.config() else {
-        return Err("config_invalid");
+    let config = match row.config() {
+        Ok(config) => config,
+        Err(e) => {
+            found.push(blocker("config_invalid", e, None));
+            return found;
+        }
     };
-    if config.validate(kind).is_err() {
-        return Err("config_invalid");
+    if let Some(spec) = &config.key
+        && !row.key_set_for(&config)
+    {
+        found.push(blocker(
+            "needs_key",
+            format!("Needs an API key from {}: {}", row.name, spec.how.trim()),
+            Some(spec.url.to_string()),
+        ));
     }
     if kind == Kind::Hn {
-        return Ok(());
+        return found;
     }
     let Some(start) = config.start(kind) else {
-        return Err("config_invalid");
+        found.push(blocker(
+            "no_endpoint",
+            if kind == Kind::JsonldSitemap {
+                "It has no sitemap address yet: Check looks for one."
+            } else {
+                "It has no feed or API address yet: Check looks for one."
+            },
+            None,
+        ));
+        return found;
     };
+    if let Err(e) = config.validate(kind) {
+        found.push(blocker("config_invalid", e, None));
+        return found;
+    }
     let report = row.report().unwrap_or_default();
     let checked_host = report.robots.host.as_deref();
     if report.checked_at.is_none() || checked_host != host_of(start).as_deref() {
-        return Err("check_needed");
+        found.push(blocker(
+            "check_needed",
+            format!(
+                "The robots rules of {} are not known yet: check the board.",
+                host_of(start).unwrap_or_default()
+            ),
+            None,
+        ));
+        return found;
     }
-    if robots::allowed(&report.robots.rules, &robots::path_of(start)).0 {
-        Ok(())
-    } else {
-        Err("robots_disallowed")
+    let (allowed, rule) = robots::allowed(&report.robots.rules, &robots::path_of(start));
+    if !allowed {
+        found.push(blocker(
+            "robots_disallowed",
+            format!(
+                "robots.txt forbids {}{}",
+                robots::path_of(start),
+                rule.map(|r| format!(" ({r})")).unwrap_or_default()
+            ),
+            start.join("/robots.txt").ok().map(|u| u.to_string()),
+        ));
     }
+    found
+}
+
+/// A board's key, as a client sees it.
+fn key_of(row: &BoardRow) -> Option<BoardKey> {
+    let config = row.config().ok()?;
+    let KeySpec { params, how, url } = config.key.clone()?;
+    let set = row.key_set_for(&config);
+    Some(BoardKey {
+        params,
+        how,
+        url: url.to_string(),
+        set,
+        set_at: if set { row.api_key_set_at } else { None },
+    })
 }
 
 async fn detail(
@@ -373,7 +482,7 @@ async fn detail(
         .unwrap_or_else(|| pay::rank(&[], home, row.country.as_deref(), &pay::COUNTRIES));
     let totals = scans::totals(&state.db, account, now).await?;
     let config = row.config().ok();
-    let blocked = approvable(&row).err().map(str::to_owned);
+    let blockers = blockers(&row);
     Ok(BoardDetail {
         board: summary(&row, ranking, totals.get(&row.id)),
         endpoint: config
@@ -383,10 +492,29 @@ async fn detail(
         config: row.config.0.clone(),
         terms: row.terms(),
         report: row.report(),
-        approvable: blocked.is_none() && matches!(row.status(), Status::Candidate | Status::Paused),
-        blocked,
+        approvable: blockers.is_empty()
+            && matches!(row.status(), Status::Candidate | Status::Paused),
+        blocked: blockers.first().map(|b| b.code.clone()),
+        key: key_of(&row),
+        blockers,
         can_manage: is_owner(deps, &state.db, account).await?,
     })
+}
+
+/// A blocker's code as a problem's (`not_approvable` for one this server
+/// does not name).
+fn conflict_code(code: &str) -> &'static str {
+    [
+        "terms_forbid",
+        "robots_disallowed",
+        "needs_key",
+        "no_endpoint",
+        "config_invalid",
+        "check_needed",
+    ]
+    .into_iter()
+    .find(|known| *known == code)
+    .unwrap_or("not_approvable")
 }
 
 async fn fetch(db: &PgPool, id: Uuid) -> Result<BoardRow> {
@@ -503,9 +631,11 @@ async fn set_status(
 
 /// Approve a job board.
 ///
-/// From then on searches read it. Only a candidate or a paused board whose
-/// config reads its kind and whose check (of the feed's host) found robots
-/// rules that allow the feed. Board owners only.
+/// From then on searches read it. Only a candidate or a paused board with
+/// no blocker: nothing the research found forbids reading it, its key is
+/// set if it needs one, its config reads its kind, and its check (of the
+/// feed's host) found robots rules that allow the feed. The problem names
+/// the first blocker and says what exactly. Board owners only.
 #[utoipa::path(
     post,
     path = "/api/v1/boards/{id}/approve",
@@ -521,10 +651,10 @@ async fn set_status(
             content_type = "application/problem+json"),
         (status = 404, description = "`not_found`", body = Problem,
             content_type = "application/problem+json"),
-        (status = 409, description = "`not_waiting`: it is approved or declined; \
-            `config_invalid`; `check_needed`: check its feed's host first; \
-            `robots_disallowed`: its robots rules forbid the feed (edit the config to an allowed \
-            path)", body = Problem, content_type = "application/problem+json"),
+        (status = 409, description = "`not_waiting`: it is approved or declined; else its first \
+            blocker: `terms_forbid`, `robots_disallowed`, `needs_key`, `no_endpoint`, \
+            `config_invalid`, `check_needed`; the detail says what exactly", body = Problem,
+            content_type = "application/problem+json"),
     ),
 )]
 pub async fn approve(
@@ -542,19 +672,8 @@ pub async fn approve(
             "Only a board waiting for you, or paused, can be approved.".to_owned(),
         ));
     }
-    if let Err(code) = approvable(&row) {
-        let detail = match code {
-            "check_needed" => {
-                "Check the board first: its robots rules for the feed's host are \
-                               not known yet."
-            }
-            "robots_disallowed" => {
-                "The board's robots rules forbid reading its feed. Edit the \
-                                    config to an allowed path."
-            }
-            _ => "The board's config does not read its kind. Edit it first.",
-        };
-        return Err(Error::Conflict(code, detail.to_owned()));
+    if let Some(first) = blockers(&row).into_iter().next() {
+        return Err(Error::Conflict(conflict_code(&first.code), first.detail));
     }
     let now = state.clock.now();
     set_status(&state.db, id, Status::Approved, None, account, now).await?;
@@ -668,10 +787,11 @@ pub async fn pause(
 
 /// Change a job board's config.
 ///
-/// The whole config, validated for the board's kind (unknown keys refused).
-/// An approved board's new feed must still be allowed by the robots rules
-/// its check found. The seed list never overwrites it again. Board owners
-/// only.
+/// The whole config, validated for the board's kind (or the new `kind`, as
+/// a check's proposal gives it); unknown keys refused; a problem names the
+/// field. An approved board's new feed must still be allowed by the robots
+/// rules its check found. The seed list never overwrites it again. Board
+/// owners only.
 #[utoipa::path(
     put,
     path = "/api/v1/boards/{id}/config",
@@ -682,8 +802,8 @@ pub async fn pause(
     request_body = BoardConfigChange,
     responses(
         (status = 200, description = "Changed.", body = BoardDetail),
-        (status = 400, description = "`invalid_config`: the detail says what is wrong",
-            body = Problem, content_type = "application/problem+json"),
+        (status = 400, description = "`invalid_config`: the detail names the field and says what \
+            is wrong", body = Problem, content_type = "application/problem+json"),
         (status = 401, description = "`session_required`", body = Problem,
             content_type = "application/problem+json"),
         (status = 403, description = "`not_board_owner`", body = Problem,
@@ -691,8 +811,8 @@ pub async fn pause(
         (status = 404, description = "`not_found`", body = Problem,
             content_type = "application/problem+json"),
         (status = 409, description = "`robots_disallowed`: an approved board's new feed is not \
-            allowed by its robots rules", body = Problem,
-            content_type = "application/problem+json"),
+            allowed by its robots rules; `kind_locked`: an approved board keeps its kind",
+            body = Problem, content_type = "application/problem+json"),
     ),
 )]
 pub async fn set_config(
@@ -707,11 +827,18 @@ pub async fn set_config(
     let Json(body) =
         body.map_err(|rejection| Error::BadRequest("invalid_config", rejection.body_text()))?;
     let row = fetch(&state.db, id).await?;
-    let kind = row
+    let old_kind = row
         .kind()
         .ok_or_else(|| Error::internal("a board of an unknown kind"))?;
-    let config: BoardConfig = serde_json::from_value(body.config)
-        .map_err(|e| Error::BadRequest("invalid_config", e.to_string()))?;
+    let kind = body.kind.unwrap_or(old_kind);
+    if kind != old_kind && row.status() == Status::Approved {
+        return Err(Error::Conflict(
+            "kind_locked",
+            "An approved board keeps its kind: pause it first.".to_owned(),
+        ));
+    }
+    let config =
+        BoardConfig::from_json(body.config).map_err(|e| Error::BadRequest("invalid_config", e))?;
     config
         .validate(kind)
         .map_err(|e| Error::BadRequest("invalid_config", e))?;
@@ -721,23 +848,168 @@ pub async fn set_config(
             config: sqlx::types::Json(value.clone()),
             ..row.clone()
         };
-        if approvable(&changed) == Err("robots_disallowed") {
+        if let Some(robots) = blockers(&changed)
+            .into_iter()
+            .find(|b| b.code == "robots_disallowed")
+        {
             return Err(Error::Conflict(
                 "robots_disallowed",
-                "The board's robots rules forbid that feed.".to_owned(),
+                format!(
+                    "The board's robots rules forbid that feed: {}",
+                    robots.detail
+                ),
             ));
         }
     }
     sqlx::query(
-        "UPDATE sources.job_boards SET config = $2, config_edited = true, updated_at = $3
+        "UPDATE sources.job_boards
+            SET config = $2, kind = $3, config_edited = true, updated_at = $4,
+                report = CASE WHEN report IS NULL THEN NULL ELSE report - 'proposal' END
           WHERE id = $1",
     )
     .bind(id)
     .bind(sqlx::types::Json(&value))
+    .bind(kind.as_str())
     .bind(state.clock.now())
     .execute(&state.db)
     .await?;
     tracing::info!(board = %row.slug, "job board config changed");
+    let row = fetch(&state.db, id).await?;
+    Ok(Json(detail(&deps, &state, account, row).await?))
+}
+
+/// Set a job board's API key.
+///
+/// One value per parameter its config's `key` names, each 1 to 200 visible
+/// characters. Stored sealed with the instance secret and sent only to the
+/// host its config reads now; never returned (the board says "key set").
+/// Board owners only.
+#[utoipa::path(
+    put,
+    path = "/api/v1/boards/{id}/key",
+    tag = "sources",
+    operation_id = "sources.set_board_key",
+    security(("session" = [])),
+    params(("id" = Uuid, Path, description = "The board.")),
+    request_body = BoardKeyChange,
+    responses(
+        (status = 200, description = "Set.", body = BoardDetail),
+        (status = 400, description = "`invalid_key`: the detail names the parameter",
+            body = Problem, content_type = "application/problem+json"),
+        (status = 401, description = "`session_required`", body = Problem,
+            content_type = "application/problem+json"),
+        (status = 403, description = "`not_board_owner`", body = Problem,
+            content_type = "application/problem+json"),
+        (status = 404, description = "`not_found`", body = Problem,
+            content_type = "application/problem+json"),
+        (status = 409, description = "`no_key_needed`: its config names no key; `no_endpoint`: \
+            it has no address to send it to", body = Problem,
+            content_type = "application/problem+json"),
+    ),
+)]
+pub async fn set_key(
+    State(state): State<AppState>,
+    SignedIn(principal): SignedIn,
+    Extension(deps): Extension<SourcesDeps>,
+    Path(id): Path<Uuid>,
+    body: std::result::Result<Json<BoardKeyChange>, JsonRejection>,
+) -> Result<Json<BoardDetail>> {
+    let account = principal.account_id;
+    owner_only(&deps, &state.db, account).await?;
+    let Json(body) =
+        body.map_err(|rejection| Error::BadRequest("invalid_key", rejection.body_text()))?;
+    let row = fetch(&state.db, id).await?;
+    let config = row.config().unwrap_or_default();
+    let Some(spec) = &config.key else {
+        return Err(Error::Conflict(
+            "no_key_needed",
+            "This board's config names no key.".to_owned(),
+        ));
+    };
+    let Some(host) = row.kind().and_then(|k| config.start(k)).and_then(host_of) else {
+        return Err(Error::Conflict(
+            "no_endpoint",
+            "This board has no address to send a key to yet.".to_owned(),
+        ));
+    };
+    if let Some(unknown) = body.values.keys().find(|k| !spec.params.contains(k)) {
+        return Err(Error::BadRequest(
+            "invalid_key",
+            format!("`{unknown}` is not one of this key's parameters"),
+        ));
+    }
+    let mut values = std::collections::BTreeMap::new();
+    for param in &spec.params {
+        let value = body.values.get(param).map(|v| v.trim()).unwrap_or("");
+        if !board_keys::is_value(value) {
+            return Err(Error::BadRequest(
+                "invalid_key",
+                format!(
+                    "`{param}`: paste the value, 1 to {} characters, no spaces",
+                    board_keys::MAX_VALUE
+                ),
+            ));
+        }
+        values.insert(param.clone(), value.to_owned());
+    }
+    let sealed = board_keys::seal(&board_keys::cipher(&state.secret), id, &values);
+    let now = state.clock.now();
+    sqlx::query(
+        "UPDATE sources.job_boards
+            SET api_key = $2, api_key_host = $3, api_key_set_at = $4, updated_at = $4
+          WHERE id = $1",
+    )
+    .bind(id)
+    .bind(sealed)
+    .bind(&host)
+    .bind(now)
+    .execute(&state.db)
+    .await?;
+    // The board and the event only: never the key.
+    tracing::info!(board = %row.slug, "job board API key set");
+    let row = fetch(&state.db, id).await?;
+    Ok(Json(detail(&deps, &state, account, row).await?))
+}
+
+/// Remove a job board's API key.
+///
+/// Searches stop reading it until a key is set again. Board owners only.
+#[utoipa::path(
+    delete,
+    path = "/api/v1/boards/{id}/key",
+    tag = "sources",
+    operation_id = "sources.forget_board_key",
+    security(("session" = [])),
+    params(("id" = Uuid, Path, description = "The board.")),
+    responses(
+        (status = 200, description = "Removed.", body = BoardDetail),
+        (status = 401, description = "`session_required`", body = Problem,
+            content_type = "application/problem+json"),
+        (status = 403, description = "`not_board_owner`", body = Problem,
+            content_type = "application/problem+json"),
+        (status = 404, description = "`not_found`", body = Problem,
+            content_type = "application/problem+json"),
+    ),
+)]
+pub async fn forget_key(
+    State(state): State<AppState>,
+    SignedIn(principal): SignedIn,
+    Extension(deps): Extension<SourcesDeps>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<BoardDetail>> {
+    let account = principal.account_id;
+    owner_only(&deps, &state.db, account).await?;
+    let row = fetch(&state.db, id).await?;
+    sqlx::query(
+        "UPDATE sources.job_boards
+            SET api_key = NULL, api_key_host = NULL, api_key_set_at = NULL, updated_at = $2
+          WHERE id = $1",
+    )
+    .bind(id)
+    .bind(state.clock.now())
+    .execute(&state.db)
+    .await?;
+    tracing::info!(board = %row.slug, "job board API key removed");
     let row = fetch(&state.db, id).await?;
     Ok(Json(detail(&deps, &state, account, row).await?))
 }

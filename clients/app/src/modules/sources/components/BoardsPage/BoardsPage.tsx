@@ -243,7 +243,9 @@ function SuggestBoard() {
       },
     });
   };
-  const error = suggest.isError ? t(`boards.errors.${boardErrorOf(suggest.error)}`) : undefined;
+  const error = suggest.isError
+    ? t(`boards.errors.${boardErrorOf(suggest.error).code}`)
+    : undefined;
   return (
     <Tagged testId="boards-suggest-form">
       <form onSubmit={submit} noValidate>

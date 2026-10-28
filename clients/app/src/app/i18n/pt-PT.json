@@ -61,5 +61,10 @@
     "title": "Esta página não existe",
     "lead": "A ligação pode ser antiga ou o endereço pode estar mal escrito.",
     "home": "Ir para Hoje"
+  },
+  "profileSkills": {
+    "eyebrow": "Perfil e objetivos",
+    "title": "Competências",
+    "lead": "As competências com que os agentes comparam as ofertas, pela ordem em que contam, e as que as suas funções mencionam."
   }
 }

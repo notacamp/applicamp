@@ -19,6 +19,8 @@ import { GoalsInterview } from "./routes/goals-interview";
 import { NotFound } from "./routes/not-found";
 import { Pipeline } from "./routes/pipeline";
 import { Profile } from "./routes/profile";
+import { ProfileImprove } from "./routes/profile-improve";
+import { ProfileSkills } from "./routes/profile-skills";
 import { Today } from "./routes/today";
 
 export interface RouterContext {
@@ -153,6 +155,75 @@ const profileRoute = createRoute({
         onStartGoals={(step) => {
           void navigate({ to: "/goals/interview", search: { step } });
         }}
+        onAction={(action) => {
+          switch (action.kind) {
+            case "improve": {
+              void navigate({ to: "/profile/improve" });
+              break;
+            }
+            case "question": {
+              void navigate({ to: "/profile/improve", search: { q: action.id } });
+              break;
+            }
+            case "skills": {
+              void navigate({ to: "/profile/skills" });
+              break;
+            }
+            case "import": {
+              void navigate({ search: { import: "new" } });
+              break;
+            }
+            case "goals": {
+              void navigate({ to: "/goals/interview" });
+              break;
+            }
+            case "edit": {
+              void navigate({ to: "/profile", hash: action.section });
+              break;
+            }
+          }
+        }}
+      />
+    );
+  },
+});
+
+/** The skills page, in the app frame: Profile & goals' Skills, in order. */
+const profileSkillsRoute = createRoute({
+  getParentRoute: () => frameRoute,
+  path: "/profile/skills",
+  component: function ProfileSkillsRoute() {
+    const navigate = profileSkillsRoute.useNavigate();
+    return (
+      <ProfileSkills
+        onBack={() => {
+          void navigate({ to: "/profile" });
+        }}
+      />
+    );
+  },
+});
+
+/** `?q=` is the question asked for; none is the most useful open one. */
+const improveSearch = z.object({ q: z.string().min(1).max(64) });
+
+/** Improve my profile: signed in, outside the app frame, so nothing else competes with the question. */
+const improveRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/profile/improve",
+  validateSearch: (search: Record<string, unknown>): { q?: string | undefined } => {
+    const parsed = improveSearch.safeParse(search);
+    return { q: parsed.success ? parsed.data.q : undefined };
+  },
+  component: function ImproveRoute() {
+    const search = improveRoute.useSearch();
+    const navigate = improveRoute.useNavigate();
+    return (
+      <ProfileImprove
+        question={search.q}
+        onLeave={(reason) => {
+          void navigate({ to: reason === "done" ? "/profile" : "/" });
+        }}
       />
     );
   },
@@ -190,7 +261,15 @@ const routeTree = rootRoute.addChildren([
   signInRoute,
   notInvitedRoute,
   interviewRoute,
-  frameRoute.addChildren([todayRoute, pipelineRoute, boardsRoute, agentsRoute, profileRoute]),
+  improveRoute,
+  frameRoute.addChildren([
+    todayRoute,
+    pipelineRoute,
+    boardsRoute,
+    agentsRoute,
+    profileRoute,
+    profileSkillsRoute,
+  ]),
 ]);
 
 /** The app's one router (`history` defaults to the browser's; tests pass a memory one). */

@@ -91,7 +91,8 @@
     "pdf": "A PDF",
     "text": "Pasted text",
     "manual": "Written here",
-    "updated": "{{source}} · updated {{date}}"
+    "updated": "{{source}} · updated {{date}}",
+    "answer": "Your answers to questions"
   },
   "basics": {
     "name": "Name",
@@ -99,7 +100,8 @@
     "location": "Location",
     "email": "Email",
     "url": "Website",
-    "summary": "Summary"
+    "summary": "Summary",
+    "section": "About you"
   },
   "placeholders": {
     "name": "Add your name",
@@ -345,6 +347,183 @@
         "year": "a year",
         "month": "a month"
       }
+    }
+  },
+  "strength": {
+    "title": "Profile strength",
+    "description": "Agents only use what is written here, and every line in a CV traces back to it. A stronger profile means better matches and better CVs.",
+    "loading": "Checking your profile…",
+    "score": "{{score}}%",
+    "scoreLabel": "Profile strength: {{score}} percent",
+    "strong": "Strong. Keep it up to date.",
+    "growing": "{{left}} points to a strong profile.",
+    "reading": "The AI is reading your profile for what is missing…",
+    "checklist": "What your profile strength is made of",
+    "improve": "Improve my profile",
+    "improveCount_one": "Improve my profile · {{count}} question",
+    "improveCount_other": "Improve my profile · {{count}} questions",
+    "add": "Add",
+    "improveItem": "Improve",
+    "skillsFound_one": "{{count}} found in your roles",
+    "skillsFound_other": "{{count}} found in your roles",
+    "note": "Strength is what agents can use: a headline and summary, results on your recent roles, skills, education, languages, a link, your positions and your goals. It never counts what you would rather leave out.",
+    "parts": {
+      "headline": "Headline",
+      "summary": "Summary",
+      "achievements": "Achievements",
+      "skills": "Skills",
+      "education": "Education",
+      "languages": "Languages",
+      "links": "Links",
+      "positions": "Positions",
+      "goals": "Goals"
+    },
+    "hint": {
+      "headline": {
+        "ok": "Written",
+        "partial": "Written",
+        "missing": "What a recruiter reads first"
+      },
+      "summary": {
+        "ok": "Written",
+        "partial": "Written",
+        "missing": "Three or four sentences about what you do best"
+      },
+      "achievements": {
+        "ok": "Your recent roles show results",
+        "partial": "{{have}} of {{of}} recent roles have results",
+        "missing": "Your recent roles say what you did, not what you achieved"
+      },
+      "skills": {
+        "ok": "{{have}} listed",
+        "partial": "{{have}} listed; five make a strong profile",
+        "missing": "None listed"
+      },
+      "education": {
+        "ok": "Listed",
+        "partial": "Listed",
+        "missing": "Your school or degree"
+      },
+      "languages": {
+        "ok": "{{have}} listed",
+        "partial": "{{have}} listed",
+        "missing": "The languages you speak"
+      },
+      "links": {
+        "ok": "Linked",
+        "partial": "Linked",
+        "missing": "GitHub, a portfolio or a personal site"
+      },
+      "positions": {
+        "ok": "{{have}} on your profile",
+        "partial": "{{have}} on your profile; three with dates make a full history",
+        "missing": "No positions yet: import your LinkedIn export or a CV"
+      },
+      "goals": {
+        "ok": "{{have}} of {{of}} answered",
+        "partial": "{{have}} of {{of}} answered",
+        "missing": "Tell agents what you want next"
+      }
+    }
+  },
+  "improve": {
+    "eyebrow": "Question {{n}} of {{total}}",
+    "readingTitle": "Reading your profile…",
+    "readingLead": "The AI is looking for what is missing or thin. This takes a few seconds.",
+    "loadFailed": "The questions couldn’t be loaded.",
+    "later": "Finish later",
+    "skip": "Skip",
+    "draft": "Draft from my answer",
+    "drafting": "Drafting…",
+    "answerLabel": "Your answer",
+    "answerHint": "Enter drafts it from your answer; Shift and Enter start a new line.",
+    "answerPlaceholder": "Answer in your own words. Rough is fine.",
+    "strengthNow": "Strength {{from}}% → {{to}}% if you answer",
+    "contextRole": "From your role · {{role}}",
+    "years": "{{from}}–{{to}}",
+    "yearsNow": "{{from}}–now",
+    "context": {
+      "label": "Your headline",
+      "summary": "Your summary",
+      "education": "Your education",
+      "links": "Your links"
+    },
+    "draftTitle": "Draft from your answer",
+    "draftSource": "Uses only what you wrote and what your profile says. Nothing is saved until you keep it.",
+    "nothingDrafted": "Nothing in your answer could be drafted without adding something you didn’t write. Add detail and draft again.",
+    "dropped_one": "{{count}} line left out: it mentioned something you didn’t write.",
+    "dropped_other": "{{count}} lines left out: they mentioned something you didn’t write.",
+    "keep": "Keep",
+    "edit": "Edit",
+    "discard": "Discard",
+    "editLabel": "Edit the draft, one line each",
+    "kept": "Kept. Your profile is now {{score}}% strong.",
+    "doneTitle": "That’s everything for now",
+    "doneLead": "You have answered or skipped every question. Your profile is {{score}}% strong.",
+    "backToProfile": "Back to your profile",
+    "unavailableTitle": "The questions need an AI model",
+    "unavailableLead": "This Applicamp has no AI model set up, so it can’t read your profile for gaps. The checklist on your profile still shows what to add.",
+    "noProfile": "There is nothing to read yet. Import or write your profile first.",
+    "failedTitle": "The questions couldn’t be made",
+    "reasons": {
+      "ai_unavailable": "This Applicamp has no AI model set up, so it can’t read your profile for gaps.",
+      "ai_daily_limit_reached": "You’ve reached today’s AI limit. Try again tomorrow.",
+      "ai_budget_reached": "You’ve reached the AI spending limit, so nothing was sent. It resets with the day or the month; the checklist on your profile still shows what to add.",
+      "ai_failed": "The AI model couldn’t read your profile just now. Try again in a minute."
+    },
+    "errors": {
+      "generic": "That didn’t work. Try again.",
+      "ai_unavailable": "This Applicamp has no AI model set up, so it can’t draft from your answer.",
+      "ai_daily_limit_reached": "You’ve reached today’s AI limit. Try again tomorrow.",
+      "ai_budget_reached": "You’ve reached the AI spending limit, so nothing was sent. You can write this in your profile yourself.",
+      "ai_failed": "The AI model couldn’t draft this just now. Try again in a minute.",
+      "profile_changed": "Your profile changed since this draft was made. Discard it and draft again.",
+      "draft_not_ready": "This draft was already kept or discarded.",
+      "invalid_answer": "Write between 1 and 2,000 characters.",
+      "invalid_items": "Check the lines: none can be empty or too long.",
+      "not_found": "This question isn’t there any more. Finish later and come back."
+    }
+  },
+  "skills": {
+    "yours": "Your skills",
+    "order": "The first three drive the job board searches, so put the ones you most want to be hired for first.",
+    "top": "Used for searches",
+    "empty": "No skills yet. Add the ones found in your roles below, or on your profile.",
+    "moveUp": "Move {{name}} up",
+    "moveDown": "Move {{name}} down",
+    "foundTitle": "Skills found in your roles",
+    "foundLead": "These appear in the descriptions of your positions but aren’t listed as skills yet. Add the ones you’d be happy to be asked about in an interview.",
+    "found": "Skills found in your roles",
+    "inRoles_one": "in {{count}} role",
+    "inRoles_other": "in {{count}} roles",
+    "add": "Add",
+    "addLabel": "Add {{name}}",
+    "notMine": "Not mine",
+    "notMineLabel": "{{name}} is not mine",
+    "foundNote": "Found by reading your own positions, with the number of roles that mention each. Nothing is added without your click.",
+    "noneFound": "Nothing left to suggest: every skill your positions mention is listed or put aside.",
+    "reading": "Reading your positions for skills…",
+    "unavailable": "Finding skills in your roles needs an AI model, which isn’t set up here. You can still add skills by hand on your profile.",
+    "loadFailed": "The skills found in your roles couldn’t be loaded.",
+    "back": "Back to your profile",
+    "reasons": {
+      "ai_unavailable": "Finding skills in your roles needs an AI model, which isn’t set up here.",
+      "ai_daily_limit_reached": "You’ve reached today’s AI limit. Try again tomorrow.",
+      "ai_budget_reached": "You’ve reached the AI spending limit, so nothing was sent. You can still add skills by hand on your profile.",
+      "ai_failed": "The AI model couldn’t read your positions just now. Try again in a minute."
+    }
+  },
+  "nudge": {
+    "title": "Your profile is {{score}}% strong.",
+    "continue": "Continue",
+    "notNow": "Not now",
+    "bodyQuestions_one": "{{count}} quick question would sharpen your matches and the CVs agents write.",
+    "bodyQuestions_other": "{{count}} quick questions would sharpen your matches and the CVs agents write.",
+    "body": {
+      "improve": "A few quick questions would sharpen your matches and the CVs agents write.",
+      "skills": "Add the skills your roles mention: searches use your top three.",
+      "import": "Import a fuller profile: matches are scored against your positions.",
+      "goals": "Answer a few questions about what you want: searches keep to them."
     }
   }
 }

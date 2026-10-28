@@ -1,7 +1,17 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Banner, Button, InlineText, Property, PropertyList, Stack, Tagged, Text } from "~/lib/ui";
+import {
+  Banner,
+  Button,
+  InlineText,
+  Property,
+  PropertyList,
+  Section,
+  Stack,
+  Tagged,
+  Text,
+} from "~/lib/ui";
 
 import {
   useSaveProfile,
@@ -50,39 +60,41 @@ export function ProfileView({ view, onImportAgain, goals }: ProfileViewProps) {
 
   return (
     <Stack gap="lg" testId="profile-view">
-      <PropertyList testId="profile-properties">
-        <Property label={t("source.label")} testId="profile-source">
-          <Text>
-            {updated === undefined || source === undefined
-              ? (source ?? "")
-              : t("source.updated", { source, date: updated })}
-          </Text>
-          <Button
-            variant="ghost"
-            icon="download"
-            data-testid="import-again"
-            onClick={onImportAgain}
-          >
-            {t("importAgain")}
-          </Button>
-        </Property>
-        {BASICS.map((key) => (
-          <Property key={key} label={t(`basics.${key}`)}>
-            <InlineText
-              label={t(`basics.${key}`)}
-              value={profile.basics[key] ?? undefined}
-              placeholder={t(`placeholders.${key}`)}
-              multiline={key === "summary"}
-              counter={(left) => t("form.charactersLeft", { left })}
-              saveLabel={t("form.save")}
-              cancelLabel={t("form.cancel")}
-              busy={save.isPending}
-              testId={`basics-${key}`}
-              onSave={saveBasics(key)}
-            />
+      <Section title={t("basics.section")} anchor="basics">
+        <PropertyList testId="profile-properties">
+          <Property label={t("source.label")} testId="profile-source">
+            <Text>
+              {updated === undefined || source === undefined
+                ? (source ?? "")
+                : t("source.updated", { source, date: updated })}
+            </Text>
+            <Button
+              variant="ghost"
+              icon="download"
+              data-testid="import-again"
+              onClick={onImportAgain}
+            >
+              {t("importAgain")}
+            </Button>
           </Property>
-        ))}
-      </PropertyList>
+          {BASICS.map((key) => (
+            <Property key={key} label={t(`basics.${key}`)}>
+              <InlineText
+                label={t(`basics.${key}`)}
+                value={profile.basics[key] ?? undefined}
+                placeholder={t(`placeholders.${key}`)}
+                multiline={key === "summary"}
+                counter={(left) => t("form.charactersLeft", { left })}
+                saveLabel={t("form.save")}
+                cancelLabel={t("form.cancel")}
+                busy={save.isPending}
+                testId={`basics-${key}`}
+                onSave={saveBasics(key)}
+              />
+            </Property>
+          ))}
+        </PropertyList>
+      </Section>
       {save.isError ? (
         <Tagged testId="profile-save-error">
           <Banner tone="danger" icon="warning" role="alert" title={t("form.saveFailed")} />

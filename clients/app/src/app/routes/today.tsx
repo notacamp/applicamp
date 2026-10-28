@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { formatDay } from "~/lib/i18n";
 import { Banner, Button, ButtonLink, Page, Placeholder, Stack, Tagged, Text } from "~/lib/ui";
 import { useToday, type Today as TodayState } from "~/modules/pipeline";
+import { StrengthNudge, type NudgeAction } from "~/modules/profile";
 import { SearchLine, SearchNowButton } from "~/modules/sources";
 
 import { useImportLink } from "../links";
@@ -80,6 +81,31 @@ function TodayBody({ state }: { state: TodayState }) {
   const navigate = useNavigate();
   const latest = state.latest_search ?? null;
   const hint = state.profile.strength_hint ?? null;
+  const nudge = state.next_profile_action ?? null;
+  const nudgeLink = (action: NudgeAction) => {
+    switch (action) {
+      case "improve": {
+        return inAppLink("/profile/improve", () => {
+          void navigate({ to: "/profile/improve" });
+        });
+      }
+      case "skills": {
+        return inAppLink("/profile/skills", () => {
+          void navigate({ to: "/profile/skills" });
+        });
+      }
+      case "import": {
+        return inAppLink("/profile?import=new", () => {
+          void navigate({ to: "/profile", search: { import: "new" } });
+        });
+      }
+      case "goals": {
+        return inAppLink("/goals/interview", () => {
+          void navigate({ to: "/goals/interview" });
+        });
+      }
+    }
+  };
 
   let step: ReactNode = null;
   switch (state.next_step) {
@@ -189,6 +215,14 @@ function TodayBody({ state }: { state: TodayState }) {
   return (
     <Stack>
       {step}
+      {nudge === null || state.next_step === "set_up_profile" ? null : (
+        <StrengthNudge
+          score={state.profile_strength}
+          questions={state.profile_questions}
+          action={nudge}
+          link={nudgeLink(nudge)}
+        />
+      )}
       {latest === null ? null : <SearchLine search={latest} testId="today-latest-search" />}
       {state.next_step === "set_up_profile" ? null : <NoSkillsLine testId="today-no-skills" />}
       {hint === null ||

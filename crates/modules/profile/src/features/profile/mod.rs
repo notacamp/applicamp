@@ -28,6 +28,8 @@ pub enum ProfileSource {
     Text,
     /// Written in the app.
     Manual,
+    /// A draft made from the person's answer to a question, kept.
+    Answer,
 }
 
 impl ProfileSource {
@@ -37,6 +39,7 @@ impl ProfileSource {
             "pdf" => Some(Self::Pdf),
             "text" => Some(Self::Text),
             "manual" => Some(Self::Manual),
+            "answer" => Some(Self::Answer),
             _ => None,
         }
     }

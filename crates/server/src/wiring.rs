@@ -372,6 +372,9 @@ impl applicamp_pipeline::Neighbours for PipelineWiring {
                 no_skills: status.no_skills,
                 goals_answered: status.goals_answered,
                 goals_total: status.goals_total,
+                strength: status.strength,
+                next_action: status.next_action.map(|a| a.as_str().to_owned()),
+                questions_left: status.questions_left,
             })
         })
     }

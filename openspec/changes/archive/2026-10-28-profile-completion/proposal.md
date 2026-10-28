@@ -24,7 +24,8 @@ https://claude.ai/artifact/Jk5QokoGi12rZqw8EhWLw9
   saved until Keep.
 - **Skills found in your roles**: skills that the person's own position
   descriptions mention but the skills list doesn't, with the number of roles,
-  each Add / Not mine.
+  each Add / Not mine. The Skills page also lets the person put their skills in
+  order (move up, move down): the first three drive the job board searches.
 - **Today** shows the profile strength and "Continue" while the profile isn't
   strong; "Not now" hides it for a week.
 

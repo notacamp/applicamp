@@ -99,6 +99,10 @@ export function todayAnswer(nextStep: Today["next_step"], overrides: Partial<Tod
   return {
     profile: { done: nextStep !== "set_up_profile", no_skills: false, strength_hint: null },
     goals: { answered: early ? 0 : 3, total: 11 },
+    // Strong, so Today's profile card stays away unless a test asks for it.
+    profile_strength: 100,
+    next_profile_action: null,
+    profile_questions: null,
     new_matches: nextStep === "review_matches" ? 9 : 0,
     latest_search: null,
     next_step: nextStep,

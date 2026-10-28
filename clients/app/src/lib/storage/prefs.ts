@@ -10,6 +10,8 @@ export type PrefKey =
   | "locale"
   | "theme"
   | "density"
+  /** Until when Today's "your profile is N% strong" card is put away (a time, ISO 8601). */
+  | "profile.nudge"
   /** Kept by @notacamp/ui's ThemeProvider: the last workspace and its accent. */
   | "workspace"
   | `accent.${string}`;

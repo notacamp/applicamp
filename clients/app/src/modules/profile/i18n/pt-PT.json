@@ -91,7 +91,8 @@
     "pdf": "Um PDF",
     "text": "Texto colado",
     "manual": "Escrito aqui",
-    "updated": "{{source}} · atualizado a {{date}}"
+    "updated": "{{source}} · atualizado a {{date}}",
+    "answer": "As suas respostas às perguntas"
   },
   "basics": {
     "name": "Nome",
@@ -99,7 +100,8 @@
     "location": "Localização",
     "email": "Email",
     "url": "Site",
-    "summary": "Resumo"
+    "summary": "Resumo",
+    "section": "Sobre si"
   },
   "placeholders": {
     "name": "Acrescente o seu nome",
@@ -345,6 +347,183 @@
         "year": "por ano",
         "month": "por mês"
       }
+    }
+  },
+  "strength": {
+    "title": "Força do perfil",
+    "description": "Os agentes só usam o que está escrito aqui, e cada linha de um CV remonta a isto. Um perfil mais forte dá melhores correspondências e melhores CVs.",
+    "loading": "A verificar o seu perfil…",
+    "score": "{{score}}%",
+    "scoreLabel": "Força do perfil: {{score}} por cento",
+    "strong": "Forte. Mantenha-o atualizado.",
+    "growing": "Faltam {{left}} pontos para um perfil forte.",
+    "reading": "A IA está a ler o seu perfil à procura do que falta…",
+    "checklist": "De que é feita a força do seu perfil",
+    "improve": "Melhorar o meu perfil",
+    "improveCount_one": "Melhorar o meu perfil · {{count}} pergunta",
+    "improveCount_other": "Melhorar o meu perfil · {{count}} perguntas",
+    "add": "Adicionar",
+    "improveItem": "Melhorar",
+    "skillsFound_one": "{{count}} encontrada nas suas funções",
+    "skillsFound_other": "{{count}} encontradas nas suas funções",
+    "note": "A força é o que os agentes podem usar: um título e um resumo, resultados nas suas funções recentes, competências, formação, línguas, uma ligação, as suas funções e os seus objetivos. Nunca conta o que prefere deixar de fora.",
+    "parts": {
+      "headline": "Título",
+      "summary": "Resumo",
+      "achievements": "Conquistas",
+      "skills": "Competências",
+      "education": "Formação",
+      "languages": "Línguas",
+      "links": "Ligações",
+      "positions": "Funções",
+      "goals": "Objetivos"
+    },
+    "hint": {
+      "headline": {
+        "ok": "Escrito",
+        "partial": "Escrito",
+        "missing": "O que um recrutador lê primeiro"
+      },
+      "summary": {
+        "ok": "Escrito",
+        "partial": "Escrito",
+        "missing": "Três ou quatro frases sobre o que faz melhor"
+      },
+      "achievements": {
+        "ok": "As suas funções recentes mostram resultados",
+        "partial": "{{have}} de {{of}} funções recentes têm resultados",
+        "missing": "As suas funções recentes dizem o que fez, não o que alcançou"
+      },
+      "skills": {
+        "ok": "{{have}} na lista",
+        "partial": "{{have}} na lista; cinco dão um perfil forte",
+        "missing": "Nenhuma na lista"
+      },
+      "education": {
+        "ok": "Indicada",
+        "partial": "Indicada",
+        "missing": "A sua escola ou curso"
+      },
+      "languages": {
+        "ok": "{{have}} na lista",
+        "partial": "{{have}} na lista",
+        "missing": "As línguas que fala"
+      },
+      "links": {
+        "ok": "Com ligação",
+        "partial": "Com ligação",
+        "missing": "GitHub, um portefólio ou um site pessoal"
+      },
+      "positions": {
+        "ok": "{{have}} no seu perfil",
+        "partial": "{{have}} no seu perfil; três com datas formam um percurso completo",
+        "missing": "Ainda sem funções: importe a exportação do LinkedIn ou um CV"
+      },
+      "goals": {
+        "ok": "{{have}} de {{of}} respondidas",
+        "partial": "{{have}} de {{of}} respondidas",
+        "missing": "Diga aos agentes o que quer a seguir"
+      }
+    }
+  },
+  "improve": {
+    "eyebrow": "Pergunta {{n}} de {{total}}",
+    "readingTitle": "A ler o seu perfil…",
+    "readingLead": "A IA procura o que falta ou está fraco. Demora alguns segundos.",
+    "loadFailed": "Não foi possível carregar as perguntas.",
+    "later": "Terminar mais tarde",
+    "skip": "Saltar",
+    "draft": "Redigir a partir da resposta",
+    "drafting": "A redigir…",
+    "answerLabel": "A sua resposta",
+    "answerHint": "Enter redige a partir da resposta; Shift e Enter mudam de linha.",
+    "answerPlaceholder": "Responda por palavras suas. Pode ser desarrumado.",
+    "strengthNow": "Força {{from}}% → {{to}}% se responder",
+    "contextRole": "Da sua função · {{role}}",
+    "years": "{{from}}–{{to}}",
+    "yearsNow": "{{from}}–atual",
+    "context": {
+      "label": "O seu título",
+      "summary": "O seu resumo",
+      "education": "A sua formação",
+      "links": "As suas ligações"
+    },
+    "draftTitle": "Rascunho a partir da sua resposta",
+    "draftSource": "Usa só o que escreveu e o que o seu perfil diz. Nada é guardado até o manter.",
+    "nothingDrafted": "Nada na sua resposta se podia redigir sem acrescentar algo que não escreveu. Acrescente pormenores e redija de novo.",
+    "dropped_one": "{{count}} linha deixada de fora: mencionava algo que não escreveu.",
+    "dropped_other": "{{count}} linhas deixadas de fora: mencionavam algo que não escreveu.",
+    "keep": "Manter",
+    "edit": "Editar",
+    "discard": "Descartar",
+    "editLabel": "Edite o rascunho, uma linha por item",
+    "kept": "Mantido. O seu perfil tem agora {{score}}% de força.",
+    "doneTitle": "Por agora é tudo",
+    "doneLead": "Respondeu ou saltou todas as perguntas. O seu perfil tem {{score}}% de força.",
+    "backToProfile": "Voltar ao seu perfil",
+    "unavailableTitle": "As perguntas precisam de um modelo de IA",
+    "unavailableLead": "Esta instalação do Applicamp não tem um modelo de IA configurado, por isso não consegue ler o seu perfil à procura de lacunas. A lista no seu perfil continua a mostrar o que acrescentar.",
+    "noProfile": "Ainda não há nada para ler. Importe ou escreva primeiro o seu perfil.",
+    "failedTitle": "Não foi possível fazer as perguntas",
+    "reasons": {
+      "ai_unavailable": "Esta instalação do Applicamp não tem um modelo de IA configurado, por isso não consegue ler o seu perfil à procura de lacunas.",
+      "ai_daily_limit_reached": "Atingiu o limite de IA de hoje. Tente amanhã.",
+      "ai_budget_reached": "Atingiu o limite de gastos de IA, por isso nada foi enviado. Repõe-se com o dia ou o mês; a lista no seu perfil continua a mostrar o que acrescentar.",
+      "ai_failed": "O modelo de IA não conseguiu ler o seu perfil agora. Tente de novo dentro de um minuto."
+    },
+    "errors": {
+      "generic": "Não resultou. Tente de novo.",
+      "ai_unavailable": "Esta instalação do Applicamp não tem um modelo de IA configurado, por isso não consegue redigir a partir da sua resposta.",
+      "ai_daily_limit_reached": "Atingiu o limite de IA de hoje. Tente amanhã.",
+      "ai_budget_reached": "Atingiu o limite de gastos de IA, por isso nada foi enviado. Pode escrever isto no seu perfil.",
+      "ai_failed": "O modelo de IA não conseguiu redigir isto agora. Tente de novo dentro de um minuto.",
+      "profile_changed": "O seu perfil mudou desde que este rascunho foi feito. Descarte-o e redija de novo.",
+      "draft_not_ready": "Este rascunho já foi mantido ou descartado.",
+      "invalid_answer": "Escreva entre 1 e 2000 carateres.",
+      "invalid_items": "Verifique as linhas: nenhuma pode estar vazia ou ser demasiado longa.",
+      "not_found": "Esta pergunta já não existe. Termine mais tarde e volte."
+    }
+  },
+  "skills": {
+    "yours": "As suas competências",
+    "order": "As três primeiras guiam as pesquisas nos sites de emprego; ponha primeiro aquelas para que mais quer ser contratado.",
+    "top": "Usada nas pesquisas",
+    "empty": "Ainda sem competências. Adicione as encontradas nas suas funções abaixo, ou no seu perfil.",
+    "moveUp": "Subir {{name}}",
+    "moveDown": "Descer {{name}}",
+    "foundTitle": "Competências encontradas nas suas funções",
+    "foundLead": "Aparecem nas descrições das suas funções, mas ainda não estão na lista de competências. Adicione aquelas sobre as quais não se importaria de ser questionado numa entrevista.",
+    "found": "Competências encontradas nas suas funções",
+    "inRoles_one": "em {{count}} função",
+    "inRoles_other": "em {{count}} funções",
+    "add": "Adicionar",
+    "addLabel": "Adicionar {{name}}",
+    "notMine": "Não é minha",
+    "notMineLabel": "{{name}} não é minha",
+    "foundNote": "Encontradas a ler as suas próprias funções, com o número de funções que mencionam cada uma. Nada é adicionado sem o seu clique.",
+    "noneFound": "Nada mais a sugerir: todas as competências que as suas funções mencionam estão na lista ou postas de parte.",
+    "reading": "A ler as suas funções à procura de competências…",
+    "unavailable": "Encontrar competências nas suas funções precisa de um modelo de IA, que não está configurado aqui. Pode sempre adicionar competências à mão no seu perfil.",
+    "loadFailed": "Não foi possível carregar as competências encontradas nas suas funções.",
+    "back": "Voltar ao seu perfil",
+    "reasons": {
+      "ai_unavailable": "Encontrar competências nas suas funções precisa de um modelo de IA, que não está configurado aqui.",
+      "ai_daily_limit_reached": "Atingiu o limite de IA de hoje. Tente amanhã.",
+      "ai_budget_reached": "Atingiu o limite de gastos de IA, por isso nada foi enviado. Pode sempre adicionar competências à mão no seu perfil.",
+      "ai_failed": "O modelo de IA não conseguiu ler as suas funções agora. Tente de novo dentro de um minuto."
+    }
+  },
+  "nudge": {
+    "title": "O seu perfil tem {{score}}% de força.",
+    "continue": "Continuar",
+    "notNow": "Agora não",
+    "bodyQuestions_one": "{{count}} pergunta rápida melhoraria as suas correspondências e os CVs que os agentes escrevem.",
+    "bodyQuestions_other": "{{count}} perguntas rápidas melhorariam as suas correspondências e os CVs que os agentes escrevem.",
+    "body": {
+      "improve": "Algumas perguntas rápidas melhorariam as suas correspondências e os CVs que os agentes escrevem.",
+      "skills": "Adicione as competências que as suas funções mencionam: as pesquisas usam as três primeiras.",
+      "import": "Importe um perfil mais completo: as correspondências são avaliadas com base nas suas funções.",
+      "goals": "Responda a algumas perguntas sobre o que quer: as pesquisas respeitam-nas."
     }
   }
 }

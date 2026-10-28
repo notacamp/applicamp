@@ -22,6 +22,8 @@ items = "/jobs"
 cursor = { param = "cursor", from = "/nextCursor" }
 poll_minutes = 15
 remote_only = true
+# Its keyword search, one query per top skill of the person's profile.
+skill_search = { param = "q", separator = " ", endpoint = "http://fake-jobs:9020/himalayas/jobs/api/search" }
 
 [board.config.fields]
 ref = "/guid"

@@ -305,6 +305,51 @@ pub struct KeySpec {
     pub url: Url,
 }
 
+/// How a board is asked for jobs naming a skill (`?tag=ruby`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SkillSearch {
+    /// The query parameter that takes the skill.
+    pub param: String,
+    /// What replaces the spaces of a skill (`-` when left out; `" "` for a
+    /// free-text keyword).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub separator: Option<String>,
+    /// A skill (lower case) the board spells differently
+    /// (`"ruby on rails" = "ruby"`).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub aliases: BTreeMap<String, String>,
+    /// A separate search address, when the board searches elsewhere than it
+    /// lists (Himalayas): one page of it is read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub endpoint: Option<Url>,
+}
+
+/// The most aliases a skill search names.
+pub const MAX_ALIASES: usize = 40;
+
+impl SkillSearch {
+    /// `skill` as this board spells it; `None` when nothing is left.
+    pub fn value_of(&self, skill: &str) -> Option<String> {
+        let lower = skill.trim().to_lowercase();
+        if let Some(alias) = self.aliases.get(&lower) {
+            return Some(alias.clone());
+        }
+        let separator = self.separator.as_deref().unwrap_or("-");
+        let value = lower
+            .split_whitespace()
+            .map(|word| {
+                word.chars()
+                    .filter(|c| c.is_alphanumeric() || matches!(c, '+' | '#' | '.' | '-'))
+                    .collect::<String>()
+            })
+            .filter(|word| !word.is_empty())
+            .collect::<Vec<_>>()
+            .join(separator);
+        (!value.is_empty() && value.chars().count() <= 60).then_some(value)
+    }
+}
+
 /// How to read a board. Validated ([`BoardConfig::validate`]) before it is
 /// saved; unknown keys are refused.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -372,6 +417,9 @@ pub struct BoardConfig {
     /// The board's API needs a key ([`KeySpec`]).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub key: Option<KeySpec>,
+    /// The board can be asked for jobs naming a skill ([`SkillSearch`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skill_search: Option<SkillSearch>,
 }
 
 /// The longest key parameter name, and the most parameters a key has.
@@ -406,6 +454,41 @@ impl BoardConfig {
     /// The least time between two requests to its host.
     pub fn spacing(&self) -> std::time::Duration {
         std::time::Duration::from_millis(self.min_interval_ms.unwrap_or(0).min(120_000))
+    }
+
+    /// The values to ask this board for, one query each: the person's top
+    /// skills as the board spells them, without repeats. None for a board
+    /// that cannot search by skill.
+    pub fn stack_queries(&self, skills: &[String]) -> Vec<String> {
+        let Some(search) = &self.skill_search else {
+            return Vec::new();
+        };
+        let mut values: Vec<String> = Vec::new();
+        for skill in crate::matching::top_skills(skills) {
+            if let Some(value) = search.value_of(skill)
+                && !values.contains(&value)
+            {
+                values.push(value);
+            }
+        }
+        values
+    }
+
+    /// The config of the extra read for the skill `value`: the same board,
+    /// the skill in the query, one page.
+    pub fn for_skill(&self, value: &str) -> Option<Self> {
+        let search = self.skill_search.as_ref()?;
+        let mut config = self.clone();
+        if let Some(endpoint) = &search.endpoint {
+            config.endpoint = Some(endpoint.clone());
+        }
+        config.query.insert(search.param.clone(), value.to_owned());
+        config.cursor = None;
+        config.page_param = None;
+        config.next = None;
+        config.max_pages = Some(1);
+        config.skill_search = None;
+        Some(config)
     }
 
     /// The URL a fetch starts at.
@@ -507,6 +590,33 @@ impl BoardConfig {
             }
             if self.fields.url.is_none() {
                 return Err("`fields.url` is required: where each job's link is".to_owned());
+            }
+        }
+        if let Some(search) = &self.skill_search {
+            if search.param.is_empty()
+                || search.param.len() > 50
+                || !search
+                    .param
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+            {
+                return Err("`skill_search.param` is a query parameter name".to_owned());
+            }
+            if search.aliases.len() > MAX_ALIASES
+                || search
+                    .aliases
+                    .iter()
+                    .any(|(k, v)| k.is_empty() || v.is_empty() || v.len() > 60 || k.len() > 60)
+            {
+                return Err(format!(
+                    "`skill_search.aliases` has up to {MAX_ALIASES} skills, each with a value"
+                ));
+            }
+            if search.endpoint.as_ref().is_some_and(|u| !web_url(u)) {
+                return Err("`skill_search.endpoint` must be an http(s) address".to_owned());
+            }
+            if kind != Kind::JsonApi {
+                return Err("`skill_search` is for a JSON API".to_owned());
             }
         }
         for (key, value) in &self.query {
@@ -1169,7 +1279,13 @@ pub struct ListedJob {
     pub engineering: bool,
     pub salary_eur_year: Option<f64>,
     pub posted_at: Option<DateTime<Utc>>,
+    /// The distinct words of its title and the start of its description
+    /// (to tell how well it fits someone's skills).
+    pub words: Vec<String>,
 }
+
+/// Most words kept per listed job.
+pub const LISTED_WORDS: usize = 400;
 
 /// Keep what `board` lists now (`sample`: a candidate's check), and forget
 /// what it listed more than 30 days ago.
@@ -1191,13 +1307,13 @@ pub async fn keep_listed(
         sqlx::query(
             "INSERT INTO sources.board_jobs
                 (board_id, source_ref, title, regions, engineering, salary_eur_year, posted_at,
-                 seen_at, sample)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                 seen_at, sample, words)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
              ON CONFLICT (board_id, source_ref) DO UPDATE
                 SET title = excluded.title, regions = excluded.regions,
                     engineering = excluded.engineering, salary_eur_year = excluded.salary_eur_year,
                     posted_at = excluded.posted_at, seen_at = excluded.seen_at,
-                    sample = excluded.sample",
+                    sample = excluded.sample, words = excluded.words",
         )
         .bind(board)
         .bind(job.source_ref.chars().take(500).collect::<String>())
@@ -1208,6 +1324,7 @@ pub async fn keep_listed(
         .bind(job.posted_at)
         .bind(now)
         .bind(sample)
+        .bind(&job.words)
         .execute(&mut *tx)
         .await?;
     }
@@ -1234,9 +1351,11 @@ pub async fn listed(db: &PgPool, since: DateTime<Utc>) -> Result<Vec<(Uuid, List
         engineering: bool,
         salary_eur_year: Option<f64>,
         posted_at: Option<DateTime<Utc>>,
+        words: Vec<String>,
     }
     let rows: Vec<Row> = sqlx::query_as(
-        "SELECT board_id, source_ref, title, regions, engineering, salary_eur_year, posted_at
+        "SELECT board_id, source_ref, title, regions, engineering, salary_eur_year, posted_at,
+                words
            FROM sources.board_jobs WHERE coalesce(posted_at, seen_at) >= $1",
     )
     .bind(since)
@@ -1254,6 +1373,7 @@ pub async fn listed(db: &PgPool, since: DateTime<Utc>) -> Result<Vec<(Uuid, List
                     engineering: r.engineering,
                     salary_eur_year: r.salary_eur_year,
                     posted_at: r.posted_at,
+                    words: r.words,
                 },
             )
         })
@@ -1263,6 +1383,69 @@ pub async fn listed(db: &PgPool, since: DateTime<Utc>) -> Result<Vec<(Uuid, List
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn skills_are_spelled_the_way_each_board_wants() {
+        let search = SkillSearch {
+            param: "tag".into(),
+            separator: None,
+            aliases: [("ruby on rails".to_owned(), "ruby".to_owned())].into(),
+            endpoint: None,
+        };
+        assert_eq!(search.value_of(" Ruby on Rails ").as_deref(), Some("ruby"));
+        assert_eq!(
+            search.value_of("Visual Basic").as_deref(),
+            Some("visual-basic")
+        );
+        assert_eq!(search.value_of("C++").as_deref(), Some("c++"));
+        assert_eq!(search.value_of("  ").as_deref(), None);
+        let spaced = SkillSearch {
+            separator: Some(" ".into()),
+            aliases: Default::default(),
+            ..search
+        };
+        assert_eq!(
+            spaced.value_of("Visual  Basic").as_deref(),
+            Some("visual basic")
+        );
+    }
+
+    #[test]
+    fn the_seed_list_asks_three_boards_for_skills_and_suggests_stack_boards_only_as_candidates() {
+        let boards = parse(SEED).unwrap();
+        let by = |slug: &str| boards.iter().find(|b| b.slug == slug).unwrap();
+        let skills: Vec<String> = ["Ruby on Rails", "React", "Ruby", "Rust"]
+            .map(String::from)
+            .into();
+        assert_eq!(
+            by("remoteok").config.stack_queries(&skills),
+            ["ruby", "react"]
+        );
+        assert_eq!(
+            by("jobicy").config.stack_queries(&skills),
+            ["rails", "react", "ruby"]
+        );
+        assert_eq!(by("himalayas").config.stack_queries(&skills).len(), 3);
+        let extra = by("himalayas").config.for_skill("react").unwrap();
+        assert_eq!(extra.query.get("q").map(String::as_str), Some("react"));
+        assert!(extra.cursor.is_none() && extra.max_pages == Some(1));
+        assert!(by("arbeitnow").config.stack_queries(&skills).is_empty());
+        assert!(by("jobicy").config.stack_queries(&[]).is_empty());
+        for slug in [
+            "python-org-jobs",
+            "larajobs",
+            "golangprojects",
+            "ruby-on-remote",
+            "javascript-jobs",
+        ] {
+            assert_eq!(by(slug).status, Status::Candidate, "{slug}");
+            assert!(
+                by(slug).blockers.is_empty(),
+                "{slug}: no unread fact is a blocker"
+            );
+        }
+        assert!(by("larajobs").config.validate(Kind::Rss).is_ok());
+    }
 
     #[test]
     fn the_seed_list_parses_with_the_first_boards() {

@@ -127,6 +127,14 @@ function PeekBody({ detail }: { detail: BoardDetail }) {
         <Property label={t("board.salary")} testId="board-salary">
           {salary.muted ? <Text tone="secondary">{salary.text}</Text> : <Text>{salary.text}</Text>}
         </Property>
+        {board.skills_fit === undefined || board.skills_fit === null ? null : (
+          <Property label={t("board.fit")} testId="board-fit">
+            {t("board.fitValue", {
+              share: String(Math.round(board.skills_fit.share * 100)),
+              jobs: String(board.skills_fit.jobs),
+            })}
+          </Property>
+        )}
         <Property label={t("board.priority")}>{t(`boards.priority.${board.priority}`)}</Property>
         <Property label={t("board.credit")} testId="board-attribution">
           {board.attribution}

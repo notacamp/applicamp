@@ -83,6 +83,14 @@ fn match_input(m: matching::Matching, now: DateTime<Utc>) -> MatchInput {
             }
             codes
         },
+        skills: m
+            .profile
+            .skills
+            .iter()
+            .map(|skill| skill.name.trim().to_owned())
+            .filter(|name| !name.is_empty())
+            .take(40)
+            .collect(),
         cash_floor: m.goals.cash_floor.as_ref().map(|floor| Floor {
             amount: f64::from(floor.amount),
             currency: floor.currency.clone(),

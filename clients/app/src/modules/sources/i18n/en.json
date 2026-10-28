@@ -91,6 +91,7 @@
     "lastError": "Last read failed: {{error}}",
     "lastFetch": "Read {{when}}: {{jobs}} jobs · {{matched}} matched this week",
     "totals": "{{label}}: {{read}} read · {{matched}} matched · AI {{cost}}",
+    "fit": "fits your skills {{share}}%",
     "suggest": {
       "label": "Suggest a board",
       "button": "Suggest",
@@ -120,6 +121,8 @@
     "close": "Close",
     "status": "Status",
     "salary": "Average salary",
+    "fitValue": "fits your skills {{share}}% ({{jobs}} jobs)",
+    "fit": "Fit with your skills",
     "priority": "Priority",
     "credit": "Credited as",
     "endpoint": "Read from",

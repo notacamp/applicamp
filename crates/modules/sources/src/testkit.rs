@@ -136,6 +136,14 @@ impl Fake {
         Arc::new(fake)
     }
 
+    /// This person, listing `skills` in this order.
+    pub(crate) fn with_skills(self: Arc<Self>, skills: &[&str]) -> Arc<Self> {
+        if let Some(input) = lock(&self.input).as_mut() {
+            input.skills = skills.iter().map(|s| (*s).to_owned()).collect();
+        }
+        self
+    }
+
     /// Someone in Lisbon who works remote only, in English and Portuguese,
     /// and would not move: the owner's goals when #19 was reported.
     pub(crate) fn lisbon_remote_only() -> Arc<Self> {
@@ -380,6 +388,12 @@ pub(crate) async fn seed_fake_boards(db: &PgPool, server: &MockServer, slugs: &[
                 let fake = format!("{}/{}{}", server.uri(), board.slug, endpoint.path());
                 board.config.endpoint = Some(fake.parse().unwrap());
             }
+            if let Some(search) = board.config.skill_search.as_mut()
+                && let Some(endpoint) = &search.endpoint
+            {
+                let fake = format!("{}/{}{}", server.uri(), board.slug, endpoint.path());
+                search.endpoint = Some(fake.parse().unwrap());
+            }
             board.config.min_interval_ms = None;
             board.status = job_boards::Status::Approved;
             board
@@ -405,6 +419,12 @@ pub(crate) async fn fake_job_boards() -> MockServer {
         .and(path("/himalayas/jobs/api"))
         .and(query_param("cursor", "Y3Vyc29yLXBhZ2UtMg"))
         .respond_with(json(HIMALAYAS_PAGE2))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/himalayas/jobs/api/search"))
+        .and(query_param_is_missing("page"))
+        .respond_with(json(HIMALAYAS))
         .mount(&server)
         .await;
     Mock::given(method("GET"))

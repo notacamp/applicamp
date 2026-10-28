@@ -310,6 +310,15 @@ export function salaryLine(
   }
 }
 
+/** "fits your skills 40%", or null when the person lists no skills or the board no jobs. */
+export function skillsFitLine(board: BoardSummary, t: TFunction<"sources">): string | null {
+  const fit = board.skills_fit;
+  if (fit === undefined || fit === null) {
+    return null;
+  }
+  return t("boards.fit", { share: String(Math.round(fit.share * 100)) });
+}
+
 /** A board's totals: "7 days: 120 read · 4 matched · €0.010". */
 export function totalsLine(
   totals: BoardSummary["totals_7d"],

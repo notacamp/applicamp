@@ -239,6 +239,7 @@ mod tests {
             engineering: is_engineering(title),
             salary_eur_year: salary,
             posted_at: None,
+            words: vec![],
         }
     }
 

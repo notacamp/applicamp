@@ -69,7 +69,21 @@
     "replace": "Replace",
     "merge": "Merge",
     "discard": "Discard",
-    "failed": "That didn’t work. Try again."
+    "failed": "That didn’t work. Try again.",
+    "empty": {
+      "title_one": "Not found in this file: {{count}} part",
+      "title_other": "Not found in this file: {{count}} parts",
+      "label": "No headline found in this file",
+      "summary": "No summary found in this file",
+      "work": "No positions found in this file",
+      "education": "No education found in this file",
+      "skills": "No skills found in this file",
+      "languages": "No languages found in this file",
+      "certificates": "No certifications found in this file",
+      "projects": "No projects found in this file",
+      "hint": "Add them by hand after you apply this, or import your LinkedIn data export, which carries skills, education and languages.",
+      "hintZip": "Add them by hand after you apply this."
+    }
   },
   "source": {
     "label": "Profile source",

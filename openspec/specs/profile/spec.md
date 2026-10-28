@@ -12,7 +12,10 @@ Agents use only what it says, and nothing in it is invented.
 The app SHALL turn a LinkedIn data export ZIP, a PDF (LinkedIn profile or CV)
 or pasted text into a draft profile that the person reviews, and SHALL save
 nothing to the profile until they choose Replace or Merge. Uploaded files
-SHALL NOT be stored.
+SHALL NOT be stored. A model-read draft SHALL ask for every section (headline,
+summary, positions, education, skills, languages, certifications, projects),
+SHALL never be saved from an answer the model cut off or that is unusable, and
+the review SHALL list the sections that came back empty.
 
 #### Scenario: A LinkedIn export
 - **WHEN** a signed-in person uploads their LinkedIn export ZIP
@@ -21,6 +24,18 @@ SHALL NOT be stored.
 #### Scenario: A CV as PDF
 - **WHEN** they upload a CV PDF with text
 - **THEN** a draft holds the structured CV and says how many details were left out because they did not appear in the file
+
+#### Scenario: A LinkedIn profile as PDF
+- **WHEN** they upload their LinkedIn profile saved as a two-column PDF with a headline, an About text, skills, education and languages
+- **THEN** the draft holds the headline, the summary, the skills, the education and the languages as well as the positions
+
+#### Scenario: An answer cut off
+- **WHEN** the model stops for length or answers something that is not the expected JSON, even after one more try
+- **THEN** the import fails with a message saying so and nothing is created
+
+#### Scenario: Parts that came back empty
+- **WHEN** a draft has no skills
+- **THEN** the review says "No skills found in this file" and suggests adding them by hand or importing the LinkedIn data export
 
 #### Scenario: A scanned PDF
 - **WHEN** the PDF has no extractable text

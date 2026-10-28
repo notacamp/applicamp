@@ -215,3 +215,36 @@ pub(crate) async fn fake_model(answer: &Value) -> MockServer {
         .await;
     server
 }
+
+/// A fake model answering the chat completions in turn: each reply is
+/// `(finish_reason, content)`; the last repeats once the script runs out.
+pub(crate) async fn scripted_model(script: Vec<(&'static str, String)>) -> MockServer {
+    struct Script {
+        replies: Vec<(&'static str, String)>,
+        next: std::sync::atomic::AtomicUsize,
+    }
+    impl wiremock::Respond for Script {
+        fn respond(&self, _: &wiremock::Request) -> ResponseTemplate {
+            let at = self.next.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let (finish, content) = &self.replies[at.min(self.replies.len() - 1)];
+            ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "model": "test/model",
+                "choices": [{
+                    "message": { "role": "assistant", "content": content },
+                    "finish_reason": finish,
+                }],
+                "usage": { "prompt_tokens": 900, "completion_tokens": 300 },
+            }))
+        }
+    }
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(Script {
+            replies: script,
+            next: std::sync::atomic::AtomicUsize::new(0),
+        })
+        .mount(&server)
+        .await;
+    server
+}

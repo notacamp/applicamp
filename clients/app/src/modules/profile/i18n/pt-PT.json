@@ -69,7 +69,21 @@
     "replace": "Substituir",
     "merge": "Juntar",
     "discard": "Descartar",
-    "failed": "Não resultou. Tente de novo."
+    "failed": "Não resultou. Tente de novo.",
+    "empty": {
+      "title_one": "Não encontrado neste ficheiro: {{count}} parte",
+      "title_other": "Não encontrado neste ficheiro: {{count}} partes",
+      "label": "Nenhum título profissional encontrado neste ficheiro",
+      "summary": "Nenhum resumo encontrado neste ficheiro",
+      "work": "Nenhuma posição encontrada neste ficheiro",
+      "education": "Nenhuma formação encontrada neste ficheiro",
+      "skills": "Nenhuma competência encontrada neste ficheiro",
+      "languages": "Nenhum idioma encontrado neste ficheiro",
+      "certificates": "Nenhuma certificação encontrada neste ficheiro",
+      "projects": "Nenhum projeto encontrado neste ficheiro",
+      "hint": "Adicione-os à mão depois de aplicar, ou importe a exportação de dados do LinkedIn, que inclui competências, formação e idiomas.",
+      "hintZip": "Adicione-os à mão depois de aplicar."
+    }
   },
   "source": {
     "label": "Origem do perfil",

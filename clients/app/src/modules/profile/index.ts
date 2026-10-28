@@ -15,3 +15,14 @@ export {
 export { useGoals, type Goals, type GoalsView } from "./api/goals";
 export { QUESTIONS, type Question } from "./api/questions";
 export { GoalInterview, type GoalInterviewProps } from "./components/GoalInterview/GoalInterview";
+export { parseAction, type Action, type StrengthItem, type StrengthView } from "./api/completion";
+export {
+  ImproveProfile,
+  type ImproveProfileProps,
+} from "./components/ImproveProfile/ImproveProfile";
+export { SkillsPanel, type SkillsPanelProps } from "./components/SkillsPanel/SkillsPanel";
+export {
+  StrengthNudge,
+  type NudgeAction,
+  type StrengthNudgeProps,
+} from "./components/StrengthNudge/StrengthNudge";

@@ -61,5 +61,10 @@
     "title": "Esta página no existe",
     "lead": "Puede que el enlace sea antiguo o que la dirección esté mal escrita.",
     "home": "Ir a Hoy"
+  },
+  "profileSkills": {
+    "eyebrow": "Perfil y objetivos",
+    "title": "Habilidades",
+    "lead": "Las habilidades con las que los agentes comparan las ofertas, en el orden en que cuentan, y las que mencionan tus propios puestos."
   }
 }

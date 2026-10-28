@@ -11,7 +11,11 @@ scanned on each board.
 ### Requirement: New job boards are found and approved by a person
 The app SHALL look for new job boards every week, check each one's robots
 rules, terms and machine-readable feed automatically, and SHALL NOT read a
-board's jobs until the owner approves it after seeing that check.
+board's jobs until the owner approves it after seeing that check. Only the
+owner SHALL decline a board: the app SHALL NOT decline one on the owner's
+behalf, and what its research found SHALL be shown as a note (an opinion) or
+as a blocker (a fact: terms that forbid automated reading, robots rules that
+disallow the job pages), never as a decline.
 
 #### Scenario: A board found by discovery
 - **WHEN** discovery finds a board with a public JSON feed and terms that mention automated access
@@ -20,6 +24,14 @@ board's jobs until the owner approves it after seeing that check.
 #### Scenario: A board whose robots rules forbid the feed
 - **WHEN** a candidate's robots.txt disallows its API path
 - **THEN** the check says so and the board cannot be approved without editing its config to an allowed path
+
+#### Scenario: A board the owner never declined is never shown as declined
+- **WHEN** a board was declined by the seed list rather than by the owner (Landing.jobs, The Muse, Wellfound, Dice)
+- **THEN** it waits for the owner as a candidate, with the research as its note, and the Declined section lists only boards the owner declined
+
+#### Scenario: Terms that forbid automated reading
+- **WHEN** a waiting board's terms forbid automated reading (Landing.jobs)
+- **THEN** its peek quotes the clause with a link to the terms, Approve stays disabled, and its site is not read by the checks at start
 
 ### Requirement: Boards are ranked by average salary
 The Boards page and the approval queue SHALL list boards by the average stated
@@ -44,3 +56,60 @@ board was skipped or failed.
 #### Scenario: After the nightly search
 - **WHEN** the nightly search has run
 - **THEN** the Scanned view lists it with each board's read, passed, scored and matched counts and its AI cost, and a board skipped for its polling limit says so
+
+### Requirement: Every waiting board can be approved or says why
+A board waiting for the owner SHALL either be approvable or show every
+reason it is not, in order, each with what exactly (the terms' sentence, the
+robots rule, the field, how to get a key): its terms forbid automated
+reading, its robots rules disallow it, it needs an API key, it has no feed
+address yet, its config does not read, it was not checked yet. A reason the
+client does not know SHALL still be shown, by its detail. Seeded boards
+waiting for the owner SHALL be checked at start once with their config (one
+request per path, robots respected), unless a fact forbids reading them.
+
+#### Scenario: A seeded board after its check
+- **WHEN** the server starts with SwissDevJobs waiting and never checked
+- **THEN** it is checked once with its own config, sample jobs appear, and Approve is enabled
+
+#### Scenario: A board with no feed address
+- **WHEN** a waiting board has no config that reads
+- **THEN** its peek says it has no feed address yet and that Check looks for one
+
+### Requirement: Boards that need an API key
+A board whose API needs a key SHALL say "Needs an API key from <board>:
+<how to get it>" with a link, and SHALL NOT be asked for jobs without it.
+Only a board owner SHALL set or remove the key; it SHALL be stored sealed
+with the instance secret, sent only as the parameters the config names to
+the host it was set for, and never returned to a client, logged, cached by
+address or kept in a report (the peek says only "Key set").
+
+#### Scenario: ITJobs.pt without a key
+- **WHEN** the owner opens ITJobs.pt
+- **THEN** it says it needs an API key from ITJobs.pt and how to get one, Approve is disabled, and its API was never asked
+
+#### Scenario: A key set
+- **WHEN** the owner pastes the key and checks the board again
+- **THEN** the peek says "Key set" without showing it, the check reads sample jobs with it, and Approve is enabled
+
+### Requirement: Errors show where you act
+Every action on a board (approve, pause, check, decline, save the config, set
+the key, use a proposal) SHALL show its error right beside its button, with
+the app's message and the server's own explanation. A config that does not
+read SHALL be refused naming the field and what is wrong.
+
+#### Scenario: A bad config edit
+- **WHEN** the owner saves a config whose `max_pages` is `"five"`
+- **THEN** the error beside Save names `max_pages` and says what is wrong
+
+### Requirement: The check proposes a config
+When a board has no usable config, its check SHALL probe the site's RSS
+links, `/api`, `/jobs/api`, `/feed`, `/rss` and JSON-LD postings through its
+sitemap (robots respected, one request per path), and SHALL propose what
+reads as an endpoint and a field mapping, shown as each field and where it is
+read from, with "Use this config". The raw JSON config SHALL stay available
+under "Advanced". A proposal SHALL apply by itself only to a discovered or
+suggested board nobody edited.
+
+#### Scenario: A site with an RSS link
+- **WHEN** a waiting board with no config has a homepage linking its RSS feed
+- **THEN** its check proposes that feed with title, link and description mapped, and "Use this config" makes it approvable

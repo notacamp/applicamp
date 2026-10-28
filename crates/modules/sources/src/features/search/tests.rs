@@ -11,7 +11,7 @@ use wiremock::{
 
 use crate::testkit::{
     Fake, Harness, answer_for, completion, config, exampleco, gateway, greenhouse_boards,
-    model_reading_facts, model_scoring, open_facts,
+    model_giving, model_reading_facts, model_scoring, open_facts,
 };
 
 async fn model_calls(model: &MockServer) -> usize {

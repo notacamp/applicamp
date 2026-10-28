@@ -401,9 +401,7 @@ pub fn claims(reason: &str) -> Vec<String> {
             .filter(|p| !p.is_empty())
             .enumerate()
         {
-            if tech::is_name(part) {
-                found.push(part.to_owned());
-            } else if part.chars().any(|c| c.is_ascii_digit()) {
+            if tech::is_name(part) || part.chars().any(|c| c.is_ascii_digit()) {
                 found.push(part.to_owned());
             } else if (position > 0 || inner > 0)
                 && part.chars().next().is_some_and(char::is_uppercase)

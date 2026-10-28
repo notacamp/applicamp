@@ -16,7 +16,7 @@
 #[cfg(test)]
 mod tests;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, hash_map::Entry};
 
 use applicamp_kernel::{JobContext, JobError, Result, jobs};
 use serde::{Deserialize, Serialize};
@@ -80,13 +80,16 @@ pub(crate) async fn reground(deps: &SourcesDeps, db: &PgPool) -> Result<Reground
         };
         after = last.opportunity;
         for item in page {
-            if !sources.contains_key(&item.account) {
-                let input = neighbours
-                    .matching_input(db, item.account, deps.clock.now())
-                    .await?;
-                sources.insert(item.account, input.as_ref().map(source_of));
-            }
-            let Some(Some(source)) = sources.get(&item.account) else {
+            let source = match sources.entry(item.account) {
+                Entry::Occupied(known) => known.into_mut(),
+                Entry::Vacant(slot) => {
+                    let input = neighbours
+                        .matching_input(db, item.account, deps.clock.now())
+                        .await?;
+                    slot.insert(input.as_ref().map(source_of))
+                }
+            };
+            let Some(source) = source else {
                 continue;
             };
             let (kept, dropped) = source.keep(item.why);

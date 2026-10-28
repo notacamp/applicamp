@@ -290,7 +290,7 @@ function Manage({ detail }: { detail: BoardDetail }) {
   const waiting = board.status === "candidate" || board.status === "paused";
   /** The error of `kind`, when it is the action that failed last. */
   const failed = (...kinds: BoardAction["kind"][]) =>
-    action.isError && action.variables !== undefined && kinds.includes(action.variables.kind);
+    action.isError && kinds.includes(action.variables.kind);
   const proposal = detail.report?.proposal ?? null;
   return (
     <Section title={t("board.manage.title")} testId="board-manage">

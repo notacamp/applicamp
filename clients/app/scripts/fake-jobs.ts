@@ -275,7 +275,7 @@ function waitingBoard(site: string, url: URL, response: ServerResponse): boolean
 const server = createServer((request, response) => {
   const url = new URL(request.url ?? "/", `http://${host}:${String(port)}`);
   const method = request.method ?? "GET";
-  const site = (request.headers.host ?? "").split(":")[0] ?? "";
+  const site = (request.headers.host ?? "").split(":", 1)[0] ?? "";
   if (method === "GET" && site.endsWith(".test") && waitingBoard(site, url, response)) {
     return;
   }

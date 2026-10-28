@@ -289,42 +289,7 @@ function Step({ view, question, kept, onKept, onLeave }: StepProps) {
           ) : null}
           {draft === null ? null : (
             <Tagged testId="improve-draft-block">
-              <Banner
-                icon="edit"
-                title={t("improve.draftTitle")}
-                action={
-                  <Cluster>
-                    <Button
-                      variant="primary"
-                      disabled={busy || draft.items.length === 0}
-                      data-testid="improve-keep"
-                      onClick={keep}
-                    >
-                      {t("improve.keep")}
-                    </Button>
-                    {canEdit && editing === null ? (
-                      <Button
-                        variant="secondary"
-                        disabled={busy || draft.items.length === 0}
-                        data-testid="improve-edit"
-                        onClick={() => {
-                          setEditing(draft.items.join("\n"));
-                        }}
-                      >
-                        {t("improve.edit")}
-                      </Button>
-                    ) : null}
-                    <Button
-                      variant="ghost"
-                      disabled={busy}
-                      data-testid="improve-discard"
-                      onClick={discard}
-                    >
-                      {t("improve.discard")}
-                    </Button>
-                  </Cluster>
-                }
-              >
+              <Banner icon="edit" title={t("improve.draftTitle")}>
                 <Stack gap="sm">
                   {editing === null ? (
                     draft.items.length === 0 ? (
@@ -355,6 +320,36 @@ function Step({ view, question, kept, onKept, onLeave }: StepProps) {
                       </Text>
                     </Tagged>
                   ) : null}
+                  <Cluster>
+                    <Button
+                      variant="primary"
+                      disabled={busy || draft.items.length === 0}
+                      data-testid="improve-keep"
+                      onClick={keep}
+                    >
+                      {t("improve.keep")}
+                    </Button>
+                    {canEdit && editing === null ? (
+                      <Button
+                        variant="secondary"
+                        disabled={busy || draft.items.length === 0}
+                        data-testid="improve-edit"
+                        onClick={() => {
+                          setEditing(draft.items.join("\n"));
+                        }}
+                      >
+                        {t("improve.edit")}
+                      </Button>
+                    ) : null}
+                    <Button
+                      variant="ghost"
+                      disabled={busy}
+                      data-testid="improve-discard"
+                      onClick={discard}
+                    >
+                      {t("improve.discard")}
+                    </Button>
+                  </Cluster>
                 </Stack>
               </Banner>
             </Tagged>

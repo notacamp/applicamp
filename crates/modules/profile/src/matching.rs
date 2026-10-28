@@ -11,7 +11,12 @@ use serde_json::{Value, json};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::{goals::Goals, schema::Profile};
+use crate::{
+    features::completion,
+    goals::Goals,
+    schema::Profile,
+    strength::{self, Strength},
+};
 
 /// Questions of the goals interview; one more (equity) when there is a cash
 /// floor.
@@ -39,9 +44,41 @@ impl StrengthHint {
     }
 }
 
+/// Where the person should go to make a weak profile stronger.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProfileAction {
+    /// The Improve flow: questions about the gaps.
+    Improve,
+    /// Skills found in their roles.
+    Skills,
+    /// Import a fuller profile.
+    Import,
+    /// Answer the goals.
+    Goals,
+}
+
+impl ProfileAction {
+    /// Lower-case name, as the API says it.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Improve => "improve",
+            Self::Skills => "skills",
+            Self::Import => "import",
+            Self::Goals => "goals",
+        }
+    }
+}
+
 /// How far a person is with their profile and goals.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Status {
+    /// How strong the profile is, 0 to 100 ([`crate::strength`]).
+    pub strength: u8,
+    /// Where to go to make it stronger; none once it is strong.
+    pub next_action: Option<ProfileAction>,
+    /// Open questions of the current gap review; none when there is no
+    /// review for the current profile (yet).
+    pub questions_left: Option<u32>,
     /// They have a profile with something in it.
     pub profile_done: bool,
     /// What would make it stronger.
@@ -148,19 +185,52 @@ async fn goals_of(db: &PgPool, account: Uuid) -> Result<Option<(Goals, i32)>> {
     Ok(row.map(|(goals, version)| (goals.0, version)))
 }
 
+/// Where a weak profile should go next: the questions when there are any,
+/// else the heaviest part that is missing.
+fn next_action(strength: &Strength, questions_left: Option<u32>) -> Option<ProfileAction> {
+    if strength.is_strong() {
+        return None;
+    }
+    if questions_left.is_some_and(|n| n > 0) {
+        return Some(ProfileAction::Improve);
+    }
+    let heaviest = strength
+        .items
+        .iter()
+        .filter(|item| item.state != strength::State::Ok)
+        .max_by_key(|item| item.key.weight() - item.earned)?;
+    Some(match heaviest.key {
+        strength::Key::Skills => ProfileAction::Skills,
+        strength::Key::Positions => ProfileAction::Import,
+        strength::Key::Goals => ProfileAction::Goals,
+        _ => ProfileAction::Improve,
+    })
+}
+
 /// How far `account` is.
 pub async fn status(db: &PgPool, account: Uuid) -> Result<Status> {
-    let profile = profile_of(db, account)
-        .await?
-        .map(|(p, _)| p)
+    let current = completion::current(db, account).await?;
+    let profile = current
+        .as_ref()
+        .map(|c| &c.profile)
         .filter(|p| !p.is_empty());
-    let (goals_answered, goals_total) = goals_of(db, account)
-        .await?
-        .map_or((0, GOAL_QUESTIONS), |(goals, _)| answered(&goals));
+    let goals = current.as_ref().map(|c| &c.goals);
+    let (goals_answered, goals_total) = goals.map_or((0, GOAL_QUESTIONS), answered);
+    let strength = strength::compute(
+        profile.unwrap_or(&Profile::default()),
+        goals.unwrap_or(&Goals::default()),
+    );
+    let questions_left = match (&current, profile) {
+        (Some(current), Some(_)) => completion::questions_left(db, account, current).await?,
+        _ => None,
+    };
     Ok(Status {
+        strength: strength.score,
+        next_action: profile.and_then(|_| next_action(&strength, questions_left)),
+        questions_left,
         profile_done: profile.is_some(),
-        strength_hint: profile.as_ref().and_then(strength_hint),
-        no_skills: profile.as_ref().is_some_and(no_stack),
+        strength_hint: profile.and_then(strength_hint),
+        no_skills: profile.is_some_and(no_stack),
         goals_answered,
         goals_total,
     })

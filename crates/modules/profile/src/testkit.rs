@@ -34,6 +34,7 @@ pub(crate) struct Harness {
     app: Router,
     pub(crate) db: PgPool,
     pub(crate) account: Uuid,
+    ai: Option<Gateway>,
 }
 
 /// One part of a `multipart/form-data` body.
@@ -76,14 +77,9 @@ fn multipart(parts: &[Part<'_>]) -> Vec<u8> {
 }
 
 /// The module's background work, alone.
-pub(crate) fn registry() -> Arc<Registry> {
-    Arc::new(
-        Registry::build(vec![(
-            crate::NAME,
-            module(ProfileDeps::default()).background,
-        )])
-        .unwrap(),
-    )
+/// The module's background work, with `ai` composed in.
+pub(crate) fn registry_with(ai: Option<Gateway>) -> Arc<Registry> {
+    Arc::new(Registry::build(vec![(crate::NAME, module(ProfileDeps { ai }).background)]).unwrap())
 }
 
 impl Harness {
@@ -94,14 +90,16 @@ impl Harness {
 
     /// Signed in as `account`.
     pub(crate) fn as_account(db: PgPool, ai: Option<Gateway>, account: Uuid) -> Self {
-        let events = EventBus::new(registry());
+        let events = EventBus::new(registry_with(ai.clone()));
         let state = AppState::new(
             db.clone(),
             Config::for_database("postgres://unused"),
             SecretKey::from_bytes([7; 32]),
         )
         .with_events(events);
-        let (router, _) = module(ProfileDeps { ai }).router.split_for_parts();
+        let (router, _) = module(ProfileDeps { ai: ai.clone() })
+            .router
+            .split_for_parts();
         let principal = Principal {
             account_id: account,
             session_id: Uuid::now_v7(),
@@ -114,7 +112,12 @@ impl Harness {
                 },
             ))
             .with_state(state);
-        Self { app, db, account }
+        Self {
+            app,
+            db,
+            account,
+            ai,
+        }
     }
 
     pub(crate) async fn send(&self, request: Request<Body>) -> (StatusCode, Value) {
@@ -165,7 +168,7 @@ impl Harness {
 
     /// Run every job that is due.
     pub(crate) async fn work(&self) {
-        let registry = registry();
+        let registry = registry_with(self.ai.clone());
         let worker = Worker::new(
             self.db.clone(),
             Arc::clone(&registry),

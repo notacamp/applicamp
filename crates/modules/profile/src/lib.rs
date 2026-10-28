@@ -14,6 +14,11 @@
 //! - **Matching** ([`matching`]): how far a person is, and what a job search
 //!   matches against, for the ports the server wires to other modules.
 //!
+//! - **Completion** ([`features::completion`]): how strong the profile is
+//!   ([`strength`]), the AI's questions about its gaps, drafts from the
+//!   person's answers (checked against their own words) and skills found
+//!   in their positions.
+//!
 //! Publishes `profile.updated` (ids only) whenever a profile changes and
 //! `profile.goals_updated` (id and version) whenever the goals do.
 
@@ -24,6 +29,7 @@ pub mod features;
 pub mod goals;
 pub mod matching;
 pub mod schema;
+pub mod strength;
 
 use applicamp_ai::Gateway;
 use applicamp_kernel::{Module, jobs::Background};
@@ -45,7 +51,7 @@ pub struct ProfileDeps {
 
 /// The profile module, composed with `deps`.
 pub fn module(deps: ProfileDeps) -> Module {
-    use features::{goals, imports, profile};
+    use features::{completion, goals, imports, profile};
     // Uploads take up to a 20 MB export; every other route keeps axum's
     // default body limit.
     let uploads = OpenApiRouter::new()
@@ -54,16 +60,28 @@ pub fn module(deps: ProfileDeps) -> Module {
     let router = OpenApiRouter::new()
         .routes(routes!(profile::get, profile::update))
         .routes(routes!(goals::get, goals::update))
+        .routes(routes!(completion::get_strength))
+        .routes(routes!(completion::get_questions))
+        .routes(routes!(completion::review_again))
+        .routes(routes!(completion::skip_question))
+        .routes(routes!(completion::draft::create_draft))
+        .routes(routes!(completion::draft::keep_draft))
+        .routes(routes!(completion::draft::discard_draft))
+        .routes(routes!(completion::skills::suggested_skills))
+        .routes(routes!(completion::skills::add_skill))
+        .routes(routes!(completion::skills::dismiss_skill))
+        .routes(routes!(completion::skills::order_skills))
         .routes(routes!(imports::get))
         .routes(routes!(imports::apply))
         .routes(routes!(imports::discard))
         .merge(uploads)
-        .layer(Extension(Ai(deps.ai)));
+        .layer(Extension(Ai(deps.ai.clone())));
     Module {
         name: NAME,
         router,
         background: Background::new()
             .job::<imports::ExpireImports>()
+            .job_with::<completion::review::GapReview, _>(Ai(deps.ai.clone()))
             .publishes::<events::ProfileUpdated>()
             .publishes::<events::GoalsUpdated>(),
     }
@@ -88,6 +106,9 @@ mod tests {
             module(ProfileDeps::default()).background,
         )])
         .unwrap();
-        assert_eq!(registry.kinds(), ["profile.expire_imports"]);
+        assert_eq!(
+            registry.kinds(),
+            ["profile.expire_imports", "profile.gap_review"]
+        );
     }
 }

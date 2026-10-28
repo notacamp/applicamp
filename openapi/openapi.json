@@ -1360,6 +1360,157 @@
         ]
       }
     },
+    "/api/v1/profile/drafts/{id}/discard": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Throw a draft away.",
+        "description": "The profile is unchanged. Discarding twice is fine; a kept draft cannot\nbe discarded.",
+        "operationId": "profile.discard_draft",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The draft.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Discarded."
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`draft_not_ready`: already kept",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/drafts/{id}/keep": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Keep a draft.",
+        "description": "Writes it into the profile as a new profile version whose source is\n`answer`, and marks the question done. `items` may be edited first.\nRefused with 409 `profile_changed` when the profile changed since the\ndraft was made.",
+        "operationId": "profile.keep_draft",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The draft.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeepRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The profile, now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_items`; `invalid_profile`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`draft_not_ready`: already kept or discarded; `profile_changed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/v1/profile/imports": {
       "post": {
         "tags": [
@@ -1621,6 +1772,506 @@
           },
           "409": {
             "description": "`import_not_ready`: already applied",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/questions": {
+      "get": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "The questions that would make the profile stronger.",
+        "description": "The first request for a profile and goals version starts the AI review in\nthe background (one model call) and answers 202 `running`; ask again in a\nmoment. The review is kept until the profile or goals change by any other\nway than the person's own kept answers. Without a model, or over a\nspending limit, the status says so (`unavailable`, `failed`) and the\nchecklist from `GET /api/v1/profile/strength` still works.",
+        "operationId": "profile.questions",
+        "responses": {
+          "200": {
+            "description": "The questions (or why there are none).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionsView"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "The review is running.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionsView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/questions/review": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Try the review again after it failed.",
+        "description": "Only a failed review is started again, and the spending limits still\napply: over one, it fails again at once without calling the model.",
+        "operationId": "profile.review_again",
+        "responses": {
+          "200": {
+            "description": "The questions (or why there are none).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionsView"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "The review is running.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionsView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/questions/{id}/draft": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Make a draft from an answer.",
+        "description": "One small model call. The draft may say only what the answer or the\nprofile says: a line with a number, a name or a tool that neither\ncontains is left out and counted in `dropped`. Nothing is saved until the\ndraft is kept. Asking again for the same question replaces the draft.",
+        "operationId": "profile.draft_answer",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The question.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The draft.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_answer`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such open question",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/questions/{id}/skip": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Skip a question.",
+        "description": "It is not asked again for this version of the profile.",
+        "operationId": "profile.skip_question",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The question.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Skipped."
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/skills/order": {
+      "put": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Put the skills in a new order.",
+        "description": "The first three skills drive the job board searches. `names` must be\nthe profile's skills exactly, each once; nothing is added or removed.",
+        "operationId": "profile.order_skills",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillOrder"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The profile, with its skills in order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_order`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/skills/suggested": {
+      "get": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Skills found in the roles.",
+        "description": "Skills that the person's own position descriptions mention but their\nskills list does not, with the number of positions each is in. Each\nname is checked against the text of the positions (whole words), so\nnothing is suggested that the profile does not say. Uses the same\nreview as the questions; 202 while it runs.",
+        "operationId": "profile.suggested_skills",
+        "responses": {
+          "200": {
+            "description": "The skills.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestedSkills"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "The review is running.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestedSkills"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/skills/suggested/{name}/add": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Add a suggested skill to the profile.",
+        "description": "It goes at the end of the skills, in the order the person adds them.",
+        "operationId": "profile.add_suggested_skill",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "The skill, as suggested.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The skills still suggested.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestedSkills"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_profile`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: not a suggestion",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/skills/suggested/{name}/dismiss": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Say a suggested skill is not theirs.",
+        "description": "It is not suggested again, whatever the profile says later.",
+        "operationId": "profile.dismiss_suggested_skill",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "The skill, as suggested.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The skills still suggested.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestedSkills"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: not a suggestion",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/strength": {
+      "get": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "The strength of the signed-in person's profile.",
+        "description": "Computed from the profile and goals, never by a model. Each part that is\nnot full says what to do about it. Reading it never starts a review.",
+        "operationId": "profile.strength",
+        "responses": {
+          "200": {
+            "description": "The strength.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrengthView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2930,6 +3581,86 @@
         },
         "additionalProperties": false
       },
+      "DraftKind": {
+        "type": "string",
+        "description": "What a draft is, and where keeping it writes.",
+        "enum": [
+          "highlights",
+          "label",
+          "summary",
+          "education",
+          "link"
+        ]
+      },
+      "DraftRequest": {
+        "type": "object",
+        "description": "The answer to turn into a draft.",
+        "required": [
+          "answer"
+        ],
+        "properties": {
+          "answer": {
+            "type": "string",
+            "description": "In the person's own words, 1 to 2000 characters."
+          }
+        }
+      },
+      "DraftView": {
+        "type": "object",
+        "description": "A draft, waiting to be kept, edited or discarded.",
+        "required": [
+          "id",
+          "question_id",
+          "kind",
+          "items",
+          "dropped",
+          "expires_at"
+        ],
+        "properties": {
+          "dropped": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Lines left out because they said something the answer and the profile\ndo not (or did not fit).",
+            "minimum": 0
+          },
+          "education": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Education",
+                "description": "The school, for `education`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the draft is deleted if it is not kept."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The draft."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The lines of the draft: achievements, the headline, the summary, the\nlinks; for a school, one line saying it."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/DraftKind",
+            "description": "What it is."
+          },
+          "question_id": {
+            "type": "string",
+            "description": "The question it answers."
+          }
+        }
+      },
       "Education": {
         "type": "object",
         "description": "A school or degree.",
@@ -3283,6 +4014,48 @@
           "remote",
           "hybrid",
           "onsite"
+        ]
+      },
+      "KeepRequest": {
+        "type": "object",
+        "description": "What the person keeps: the draft as it is, or edited.",
+        "properties": {
+          "education": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Education",
+                "description": "The school, possibly edited, for an `education` draft."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "items": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "The lines, possibly edited; the draft's own when left out. Edited\nlines are the person's own words and skip the source check."
+          }
+        }
+      },
+      "Key": {
+        "type": "string",
+        "description": "What the score is made of.",
+        "enum": [
+          "headline",
+          "summary",
+          "achievements",
+          "skills",
+          "education",
+          "languages",
+          "links",
+          "positions",
+          "goals"
         ]
       },
       "Language": {
@@ -3971,6 +4744,16 @@
         },
         "additionalProperties": false
       },
+      "ProfileAction": {
+        "type": "string",
+        "description": "Where to go to make the profile stronger.",
+        "enum": [
+          "improve",
+          "skills",
+          "import",
+          "goals"
+        ]
+      },
       "ProfileSource": {
         "type": "string",
         "description": "Where the profile came from last.",
@@ -3978,7 +4761,8 @@
           "linkedin_zip",
           "pdf",
           "text",
-          "manual"
+          "manual",
+          "answer"
         ]
       },
       "ProfileView": {
@@ -4087,6 +4871,101 @@
           }
         }
       },
+      "Question": {
+        "type": "object",
+        "description": "A question about a gap in the profile.",
+        "required": [
+          "id",
+          "section",
+          "question",
+          "why",
+          "expected_gain"
+        ],
+        "properties": {
+          "context": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RoleContext",
+                "description": "The position it is about, for `work`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expected_gain": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Points the profile strength would gain if it were answered.",
+            "minimum": 0
+          },
+          "id": {
+            "type": "string",
+            "description": "The question's id."
+          },
+          "question": {
+            "type": "string",
+            "description": "The question, at most 160 characters."
+          },
+          "section": {
+            "$ref": "#/components/schemas/Section",
+            "description": "What it is about."
+          },
+          "why": {
+            "type": "string",
+            "description": "Why it matters, at most 140 characters."
+          }
+        }
+      },
+      "QuestionsView": {
+        "type": "object",
+        "description": "The questions that would fill the profile's gaps.",
+        "required": [
+          "status",
+          "score",
+          "total",
+          "answered",
+          "questions"
+        ],
+        "properties": {
+          "answered": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Questions kept or skipped so far.",
+            "minimum": 0
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Question"
+            },
+            "description": "The questions still open, the most useful first."
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why it is unavailable or failed: `ai_unavailable`,\n`ai_budget_reached`, `ai_daily_limit_reached`, `ai_failed`; none when\nthere is simply no profile."
+          },
+          "score": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The profile strength now.",
+            "minimum": 0
+          },
+          "status": {
+            "$ref": "#/components/schemas/ReviewStatus",
+            "description": "Where the review is."
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Questions in the review.",
+            "minimum": 0
+          }
+        }
+      },
       "RankingBasis": {
         "type": "string",
         "description": "What a board's place in the order rests on.",
@@ -4105,6 +4984,16 @@
           "within_country",
           "within_eu",
           "anywhere"
+        ]
+      },
+      "ReviewStatus": {
+        "type": "string",
+        "description": "Where the review is.",
+        "enum": [
+          "running",
+          "ready",
+          "unavailable",
+          "failed"
         ]
       },
       "RobotsReport": {
@@ -4173,6 +5062,40 @@
           },
           "pattern": {
             "type": "string"
+          }
+        }
+      },
+      "RoleContext": {
+        "type": "object",
+        "description": "The position a question is about.",
+        "properties": {
+          "company": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its company."
+          },
+          "end_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "As `start_date`; none while it is their current position."
+          },
+          "position": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its title."
+          },
+          "start_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`YYYY`, `YYYY-MM` or `YYYY-MM-DD`."
           }
         }
       },
@@ -4516,6 +5439,17 @@
           "nightly"
         ]
       },
+      "Section": {
+        "type": "string",
+        "description": "What a question is about, and where its answer goes.",
+        "enum": [
+          "work",
+          "basics.label",
+          "basics.summary",
+          "education",
+          "links"
+        ]
+      },
       "Seniority": {
         "type": "string",
         "description": "Which levels fit.",
@@ -4551,6 +5485,22 @@
           }
         },
         "additionalProperties": false
+      },
+      "SkillOrder": {
+        "type": "object",
+        "description": "The skills in the order the person wants them.",
+        "required": [
+          "names"
+        ],
+        "properties": {
+          "names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Every skill name, once, in the new order."
+          }
+        }
       },
       "SkillsFit": {
         "type": "object",
@@ -4607,6 +5557,15 @@
           }
         }
       },
+      "State": {
+        "type": "string",
+        "description": "Where a part is.",
+        "enum": [
+          "ok",
+          "partial",
+          "missing"
+        ]
+      },
       "StrengthHint": {
         "type": "string",
         "description": "What would make the profile stronger.",
@@ -4616,12 +5575,160 @@
           "add_skills"
         ]
       },
+      "StrengthItem": {
+        "type": "object",
+        "description": "One part of the score.",
+        "required": [
+          "key",
+          "state",
+          "earned",
+          "weight",
+          "have",
+          "of"
+        ],
+        "properties": {
+          "action": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What to do about it, when it is not full: `question:<id>` (an open\nquestion about it), `skills`, `import`, `goals`, or\n`edit:<section>` (`basics`, `work`, `education`, `languages`)."
+          },
+          "earned": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Points earned.",
+            "minimum": 0
+          },
+          "have": {
+            "type": "integer",
+            "format": "int32",
+            "description": "What there is: skills listed, recent roles with results, positions…",
+            "minimum": 0
+          },
+          "key": {
+            "$ref": "#/components/schemas/Key",
+            "description": "Which part."
+          },
+          "of": {
+            "type": "integer",
+            "format": "int32",
+            "description": "What there should be for the full weight; 0 when it is a yes or no.",
+            "minimum": 0
+          },
+          "state": {
+            "$ref": "#/components/schemas/State",
+            "description": "Where it is."
+          },
+          "weight": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Points it is worth.",
+            "minimum": 0
+          }
+        }
+      },
+      "StrengthView": {
+        "type": "object",
+        "description": "How strong the profile is.",
+        "required": [
+          "score",
+          "strong",
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StrengthItem"
+            },
+            "description": "The parts, in checklist order."
+          },
+          "questions_left": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Open questions of the review for the current profile; none when\nthere is no review (yet).",
+            "minimum": 0
+          },
+          "score": {
+            "type": "integer",
+            "format": "int32",
+            "description": "0 to 100.",
+            "minimum": 0
+          },
+          "strong": {
+            "type": "boolean",
+            "description": "At least 80."
+          },
+          "suggested_skills": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Skills the positions mention that the profile does not list; none\nwhen there is no review (yet).",
+            "minimum": 0
+          }
+        }
+      },
+      "SuggestedSkill": {
+        "type": "object",
+        "description": "A skill the person's positions mention and their skills list does not.",
+        "required": [
+          "name",
+          "roles"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The skill, as the positions write it."
+          },
+          "roles": {
+            "type": "integer",
+            "format": "int32",
+            "description": "In how many positions it appears.",
+            "minimum": 0
+          }
+        }
+      },
+      "SuggestedSkills": {
+        "type": "object",
+        "description": "Skills found in the person's roles.",
+        "required": [
+          "status",
+          "skills"
+        ],
+        "properties": {
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why there are none: `ai_unavailable`, `ai_budget_reached`,\n`ai_daily_limit_reached` or `ai_failed`."
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SuggestedSkill"
+            },
+            "description": "The skills, the most roles first."
+          },
+          "status": {
+            "$ref": "#/components/schemas/ReviewStatus",
+            "description": "Where the review is (the same review as the questions')."
+          }
+        }
+      },
       "Today": {
         "type": "object",
         "description": "Where the person is.",
         "required": [
           "profile",
           "goals",
+          "profile_strength",
           "new_matches",
           "next_step"
         ],
@@ -4646,11 +5753,37 @@
             "description": "Found opportunities never opened (hidden ones not counted).",
             "minimum": 0
           },
+          "next_profile_action": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProfileAction",
+                "description": "Where to go to make it stronger; none once it is strong or while\nthere is no profile."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "next_step": {
             "$ref": "#/components/schemas/NextStep"
           },
           "profile": {
             "$ref": "#/components/schemas/TodayProfile"
+          },
+          "profile_questions": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Questions that would make it stronger, when the AI has read it.",
+            "minimum": 0
+          },
+          "profile_strength": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How strong the profile is, 0 to 100 (80 or more is strong).",
+            "minimum": 0
           }
         }
       },

@@ -197,12 +197,12 @@ fn next_action(strength: &Strength, questions_left: Option<u32>) -> Option<Profi
     let heaviest = strength
         .items
         .iter()
-        .filter(|item| item.state != strength::State::Ok)
+        .filter(|item| item.state != strength::StrengthState::Ok)
         .max_by_key(|item| item.key.weight() - item.earned)?;
     Some(match heaviest.key {
-        strength::Key::Skills => ProfileAction::Skills,
-        strength::Key::Positions => ProfileAction::Import,
-        strength::Key::Goals => ProfileAction::Goals,
+        strength::StrengthKey::Skills => ProfileAction::Skills,
+        strength::StrengthKey::Positions => ProfileAction::Import,
+        strength::StrengthKey::Goals => ProfileAction::Goals,
         _ => ProfileAction::Improve,
     })
 }

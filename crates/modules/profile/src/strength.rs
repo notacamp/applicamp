@@ -22,7 +22,7 @@ pub const FULL_SKILLS: usize = 5;
 /// What the score is made of.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum Key {
+pub enum StrengthKey {
     Headline,
     Summary,
     Achievements,
@@ -34,7 +34,7 @@ pub enum Key {
     Goals,
 }
 
-impl Key {
+impl StrengthKey {
     /// Every part, in the order the checklist shows them.
     pub const ALL: [Self; 9] = [
         Self::Headline,
@@ -66,7 +66,7 @@ impl Key {
 /// Where a part is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum State {
+pub enum StrengthState {
     /// Full weight.
     Ok,
     /// Some of the weight.
@@ -79,10 +79,10 @@ pub enum State {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Item {
     /// Which part.
-    pub key: Key,
+    pub key: StrengthKey,
     /// Where it is.
-    pub state: State,
-    /// Points earned, out of [`Key::weight`].
+    pub state: StrengthState,
+    /// Points earned, out of [`StrengthKey::weight`].
     pub earned: u32,
     /// What there is: skills listed, roles with results, positions…
     pub have: u32,
@@ -106,7 +106,7 @@ impl Strength {
     }
 
     /// The part `key`.
-    pub fn item(&self, key: Key) -> Option<&Item> {
+    pub fn item(&self, key: StrengthKey) -> Option<&Item> {
         self.items.iter().find(|item| item.key == key)
     }
 }
@@ -133,13 +133,13 @@ fn role_points(highlights: &[String]) -> u32 {
     }
 }
 
-fn item(key: Key, earned: u32, have: u32, of: u32) -> Item {
+fn item(key: StrengthKey, earned: u32, have: u32, of: u32) -> Item {
     let state = if earned >= key.weight() {
-        State::Ok
+        StrengthState::Ok
     } else if earned == 0 {
-        State::Missing
+        StrengthState::Missing
     } else {
-        State::Partial
+        StrengthState::Partial
     };
     Item {
         key,
@@ -150,7 +150,7 @@ fn item(key: Key, earned: u32, have: u32, of: u32) -> Item {
     }
 }
 
-fn yes(key: Key, there: bool) -> Item {
+fn yes(key: StrengthKey, there: bool) -> Item {
     item(
         key,
         if there { key.weight() } else { 0 },
@@ -172,7 +172,7 @@ pub fn compute(profile: &Profile, goals: &Goals) -> Strength {
         0
     } else {
         let points: u32 = recent.iter().map(|w| role_points(&w.highlights)).sum();
-        (points * Key::Achievements.weight()).div_ceil(8 * count(recent.len()))
+        (points * StrengthKey::Achievements.weight()).div_ceil(8 * count(recent.len()))
     };
     let with_results = count(
         recent
@@ -195,30 +195,41 @@ pub fn compute(profile: &Profile, goals: &Goals) -> Strength {
     };
     let (answered, total) = matching::answered(goals);
     let items = vec![
-        yes(Key::Headline, present(profile.basics.label.as_deref())),
-        yes(Key::Summary, present(profile.basics.summary.as_deref())),
+        yes(
+            StrengthKey::Headline,
+            present(profile.basics.label.as_deref()),
+        ),
+        yes(
+            StrengthKey::Summary,
+            present(profile.basics.summary.as_deref()),
+        ),
         item(
-            Key::Achievements,
+            StrengthKey::Achievements,
             achievements,
             with_results,
             count(recent.len()),
         ),
         item(
-            Key::Skills,
-            (skills.min(count(FULL_SKILLS)) * Key::Skills.weight()) / count(FULL_SKILLS),
+            StrengthKey::Skills,
+            (skills.min(count(FULL_SKILLS)) * StrengthKey::Skills.weight()) / count(FULL_SKILLS),
             skills,
             count(FULL_SKILLS),
         ),
-        yes(Key::Education, !profile.education.is_empty()),
-        yes(Key::Languages, !profile.languages.is_empty()),
+        yes(StrengthKey::Education, !profile.education.is_empty()),
+        yes(StrengthKey::Languages, !profile.languages.is_empty()),
         yes(
-            Key::Links,
+            StrengthKey::Links,
             !profile.basics.profiles.is_empty() || present(profile.basics.url.as_deref()),
         ),
-        item(Key::Positions, positions, count(profile.work.len()), 3),
         item(
-            Key::Goals,
-            (answered * Key::Goals.weight()) / total.max(1),
+            StrengthKey::Positions,
+            positions,
+            count(profile.work.len()),
+            3,
+        ),
+        item(
+            StrengthKey::Goals,
+            (answered * StrengthKey::Goals.weight()) / total.max(1),
             answered,
             total,
         ),
@@ -255,14 +266,22 @@ mod tests {
 
     #[test]
     fn the_weights_add_up_to_one_hundred() {
-        assert_eq!(Key::ALL.iter().map(|k| k.weight()).sum::<u32>(), 100);
+        assert_eq!(
+            StrengthKey::ALL.iter().map(|k| k.weight()).sum::<u32>(),
+            100
+        );
     }
 
     #[test]
     fn an_empty_profile_scores_nothing() {
         let strength = compute(&Profile::default(), &Goals::default());
         assert_eq!(strength.score, 0);
-        assert!(strength.items.iter().all(|i| i.state == State::Missing));
+        assert!(
+            strength
+                .items
+                .iter()
+                .all(|i| i.state == StrengthState::Missing)
+        );
         assert!(!strength.is_strong());
     }
 
@@ -317,7 +336,7 @@ mod tests {
         };
         let of = |profile: &Profile| {
             compute(profile, &Goals::default())
-                .item(Key::Achievements)
+                .item(StrengthKey::Achievements)
                 .copied()
                 .unwrap()
         };
@@ -329,14 +348,14 @@ mod tests {
             (6, 1, 3),
             "6 of 8 of a third"
         );
-        assert_eq!(one.state, State::Partial);
+        assert_eq!(one.state, StrengthState::Partial);
         profile.work[0].highlights = vec!["Cut runs from 6 hours to 40 minutes".into()];
         assert_eq!(of(&profile).earned, 8, "a number is worth 2 more");
         for work in &mut profile.work[..3] {
             work.highlights = vec!["Cut runs by 40%".into()];
         }
         let full = of(&profile);
-        assert_eq!((full.earned, full.state), (24, State::Ok));
+        assert_eq!((full.earned, full.state), (24, StrengthState::Ok));
     }
 
     #[test]
@@ -346,7 +365,7 @@ mod tests {
             ..Profile::default()
         };
         let item = *compute(&profile, &Goals::default())
-            .item(Key::Achievements)
+            .item(StrengthKey::Achievements)
             .unwrap();
         assert_eq!(item.earned, 24);
     }

@@ -18,7 +18,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use super::{
-    Section, StoredQuestion, carry_forward, check::Evidence, current, stored, write_profile,
+    QuestionSection, StoredQuestion, carry_forward, check::Evidence, current, stored, write_profile,
 };
 use crate::{
     features::{
@@ -62,13 +62,13 @@ pub enum DraftKind {
 }
 
 impl DraftKind {
-    const fn of(section: Section) -> Self {
+    const fn of(section: QuestionSection) -> Self {
         match section {
-            Section::Work => Self::Highlights,
-            Section::BasicsLabel => Self::Label,
-            Section::BasicsSummary => Self::Summary,
-            Section::Education => Self::Education,
-            Section::Links => Self::Link,
+            QuestionSection::Work => Self::Highlights,
+            QuestionSection::BasicsLabel => Self::Label,
+            QuestionSection::BasicsSummary => Self::Summary,
+            QuestionSection::Education => Self::Education,
+            QuestionSection::Links => Self::Link,
         }
     }
 

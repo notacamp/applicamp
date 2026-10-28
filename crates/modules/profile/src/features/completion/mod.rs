@@ -30,12 +30,12 @@ use crate::{
     features::imports::Ai,
     goals::Goals,
     schema::{Education, Link, Profile},
-    strength::{self, Key, State as PartState},
+    strength::{self, StrengthKey, StrengthState as PartState},
 };
 
 /// What a question is about, and where its answer goes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub enum Section {
+pub enum QuestionSection {
     /// A position: its answer becomes achievements of that position.
     #[serde(rename = "work")]
     Work,
@@ -53,7 +53,7 @@ pub enum Section {
     Links,
 }
 
-impl Section {
+impl QuestionSection {
     fn parse(raw: &str) -> Option<Self> {
         match raw {
             "work" => Some(Self::Work),
@@ -70,7 +70,7 @@ impl Section {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct StoredQuestion {
     pub(crate) id: String,
-    pub(crate) section: Section,
+    pub(crate) section: QuestionSection,
     pub(crate) role_ref: Option<u32>,
     pub(crate) question: String,
     pub(crate) why: String,
@@ -118,7 +118,7 @@ pub(crate) async fn current(db: &PgPool, account: Uuid) -> Result<Option<Current
 /// The score `section`'s question would add if the person answered it: the
 /// strength with a result added to the position, or the section filled.
 pub(crate) fn gain_of(
-    section: Section,
+    section: QuestionSection,
     role_ref: Option<u32>,
     profile: &Profile,
     goals: &Goals,
@@ -126,7 +126,7 @@ pub(crate) fn gain_of(
     let before = strength::compute(profile, goals).score;
     let mut after = profile.clone();
     match section {
-        Section::Work => {
+        QuestionSection::Work => {
             if let Some(work) = role_ref
                 .and_then(|i| usize::try_from(i).ok())
                 .and_then(|i| after.work.get_mut(i))
@@ -134,13 +134,13 @@ pub(crate) fn gain_of(
                 work.highlights.push("1".to_owned());
             }
         }
-        Section::BasicsLabel => after.basics.label = Some("x".to_owned()),
-        Section::BasicsSummary => after.basics.summary = Some("x".to_owned()),
-        Section::Education => after.education.push(Education {
+        QuestionSection::BasicsLabel => after.basics.label = Some("x".to_owned()),
+        QuestionSection::BasicsSummary => after.basics.summary = Some("x".to_owned()),
+        QuestionSection::Education => after.education.push(Education {
             institution: "x".to_owned(),
             ..Education::default()
         }),
-        Section::Links => after.basics.profiles.push(Link {
+        QuestionSection::Links => after.basics.profiles.push(Link {
             network: None,
             url: "x".to_owned(),
         }),
@@ -352,7 +352,7 @@ pub(crate) async fn carry_forward(
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct StrengthItem {
     /// Which part.
-    pub key: Key,
+    pub key: StrengthKey,
     /// Where it is.
     pub state: PartState,
     /// Points earned.
@@ -387,22 +387,32 @@ pub struct StrengthView {
 }
 
 /// The action for a part that is not full.
-fn action_for(key: Key, open: &[(StoredQuestion, u8)]) -> String {
-    let asking = |wanted: Section| {
+fn action_for(key: StrengthKey, open: &[(StoredQuestion, u8)]) -> String {
+    let asking = |wanted: QuestionSection| {
         open.iter()
             .find(|(q, _)| q.section == wanted)
             .map(|(q, _)| format!("question:{}", q.id))
     };
     match key {
-        Key::Headline => asking(Section::BasicsLabel).unwrap_or_else(|| "edit:basics".to_owned()),
-        Key::Summary => asking(Section::BasicsSummary).unwrap_or_else(|| "edit:basics".to_owned()),
-        Key::Achievements => asking(Section::Work).unwrap_or_else(|| "edit:work".to_owned()),
-        Key::Skills => "skills".to_owned(),
-        Key::Education => asking(Section::Education).unwrap_or_else(|| "edit:education".to_owned()),
-        Key::Languages => "edit:languages".to_owned(),
-        Key::Links => asking(Section::Links).unwrap_or_else(|| "edit:basics".to_owned()),
-        Key::Positions => "import".to_owned(),
-        Key::Goals => "goals".to_owned(),
+        StrengthKey::Headline => {
+            asking(QuestionSection::BasicsLabel).unwrap_or_else(|| "edit:basics".to_owned())
+        }
+        StrengthKey::Summary => {
+            asking(QuestionSection::BasicsSummary).unwrap_or_else(|| "edit:basics".to_owned())
+        }
+        StrengthKey::Achievements => {
+            asking(QuestionSection::Work).unwrap_or_else(|| "edit:work".to_owned())
+        }
+        StrengthKey::Skills => "skills".to_owned(),
+        StrengthKey::Education => {
+            asking(QuestionSection::Education).unwrap_or_else(|| "edit:education".to_owned())
+        }
+        StrengthKey::Languages => "edit:languages".to_owned(),
+        StrengthKey::Links => {
+            asking(QuestionSection::Links).unwrap_or_else(|| "edit:basics".to_owned())
+        }
+        StrengthKey::Positions => "import".to_owned(),
+        StrengthKey::Goals => "goals".to_owned(),
     }
 }
 
@@ -517,7 +527,7 @@ pub struct Question {
     /// The question's id.
     pub id: String,
     /// What it is about.
-    pub section: Section,
+    pub section: QuestionSection,
     /// The position it is about, for `work`.
     pub context: Option<RoleContext>,
     /// The question, at most 160 characters.

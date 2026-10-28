@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use super::{Section, StoredQuestion, StoredSkill, gain_of};
+use super::{QuestionSection, StoredQuestion, StoredSkill, gain_of};
 use crate::{features::imports::Ai, goals::Goals, schema::Profile};
 
 /// Most questions a review keeps.
@@ -244,7 +244,7 @@ pub(crate) fn validate(
 ) -> (Vec<StoredQuestion>, Vec<StoredSkill>) {
     let mut questions: Vec<StoredQuestion> = Vec::new();
     for raw in answer.questions {
-        let Some(section) = Section::parse(&raw.section) else {
+        let Some(section) = QuestionSection::parse(&raw.section) else {
             continue;
         };
         let question = raw.question.trim().to_owned();
@@ -257,7 +257,7 @@ pub(crate) fn validate(
             continue;
         }
         let role_ref = match section {
-            Section::Work => {
+            QuestionSection::Work => {
                 let Some(index) = raw
                     .role_ref
                     .and_then(|i| usize::try_from(i).ok())
@@ -270,11 +270,13 @@ pub(crate) fn validate(
             _ => None,
         };
         let already = match section {
-            Section::Work => false,
-            Section::BasicsLabel => profile.basics.label.is_some(),
-            Section::BasicsSummary => profile.basics.summary.is_some(),
-            Section::Education => !profile.education.is_empty(),
-            Section::Links => !profile.basics.profiles.is_empty() || profile.basics.url.is_some(),
+            QuestionSection::Work => false,
+            QuestionSection::BasicsLabel => profile.basics.label.is_some(),
+            QuestionSection::BasicsSummary => profile.basics.summary.is_some(),
+            QuestionSection::Education => !profile.education.is_empty(),
+            QuestionSection::Links => {
+                !profile.basics.profiles.is_empty() || profile.basics.url.is_some()
+            }
         };
         let repeated = questions
             .iter()
@@ -519,7 +521,7 @@ mod tests {
             &profile(),
             &Goals::default(),
         );
-        let got: Vec<(&str, Section, Option<u32>)> = questions
+        let got: Vec<(&str, QuestionSection, Option<u32>)> = questions
             .iter()
             .map(|q| (q.id.as_str(), q.section, q.role_ref))
             .collect();
@@ -527,8 +529,8 @@ mod tests {
         assert_eq!(
             got,
             [
-                ("q1", Section::Work, Some(0)),
-                ("q2", Section::BasicsSummary, None)
+                ("q1", QuestionSection::Work, Some(0)),
+                ("q2", QuestionSection::BasicsSummary, None)
             ]
         );
     }

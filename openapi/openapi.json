@@ -4043,21 +4043,6 @@
           }
         }
       },
-      "Key": {
-        "type": "string",
-        "description": "What the score is made of.",
-        "enum": [
-          "headline",
-          "summary",
-          "achievements",
-          "skills",
-          "education",
-          "languages",
-          "links",
-          "positions",
-          "goals"
-        ]
-      },
       "Language": {
         "type": "object",
         "description": "A language they speak.",
@@ -4908,7 +4893,7 @@
             "description": "The question, at most 160 characters."
           },
           "section": {
-            "$ref": "#/components/schemas/Section",
+            "$ref": "#/components/schemas/QuestionSection",
             "description": "What it is about."
           },
           "why": {
@@ -4916,6 +4901,17 @@
             "description": "Why it matters, at most 140 characters."
           }
         }
+      },
+      "QuestionSection": {
+        "type": "string",
+        "description": "What a question is about, and where its answer goes.",
+        "enum": [
+          "work",
+          "basics.label",
+          "basics.summary",
+          "education",
+          "links"
+        ]
       },
       "QuestionsView": {
         "type": "object",
@@ -5439,17 +5435,6 @@
           "nightly"
         ]
       },
-      "Section": {
-        "type": "string",
-        "description": "What a question is about, and where its answer goes.",
-        "enum": [
-          "work",
-          "basics.label",
-          "basics.summary",
-          "education",
-          "links"
-        ]
-      },
       "Seniority": {
         "type": "string",
         "description": "Which levels fit.",
@@ -5557,15 +5542,6 @@
           }
         }
       },
-      "State": {
-        "type": "string",
-        "description": "Where a part is.",
-        "enum": [
-          "ok",
-          "partial",
-          "missing"
-        ]
-      },
       "StrengthHint": {
         "type": "string",
         "description": "What would make the profile stronger.",
@@ -5607,7 +5583,7 @@
             "minimum": 0
           },
           "key": {
-            "$ref": "#/components/schemas/Key",
+            "$ref": "#/components/schemas/StrengthKey",
             "description": "Which part."
           },
           "of": {
@@ -5617,7 +5593,7 @@
             "minimum": 0
           },
           "state": {
-            "$ref": "#/components/schemas/State",
+            "$ref": "#/components/schemas/StrengthState",
             "description": "Where it is."
           },
           "weight": {
@@ -5627,6 +5603,30 @@
             "minimum": 0
           }
         }
+      },
+      "StrengthKey": {
+        "type": "string",
+        "description": "What the score is made of.",
+        "enum": [
+          "headline",
+          "summary",
+          "achievements",
+          "skills",
+          "education",
+          "languages",
+          "links",
+          "positions",
+          "goals"
+        ]
+      },
+      "StrengthState": {
+        "type": "string",
+        "description": "Where a part is.",
+        "enum": [
+          "ok",
+          "partial",
+          "missing"
+        ]
       },
       "StrengthView": {
         "type": "object",

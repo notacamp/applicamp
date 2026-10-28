@@ -118,7 +118,7 @@ fn serve() -> ExitCode {
         Err(e) => return fail(&e.to_string()),
     };
     let composition = match applicamp_server::Composition::from_env() {
-        Ok(composition) => composition,
+        Ok(composition) => composition.with_secret(&secret),
         Err(e) => return fail(&e),
     };
     let runtime = match runtime() {

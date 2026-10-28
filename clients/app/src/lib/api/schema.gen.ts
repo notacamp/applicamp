@@ -109,9 +109,11 @@ export interface paths {
         put?: never;
         /**
          * Approve a job board.
-         * @description From then on searches read it. Only a candidate or a paused board whose
-         *     config reads its kind and whose check (of the feed's host) found robots
-         *     rules that allow the feed. Board owners only.
+         * @description From then on searches read it. Only a candidate or a paused board with
+         *     no blocker: nothing the research found forbids reading it, its key is
+         *     set if it needs one, its config reads its kind, and its check (of the
+         *     feed's host) found robots rules that allow the feed. The problem names
+         *     the first blocker and says what exactly. Board owners only.
          */
         post: operations["sources.approve_board"];
         delete?: never;
@@ -152,10 +154,11 @@ export interface paths {
         get?: never;
         /**
          * Change a job board's config.
-         * @description The whole config, validated for the board's kind (unknown keys refused).
-         *     An approved board's new feed must still be allowed by the robots rules
-         *     its check found. The seed list never overwrites it again. Board owners
-         *     only.
+         * @description The whole config, validated for the board's kind (or the new `kind`, as
+         *     a check's proposal gives it); unknown keys refused; a problem names the
+         *     field. An approved board's new feed must still be allowed by the robots
+         *     rules its check found. The seed list never overwrites it again. Board
+         *     owners only.
          */
         put: operations["sources.set_board_config"];
         post?: never;
@@ -180,6 +183,33 @@ export interface paths {
          */
         post: operations["sources.decline_board"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/boards/{id}/key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set a job board's API key.
+         * @description One value per parameter its config's `key` names, each 1 to 200 visible
+         *     characters. Stored sealed with the instance secret and sent only to the
+         *     host its config reads now; never returned (the board says "key set").
+         *     Board owners only.
+         */
+        put: operations["sources.set_board_key"];
+        post?: never;
+        /**
+         * Remove a job board's API key.
+         * @description Searches stop reading it until a key is set again. Board owners only.
+         */
+        delete: operations["sources.forget_board_key"];
         options?: never;
         head?: never;
         patch?: never;
@@ -667,19 +697,42 @@ export interface components {
             /** @description Their own site. */
             url?: string | null;
         };
+        /** @description Why a board cannot be approved yet. */
+        BoardBlocker: {
+            /**
+             * @description `terms_forbid`, `robots_disallowed`, `needs_key`, `no_endpoint`,
+             *     `config_invalid`, `check_needed`; clients translate the ones they
+             *     know and show `detail` for any other.
+             */
+            code: string;
+            /** @description What exactly, in English: the terms' sentence, the rule, the field. */
+            detail: string;
+            /** @description Where it says so (the terms page, robots.txt). */
+            source?: string | null;
+        };
         /** @description A board's new config. */
         BoardConfigChange: {
             /** @description The whole config, validated for the board's kind. */
             config: {
                 [key: string]: unknown;
             };
+            kind?: components["schemas"]["BoardKind"] | null;
         };
         /** @description A job board, whole: its check, config and terms. */
         BoardDetail: {
-            /** @description It can be approved now; else `blocked` says why. */
+            /** @description It can be approved now; else `blockers` say why. */
             approvable: boolean;
-            /** @description `check_needed`, `robots_disallowed`, `config_invalid`, or none. */
+            /**
+             * @description The first blocker's code (`terms_forbid`, `robots_disallowed`,
+             *     `needs_key`, `no_endpoint`, `config_invalid`, `check_needed`), or
+             *     none.
+             */
             blocked?: string | null;
+            /**
+             * @description Everything that stands between the board and its approval, in order,
+             *     each with its detail; empty when it can be approved.
+             */
+            blockers: components["schemas"]["BoardBlocker"][];
             board: components["schemas"]["BoardSummary"];
             can_manage: boolean;
             /** @description How it is read (the config's JSON). */
@@ -688,8 +741,28 @@ export interface components {
             };
             /** @description The address its jobs are read from. */
             endpoint?: string | null;
+            key?: components["schemas"]["BoardKey"] | null;
             report?: components["schemas"]["BoardReport"] | null;
             terms: components["schemas"]["BoardTerms"];
+        };
+        /** @description A board's API key, as a client sees it: never the key itself. */
+        BoardKey: {
+            /** @description How to get one. */
+            how: string;
+            /** @description The parameters it is sent in (one field each). */
+            params: string[];
+            /** @description A key is set for the host its config reads. */
+            set: boolean;
+            /** Format: date-time */
+            set_at?: string | null;
+            url: string;
+        };
+        /** @description A board's API key: one value per parameter its config names. */
+        BoardKeyChange: {
+            /** @description Parameter → value (`{ "api_key": "…" }`). */
+            values: {
+                [key: string]: string;
+            };
         };
         /**
          * @description How a board is read.
@@ -712,6 +785,14 @@ export interface components {
          * @enum {string}
          */
         BoardPriority: "high" | "low";
+        /** @description A config a check proposes, and the kind it reads. */
+        BoardProposal: {
+            /** @description The config's JSON, as `PUT …/config` takes it. */
+            config: {
+                [key: string]: unknown;
+            };
+            kind: components["schemas"]["BoardKind"];
+        };
         /** @description A board's average salary and its key in the order. */
         BoardRanking: {
             /**
@@ -752,6 +833,11 @@ export interface components {
             /** Format: date-time */
             checked_at?: string | null;
             /**
+             * @description A fingerprint of the config the check read with: a seeded board
+             *     whose config changed since is checked again at start.
+             */
+            config_fingerprint?: string;
+            /**
              * @description What the owner should know ("robots.txt disallows the API",
              *     "terms changed since approval").
              */
@@ -765,6 +851,7 @@ export interface components {
             language?: string | null;
             /** @description For the owner, in a sentence (the seed list's notes). */
             notes?: string;
+            proposal?: components["schemas"]["BoardProposal"] | null;
             /**
              * Format: double
              * @description Share of the sample that is remote (0–1).
@@ -1902,7 +1989,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `not_waiting`: it is approved or declined; `config_invalid`; `check_needed`: check its feed's host first; `robots_disallowed`: its robots rules forbid the feed (edit the config to an allowed path) */
+            /** @description `not_waiting`: it is approved or declined; else its first blocker: `terms_forbid`, `robots_disallowed`, `needs_key`, `no_endpoint`, `config_invalid`, `check_needed`; the detail says what exactly */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1988,7 +2075,7 @@ export interface operations {
                     "application/json": components["schemas"]["BoardDetail"];
                 };
             };
-            /** @description `invalid_config`: the detail says what is wrong */
+            /** @description `invalid_config`: the detail names the field and says what is wrong */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2024,7 +2111,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `robots_disallowed`: an approved board's new feed is not allowed by its robots rules */
+            /** @description `robots_disallowed`: an approved board's new feed is not allowed by its robots rules; `kind_locked`: an approved board keeps its kind */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -2067,6 +2154,128 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_board_owner` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "sources.set_board_key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The board. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BoardKeyChange"];
+            };
+        };
+        responses: {
+            /** @description Set. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardDetail"];
+                };
+            };
+            /** @description `invalid_key`: the detail names the parameter */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_board_owner` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `no_key_needed`: its config names no key; `no_endpoint`: it has no address to send it to */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "sources.forget_board_key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The board. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardDetail"];
                 };
             };
             /** @description `session_required` */

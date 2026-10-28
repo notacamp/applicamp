@@ -21,6 +21,15 @@
 //   APPLICAMP_AI__COMPLETE__BASE_URL=http://localhost:9020/v1
 //   APPLICAMP_AI__COMPLETE__MODEL=fake/model
 //
+// Boards waiting for the owner (#26), each at its own host name (aliases of
+// this fake on the e2e network), every one with robots rules that allow it:
+//   seeded-board.test     a JSON API the seed list names: checked at start,
+//                         then approvable;
+//   keyed-board.test      a JSON API that answers only with the key `e2e-key`;
+//   feed-site-<p>.test    a site with no config whose homepage links its RSS
+//                         feed: the check proposes a config (one per
+//                         Playwright project, desktop and phone).
+//
 // Every list answers with four new jobs (new ids each time); a board keeps to
 // its polling interval, so a search within it reads the last answer. The
 // fourth is remote only from Germany or Austria, in the words of the posting
@@ -196,9 +205,80 @@ function remoteJob(id: number, title: string) {
   };
 }
 
+/** A few invented jobs of a waiting board, as a JSON API lists them. */
+function waitingJobs(site: string) {
+  return {
+    jobs: ["Senior Backend Engineer", "Staff Platform Engineer"].map((title, index) => ({
+      id: `${site}-${String(index + 1)}`,
+      title,
+      company: "Example Co",
+      url: `https://example.com/${site}/jobs/${String(index + 1)}`,
+      location: "Remote",
+    })),
+  };
+}
+
+/** The same jobs as an RSS feed. */
+function waitingFeed(site: string): string {
+  const items = waitingJobs(site)
+    .jobs.map(
+      (job) =>
+        `<item><title>${job.title}</title><link>${job.url}</link><guid>${job.id}</guid>` +
+        `<description>Invented.</description></item>`,
+    )
+    .join("");
+  return `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel>${items}</channel></rss>`;
+}
+
+function text(response: ServerResponse, type: string, body: string) {
+  response.writeHead(200, { "content-type": type, "cache-control": "no-store" });
+  response.end(body);
+}
+
+/** A waiting board's site, by its host name; whether it answered. */
+function waitingBoard(site: string, url: URL, response: ServerResponse): boolean {
+  if (url.pathname === "/robots.txt") {
+    text(response, "text/plain", "User-agent: *\nDisallow: /private\n");
+    return true;
+  }
+  if (site.startsWith("feed-site-")) {
+    if (url.pathname === "/") {
+      text(
+        response,
+        "text/html",
+        `<html lang="en"><head><link rel="alternate" type="application/rss+xml" href="/jobs.rss"></head><body>Invented jobs.</body></html>`,
+      );
+      return true;
+    }
+    if (url.pathname === "/jobs.rss") {
+      text(response, "application/rss+xml", waitingFeed(site));
+      return true;
+    }
+    return false;
+  }
+  if (url.pathname === "/") {
+    text(response, "text/html", `<html lang="en"><body>Invented jobs.</body></html>`);
+    return true;
+  }
+  if (url.pathname === "/api/jobs") {
+    if (site === "keyed-board.test" && url.searchParams.get("api_key") !== "e2e-key") {
+      json(response, 401, { error: "API key required." });
+      return true;
+    }
+    console.log(`fake-jobs: listed the waiting board ${site}`);
+    json(response, 200, waitingJobs(site));
+    return true;
+  }
+  return false;
+}
+
 const server = createServer((request, response) => {
   const url = new URL(request.url ?? "/", `http://${host}:${String(port)}`);
   const method = request.method ?? "GET";
+  const site = (request.headers.host ?? "").split(":", 1)[0] ?? "";
+  if (method === "GET" && site.endsWith(".test") && waitingBoard(site, url, response)) {
+    return;
+  }
   const board = /^\/v1\/boards\/([\w-]+)\/jobs\/?$/.exec(url.pathname);
   const posting = /^\/v1\/boards\/([\w-]+)\/jobs\/(\d+)$/.exec(url.pathname);
   if (method === "GET" && board !== null) {

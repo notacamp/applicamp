@@ -98,6 +98,19 @@ impl Composition {
         })
     }
 
+    /// The same, sealing the job boards' API keys with the instance
+    /// `secret` (the sources module reads keyed boards with them).
+    #[must_use]
+    pub fn with_secret(mut self, secret: &applicamp_kernel::crypto::SecretKey) -> Self {
+        self.sources = self.sources.with_secret(secret);
+        self.pipeline = applicamp_pipeline::PipelineDeps {
+            neighbours: Some(std::sync::Arc::new(wiring::PipelineWiring {
+                sources: self.sources.clone(),
+            })),
+        };
+        self
+    }
+
     /// The model serving `complete`, if any (for the startup log).
     pub fn complete_model(&self) -> Option<&str> {
         self.profile

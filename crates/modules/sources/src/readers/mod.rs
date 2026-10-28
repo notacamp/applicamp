@@ -39,7 +39,10 @@ use serde::de::DeserializeOwned;
 use sqlx::PgPool;
 use url::Url;
 
+use applicamp_kernel::crypto::Cipher;
+
 use crate::{
+    board_keys,
     config::SourcesConfig,
     job::{BoardJob, Job, Source, SourceLink},
     job_boards::{self, BoardConfig, BoardRow, Kind, ListedJob},
@@ -116,6 +119,8 @@ pub enum FetchError {
     Refused,
     /// Its config does not read.
     BadConfig,
+    /// Its API needs a key, and none is set (or it cannot be opened).
+    NeedsKey,
 }
 
 impl FetchError {
@@ -132,6 +137,7 @@ impl FetchError {
             Self::BackingOff => "backing_off".to_owned(),
             Self::Refused => "refused_host".to_owned(),
             Self::BadConfig => "bad_config".to_owned(),
+            Self::NeedsKey => "needs_key".to_owned(),
         }
     }
 }
@@ -149,6 +155,7 @@ impl std::fmt::Display for FetchError {
             Self::BackingOff => f.write_str("the board asked to slow down earlier"),
             Self::Refused => f.write_str("the board's address is not a public https one"),
             Self::BadConfig => f.write_str("the board's config does not read"),
+            Self::NeedsKey => f.write_str("the board's API key is not set"),
         }
     }
 }
@@ -230,6 +237,9 @@ impl Fetched {
 #[derive(Clone)]
 pub struct Reader {
     inner: Arc<Inner>,
+    /// Opens the boards' API keys ([`board_keys`]); none in a composition
+    /// without the instance secret (then no keyed board is read).
+    keys: Option<Arc<Cipher>>,
 }
 
 struct Inner {
@@ -276,7 +286,20 @@ impl Reader {
                 config,
                 next: tokio::sync::Mutex::new(HashMap::new()),
             }),
+            keys: None,
         })
+    }
+
+    /// The same, opening the boards' API keys with `keys`.
+    #[must_use]
+    pub fn with_keys(mut self, keys: Arc<Cipher>) -> Self {
+        self.keys = Some(keys);
+        self
+    }
+
+    /// What opens the boards' API keys.
+    pub fn keys(&self) -> Option<&Cipher> {
+        self.keys.as_deref()
     }
 
     /// The configuration it reads with.
@@ -302,7 +325,10 @@ impl Reader {
 
     /// `url`'s answer through `client` (at most `max` bytes), from the cache
     /// while it is younger than `ttl`; `spacing` between two requests to its
-    /// host. `Ok(None)` when the board says there is no such thing (404).
+    /// host. `secret` (a board's API key) is added to the request's query
+    /// only: the cache, the logs and every error know `url` without it.
+    /// `Ok(None)` when the board says there is no such thing (404).
+    #[allow(clippy::too_many_arguments)]
     async fn fetch(
         &self,
         client: &reqwest::Client,
@@ -311,6 +337,7 @@ impl Reader {
         max: usize,
         ttl: Duration,
         spacing: Duration,
+        secret: &[(String, String)],
     ) -> Result<Option<Got>, FetchError> {
         if !ttl.is_zero() {
             let fresh_since =
@@ -329,8 +356,14 @@ impl Reader {
         }
         self.wait_turn(url.host_str().unwrap_or_default(), spacing)
             .await;
+        let mut request_url = url.clone();
+        if !secret.is_empty() {
+            request_url
+                .query_pairs_mut()
+                .extend_pairs(secret.iter().map(|(k, v)| (k.as_str(), v.as_str())));
+        }
         let mut response = client
-            .get(url.clone())
+            .get(request_url)
             .header(
                 reqwest::header::ACCEPT,
                 "application/json, application/rss+xml, application/xml;q=0.9, */*;q=0.8",
@@ -409,6 +442,7 @@ impl Reader {
                 max,
                 config.cache_ttl(),
                 Duration::ZERO,
+                &[],
             )
             .await?
             .map(|got| got.body))
@@ -433,6 +467,18 @@ impl Reader {
     /// cache, at most [`MAX_PAGE`], a second apart on one host. `Ok(None)`
     /// on a 404.
     pub async fn visit(&self, db: &PgPool, url: &Url) -> Result<Option<Vec<u8>>, FetchError> {
+        self.visit_with(db, url, MAX_PAGE, &[]).await
+    }
+
+    /// [`visit`](Self::visit), reading at most `max` bytes, with a board's
+    /// API key (`secret`) in the request's query.
+    pub async fn visit_with(
+        &self,
+        db: &PgPool,
+        url: &Url,
+        max: usize,
+        secret: &[(String, String)],
+    ) -> Result<Option<Vec<u8>>, FetchError> {
         let allow_private = self.inner.config.allow_private_hosts();
         net::check(url, allow_private).map_err(|_| FetchError::Refused)?;
         let spacing = if allow_private {
@@ -445,22 +491,25 @@ impl Reader {
                 &self.inner.boards_http,
                 db,
                 url,
-                MAX_PAGE,
+                max.min(MAX_BOARD_BODY),
                 Duration::ZERO,
                 spacing,
+                secret,
             )
             .await?
             .map(|got| got.body))
     }
 
     /// A job board's answer at `url`: a public https address only (unless
-    /// allowed), at most [`MAX_BOARD_BODY`], reused for `ttl`.
+    /// allowed), at most [`MAX_BOARD_BODY`], reused for `ttl`; `secret`, its
+    /// API key, in the request's query only.
     async fn get_board(
         &self,
         db: &PgPool,
         url: &Url,
         ttl: Duration,
         spacing: Duration,
+        secret: &[(String, String)],
     ) -> Result<Got, FetchError> {
         net::check(url, self.inner.config.allow_private_hosts())
             .map_err(|_| FetchError::Refused)?;
@@ -471,6 +520,7 @@ impl Reader {
             MAX_BOARD_BODY,
             ttl,
             spacing,
+            secret,
         )
         .await?
         .ok_or(FetchError::Status(404))
@@ -557,7 +607,15 @@ impl Reader {
         let mut cached = true;
         let mut get = async |url: Url| -> Result<Vec<u8>, FetchError> {
             let got = self
-                .fetch(&self.inner.http, db, &url, MAX_BODY, ttl, Duration::ZERO)
+                .fetch(
+                    &self.inner.http,
+                    db,
+                    &url,
+                    MAX_BODY,
+                    ttl,
+                    Duration::ZERO,
+                    &[],
+                )
                 .await?
                 .ok_or(FetchError::Status(404))?;
             cached &= got.cached;
@@ -726,11 +784,13 @@ impl Reader {
         let config = row.config().map_err(|_| FetchError::BadConfig)?;
         let kind = row.kind().ok_or(FetchError::BadConfig)?;
         config.validate(kind).map_err(|_| FetchError::BadConfig)?;
+        let secret =
+            board_keys::query(self.keys(), row, &config).map_err(|_| FetchError::NeedsKey)?;
         let ttl = config.poll().to_std().unwrap_or(Duration::from_secs(3_600));
         match kind {
-            Kind::JsonApi => self.json_api(db, &config, board, ttl).await,
-            Kind::Rss => self.feed(db, &config, board, ttl).await,
-            Kind::JsonldSitemap => self.sitemap(db, &config, row, board, ttl).await,
+            Kind::JsonApi => self.json_api(db, &config, board, ttl, &secret).await,
+            Kind::Rss => self.feed(db, &config, board, ttl, &secret).await,
+            Kind::JsonldSitemap => self.sitemap(db, &config, row, board, ttl, &secret).await,
             Kind::Hn => {
                 let (mut jobs, cached) = self.hn_with(db, ttl).await?;
                 for job in &mut jobs {
@@ -756,6 +816,7 @@ impl Reader {
         config: &BoardConfig,
         board: &BoardRef,
         ttl: Duration,
+        secret: &[(String, String)],
     ) -> Result<(Vec<Job>, bool), FetchError> {
         let endpoint = config.endpoint.as_ref().ok_or(FetchError::BadConfig)?;
         let mut jobs = Vec::new();
@@ -778,7 +839,9 @@ impl Reader {
             if url.query() == Some("") {
                 url.set_query(None);
             }
-            let got = self.get_board(db, &url, ttl, config.spacing()).await?;
+            let got = self
+                .get_board(db, &url, ttl, config.spacing(), secret)
+                .await?;
             cached &= got.cached;
             let answer: serde_json::Value =
                 serde_json::from_slice(&got.body).map_err(|_| FetchError::Unexpected)?;
@@ -827,9 +890,12 @@ impl Reader {
         config: &BoardConfig,
         board: &BoardRef,
         ttl: Duration,
+        secret: &[(String, String)],
     ) -> Result<(Vec<Job>, bool), FetchError> {
         let endpoint = config.endpoint.as_ref().ok_or(FetchError::BadConfig)?;
-        let got = self.get_board(db, endpoint, ttl, config.spacing()).await?;
+        let got = self
+            .get_board(db, endpoint, ttl, config.spacing(), secret)
+            .await?;
         let jobs = rss::items(&got.body)
             .iter()
             .filter_map(|item| mapping::job_of(item, config, board))
@@ -846,9 +912,12 @@ impl Reader {
         row: &BoardRow,
         board: &BoardRef,
         ttl: Duration,
+        secret: &[(String, String)],
     ) -> Result<(Vec<Job>, bool), FetchError> {
         let sitemap = config.sitemap.as_ref().ok_or(FetchError::BadConfig)?;
-        let got = self.get_board(db, sitemap, ttl, config.spacing()).await?;
+        let got = self
+            .get_board(db, sitemap, ttl, config.spacing(), secret)
+            .await?;
         let mut cached = got.cached;
         let most = usize::try_from(
             config
@@ -868,7 +937,7 @@ impl Reader {
             if !robots::allowed(&rules, &robots::path_of(&page)).0 {
                 continue;
             }
-            let got = match self.get_board(db, &page, ttl, config.spacing()).await {
+            let got = match self.get_board(db, &page, ttl, config.spacing(), &[]).await {
                 Ok(got) => got,
                 Err(FetchError::Status(404)) => continue,
                 Err(e) => return Err(e),

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ApiError, errorStatus, problemCode, unwrap, unwrapEmpty } from "./errors";
+import { ApiError, errorStatus, problemCode, problemDetail, unwrap, unwrapEmpty } from "./errors";
 
 const response = (status: number) => new Response(null, { status });
 
@@ -34,5 +34,14 @@ describe("API results", () => {
     expect(problemCode(new ApiError(500, { code: 5 }))).toBeUndefined();
     expect(problemCode(new ApiError(500, null))).toBeUndefined();
     expect(errorStatus(new Error("network"))).toBeUndefined();
+  });
+
+  it("carries the server's own words about what went wrong", () => {
+    const problem = { code: "invalid_config", detail: "`max_pages` must be 1 to 10" };
+    expect(problemDetail(new ApiError(400, problem))).toBe("`max_pages` must be 1 to 10");
+    expect(problemDetail(new ApiError(400, { code: "x", detail: " " }))).toBeUndefined();
+    expect(problemDetail(new ApiError(400, { code: "x" }))).toBeUndefined();
+    expect(problemDetail(new ApiError(500, null))).toBeUndefined();
+    expect(problemDetail(new Error("network"))).toBeUndefined();
   });
 });

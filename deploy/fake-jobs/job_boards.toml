@@ -2,7 +2,11 @@
 # (clients/app/scripts/fake-jobs.ts). Invented: no real board. Tests only.
 #
 # One approved remote board, shaped like Himalayas' API, and one candidate
-# waiting for the owner with its check, for the Boards page.
+# waiting for the owner with its check, for the Boards page. Then the boards
+# of #26, at host names the fake answers to (compose.e2e.yml): one the check
+# at start makes approvable, one that needs a key, one whose terms forbid
+# reading it, and two sites with no config whose RSS link the check finds
+# (one per Playwright project).
 
 [[board]]
 slug = "fake-remote"
@@ -80,3 +84,81 @@ found = true
 rules = [{ allow = false, pattern = "/private" }]
 endpoint_allowed = true
 fingerprint = "e2e"
+
+[[board]]
+slug = "fake-seeded"
+name = "Fake Seeded Board"
+homepage = "http://seeded-board.test:9020"
+kind = "json_api"
+priority = "low"
+status = "candidate"
+
+[board.config]
+endpoint = "http://seeded-board.test:9020/api/jobs"
+items = "/jobs"
+poll_minutes = 360
+
+[board.config.fields]
+ref = "/id"
+title = "/title"
+company = "/company"
+url = "/url"
+location = "/location"
+
+[board.report]
+notes = "Invented for tests: checked at start, then approvable."
+
+[[board]]
+slug = "fake-keyed"
+name = "Fake Keyed Board"
+homepage = "http://keyed-board.test:9020"
+kind = "json_api"
+priority = "low"
+status = "candidate"
+
+[board.config]
+endpoint = "http://keyed-board.test:9020/api/jobs"
+items = "/jobs"
+poll_minutes = 360
+key = { params = ["api_key"], how = "Ask the fake for one (it is e2e-key).", url = "https://keys.example/fake" }
+
+[board.config.fields]
+ref = "/id"
+title = "/title"
+company = "/company"
+url = "/url"
+
+[board.report]
+notes = "Invented for tests: its API answers only with a key."
+
+[[board]]
+slug = "fake-forbidding"
+name = "Fake Forbidding Board"
+homepage = "https://forbidding-board.example"
+kind = "json_api"
+priority = "low"
+status = "candidate"
+
+[[board.blockers]]
+code = "terms_forbid"
+detail = "You may not \"read this invented site with robots of any kind\"."
+source = "https://forbidding-board.example/terms"
+
+[board.report]
+notes = "Invented for tests: its terms forbid automated reading."
+
+[[board]]
+slug = "fake-feed-desktop"
+name = "Fake Feed Site (desktop)"
+homepage = "http://feed-site-desktop.test:9020"
+kind = "json_api"
+priority = "low"
+status = "candidate"
+
+[[board]]
+slug = "fake-feed-phone"
+name = "Fake Feed Site (phone)"
+homepage = "http://feed-site-phone.test:9020"
+kind = "json_api"
+priority = "low"
+status = "candidate"

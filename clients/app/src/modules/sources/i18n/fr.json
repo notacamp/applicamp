@@ -91,6 +91,7 @@
     "lastError": "La dernière lecture a échoué : {{error}}",
     "lastFetch": "Lu {{when}} : {{jobs}} offres · {{matched}} correspondances cette semaine",
     "totals": "{{label}} : {{read}} lues · {{matched}} correspondances · IA {{cost}}",
+    "fit": "correspond à vos compétences {{share}} %",
     "suggest": {
       "label": "Suggérer un site",
       "button": "Suggérer",
@@ -120,6 +121,8 @@
     "close": "Fermer",
     "status": "Statut",
     "salary": "Salaire moyen",
+    "fitValue": "correspond à vos compétences {{share}} % ({{jobs}} offres)",
+    "fit": "Adéquation à vos compétences",
     "priority": "Priorité",
     "credit": "Crédité comme",
     "endpoint": "Lu depuis",

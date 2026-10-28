@@ -60,6 +60,7 @@ export function waiting(overrides: Partial<BoardSummary> = {}): BoardSummary {
     kind: "rss",
     status: "candidate",
     origin: "discovery",
+    skills_fit: { share: 0.4, jobs: 10 },
     ranking: ranking({
       basis: "few",
       salaried_jobs: 3,

@@ -91,6 +91,7 @@
     "lastError": "La última lectura falló: {{error}}",
     "lastFetch": "Leído {{when}}: {{jobs}} ofertas · {{matched}} coincidencias esta semana",
     "totals": "{{label}}: {{read}} leídas · {{matched}} coincidencias · IA {{cost}}",
+    "fit": "encaja con tus habilidades {{share}}%",
     "suggest": {
       "label": "Sugerir un portal",
       "button": "Sugerir",
@@ -120,6 +121,8 @@
     "close": "Cerrar",
     "status": "Estado",
     "salary": "Salario medio",
+    "fitValue": "encaja con tus habilidades {{share}}% ({{jobs}} ofertas)",
+    "fit": "Encaje con tus habilidades",
     "priority": "Prioridad",
     "credit": "Se acredita como",
     "endpoint": "Se lee de",

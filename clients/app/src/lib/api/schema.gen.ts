@@ -913,6 +913,7 @@ export interface components {
             priority: components["schemas"]["BoardPriority"];
             /** @description Its average salary and its key in the order. */
             ranking: components["schemas"]["BoardRanking"];
+            skills_fit?: components["schemas"]["SkillsFit"] | null;
             /** @description Its stable name: the source its jobs carry. */
             slug: string;
             status: components["schemas"]["BoardStatus"];
@@ -1657,6 +1658,19 @@ export interface components {
             level?: string | null;
             /** @description The skill ("PostgreSQL"). */
             name: string;
+        };
+        /** @description How well a board's listed engineering jobs fit someone's top skills. */
+        SkillsFit: {
+            /**
+             * Format: int32
+             * @description The jobs it is counted from.
+             */
+            jobs: number;
+            /**
+             * Format: double
+             * @description The share of those jobs that name one of their top skills, 0 to 1.
+             */
+            share: number;
         };
         /** @description What was spent on AI, in euros, against the limits. */
         Spend: {

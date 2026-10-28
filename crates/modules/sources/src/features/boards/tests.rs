@@ -785,3 +785,60 @@ async fn boards_the_seed_list_declined_wait_for_the_owner_again(db: PgPool) {
         .collect();
     assert_eq!(declined, ["not-for-me", "the-muse"]);
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_board_says_how_well_it_fits_your_top_skills(db: PgPool) {
+    let fake =
+        Fake::lisbon_remote_only().with_skills(&["Ruby on Rails", "React", "Postgres", "Go"]);
+    fake.signed_in_as("someone@example.com");
+    let h = Harness::new(db, owners_config(), None, fake).await;
+    let id = board(&h.db, "stack", "candidate", None, json!({}), None).await;
+    let words: [&[&str]; 5] = [
+        &["senior", "engineer", "ruby", "rails"],
+        &["engineer", "react"],
+        &["engineer", "java"],
+        &["engineer", "cobol"],
+        // Only the fourth skill: not a top skill.
+        &["engineer", "go"],
+    ];
+    for (i, w) in words.iter().enumerate() {
+        sqlx::query(
+            "INSERT INTO sources.board_jobs (board_id, source_ref, title, regions, engineering,
+                posted_at, seen_at, words)
+             VALUES ($1, $2, 'Engineer', '{}', true, $3, $3, $4)",
+        )
+        .bind(id)
+        .bind(format!("job-{i}"))
+        .bind(today() - TimeDelta::days(1))
+        .bind(w.iter().map(|w| (*w).to_owned()).collect::<Vec<_>>())
+        .execute(&h.db)
+        .await
+        .unwrap();
+    }
+    // A job from before the words were kept is not counted.
+    sqlx::query(
+        "INSERT INTO sources.board_jobs (board_id, source_ref, title, regions, engineering,
+            posted_at, seen_at)
+         VALUES ($1, 'before-words', 'Engineer', '{}', true, $2, $2)",
+    )
+    .bind(id)
+    .bind(today() - TimeDelta::days(1))
+    .execute(&h.db)
+    .await
+    .unwrap();
+
+    let (status, list) = h.get("/api/v1/boards").await;
+    assert_eq!(status, StatusCode::OK, "{list}");
+    let fit = &list["boards"][0]["skills_fit"];
+    assert_eq!(fit["jobs"], 5, "{list}");
+    assert!((fit["share"].as_f64().unwrap() - 0.4).abs() < 1e-9, "{fit}");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn without_skills_no_board_shows_a_fit(db: PgPool) {
+    let h = harness(db, false).await;
+    let id = board(&h.db, "stack", "candidate", None, json!({}), None).await;
+    listed(&h.db, id, 3, None).await;
+    let (_, list) = h.get("/api/v1/boards").await;
+    assert!(list["boards"][0]["skills_fit"].is_null(), "{list}");
+}

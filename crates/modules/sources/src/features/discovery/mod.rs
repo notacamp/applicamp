@@ -827,7 +827,7 @@ async fn read_sitemap(
     sitemap: &Url,
     body: &[u8],
     job_path: Option<&str>,
-    allowed: &dyn Fn(&Url) -> bool,
+    allowed: &(dyn Fn(&Url) -> bool + Sync),
     board: &BoardRef,
 ) -> Option<Found> {
     let text = String::from_utf8_lossy(body);

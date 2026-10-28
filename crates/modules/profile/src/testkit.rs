@@ -182,10 +182,15 @@ impl Harness {
 /// A gateway to `server`'s fake model, capped at `daily_tokens`.
 pub(crate) fn gateway(server: &MockServer, daily_tokens: Option<u64>) -> Gateway {
     Gateway::new(AiConfig {
-        complete: Some(ProviderConfig::new(
+        complete: Some(
+            ProviderConfig::new(
             format!("{}/v1", server.uri()).parse().unwrap(),
             "test/model",
-        )),
+        )
+        // Priced like a cheap model, as the real one is: an unpriced model
+        // is assumed dear, and two long calls would cross the daily limit.
+        .with_price(0.15, 0.5),
+        ),
         daily_tokens,
         ..AiConfig::default()
     })
@@ -211,6 +216,39 @@ pub(crate) async fn fake_model(answer: &Value) -> MockServer {
             }],
             "usage": { "prompt_tokens": 900, "completion_tokens": 300 },
         })))
+        .mount(&server)
+        .await;
+    server
+}
+
+/// A fake model answering the chat completions in turn: each reply is
+/// `(finish_reason, content)`; the last repeats once the script runs out.
+pub(crate) async fn scripted_model(script: Vec<(&'static str, String)>) -> MockServer {
+    struct Script {
+        replies: Vec<(&'static str, String)>,
+        next: std::sync::atomic::AtomicUsize,
+    }
+    impl wiremock::Respond for Script {
+        fn respond(&self, _: &wiremock::Request) -> ResponseTemplate {
+            let at = self.next.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let (finish, content) = &self.replies[at.min(self.replies.len() - 1)];
+            ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "model": "test/model",
+                "choices": [{
+                    "message": { "role": "assistant", "content": content },
+                    "finish_reason": finish,
+                }],
+                "usage": { "prompt_tokens": 900, "completion_tokens": 300 },
+            }))
+        }
+    }
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(Script {
+            replies: script,
+            next: std::sync::atomic::AtomicUsize::new(0),
+        })
         .mount(&server)
         .await;
     server

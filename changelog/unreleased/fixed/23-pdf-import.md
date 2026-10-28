@@ -1,0 +1,1 @@
+- **PDF and CV imports bring back every section.** Importing a LinkedIn PDF could return the positions and nothing else (no headline, summary, skills, education or languages). The text is now read in two focused calls, an answer the model cut off is asked again and never saved half-done, and the review lists which parts the file didn't have so you can add them by hand.

@@ -69,7 +69,21 @@
     "replace": "Remplacer",
     "merge": "Fusionner",
     "discard": "Abandonner",
-    "failed": "Cela n’a pas fonctionné. Réessayez."
+    "failed": "Cela n’a pas fonctionné. Réessayez.",
+    "empty": {
+      "title_one": "Introuvable dans ce fichier : {{count}} partie",
+      "title_other": "Introuvable dans ce fichier : {{count}} parties",
+      "label": "Aucun titre trouvé dans ce fichier",
+      "summary": "Aucun résumé trouvé dans ce fichier",
+      "work": "Aucun poste trouvé dans ce fichier",
+      "education": "Aucune formation trouvée dans ce fichier",
+      "skills": "Aucune compétence trouvée dans ce fichier",
+      "languages": "Aucune langue trouvée dans ce fichier",
+      "certificates": "Aucune certification trouvée dans ce fichier",
+      "projects": "Aucun projet trouvé dans ce fichier",
+      "hint": "Ajoutez-les à la main après avoir appliqué, ou importez votre export de données LinkedIn, qui contient compétences, formation et langues.",
+      "hintZip": "Ajoutez-les à la main après avoir appliqué."
+    }
   },
   "source": {
     "label": "Origine du profil",

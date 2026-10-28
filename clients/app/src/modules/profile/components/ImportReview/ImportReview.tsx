@@ -18,7 +18,14 @@ import {
 
 import { useApplyImport, useDiscardImport, useImport, type ApplyMode } from "../../api/imports";
 import { isEmptyProfile, type Profile } from "../../api/profile";
-import { BASICS, compareBasics, compareList, LISTS, type Change } from "../../api/sections";
+import {
+  BASICS,
+  compareBasics,
+  compareList,
+  emptySections,
+  LISTS,
+  type Change,
+} from "../../api/sections";
 import { useDescribe } from "../EntryList/EntryList";
 
 export interface ImportReviewProps {
@@ -74,7 +81,8 @@ export function ImportReview({ id, current, onDone, onRestart }: ImportReviewPro
     );
   }
 
-  const { draft: next, dropped } = draft.data;
+  const { draft: next, dropped, kind } = draft.data;
+  const empty = emptySections(next);
   const choose = (mode: ApplyMode) => () => {
     apply.mutate(
       { id, mode },
@@ -100,6 +108,22 @@ export function ImportReview({ id, current, onDone, onRestart }: ImportReviewPro
           <Tagged testId="review-dropped">
             <Banner icon="warning" title={t("review.dropped", { dropped })}>
               {t("review.droppedBody")}
+            </Banner>
+          </Tagged>
+        ) : null}
+        {empty.length > 0 ? (
+          <Tagged testId="review-empty">
+            <Banner icon="warning" title={t("review.empty.title", { count: empty.length })}>
+              <Stack gap="sm">
+                {empty.map((section) => (
+                  <Tagged key={section} testId={`review-empty-${section}`}>
+                    <Text>{t(`review.empty.${section}`)}</Text>
+                  </Tagged>
+                ))}
+                <Text tone="secondary">
+                  {t(kind === "linkedin_zip" ? "review.empty.hintZip" : "review.empty.hint")}
+                </Text>
+              </Stack>
             </Banner>
           </Tagged>
         ) : null}

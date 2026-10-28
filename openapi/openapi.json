@@ -268,7 +268,7 @@
           "sources"
         ],
         "summary": "Approve a job board.",
-        "description": "From then on searches read it. Only a candidate or a paused board whose\nconfig reads its kind and whose check (of the feed's host) found robots\nrules that allow the feed. Board owners only.",
+        "description": "From then on searches read it. Only a candidate or a paused board with\nno blocker: nothing the research found forbids reading it, its key is\nset if it needs one, its config reads its kind, and its check (of the\nfeed's host) found robots rules that allow the feed. The problem names\nthe first blocker and says what exactly. Board owners only.",
         "operationId": "sources.approve_board",
         "parameters": [
           {
@@ -324,7 +324,7 @@
             }
           },
           "409": {
-            "description": "`not_waiting`: it is approved or declined; `config_invalid`; `check_needed`: check its feed's host first; `robots_disallowed`: its robots rules forbid the feed (edit the config to an allowed path)",
+            "description": "`not_waiting`: it is approved or declined; else its first blocker: `terms_forbid`, `robots_disallowed`, `needs_key`, `no_endpoint`, `config_invalid`, `check_needed`; the detail says what exactly",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -416,7 +416,7 @@
           "sources"
         ],
         "summary": "Change a job board's config.",
-        "description": "The whole config, validated for the board's kind (unknown keys refused).\nAn approved board's new feed must still be allowed by the robots rules\nits check found. The seed list never overwrites it again. Board owners\nonly.",
+        "description": "The whole config, validated for the board's kind (or the new `kind`, as\na check's proposal gives it); unknown keys refused; a problem names the\nfield. An approved board's new feed must still be allowed by the robots\nrules its check found. The seed list never overwrites it again. Board\nowners only.",
         "operationId": "sources.set_board_config",
         "parameters": [
           {
@@ -452,7 +452,7 @@
             }
           },
           "400": {
-            "description": "`invalid_config`: the detail says what is wrong",
+            "description": "`invalid_config`: the detail names the field and says what is wrong",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -492,7 +492,7 @@
             }
           },
           "409": {
-            "description": "`robots_disallowed`: an approved board's new feed is not allowed by its robots rules",
+            "description": "`robots_disallowed`: an approved board's new feed is not allowed by its robots rules; `kind_locked`: an approved board keeps its kind",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -556,6 +556,172 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`not_board_owner`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/boards/{id}/key": {
+      "put": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Set a job board's API key.",
+        "description": "One value per parameter its config's `key` names, each 1 to 200 visible\ncharacters. Stored sealed with the instance secret and sent only to the\nhost its config reads now; never returned (the board says \"key set\").\nBoard owners only.",
+        "operationId": "sources.set_board_key",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The board.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BoardKeyChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Set.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_key`: the detail names the parameter",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`not_board_owner`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`no_key_needed`: its config names no key; `no_endpoint`: it has no address to send it to",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Remove a job board's API key.",
+        "description": "Searches stop reading it until a key is set again. Board owners only.",
+        "operationId": "sources.forget_board_key",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The board.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
                 }
               }
             }
@@ -1977,6 +2143,32 @@
         },
         "additionalProperties": false
       },
+      "BoardBlocker": {
+        "type": "object",
+        "description": "Why a board cannot be approved yet.",
+        "required": [
+          "code",
+          "detail"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "`terms_forbid`, `robots_disallowed`, `needs_key`, `no_endpoint`,\n`config_invalid`, `check_needed`; clients translate the ones they\nknow and show `detail` for any other."
+          },
+          "detail": {
+            "type": "string",
+            "description": "What exactly, in English: the terms' sentence, the rule, the field."
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where it says so (the terms page, robots.txt)."
+          }
+        },
+        "additionalProperties": false
+      },
       "BoardConfigChange": {
         "type": "object",
         "description": "A board's new config.",
@@ -1991,6 +2183,17 @@
             "propertyNames": {
               "type": "string"
             }
+          },
+          "kind": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BoardKind",
+                "description": "A new kind for it (a proposal that found a feed on an API board);\nits kind stays when left out."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false
@@ -2003,19 +2206,27 @@
           "config",
           "terms",
           "approvable",
+          "blockers",
           "can_manage"
         ],
         "properties": {
           "approvable": {
             "type": "boolean",
-            "description": "It can be approved now; else `blocked` says why."
+            "description": "It can be approved now; else `blockers` say why."
           },
           "blocked": {
             "type": [
               "string",
               "null"
             ],
-            "description": "`check_needed`, `robots_disallowed`, `config_invalid`, or none."
+            "description": "The first blocker's code (`terms_forbid`, `robots_disallowed`,\n`needs_key`, `no_endpoint`, `config_invalid`, `check_needed`), or\nnone."
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BoardBlocker"
+            },
+            "description": "Everything that stands between the board and its approval, in order,\neach with its detail; empty when it can be approved."
           },
           "board": {
             "$ref": "#/components/schemas/BoardSummary"
@@ -2038,6 +2249,17 @@
             ],
             "description": "The address its jobs are read from."
           },
+          "key": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BoardKey",
+                "description": "The API key its config says it needs: how to get one, and whether it\nis set. Never the key."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "report": {
             "oneOf": [
               {
@@ -2053,6 +2275,63 @@
             "$ref": "#/components/schemas/BoardTerms"
           }
         }
+      },
+      "BoardKey": {
+        "type": "object",
+        "description": "A board's API key, as a client sees it: never the key itself.",
+        "required": [
+          "params",
+          "how",
+          "url",
+          "set"
+        ],
+        "properties": {
+          "how": {
+            "type": "string",
+            "description": "How to get one."
+          },
+          "params": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The parameters it is sent in (one field each)."
+          },
+          "set": {
+            "type": "boolean",
+            "description": "A key is set for the host its config reads."
+          },
+          "set_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "BoardKeyChange": {
+        "type": "object",
+        "description": "A board's API key: one value per parameter its config names.",
+        "required": [
+          "values"
+        ],
+        "properties": {
+          "values": {
+            "type": "object",
+            "description": "Parameter → value (`{ \"api_key\": \"…\" }`).",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
       },
       "BoardKind": {
         "type": "string",
@@ -2100,6 +2379,27 @@
           "high",
           "low"
         ]
+      },
+      "BoardProposal": {
+        "type": "object",
+        "description": "A config a check proposes, and the kind it reads.",
+        "required": [
+          "kind",
+          "config"
+        ],
+        "properties": {
+          "config": {
+            "type": "object",
+            "description": "The config's JSON, as `PUT …/config` takes it.",
+            "additionalProperties": {},
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "kind": {
+            "$ref": "#/components/schemas/BoardKind"
+          }
+        }
       },
       "BoardRanking": {
         "type": "object",
@@ -2178,6 +2478,10 @@
             ],
             "format": "date-time"
           },
+          "config_fingerprint": {
+            "type": "string",
+            "description": "A fingerprint of the config the check read with: a seeded board\nwhose config changed since is checked again at start."
+          },
           "flags": {
             "type": "array",
             "items": {
@@ -2217,6 +2521,17 @@
           "notes": {
             "type": "string",
             "description": "For the owner, in a sentence (the seed list's notes)."
+          },
+          "proposal": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BoardProposal",
+                "description": "A config the check found for a board without a usable one: the\nowner may use it (\"Use this config\"); never applied by itself to a\nseeded or edited board."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "remote_share": {
             "type": [

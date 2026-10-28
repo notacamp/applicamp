@@ -340,9 +340,10 @@ impl Source {
                 .to_lowercase()
                 .contains('k')
                 .then(|| format!("{digits}000"));
+            let versioned = claim.chars().any(char::is_alphabetic) && !claim.ends_with(['k', 'K']);
             return self.words.contains(&digits)
                 || thousands.is_some_and(|t| self.words.contains(&t))
-                || self.squashed.contains(&squash(claim));
+                || (versioned && self.squashed.contains(&squash(claim)));
         }
         let squashed = squash(claim);
         if squashed.is_empty() {
@@ -401,12 +402,10 @@ pub fn claims(reason: &str) -> Vec<String> {
             .filter(|p| !p.is_empty())
             .enumerate()
         {
-            if tech::is_name(part) || part.chars().any(|c| c.is_ascii_digit()) {
-                found.push(part.to_owned());
-            } else if (position > 0 || inner > 0)
+            let capitalised = (position > 0 || inner > 0)
                 && part.chars().next().is_some_and(char::is_uppercase)
-                && !COMMON.contains(&part.to_lowercase().as_str())
-            {
+                && !COMMON.contains(&part.to_lowercase().as_str());
+            if tech::is_name(part) || part.chars().any(|c| c.is_ascii_digit()) || capitalised {
                 found.push(part.to_owned());
             }
         }

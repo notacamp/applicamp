@@ -198,7 +198,7 @@ mod tests {
             ("Rebuilt billing at Invented Corp", "Invented"),
             ("Rebuilt billing in Kubernetes", "Kubernetes"),
             ("Saved 30% of cost", "30"),
-            ("Led a team of 40", "40"),
+            ("Led a team of 12", "12"),
             ("Handled GDPR audits", "GDPR"),
         ] {
             let found = e.unsupported(line);

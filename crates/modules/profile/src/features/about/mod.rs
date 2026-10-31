@@ -131,6 +131,9 @@ pub struct SentenceView {
     pub kind: SentenceKind,
     /// For an assumption, why it was assumed (the person's language).
     pub why: Option<String>,
+    /// For an assumption: what is saved as the fact if the person says
+    /// "That's right".
+    pub claim: Option<String>,
     /// The check could not find it in the profile in these words, so it
     /// became an assumption.
     pub downgraded: bool,
@@ -474,6 +477,7 @@ fn told_sentences(changes: &[Change]) -> Vec<SentenceView> {
             text: c.sentence.clone(),
             kind: SentenceKind::Told,
             why: None,
+            claim: None,
             downgraded: false,
             topic: c.area,
             position: c.position,
@@ -490,6 +494,7 @@ fn sentence_view(sentence: &Sentence, choices: &BTreeMap<String, Choice>) -> Sen
         text: sentence.text.clone(),
         kind: sentence.kind,
         why: sentence.why.clone(),
+        claim: (sentence.kind == SentenceKind::Assumed).then(|| judge::claim_of(sentence)),
         downgraded: sentence.downgraded,
         topic: sentence.topic,
         position: sentence.position,
@@ -1285,7 +1290,7 @@ fn review_of(profile: &Profile, row: &Row) -> AboutReview {
                 ReviewRow {
                     id: sentence.id.clone(),
                     source: RowSource::Confirmed,
-                    text: sentence.text.clone(),
+                    text: judge::claim_of(sentence),
                     field: None,
                     flags: Vec::new(),
                     resolution: None,
@@ -1449,10 +1454,11 @@ fn apply(
         let placed = place_of(profile, sentence.role_key.as_deref())
             .and_then(|at| profile.work.get_mut(at))
             .is_some_and(|work| {
+                let claim = judge::claim_of(sentence);
                 push_fact(
                     work,
-                    &sentence.text,
-                    &sentence.text,
+                    &claim,
+                    &claim,
                     sentence.topic,
                     FactStatus::ConfirmedAssumption,
                     basis,

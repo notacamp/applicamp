@@ -24,6 +24,7 @@ const SENTENCES = [
   sentence("s1", "known", "You were Senior Engineer at Example Org."),
   sentence("s2", "told", "You told me: Moved invoicing onto PostgreSQL"),
   sentence("s3", "assumed", "I assume you led a small team.", {
+    claim: "Led a small team",
     why: "Senior titles often mean leading people.",
     position: 0,
   }),
@@ -130,6 +131,9 @@ describe("Tell me about you", () => {
     const panel = await screen.findByTestId("about-panel");
     expect(panel).toHaveTextContent("I assumed: I assume you led a small team.");
     expect(panel).toHaveTextContent("Why: Senior titles often mean leading people.");
+    expect(screen.getByTestId("about-claim")).toHaveTextContent(
+      "If right, I’ll save: Led a small team",
+    );
     expect(screen.getByTestId("about-choice-right")).toHaveTextContent("That’s right");
     expect(screen.getByTestId("about-choice-wrong")).toHaveTextContent("That’s wrong");
     expect(screen.getByTestId("about-choice-later")).toHaveTextContent("Ask me about it later");

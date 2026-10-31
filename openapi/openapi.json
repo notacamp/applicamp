@@ -10535,6 +10535,13 @@
               }
             ]
           },
+          "claim": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For an assumption: what is saved as the fact if the person says\n\"That's right\"."
+          },
           "downgraded": {
             "type": "boolean",
             "description": "The check could not find it in the profile in these words, so it\nbecame an assumption."

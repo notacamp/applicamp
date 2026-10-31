@@ -694,7 +694,8 @@
       "guess": "Lo supongo por tu puesto.",
       "right": "Es correcto",
       "wrong": "Es incorrecto",
-      "later": "Pregúntamelo más tarde"
+      "later": "Pregúntamelo más tarde",
+      "save": "Si es correcto, guardaré: {{claim}}"
     },
     "employers": {
       "title": "Antiguos empleadores que miré",

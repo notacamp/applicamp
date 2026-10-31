@@ -36,7 +36,7 @@ wrote themselves; `research`: a fact read on a past employer's own website, with
 to do something.\n\
 \n\
 Answer with one JSON object, `sentences`, in the order they read, each `{text, kind, sources, \
-why, topic, position}`:\n\
+why, claim, topic, position}`:\n\
 - `kind` `known`: says only what the cited `profile` or `told` sources say, in their terms. \
 `sources` lists their ids.\n\
 - `kind` `told`: says only what a cited `told` source says.\n\
@@ -44,7 +44,10 @@ why, topic, position}`:\n\
 you infer, or what an employer's website says about the company (cite its `research` source; \
 the person must still confirm their own part in it). Begin the text with what you assume (\"I \
 assume…\", or the equivalent in the language), and put in `why` the reason, in one sentence: \
-what is typical and what the profile does not say.\n\
+what is typical and what the profile does not say. Put in `claim` the plain statement to keep \
+if the person confirms it, as a line of their CV: no \"I assume\", no hedge, no reasoning, \
+saying nothing the `text` does not say (\"Led a small team at Example Org (3 to 6 engineers)\"). \
+For known and told sentences `claim` is empty.\n\
 - Give `assumed` sentences about a position its `position` (the index you were shown), else \
 null. `topic` is one of context, your_part, stack_scale, results, hard_problems, people, \
 stories.\n\
@@ -71,12 +74,13 @@ pub fn portrait_schema() -> Value {
                 "items": {
                     "type": "object",
                     "additionalProperties": false,
-                    "required": ["text", "kind", "sources", "why", "topic", "position"],
+                    "required": ["text", "kind", "sources", "why", "claim", "topic", "position"],
                     "properties": {
                         "text": { "type": "string" },
                         "kind": { "type": "string", "enum": ["known", "told", "assumed"] },
                         "sources": { "type": "array", "items": { "type": "string" } },
                         "why": { "type": "string" },
+                        "claim": { "type": "string" },
                         "topic": { "type": "string", "enum": areas },
                         "position": { "type": ["integer", "null"] },
                     },

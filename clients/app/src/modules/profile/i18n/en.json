@@ -694,7 +694,8 @@
       "guess": "I’m guessing from your role.",
       "right": "That’s right",
       "wrong": "That’s wrong",
-      "later": "Ask me about it later"
+      "later": "Ask me about it later",
+      "save": "If right, I’ll save: {{claim}}"
     },
     "employers": {
       "title": "Past employers I looked at",

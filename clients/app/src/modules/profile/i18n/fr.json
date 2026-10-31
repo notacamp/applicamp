@@ -694,7 +694,8 @@
       "guess": "Je le devine d’après votre poste.",
       "right": "C’est juste",
       "wrong": "C’est faux",
-      "later": "Me le demander plus tard"
+      "later": "Me le demander plus tard",
+      "save": "Si c’est juste, j’enregistrerai : {{claim}}"
     },
     "employers": {
       "title": "Anciens employeurs que j’ai regardés",

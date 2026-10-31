@@ -101,6 +101,13 @@ export function PortraitStep({ view, onContinue }: PortraitStepProps) {
               : (sentence.why ?? t("about.panel.guess"))}
             {sentence.urls.length > 0 ? ` ${sentence.urls[0] ?? ""}` : ""}
           </Text>
+          {sentence.claim === null || sentence.claim === undefined ? null : (
+            <Text size="sm" as="p">
+              <span data-testid="about-claim">
+                {t("about.panel.save", { claim: sentence.claim })}
+              </span>
+            </Text>
+          )}
           <Cluster>
             {CHOICES.map((choice) => (
               <Button

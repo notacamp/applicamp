@@ -378,7 +378,8 @@ function aboutPortrait(userContent: string) {
     why: string,
     topic: string,
     position: number | null,
-  ) => ({ text, kind, sources: cited, why, topic, position });
+    claim = "",
+  ) => ({ text, kind, sources: cited, why, claim, topic, position });
   const sentences = positions.slice(0, 3).flatMap((role) => {
     const title = role.title ?? "an engineer";
     const company = role.company ?? "an employer";
@@ -398,6 +399,7 @@ function aboutPortrait(userContent: string) {
         `${title} often means leading people. Your profile doesn’t say how many.`,
         "people",
         role.index,
+        `Led a small team at ${company} (3 to 6 people)`,
       ),
     ];
     if (role.index === 0) {
@@ -409,6 +411,7 @@ function aboutPortrait(userContent: string) {
           "That is what platforms like this are made of. Your role only says what it says.",
           "your_part",
           role.index,
+          `Worked on bookings, payments and building access at ${company}`,
         ),
       );
     }
@@ -439,6 +442,7 @@ function aboutPortrait(userContent: string) {
           "Read on the company’s own website, so I didn’t need to ask you. Tell me if your part was something else.",
           "context",
           0,
+          `${source.text} (read on its own website)`,
         ),
       ),
       ...sentences.slice(1),

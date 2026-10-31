@@ -3662,6 +3662,11 @@ export interface components {
         SentenceView: {
             choice?: components["schemas"]["Choice"] | null;
             /**
+             * @description For an assumption: what is saved as the fact if the person says
+             *     "That's right".
+             */
+            claim?: string | null;
+            /**
              * @description The check could not find it in the profile in these words, so it
              *     became an assumption.
              */

@@ -694,7 +694,8 @@
       "guess": "Estou a adivinhar pelas suas funções.",
       "right": "Está certo",
       "wrong": "Está errado",
-      "later": "Perguntar-me mais tarde"
+      "later": "Perguntar-me mais tarde",
+      "save": "Se estiver certo, vou guardar: {{claim}}"
     },
     "employers": {
       "title": "Antigos empregadores que consultei",

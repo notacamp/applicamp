@@ -77,6 +77,9 @@ pub struct RawSentence {
     pub sources: Vec<String>,
     #[serde(default)]
     pub why: String,
+    /// For an assumption: the plain statement to keep if the person confirms it.
+    #[serde(default)]
+    pub claim: String,
     #[serde(default)]
     pub topic: String,
     #[serde(default)]
@@ -99,6 +102,10 @@ pub struct Sentence {
     pub sources: Vec<String>,
     /// For an assumption: why it was assumed.
     pub why: Option<String>,
+    /// For an assumption: what is saved as the fact if the person confirms it
+    /// (no hedge, no reasoning). Older portraits have none.
+    #[serde(default)]
+    pub claim: Option<String>,
     /// The check moved it from `known` or `told` to `assumed`.
     pub downgraded: bool,
     /// What it is about.
@@ -124,6 +131,73 @@ pub struct Portrait {
 /// Cut `text` to `max` characters.
 pub fn cut(text: &str, max: usize) -> String {
     text.trim().chars().take(max).collect()
+}
+
+/// Leading hedges, in the languages the app speaks, longest first.
+const HEDGES: &[&str] = &[
+    "i assume that",
+    "i assume",
+    "i presume that",
+    "i guess that",
+    "presumo que",
+    "suponho que",
+    "presumi que",
+    "presumi",
+    "asumo que",
+    "supongo que",
+    "supuse que",
+    "supuse",
+    "je suppose que",
+    "je suppose",
+    "je présume que",
+    "je présume",
+    "j’ai supposé que",
+    "j'ai supposé que",
+];
+
+/// `text` without a leading "I assume (that)" or its equivalent, first letter
+/// in capitals.
+pub fn without_hedge(text: &str) -> String {
+    let trimmed = text.trim();
+    let lower = trimmed.to_lowercase();
+    let rest = HEDGES
+        .iter()
+        .find(|h| {
+            lower.strip_prefix(**h).is_some_and(|after| {
+                after.is_empty() || after.starts_with(|c: char| c.is_whitespace() || c == ',')
+            })
+        })
+        .map_or(trimmed, |h| {
+            let cut = trimmed
+                .char_indices()
+                .nth(h.chars().count())
+                .map_or(trimmed.len(), |(i, _)| i);
+            trimmed[cut..].trim_start_matches([',', ' '])
+        });
+    let mut chars = rest.chars();
+    chars.next().map_or_else(String::new, |first| {
+        first.to_uppercase().chain(chars).collect()
+    })
+}
+
+/// The claim saved if `sentence` is confirmed: the model's, when every claim
+/// it makes is in the sentence's own text; else the sentence without its hedge.
+fn checked_claim(claim: &str, text: &str) -> String {
+    let claim = cut(claim, MAX_SENTENCE);
+    if !claim.is_empty() && Evidence::of_texts([text]).unsupported(&claim).is_empty() {
+        claim
+    } else {
+        without_hedge(text)
+    }
+}
+
+/// What is saved if an assumption is confirmed.
+pub fn claim_of(sentence: &Sentence) -> String {
+    sentence
+        .claim
+        .clone()
+        .filter(|c| !c.is_empty())
+        .unwrap_or_else(|| without_hedge(&sentence.text))
 }
 
 /// Judge `raw` against `sources`. `role_keys` are the positions' keys, by
@@ -164,11 +238,13 @@ pub fn judge_portrait(raw: RawPortrait, sources: &[Source], role_keys: &[String]
         let position = item
             .position
             .filter(|p| usize::try_from(*p).is_ok_and(|p| p < role_keys.len()));
+        let claim = (kind == SentenceKind::Assumed).then(|| checked_claim(&item.claim, &text));
         sentences.push(Sentence {
             id: format!("s{}", sentences.len() + 1),
             text,
             kind,
             sources: cited.iter().map(|s| s.id.clone()).collect(),
+            claim,
             why: if kind == SentenceKind::Assumed {
                 why
             } else {

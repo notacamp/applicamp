@@ -191,8 +191,8 @@ the person saves.
 - **THEN** it is deleted and can no longer be kept
 
 #### Scenario: A confirmed assumption
-- **WHEN** the person confirms the assumption "I assume you led a small team" and saves
-- **THEN** it is a fact on that position marked as a confirmed assumption with the reason it was assumed, shown as such on the profile, and used as evidence like any other fact
+- **WHEN** the person confirms the assumption "I assume you led a small team at Example Co, probably 3 to 6 people" and saves
+- **THEN** the fact is its plain claim ("Led a small team at Example Co (3 to 6 people)", shown before saving, checked against the sentence's own text and falling back to the sentence without "I assume"), on that position, marked as a confirmed assumption with the reason it was assumed, shown as such on the profile, and used as evidence like any other fact
 
 ### Requirement: Grill me is small, capped and never in the background
 Each start, answer or skip SHALL make at most one model call, and no call

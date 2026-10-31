@@ -111,6 +111,9 @@ test("someone reads what Applicamp knows and assumes about them, settles two ass
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("about-panel")).toContainText("Why:");
   await expect(page.getByTestId("about-panel")).toContainText("doesn’t say how many");
+  await expect(page.getByTestId("about-claim")).toHaveText(
+    "If right, I’ll save: Led a small team at Example Co (3 to 6 people)",
+  );
   await expectNoSidewaysScroll(page);
   await page.getByTestId("about-choice-right").click();
   await expect(led).toHaveAttribute("data-kind", "confirmed");
@@ -164,6 +167,9 @@ test("someone reads what Applicamp knows and assumes about them, settles two ass
   }
   await expect(page.getByTestId("about-group-position-0")).toContainText("Confirmed");
   await expect(page.getByTestId("about-group-position-0")).toContainText("Led 4 engineers");
+  await expect(page.getByTestId("about-group-position-0")).toContainText(
+    "Led a small team at Example Co (3 to 6 people)",
+  );
   await expect(page.getByTestId("about-group-summary")).toContainText("You told me");
   await expect(page.getByTestId("about-left-out")).toBeVisible();
   await expectNoSidewaysScroll(page);
@@ -193,7 +199,7 @@ test("someone reads what Applicamp knows and assumes about them, settles two ass
   const facts = saved.work[0]?.facts ?? [];
   expect(facts.map((fact) => fact.text)).toContain("Led 4 engineers");
   const confirmed = facts.find((fact) => fact.status === "confirmed_assumption");
-  expect(confirmed?.text).toContain("I assume you led a small team at Example Co");
+  expect(confirmed?.text).toBe("Led a small team at Example Co (3 to 6 people)");
   expect(facts.some((fact) => fact.text.includes("bookings, payments"))).toBe(false);
   await expect(page.getByTestId("basics-summary")).toContainText("I ran events");
   await expect(page.getByTestId("basics-background")).toContainText("6 years");

@@ -46,7 +46,14 @@ fn reply(value: &Value) -> (&'static str, String) {
 }
 
 fn sentence(text: &str, kind: &str, sources: &[&str], why: &str, position: Option<u32>) -> Value {
-    json!({ "text": text, "kind": kind, "sources": sources, "why": why,
+    // The claim of "I assume you led a small team." is its plain statement; one
+    // with a name the sentence never says must fall back to the sentence.
+    let claim = match text {
+        "I assume you led a small team." => "Led a small team",
+        "I assume you built invoicing." => "Built invoicing at Acme",
+        _ => "",
+    };
+    json!({ "text": text, "kind": kind, "sources": sources, "why": why, "claim": claim,
             "topic": "context", "position": position })
 }
 
@@ -349,6 +356,8 @@ async fn right_wrong_and_later_are_kept_and_only_right_is_saved(db: PgPool) {
     );
     assert_eq!(review["groups"][0]["key"], "position");
     assert_eq!(review["groups"][0]["rows"][0]["source"], "confirmed");
+    // The review shows what will be saved: the claim, not the sentence.
+    assert_eq!(review["groups"][0]["rows"][0]["text"], "Led a small team");
 
     let (status, done) = h.post("/api/v1/profile/about/save").await;
     assert_eq!(status, 200, "{done}");
@@ -358,7 +367,8 @@ async fn right_wrong_and_later_are_kept_and_only_right_is_saved(db: PgPool) {
         .as_array()
         .unwrap();
     assert_eq!(facts.len(), 1);
-    assert_eq!(facts[0]["text"], "I assume you led a small team.");
+    assert_eq!(facts[0]["text"], "Led a small team");
+    assert_eq!(facts[0]["quote"], "Led a small team");
     assert_eq!(facts[0]["status"], "confirmed_assumption");
     assert_eq!(facts[0]["basis"], "Senior Engineers often lead people.");
     assert!(profile_now["profile"]["work"][1].get("facts").is_none());
@@ -656,4 +666,31 @@ fn a_change_whose_quote_is_not_theirs_is_flagged() {
     assert_eq!(changes.len(), 1);
     assert!(changes[0].open());
     assert_eq!(changes[0].flags[0].kind, judge::FlagKind::Quote);
+}
+
+#[test]
+fn a_claim_saying_more_than_its_sentence_falls_back_to_the_sentence_without_its_hedge() {
+    let raw: RawPortrait = serde_json::from_value(json!({ "sentences": [
+        { "text": "I assume that you led 4 engineers.", "kind": "assumed", "sources": [],
+          "why": "Usual.", "claim": "Led 4 engineers", "topic": "people", "position": null },
+        { "text": "I assume that you led 4 engineers.", "kind": "assumed", "sources": [],
+          "why": "Usual.", "claim": "Led 9 engineers at Acme", "topic": "people", "position": null },
+        { "text": "Je suppose que vous dirigiez une équipe.", "kind": "assumed", "sources": [],
+          "why": "", "claim": "", "topic": "people", "position": null },
+    ]})).unwrap();
+    let judged = judge::judge_portrait(raw, &[], &[]);
+    let claims: Vec<_> = judged
+        .sentences
+        .iter()
+        .map(|s| s.claim.clone().unwrap())
+        .collect();
+    assert_eq!(
+        claims,
+        [
+            "Led 4 engineers",
+            "You led 4 engineers.",
+            "Vous dirigiez une équipe."
+        ]
+    );
+    assert_eq!(judge::without_hedge("I assume it"), "It");
 }

@@ -145,7 +145,7 @@ test("someone drafts a CV, sees the lines that can't be traced to their profile,
   );
   await expect(page.getByTestId("cv-approve")).toBeDisabled();
   await expect(page.getByTestId("cv-approve")).toContainText("Approve v1");
-  const banner = await page.getByTestId("cv-banner-flagged").boundingBox();
+  const banner = await page.getByTestId("cv-first-flagged").boundingBox();
   const paper = await page.getByTestId("cv-paper").boundingBox();
   expect(banner).not.toBeNull();
   expect(paper).not.toBeNull();

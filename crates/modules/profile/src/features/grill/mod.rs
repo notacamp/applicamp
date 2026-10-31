@@ -149,12 +149,35 @@ pub struct OpenQuestion {
     pub push: bool,
 }
 
-/// A fact taken from an answer, waiting for Keep, Fix or Drop.
+/// Where a fact taken from an answer is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ProposalStatus {
+    /// Waiting for Keep, Fix or Drop.
+    Ready,
+    /// Kept: it is on the position in the profile.
+    Kept,
+    /// Dropped.
+    Dropped,
+}
+
+impl ProposalStatus {
+    fn parse(raw: &str) -> Option<Self> {
+        match raw {
+            "ready" => Some(Self::Ready),
+            "kept" => Some(Self::Kept),
+            "dropped" => Some(Self::Dropped),
+            _ => None,
+        }
+    }
+}
+
+/// A fact taken from an answer.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct ProposalView {
     /// Its id.
     pub id: Uuid,
-    /// The fact.
+    /// The fact (as the person fixed it, once kept).
     pub text: String,
     /// The person's exact words it was taken from.
     pub quote: String,
@@ -162,6 +185,8 @@ pub struct ProposalView {
     pub area: Area,
     /// The answer it was taken from.
     pub turn_seq: i32,
+    /// Waiting, kept or dropped.
+    pub status: ProposalStatus,
     /// When it is deleted if nobody keeps it.
     pub expires_at: DateTime<Utc>,
 }
@@ -206,9 +231,10 @@ pub struct GrillView {
     /// The question waiting for an answer; none when there is none (before
     /// the start, after "done", or when everything is covered).
     pub question: Option<OpenQuestion>,
-    /// Facts waiting for Keep, Fix or Drop.
+    /// Facts taken from answers in the last 24 hours, whether they wait for
+    /// Keep, Fix or Drop, were kept or were dropped.
     pub proposals: Vec<ProposalView>,
-    /// Facts the person has kept on this position.
+    /// Facts the person has kept on this position, in all.
     pub kept: u32,
     /// Model calls made today by this account, of `daily_cap`.
     pub calls_today: u32,
@@ -352,8 +378,8 @@ async fn turns_of(db: &PgPool, session: Uuid) -> Result<Vec<Turn>> {
 
 async fn proposals_of(db: &PgPool, session: Uuid, now: DateTime<Utc>) -> Result<Vec<ProposalView>> {
     let rows = sqlx::query(
-        "SELECT id, text, quote, area, turn_seq, expires_at FROM profile.grill_proposals
-          WHERE session_id = $1 AND status = 'ready' AND expires_at > $2
+        "SELECT id, text, quote, area, turn_seq, status, expires_at FROM profile.grill_proposals
+          WHERE session_id = $1 AND expires_at > $2
           ORDER BY turn_seq, id",
     )
     .bind(session)
@@ -363,12 +389,15 @@ async fn proposals_of(db: &PgPool, session: Uuid, now: DateTime<Utc>) -> Result<
     rows.into_iter()
         .map(|row| {
             let area: String = row.try_get("area")?;
+            let status: String = row.try_get("status")?;
             Ok(ProposalView {
                 id: row.try_get("id")?,
                 text: row.try_get("text")?,
                 quote: row.try_get("quote")?,
                 area: Area::parse(&area).ok_or_else(|| Error::internal("an unknown fact area"))?,
                 turn_seq: row.try_get("turn_seq")?,
+                status: ProposalStatus::parse(&status)
+                    .ok_or_else(|| Error::internal("an unknown fact status"))?,
                 expires_at: row.try_get("expires_at")?,
             })
         })
@@ -518,7 +547,16 @@ async fn ask(
     Err(last)
 }
 
-/// Facts kept or waiting, squashed: not proposed again.
+/// The facts still waiting for the person, as the model is shown them.
+fn ready_texts(proposals: &[ProposalView]) -> Vec<(Area, String)> {
+    proposals
+        .iter()
+        .filter(|p| p.status == ProposalStatus::Ready)
+        .map(|p| (p.area, p.text.clone()))
+        .collect()
+}
+
+/// Facts kept, waiting or dropped, squashed: not proposed again.
 fn known_facts(work: &Work, waiting: &[ProposalView]) -> Vec<String> {
     work.facts
         .iter()
@@ -801,8 +839,7 @@ pub async fn start(
         Some(s) => proposals_of(&state.db, s.id, now).await?,
         None => Vec::new(),
     };
-    let waiting_texts: Vec<(Area, String)> =
-        waiting.iter().map(|p| (p.area, p.text.clone())).collect();
+    let waiting_texts = ready_texts(&waiting);
     let language = prompt::language(query.locale.as_deref());
     let raw = ask(
         &state,
@@ -959,8 +996,7 @@ pub async fn answer(
     let now = state.clock.now();
     ensure_room(&state.db, account, now).await?;
     let waiting = proposals_of(&state.db, session.id, now).await?;
-    let waiting_texts: Vec<(Area, String)> =
-        waiting.iter().map(|p| (p.area, p.text.clone())).collect();
+    let waiting_texts = ready_texts(&waiting);
     let language = prompt::language(query.locale.as_deref());
     let raw = ask(
         &state,
@@ -1118,8 +1154,7 @@ pub async fn skip(
         let gateway = gateway(&ai)?;
         ensure_room(&state.db, account, now).await?;
         let waiting = proposals_of(&state.db, session.id, now).await?;
-        let waiting_texts: Vec<(Area, String)> =
-            waiting.iter().map(|p| (p.area, p.text.clone())).collect();
+        let waiting_texts = ready_texts(&waiting);
         let language = prompt::language(query.locale.as_deref());
         let raw = ask(
             &state,
@@ -1378,10 +1413,14 @@ async fn keep_proposals(
     let profile = profile.tidied();
     profile.validate()?;
     let ids: Vec<Uuid> = proposals.iter().map(|p| p.id).collect();
-    sqlx::query("UPDATE profile.grill_proposals SET status = 'kept' WHERE id = ANY($1)")
-        .bind(&ids)
-        .execute(&mut *tx)
-        .await?;
+    sqlx::query(
+        "UPDATE profile.grill_proposals SET status = 'kept', text = coalesce($2, text)
+          WHERE id = ANY($1)",
+    )
+    .bind(&ids)
+    .bind(fixed.map(str::trim))
+    .execute(&mut *tx)
+    .await?;
     let new_version = write_profile(state, &mut tx, account, &profile, Some("answer")).await?;
     // The person's own kept fact does not make the gap review stale.
     carry_forward(&mut tx, account, version, new_version, None).await?;

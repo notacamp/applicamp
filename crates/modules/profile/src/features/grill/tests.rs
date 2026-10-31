@@ -59,6 +59,16 @@ fn read_answer() -> Value {
     })
 }
 
+/// Facts of `view` still waiting for Keep, Fix or Drop.
+fn ready(view: &Value) -> usize {
+    view["proposals"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|p| p["status"] == "ready")
+        .count()
+}
+
 async fn calls(server: &MockServer) -> usize {
     server.received_requests().await.unwrap().len()
 }
@@ -166,7 +176,8 @@ async fn an_interview_pushes_back_takes_facts_and_keeps_only_what_the_person_kee
         .await;
     assert_eq!(status, 200, "{kept}");
     assert_eq!(kept["kept"], 1);
-    assert_eq!(kept["proposals"].as_array().unwrap().len(), 2);
+    assert_eq!(ready(&kept), 2);
+    assert_eq!(kept["proposals"][0]["status"], "kept");
 
     // Fix one: a claim neither the quote nor the profile makes is refused.
     let second = proposals[1]["id"].as_str().unwrap();
@@ -195,7 +206,12 @@ async fn an_interview_pushes_back_takes_facts_and_keeps_only_what_the_person_kee
         .post(&format!("/api/v1/profile/grill/proposals/{third}/drop"))
         .await;
     assert_eq!(status, 200, "{dropped}");
-    assert_eq!(dropped["proposals"], json!([]));
+    assert_eq!(ready(&dropped), 0);
+    assert_eq!(dropped["proposals"][2]["status"], "dropped");
+    assert_eq!(
+        dropped["proposals"][1]["text"],
+        "Two others helped part time"
+    );
     assert_eq!(dropped["kept"], 2);
 
     // The profile holds the two kept facts, each with the person's own words.
@@ -259,7 +275,7 @@ async fn keep_all_writes_every_waiting_fact_in_one_profile_version(db: PgPool) {
 
     let (status, view) = h.post("/api/v1/profile/grill/0/keep-all").await;
     assert_eq!(status, 200, "{view}");
-    assert_eq!(view["proposals"], json!([]));
+    assert_eq!(ready(&view), 0);
     assert_eq!(view["kept"], 3);
     let after: i32 =
         sqlx::query_scalar("SELECT version FROM profile.profiles WHERE account_id = $1")

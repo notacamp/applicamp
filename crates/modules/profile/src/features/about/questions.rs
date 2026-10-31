@@ -58,7 +58,7 @@ const MAX_CHOICE: usize = 80;
 /// What the question says it is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum Tag {
+pub enum AboutQuestionTag {
     /// "I assumed": the question confirms or corrects an assumption.
     Assumed,
     /// "I don't know": there is no basis to assume.
@@ -67,7 +67,7 @@ pub enum Tag {
     Told,
 }
 
-impl Tag {
+impl AboutQuestionTag {
     fn parse(raw: &str) -> Option<Self> {
         match raw.trim() {
             "assumed" => Some(Self::Assumed),
@@ -84,7 +84,7 @@ pub struct Asked {
     pub gap: Gap,
     pub question: String,
     pub why: String,
-    pub tag: Tag,
+    pub tag: AboutQuestionTag,
     pub choices: Vec<String>,
 }
 
@@ -118,7 +118,7 @@ impl Progress {
 
 /// The question to answer now.
 #[derive(Debug, Clone, Serialize, ToSchema)]
-pub struct QuestionView {
+pub struct AboutQuestion {
     /// The gap's id: what the answer and skip routes name.
     pub id: String,
     pub kind: GapKind,
@@ -128,7 +128,7 @@ pub struct QuestionView {
     pub question: String,
     /// What was assumed, or what is not known: why it is asked.
     pub why: String,
-    pub tag: Tag,
+    pub tag: AboutQuestionTag,
     /// For a closed question, the answers to pick from.
     pub choices: Vec<String>,
     /// The profile's strength if this is answered, 0 to 100 (the same as
@@ -138,9 +138,9 @@ pub struct QuestionView {
 
 /// The questions about the gaps.
 #[derive(Debug, Clone, Serialize, ToSchema)]
-pub struct QuestionsView {
+pub struct AboutQuestions {
     /// The question to ask now; none until `POST …/questions/next` made it.
-    pub current: Option<QuestionView>,
+    pub current: Option<AboutQuestion>,
     /// Questions answered.
     pub answered: u32,
     /// Questions skipped.
@@ -158,7 +158,7 @@ pub struct QuestionsView {
     pub updated: Vec<String>,
 }
 
-impl QuestionsView {
+impl AboutQuestions {
     fn none() -> Self {
         Self {
             current: None,
@@ -222,9 +222,9 @@ pub(super) async fn state(
     seen: Option<&crate::features::completion::Current>,
     row: &Row,
     built: bool,
-) -> Result<QuestionsView> {
+) -> Result<AboutQuestions> {
     let Some(seen) = seen.filter(|_| built) else {
-        return Ok(QuestionsView::none());
+        return Ok(AboutQuestions::none());
     };
     let now = state.clock.now();
     let skills_out = dismissed(&state.db, account).await?;
@@ -242,7 +242,7 @@ pub(super) async fn state(
         .current
         .as_ref()
         .filter(|asked| left.iter().any(|g| g.id == asked.gap.id))
-        .map(|asked| QuestionView {
+        .map(|asked| AboutQuestion {
             id: asked.gap.id.clone(),
             kind: asked.gap.kind,
             position: asked.gap.position,
@@ -255,7 +255,7 @@ pub(super) async fn state(
                 .saturating_add(gaps::gain(&asked.gap, &profile, &goals, now))
                 .min(100),
         });
-    Ok(QuestionsView {
+    Ok(AboutQuestions {
         current,
         answered: counted(progress.answered.len()),
         skipped: counted(progress.skipped.len()),
@@ -293,9 +293,9 @@ pub fn judge_question(raw: RawQuestion, gap: &Gap) -> Option<Asked> {
         .filter(|w| !w.is_empty())
         .unwrap_or_else(|| judge::cut(&gap.basis, MAX_SENTENCE));
     let tag = match gap.kind {
-        GapKind::Assumed => Tag::Assumed,
-        GapKind::Claim => Tag::Told,
-        _ => Tag::parse(&raw.tag).unwrap_or(Tag::Unknown),
+        GapKind::Assumed => AboutQuestionTag::Assumed,
+        GapKind::Claim => AboutQuestionTag::Told,
+        _ => AboutQuestionTag::parse(&raw.tag).unwrap_or(AboutQuestionTag::Unknown),
     };
     let mut choices: Vec<String> = Vec::new();
     for choice in raw.choices {
@@ -372,7 +372,7 @@ pub fn merge(pending: &mut Vec<Change>, new: Vec<Change>) -> Vec<String> {
 /// An answer to a question.
 #[derive(Debug, Clone, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
-pub struct AnswerRequest {
+pub struct AboutAnswerRequest {
     /// In their own words, up to 4000 characters; may be empty when a choice
     /// is picked.
     #[serde(default)]
@@ -533,7 +533,7 @@ pub async fn next(
         ("id" = String, Path, description = "The question on screen."),
         LocaleQuery,
     ),
-    request_body = AnswerRequest,
+    request_body = AboutAnswerRequest,
     responses(
         (status = 200, description = "The wizard's state, with the changes.", body = AboutView),
         (status = 400, description = "`invalid_text`; `invalid_choice`", body = Problem,
@@ -558,7 +558,7 @@ pub async fn answer(
     Extension(research): Extension<Researcher>,
     Path(id): Path<String>,
     Query(query): Query<LocaleQuery>,
-    body: std::result::Result<Json<AnswerRequest>, JsonRejection>,
+    body: std::result::Result<Json<AboutAnswerRequest>, JsonRejection>,
 ) -> Result<Json<AboutView>> {
     let Json(request) = body.map_err(|rejection| invalid("invalid_text", rejection.body_text()))?;
     let account = principal.account_id;

@@ -1013,7 +1013,7 @@ fn a_question_always_says_why_and_an_assumption_is_tagged_as_one() {
     );
     assert_eq!(
         asked.tag,
-        questions::Tag::Assumed,
+        questions::AboutQuestionTag::Assumed,
         "an assumption is tagged as one"
     );
     assert_eq!(
@@ -1030,13 +1030,13 @@ fn a_question_always_says_why_and_an_assumption_is_tagged_as_one() {
         questions::judge_question(raw("Why.", "told"), &unknown)
             .unwrap()
             .tag,
-        questions::Tag::Told
+        questions::AboutQuestionTag::Told
     );
     assert_eq!(
         questions::judge_question(raw("Why.", "nonsense"), &unknown)
             .unwrap()
             .tag,
-        questions::Tag::Unknown
+        questions::AboutQuestionTag::Unknown
     );
     let empty = questions::RawQuestion {
         question: " ".into(),

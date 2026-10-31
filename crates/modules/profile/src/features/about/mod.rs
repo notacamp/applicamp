@@ -247,7 +247,7 @@ pub struct AboutView {
     /// The changes proposed from it and from the answers to the questions.
     pub changes: Vec<ChangeView>,
     /// The questions about the gaps (#44).
-    pub questions: questions::QuestionsView,
+    pub questions: questions::AboutQuestions,
     /// Model calls made today by this account, of `daily_cap`.
     pub calls_today: u32,
     /// The most model calls a wizard can make for an account in a UTC day.

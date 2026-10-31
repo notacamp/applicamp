@@ -105,7 +105,13 @@
     "hidden": "Oculta: não cumpre os teus requisitos",
     "sources": "Encontrado em",
     "from": "Em {{name}}",
-    "apply": "Candidatar"
+    "apply": "Candidatar",
+    "tailored": {
+      "title": "CV à medida",
+      "lead": "Um CV para esta vaga, baseado em factos reais sobre a empresa e a vaga.",
+      "prepare": "Preparar: empresa e vaga",
+      "cost": "Cerca de {{cost}}. Nada é enviado para lado nenhum."
+    }
   },
   "hidden": {
     "reasons": {
@@ -125,6 +131,108 @@
       "yes": "Aberta a onde vives",
       "no": "Não está aberta a onde vives",
       "unclear": "Não diz a quem está aberta"
+    }
+  },
+  "prepare": {
+    "title": "Preparar",
+    "eyebrow": "CV à medida",
+    "heading": "{{title}} · {{company}}",
+    "lead": "No que se baseia um CV para esta vaga: factos lidos no site da própria empresa e o que o anúncio diz. Nada vem da memória de um modelo.",
+    "back": "Voltar ao pipeline",
+    "loading": "A carregar…",
+    "loadFailed": "Não foi possível carregar esta página.",
+    "thisCompany": "esta empresa",
+    "companyTitle": "Sobre {{company}}",
+    "site": {
+      "label": "Site de {{company}}",
+      "hint": "O site da própria empresa, não uma plataforma de emprego. Só o endereço é guardado, uma vez, para todas as vagas dela.",
+      "save": "Guardar o site",
+      "cancel": "Cancelar",
+      "is": "Site de {{company}}: {{site}}",
+      "change": "Alterar"
+    },
+    "readLead": "Lê o anúncio e o site da própria empresa (só esse site, onde o robots.txt permite) e cria os factos: uma chamada à IA, reutilizada durante 30 dias. Depois, outra compara a vaga com o seu perfil.",
+    "read": "Ler sobre {{company}} · cerca de {{cost}}",
+    "reading": "A ler…",
+    "readingLead": "A ler as páginas de {{company}} e a comparar a vaga com o seu perfil. Demora alguns segundos.",
+    "readAgain": "Ler outra vez · cerca de {{cost}}",
+    "noFacts": "Não foi possível citar nada sobre {{company}} nas suas páginas.",
+    "facts": {
+      "title": "O que dizem as páginas de {{company}}",
+      "count_one": "{{count}} facto, cada um com as palavras da própria página.",
+      "count_other": "{{count}} factos, cada um com as palavras da própria página.",
+      "pageSays": "A página diz:",
+      "removed": "Removido",
+      "undo": "Anular",
+      "remove": "Errado, remover",
+      "removeLabel": "Errado, remover: {{text}}",
+      "fetched": "lida em {{date}}"
+    },
+    "pages": {
+      "line_one": "Leu {{count}} página em {{date}}: {{pages}}. Reutilizada até {{until}}, para todas as vagas desta empresa.",
+      "line_other": "Leu {{count}} páginas em {{date}}: {{pages}}. Reutilizadas até {{until}}, para todas as vagas desta empresa.",
+      "blocked_one": "{{count}} página ficou por ler: o site pede aos robôs que não a leiam.",
+      "blocked_other": "{{count}} páginas ficaram por ler: o site pede aos robôs que não as leiam.",
+      "dropped_one": "{{count}} facto ficou de fora: a citação não está na página indicada.",
+      "dropped_other": "{{count}} factos ficaram de fora: as citações não estão nas páginas indicadas."
+    },
+    "wants": {
+      "title": "O que esta vaga mais pede",
+      "pending": "Leia sobre a empresa para ver o que a vaga mais pede.",
+      "noText": "O anúncio não tem texto para ler.",
+      "none": "Nada do que o anúncio pede pôde ser citado.",
+      "nice": "{{label}} · é um plus"
+    },
+    "questions": {
+      "title_one": "{{count}} pergunta para esta vaga",
+      "title_other": "{{count}} perguntas para esta vaga",
+      "titleNone": "Perguntas para esta vaga",
+      "lead": "Só se pergunta onde o seu perfil é fraco para o que a vaga pede. Uma resposta só chega ao seu perfil quando a guarda.",
+      "goesTo": "A sua resposta vai para {{role}}.",
+      "goesToLatest": "Esta pergunta não indica nenhuma função, por isso a resposta vai para a mais recente: {{role}}.",
+      "noPosition": "Acrescente primeiro uma função ao seu perfil: a resposta precisa de uma onde ficar.",
+      "yourAnswer": "A sua resposta",
+      "cost": "Uma chamada pequena à IA · cerca de {{cost}}",
+      "answer": "Responder",
+      "answering": "A ler a sua resposta…",
+      "dontHave": "Não tenho",
+      "dontHaveHint": "“Não” é uma boa resposta: {{skill}} fica fora dos seus CVs e não volta a ser perguntado.",
+      "skip": "Saltar",
+      "wentTo": "Retirado da sua resposta, para {{role}}.",
+      "wentToLatest": "Retirado da sua resposta, para a sua função mais recente: {{role}}.",
+      "nothing": "Nada nessa resposta pôde ser guardado como facto.",
+      "dropped_one": "{{count}} linha ficou de fora: as verificações não a conseguiram ligar às suas palavras.",
+      "dropped_other": "{{count}} linhas ficaram de fora: as verificações não as conseguiram ligar às suas palavras."
+    },
+    "draft": {
+      "title": "Redigir o CV",
+      "lead": "A seguir: o CV é redigido a partir destes factos, do seu perfil e das suas respostas, e cada linha é verificada contra eles."
+    },
+    "costLine": "Ler uma empresa: uma chamada à IA, cerca de {{read}}, reutilizada durante 30 dias. Comparar a vaga: uma chamada, cerca de {{analysis}}. Cada resposta: uma chamada pequena, cerca de {{answer}}. Nada corre em segundo plano.",
+    "spend": {
+      "month": "IA este mês: {{spent}} de {{limit}}.",
+      "monthNoLimit": "IA este mês: {{spent}}.",
+      "reads": "Empresas lidas hoje: {{n}} de {{cap}}."
+    },
+    "errors": {
+      "site_needed": "Escreva primeiro o site da empresa.",
+      "invalid_site": "Isso não é um endereço de site. Escreva-o a começar por https://.",
+      "site_not_allowed": "Esse endereço não pode ser lido. Use o site público da empresa.",
+      "site_unreachable": "Não é possível chegar ao site da empresa neste momento. Verifique o endereço ou tente mais tarde.",
+      "robots_disallows": "O site da empresa pede aos robôs que não o leiam, por isso nada foi lido.",
+      "no_pages_readable": "Nenhuma das páginas da empresa tinha texto para ler.",
+      "company_reads_daily_cap": "Já leu 20 empresas hoje. A leitura continua amanhã.",
+      "company_unknown": "Esta oportunidade ainda não tem o nome da empresa. Escreva-o primeiro.",
+      "ai_unavailable": "A IA não está configurada neste servidor, por isso nada pode ser lido.",
+      "ai_daily_limit_reached": "Atingiu o limite de IA de hoje. Continua amanhã.",
+      "ai_budget_reached": "Atingiu o seu limite de gasto em IA. Continua quando o limite for reposto.",
+      "ai_failed": "A IA não conseguiu responder desta vez. Nada se perdeu; tente outra vez.",
+      "invalid_answer": "Escreva entre 1 e 2000 caracteres.",
+      "question_closed": "Esta pergunta já foi respondida ou posta de parte.",
+      "profile_needed": "Acrescente primeiro uma função ao seu perfil: a resposta precisa de uma onde ficar.",
+      "no_skill": "Esta pergunta não é sobre uma competência.",
+      "not_found": "Esta oportunidade não foi encontrada.",
+      "generic": "Algo correu mal. Tente outra vez."
     }
   }
 }

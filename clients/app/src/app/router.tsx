@@ -18,6 +18,7 @@ import { SignedInFrame } from "./routes/frame";
 import { GoalsInterview } from "./routes/goals-interview";
 import { NotFound } from "./routes/not-found";
 import { Pipeline } from "./routes/pipeline";
+import { PipelinePrepare } from "./routes/pipeline-prepare";
 import { Profile } from "./routes/profile";
 import { ProfileGrill } from "./routes/profile-grill";
 import { ProfileImprove } from "./routes/profile-improve";
@@ -101,6 +102,27 @@ const pipelineRoute = createRoute({
         run={search.run}
         onSearch={(next) => {
           void navigate({ search: next, replace: true });
+        }}
+        onPrepare={(id) => {
+          void navigate({ to: "/pipeline/$id/prepare", params: { id } });
+        }}
+      />
+    );
+  },
+});
+
+/** Prepare a tailored CV: the company's and the job's real facts, in the app frame. */
+const prepareRoute = createRoute({
+  getParentRoute: () => frameRoute,
+  path: "/pipeline/$id/prepare",
+  component: function PrepareRoute() {
+    const { id } = prepareRoute.useParams();
+    const navigate = prepareRoute.useNavigate();
+    return (
+      <PipelinePrepare
+        id={id}
+        onBack={() => {
+          void navigate({ to: "/pipeline" });
         }}
       />
     );
@@ -321,6 +343,7 @@ const routeTree = rootRoute.addChildren([
   frameRoute.addChildren([
     todayRoute,
     pipelineRoute,
+    prepareRoute,
     boardsRoute,
     agentsRoute,
     profileRoute,

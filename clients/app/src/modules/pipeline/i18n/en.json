@@ -105,7 +105,13 @@
     "hidden": "Hidden: it doesn’t meet your requirements",
     "sources": "Found on",
     "from": "From {{name}}",
-    "apply": "Apply"
+    "apply": "Apply",
+    "tailored": {
+      "title": "Tailored CV",
+      "lead": "A CV for this job, based on real facts about the company and the job.",
+      "prepare": "Prepare: company and job",
+      "cost": "About {{cost}}. Nothing is sent anywhere."
+    }
   },
   "hidden": {
     "reasons": {
@@ -125,6 +131,108 @@
       "yes": "Open to where you live",
       "no": "Not open to where you live",
       "unclear": "Who it’s open to not stated"
+    }
+  },
+  "prepare": {
+    "title": "Prepare",
+    "eyebrow": "Tailored CV",
+    "heading": "{{title}} · {{company}}",
+    "lead": "What a CV for this job is based on: facts read on the company’s own website, and what the posting says. Nothing comes from a model’s memory.",
+    "back": "Back to the pipeline",
+    "loading": "Loading…",
+    "loadFailed": "This page couldn’t be loaded.",
+    "thisCompany": "this company",
+    "companyTitle": "About {{company}}",
+    "site": {
+      "label": "{{company}}’s website",
+      "hint": "Its own site, not a job board. Only the address is kept, once, for every job there.",
+      "save": "Save the website",
+      "cancel": "Cancel",
+      "is": "{{company}}’s website: {{site}}",
+      "change": "Change"
+    },
+    "readLead": "Reads the posting and the company’s own website (that site only, where robots.txt allows) and makes the facts: one AI call, reused for 30 days. Then one more compares the job with your profile.",
+    "read": "Read about {{company}} · about {{cost}}",
+    "reading": "Reading…",
+    "readingLead": "Reading {{company}}’s pages, then comparing the job with your profile. This takes a few seconds.",
+    "readAgain": "Read again · about {{cost}}",
+    "noFacts": "Nothing about {{company}} could be quoted from its pages.",
+    "facts": {
+      "title": "What {{company}}’s own pages say",
+      "count_one": "{{count}} fact, each with the page’s own words.",
+      "count_other": "{{count}} facts, each with the page’s own words.",
+      "pageSays": "The page says:",
+      "removed": "Removed",
+      "undo": "Undo",
+      "remove": "Wrong, remove",
+      "removeLabel": "Wrong, remove: {{text}}",
+      "fetched": "read {{date}}"
+    },
+    "pages": {
+      "line_one": "Read {{count}} page on {{date}}: {{pages}}. Reused until {{until}}, for every job at this company.",
+      "line_other": "Read {{count}} pages on {{date}}: {{pages}}. Reused until {{until}}, for every job at this company.",
+      "blocked_one": "{{count}} page was left alone: the website asks robots not to read it.",
+      "blocked_other": "{{count}} pages were left alone: the website asks robots not to read them.",
+      "dropped_one": "{{count}} fact was left out: its quote isn’t on the page it cites.",
+      "dropped_other": "{{count}} facts were left out: their quotes aren’t on the pages they cite."
+    },
+    "wants": {
+      "title": "What this job wants most",
+      "pending": "Read about the company to see what the job wants most.",
+      "noText": "The posting has no text to read.",
+      "none": "Nothing the posting asks for could be quoted.",
+      "nice": "{{label}} · nice to have"
+    },
+    "questions": {
+      "title_one": "{{count}} question for this job",
+      "title_other": "{{count}} questions for this job",
+      "titleNone": "Questions for this job",
+      "lead": "Asked only where your profile is thin for what this job wants. An answer reaches your profile only when you keep it.",
+      "goesTo": "Your answer goes on {{role}}.",
+      "goesToLatest": "This question names no position, so your answer goes on your most recent one: {{role}}.",
+      "noPosition": "Add a position to your profile first: an answer needs one to go on.",
+      "yourAnswer": "Your answer",
+      "cost": "One small AI call · about {{cost}}",
+      "answer": "Answer",
+      "answering": "Reading your answer…",
+      "dontHave": "I don’t have it",
+      "dontHaveHint": "“No” is a good answer: {{skill}} stays off your CVs and isn’t asked about again.",
+      "skip": "Skip",
+      "wentTo": "Taken from your answer, for {{role}}.",
+      "wentToLatest": "Taken from your answer, for your most recent position: {{role}}.",
+      "nothing": "Nothing in that answer could be kept as a fact.",
+      "dropped_one": "{{count}} line was left out: the checks couldn’t trace it to your words.",
+      "dropped_other": "{{count}} lines were left out: the checks couldn’t trace them to your words."
+    },
+    "draft": {
+      "title": "Draft the CV",
+      "lead": "Next: the CV is drafted from these facts, your profile and your answers, and every line is checked against them."
+    },
+    "costLine": "Reading a company: one AI call, about {{read}}, reused for 30 days. Comparing the job: one call, about {{analysis}}. Each answer: one small call, about {{answer}}. Nothing runs in the background.",
+    "spend": {
+      "month": "AI this month: {{spent}} of {{limit}}.",
+      "monthNoLimit": "AI this month: {{spent}}.",
+      "reads": "Company reads today: {{n}} of {{cap}}."
+    },
+    "errors": {
+      "site_needed": "Type the company’s website first.",
+      "invalid_site": "That isn’t a website address. Write it starting with https://.",
+      "site_not_allowed": "That address can’t be read. Use the company’s public website.",
+      "site_unreachable": "The company’s website can’t be reached right now. Check the address, or try again later.",
+      "robots_disallows": "The company’s website asks robots not to read it, so nothing was read.",
+      "no_pages_readable": "None of the company’s pages had text to read.",
+      "company_reads_daily_cap": "You’ve read 20 companies today. Reading continues tomorrow.",
+      "company_unknown": "This opportunity has no company name yet. Type it in first.",
+      "ai_unavailable": "The AI isn’t set up on this server, so nothing can be read.",
+      "ai_daily_limit_reached": "You’ve reached today’s AI limit. It continues tomorrow.",
+      "ai_budget_reached": "You’ve reached your AI spending limit. It continues when the limit resets.",
+      "ai_failed": "The AI couldn’t answer this time. Nothing was lost; try again.",
+      "invalid_answer": "Write between 1 and 2000 characters.",
+      "question_closed": "This question was already answered or put away.",
+      "profile_needed": "Add a position to your profile first: the answer needs one to go on.",
+      "no_skill": "This question isn’t about a skill.",
+      "not_found": "This opportunity wasn’t found.",
+      "generic": "Something went wrong. Try again."
     }
   }
 }

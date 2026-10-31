@@ -662,6 +662,7 @@ async fn another_accounts_opportunity_is_not_found(db: PgPool) {
         ("POST", "/drafts/1/put-back", json!({ "position": 2 })),
         ("POST", "/drafts/1/approve", json!({})),
         ("POST", "/drafts/1/discard", json!({})),
+        ("POST", "/versions", json!({ "template": "compact" })),
     ] {
         let (status, got) = if method == "GET" {
             other.get(&url(&s.opp, tail)).await
@@ -720,4 +721,339 @@ async fn the_sweep_deletes_drafts_nobody_approved_but_keeps_versions(db: PgPool)
         .await
         .unwrap();
     assert_eq!(left, 0);
+}
+
+// ---- the PDF (#38) --------------------------------------------------------------
+
+/// A draft with every flag removed, ready to approve.
+async fn ready(s: &Stack) -> Value {
+    let cv = draft(s).await;
+    let mut cv = cv;
+    for (id, _) in flagged(&cv) {
+        let (status, next) =
+            s.h.json(
+                "PATCH",
+                &url(&s.opp, &format!("/drafts/1/lines/{id}")),
+                &json!({ "remove": true }),
+            )
+            .await;
+        assert_eq!(status, StatusCode::OK, "{next}");
+        cv = next;
+    }
+    assert_eq!(cv["draft"]["can_approve"], true, "{cv}");
+    cv
+}
+
+async fn approved(s: &Stack, layout: Value) -> Value {
+    ready(s).await;
+    let (status, cv) =
+        s.h.json("POST", &url(&s.opp, "/drafts/1/approve"), &layout)
+            .await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    cv
+}
+
+fn version_pdf(opp: &str, version: u32, tail: &str) -> String {
+    url(opp, &format!("/versions/{version}/pdf{tail}"))
+}
+
+async fn stored(s: &Stack, version: i32) -> Vec<u8> {
+    sqlx::query_scalar("SELECT pdf FROM pipeline.cv_versions WHERE version = $1")
+        .bind(version)
+        .fetch_one(&s.h.db)
+        .await
+        .unwrap()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn approving_keeps_a_pdf_that_was_read_back_and_serves_it_inline_then_as_a_download(
+    db: PgPool,
+) {
+    let s = stack(db).await;
+    let cv = approved(&s, json!({})).await;
+    assert_eq!(cv["draft"]["status"], "approved");
+    assert_eq!(cv["draft"]["version"], 1);
+    let v = &cv["versions"][0];
+    assert_eq!(v["version"], 1);
+    assert_eq!(v["template"], "clean");
+    assert_eq!(v["length"], 1);
+    assert_eq!(v["pages"], 1);
+    assert_eq!(v["current"], true);
+    assert!(v["size_bytes"].as_u64().unwrap() > 1000);
+    assert!(v["downloaded_at"].is_null());
+    // What the read-back found.
+    let checks = &v["checks"];
+    assert_eq!(checks["sections"]["missing"], json!([]));
+    assert_eq!(
+        checks["sections"]["expected"],
+        json!(["Summary", "Experience", "Skills", "Education", "Languages"])
+    );
+    assert_eq!(checks["lines"]["missing"], json!([]));
+    assert_eq!(checks["keywords"]["missing"], json!([]));
+    assert_eq!(checks["text_layer"], true);
+    assert_eq!(checks["contact"]["links"], true);
+    assert_eq!(checks["size"]["pages"], 1);
+
+    // Viewing: inline, never cached or sniffed.
+    let (status, headers, bytes) = s.h.get_raw(&version_pdf(&s.opp, 1, "")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(bytes.starts_with(b"%PDF-"));
+    assert_eq!(bytes, stored(&s, 1).await);
+    let header = |name: &str| headers[name].to_str().unwrap().to_owned();
+    assert_eq!(header("content-type"), "application/pdf");
+    assert_eq!(header("cache-control"), "private, no-store");
+    assert_eq!(header("x-content-type-options"), "nosniff");
+    let disposition = header("content-disposition");
+    assert!(
+        disposition
+            .starts_with("inline; filename=\"Alex Demo CV - Example Co.pdf\"; filename*=UTF-8''"),
+        "{disposition}"
+    );
+    let (_, cv) = s.h.get(&url(&s.opp, "")).await;
+    assert!(
+        cv["versions"][0]["downloaded_at"].is_null(),
+        "viewing is not downloading"
+    );
+
+    // Downloading: an attachment, and the time is kept.
+    let (status, headers, _) = s.h.get_raw(&version_pdf(&s.opp, 1, "?download=1")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        headers["content-disposition"]
+            .to_str()
+            .unwrap()
+            .starts_with("attachment; filename=\"Alex Demo CV - Example Co.pdf\"")
+    );
+    let (_, cv) = s.h.get(&url(&s.opp, "")).await;
+    assert!(cv["versions"][0]["downloaded_at"].is_string());
+
+    // No such version.
+    let (status, _, _) = s.h.get_raw(&version_pdf(&s.opp, 2, "")).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    // The PDF text is the CV's, for an ATS: read it back here too.
+    let read = super::pdf::readback::extract(&bytes).unwrap();
+    assert!(
+        read.text.contains("Moved invoicing over to PostgreSQL"),
+        "{}",
+        read.text
+    );
+    assert!(read.text.contains("alex@example.com"));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_new_template_or_length_is_the_next_version_with_no_model_and_the_old_bytes_stay(
+    db: PgPool,
+) {
+    let s = stack(db).await;
+    approved(&s, json!({ "template": "clean", "length": 1 })).await;
+    let before = stored(&s, 1).await;
+    assert_eq!(s.model.calls(CV).await, 1);
+
+    let (status, cv) =
+        s.h.json(
+            "POST",
+            &url(&s.opp, "/versions"),
+            &json!({ "template": "compact" }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    let versions = cv["versions"].as_array().unwrap();
+    assert_eq!(versions.len(), 2);
+    assert_eq!(versions[0]["version"], 2);
+    assert_eq!(versions[0]["template"], "compact");
+    assert_eq!(versions[0]["current"], true);
+    assert_eq!(versions[1]["version"], 1);
+    assert_eq!(versions[1]["template"], "clean");
+    assert_eq!(versions[1]["current"], false);
+    // The approved draft is shown as its newest version.
+    assert_eq!(cv["draft"]["version"], 2);
+    // The same text: both say the same line.
+    assert_eq!(
+        stored(&s, 1).await,
+        before,
+        "what was sent is never overwritten"
+    );
+    assert_ne!(stored(&s, 2).await, before);
+    assert_eq!(
+        s.model.calls(CV).await,
+        1,
+        "a layout change never calls the model"
+    );
+
+    // Two pages, from the newest version's template.
+    let (status, cv) =
+        s.h.json("POST", &url(&s.opp, "/versions"), &json!({ "length": 2 }))
+            .await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    assert_eq!(cv["versions"][0]["version"], 3);
+    assert_eq!(cv["versions"][0]["template"], "compact");
+    assert_eq!(cv["versions"][0]["length"], 2);
+
+    // The layout it already has, and what cannot be asked for.
+    let (status, body) =
+        s.h.json(
+            "POST",
+            &url(&s.opp, "/versions"),
+            &json!({ "template": "compact" }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CONFLICT, "{body}");
+    assert_eq!(body["code"], "same_layout");
+    let (status, body) =
+        s.h.json("POST", &url(&s.opp, "/versions"), &json!({ "length": 3 }))
+            .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+    assert_eq!(body["code"], "invalid_length");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_pdf_needs_an_approved_cv_and_the_versions_are_capped(db: PgPool) {
+    let s = stack(db).await;
+    let (status, body) =
+        s.h.json(
+            "POST",
+            &url(&s.opp, "/versions"),
+            &json!({ "template": "compact" }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CONFLICT, "{body}");
+    assert_eq!(body["code"], "not_approved");
+
+    ready(&s).await;
+    let (status, _) =
+        s.h.json("POST", &url(&s.opp, "/drafts/1/approve"), &json!({}))
+            .await;
+    assert_eq!(status, StatusCode::OK);
+    // Filling the cap without rendering: the rows are what is counted.
+    sqlx::query(
+        "INSERT INTO pipeline.cv_versions
+            (id, account_id, opportunity_id, draft_id, version, template, length, language,
+             pdf, size_bytes, pages, checks, created_at)
+         SELECT gen_random_uuid(), account_id, opportunity_id, draft_id, 1 + g, 'clean', 1, language,
+                pdf, size_bytes, pages, checks, created_at
+           FROM pipeline.cv_versions, generate_series(1, 19) g",
+    )
+    .execute(&s.h.db)
+    .await
+    .unwrap();
+    let (status, body) =
+        s.h.json(
+            "POST",
+            &url(&s.opp, "/versions"),
+            &json!({ "template": "compact" }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS, "{body}");
+    assert_eq!(body["code"], "cv_versions_cap");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_cv_that_does_not_fit_the_length_is_not_approved_and_nothing_is_kept(db: PgPool) {
+    let s = stack(db).await;
+    ready(&s).await;
+    // Seventy lines in the first role, each word for word what the profile says.
+    let bullets: Vec<Value> = (0..70)
+        .map(|i| {
+            json!({ "id": format!("x{i}"), "text": "Led a team of 4 engineers",
+                          "sources": ["w0.h2"], "edited": false })
+        })
+        .collect();
+    sqlx::query(
+        "UPDATE pipeline.cv_drafts SET content = jsonb_set(content, '{experience,0,bullets}', $1)",
+    )
+    .bind(sqlx::types::Json(bullets))
+    .execute(&s.h.db)
+    .await
+    .unwrap();
+
+    let (status, body) =
+        s.h.json("POST", &url(&s.opp, "/drafts/1/approve"), &json!({}))
+            .await;
+    assert_eq!(status, StatusCode::CONFLICT, "{body}");
+    assert_eq!(body["code"], "cv_doesnt_fit");
+    assert_eq!(
+        body["detail"],
+        "Doesn't fit on 1 page: switch to 2 pages or remove a few lines"
+    );
+    let (_, cv) = s.h.get(&url(&s.opp, "")).await;
+    assert_eq!(cv["draft"]["status"], "draft", "nothing was approved");
+    assert_eq!(cv["versions"], json!([]));
+    let kept: i64 = sqlx::query_scalar("SELECT count(*) FROM pipeline.cv_versions")
+        .fetch_one(&s.h.db)
+        .await
+        .unwrap();
+    assert_eq!(kept, 0);
+
+    // Two pages take it.
+    let (status, cv) =
+        s.h.json(
+            "POST",
+            &url(&s.opp, "/drafts/1/approve"),
+            &json!({ "length": 2 }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    assert_eq!(cv["versions"][0]["pages"], 2);
+    assert_eq!(cv["versions"][0]["length"], 2);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_cvs_page_lists_every_version_and_live_draft_of_the_account_and_no_one_elses(
+    db: PgPool,
+) {
+    let s = stack(db.clone()).await;
+    // Nothing yet.
+    let (status, list) = s.h.get("/api/v1/cvs").await;
+    assert_eq!(status, StatusCode::OK, "{list}");
+    assert_eq!(list["items"], json!([]));
+
+    approved(&s, json!({})).await;
+    let (status, _) =
+        s.h.json(
+            "POST",
+            &url(&s.opp, "/versions"),
+            &json!({ "template": "compact" }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    // A draft on another job.
+    let second = add(&s.h, "shortlisted").await;
+    let (status, _) = s.h.json("POST", &url(&second, "/drafts"), &json!({})).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (_, list) = s.h.get("/api/v1/cvs").await;
+    let items = list["items"].as_array().unwrap();
+    assert_eq!(items.len(), 3, "{list}");
+    // Newest first: the draft, v2, v1.
+    assert_eq!(items[0]["kind"], "draft");
+    assert_eq!(items[0]["status"], "draft");
+    assert_eq!(items[0]["opportunity_id"], second);
+    assert!(items[0]["version"].is_null());
+    assert_eq!(items[1]["kind"], "version");
+    assert_eq!(items[1]["version"], 2);
+    assert_eq!(items[1]["template"], "compact");
+    assert_eq!(items[1]["current"], true);
+    assert_eq!(items[1]["company"], "Example Co");
+    assert_eq!(items[1]["title"], "Staff Engineer");
+    assert_eq!(items[1]["opportunity_id"], s.opp);
+    assert_eq!(items[2]["version"], 1);
+    assert_eq!(items[2]["current"], false);
+    assert_eq!(items[2]["pages"], 1);
+    assert!(items[2]["size_bytes"].as_u64().unwrap() > 1000);
+
+    // Someone else sees none of it, and cannot open its PDF.
+    let other = Harness::as_account(db, Uuid::now_v7(), Arc::clone(&s.fake));
+    let (_, list) = other.get("/api/v1/cvs").await;
+    assert_eq!(list["items"], json!([]));
+    let (status, _, _) = other.get_raw(&version_pdf(&s.opp, 1, "")).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    let (status, _, _) = other.get_raw(&version_pdf(&s.opp, 1, "?download=1")).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    let downloaded: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM pipeline.cv_versions WHERE downloaded_at IS NOT NULL",
+    )
+    .fetch_one(&s.h.db)
+    .await
+    .unwrap();
+    assert_eq!(downloaded, 0, "a refused download is not a download");
 }

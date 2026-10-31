@@ -843,6 +843,43 @@
         ]
       }
     },
+    "/api/v1/cvs": {
+      "get": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Every CV the person has.",
+        "description": "The PDF versions and the drafts still being reviewed, across all the\nopportunities of the account (the ones put away included: a PDF is what was\nsent), newest first. Never calls a model.",
+        "operationId": "pipeline.cvs",
+        "responses": {
+          "200": {
+            "description": "The CVs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CvList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/v1/goals": {
       "get": {
         "tags": [
@@ -2119,7 +2156,7 @@
           "pipeline"
         ],
         "summary": "Approve the draft.",
-        "description": "Refused (409 `lines_flagged`) while any line or skill cannot be traced to\nthe profile. The draft is frozen as the next version (contact details are\nread from the profile again); part B renders it as a PDF. No model call.",
+        "description": "Refused (409 `lines_flagged`) while any line or skill cannot be traced to\nthe profile. The draft is frozen, its text rendered as a PDF with the\n`template` and `length` asked for (Clean, 1 page by default), the PDF read\nback out and compared with the CV, and the PDF kept as the next version:\nall or nothing. If it does not fit the length (`cv_doesnt_fit`) or the\nread-back finds it lacking (`cv_pdf_check_failed`, with the reasons, one\nper line), nothing is approved. Contact details are read from the profile\nagain. No model call.",
         "operationId": "pipeline.cv_approve",
         "parameters": [
           {
@@ -2144,6 +2181,17 @@
             }
           }
         ],
+        "requestBody": {
+          "description": "The look of the PDF; optional.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LayoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "The CV, with the version.",
@@ -2151,6 +2199,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Cv"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_layout`; `invalid_length`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -2176,7 +2234,17 @@
             }
           },
           "409": {
-            "description": "`lines_flagged`; `draft_frozen`",
+            "description": "`lines_flagged`; `draft_frozen`; `cv_doesnt_fit`; `cv_pdf_check_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`cv_pdf_unavailable`",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2575,6 +2643,199 @@
           },
           "409": {
             "description": "`draft_frozen`; `already_on_cv`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/cv/versions": {
+      "post": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Make another version of the approved CV.",
+        "description": "The latest approved draft's text, rendered with `template` and `length`\n(what the newest version has when left out), read back, and kept as the\nnext version. **No model call.** The earlier versions are untouched. Refused\nwhen the text does not fit the length (`cv_doesnt_fit`) or the read-back\nfinds the PDF lacking (`cv_pdf_check_failed`, with the reasons, one per\nline). At most 20 versions per opportunity.",
+        "operationId": "pipeline.cv_version",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LayoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The CV, with the new version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cv"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_layout`; `invalid_length`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`not_approved`; `same_layout`; `cv_doesnt_fit`; `cv_pdf_check_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`cv_versions_cap`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`cv_pdf_unavailable`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/cv/versions/{version}/pdf": {
+      "get": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "The PDF of a version.",
+        "description": "`Content-Type: application/pdf`, shown inline, named\n`<Name> CV - <Company>.pdf`. `?download=1` serves it as an attachment and\nsets the version's `downloaded_at`. Never cached, never sniffed. Another\naccount's version is not found.",
+        "operationId": "pipeline.cv_pdf",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "description": "The version.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "download",
+            "in": "query",
+            "description": "`1` serves it as an attachment and records the download.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The PDF.",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "int32",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6048,6 +6309,29 @@
         },
         "additionalProperties": false
       },
+      "ContactCheck": {
+        "type": "object",
+        "description": "Name, email and links as text.",
+        "required": [
+          "name",
+          "email",
+          "links"
+        ],
+        "properties": {
+          "email": {
+            "type": "boolean",
+            "description": "The email is text in the PDF (true when the CV has none)."
+          },
+          "links": {
+            "type": "boolean",
+            "description": "Every link is text and a real link in the PDF."
+          },
+          "name": {
+            "type": "boolean",
+            "description": "The name is text in the PDF (true when the CV has none)."
+          }
+        }
+      },
       "ContactView": {
         "type": "object",
         "description": "How to reach the person, from the profile.",
@@ -6172,7 +6456,7 @@
             "items": {
               "$ref": "#/components/schemas/CvVersion"
             },
-            "description": "The approved versions, newest first (no PDF yet)."
+            "description": "The PDF versions, newest first."
           }
         }
       },
@@ -6384,27 +6668,195 @@
           }
         }
       },
-      "CvVersion": {
-        "type": "object",
-        "description": "An approved version.",
-        "required": [
-          "n",
+      "CvKind": {
+        "type": "string",
+        "description": "What a row of the CVs page is.",
+        "enum": [
           "version",
-          "language",
-          "approved_at"
+          "draft"
+        ]
+      },
+      "CvList": {
+        "type": "object",
+        "description": "Every CV of the account.",
+        "required": [
+          "items"
         ],
         "properties": {
-          "approved_at": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CvListItem"
+            },
+            "description": "Newest first: every PDF version and every draft being reviewed, across\nthe opportunities (at most 200)."
+          }
+        }
+      },
+      "CvListItem": {
+        "type": "object",
+        "description": "One row of the CVs page.",
+        "required": [
+          "kind",
+          "opportunity_id",
+          "title",
+          "company",
+          "draft",
+          "status",
+          "language",
+          "created_at",
+          "current"
+        ],
+        "properties": {
+          "company": {
+            "type": "string"
+          },
+          "created_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "current": {
+            "type": "boolean",
+            "description": "The newest version of its opportunity."
+          },
+          "downloaded_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "draft": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The draft it comes from.",
+            "minimum": 0
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CvKind"
           },
           "language": {
             "type": "string"
           },
+          "opportunity_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "pages": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "size_bytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          },
+          "status": {
+            "$ref": "#/components/schemas/DraftStatus",
+            "description": "`approved` for a version, `draft` for a draft being reviewed."
+          },
+          "template": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Template"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "type": "string",
+            "description": "The role."
+          },
+          "version": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The version, for a PDF.",
+            "minimum": 0
+          }
+        }
+      },
+      "CvVersion": {
+        "type": "object",
+        "description": "An approved version: the approved text as a PDF.",
+        "required": [
+          "n",
+          "version",
+          "language",
+          "approved_at",
+          "template",
+          "length",
+          "pages",
+          "size_bytes",
+          "created_at",
+          "current",
+          "checks"
+        ],
+        "properties": {
+          "approved_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the draft was approved."
+          },
+          "checks": {
+            "$ref": "#/components/schemas/PdfChecks",
+            "description": "What the read-back found."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When this PDF was made."
+          },
+          "current": {
+            "type": "boolean",
+            "description": "The newest version of the opportunity."
+          },
+          "downloaded_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "The last time it was downloaded; none if it never was."
+          },
+          "language": {
+            "type": "string"
+          },
+          "length": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The most pages it may take: 1 or 2.",
+            "minimum": 0
+          },
           "n": {
             "type": "integer",
             "format": "int32",
+            "description": "The draft it renders.",
             "minimum": 0
+          },
+          "pages": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The pages it takes.",
+            "minimum": 0
+          },
+          "size_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "template": {
+            "$ref": "#/components/schemas/Template"
           },
           "version": {
             "type": "integer",
@@ -7415,6 +7867,35 @@
           }
         }
       },
+      "KeywordsCheck": {
+        "type": "object",
+        "description": "The job keywords the review showed as on the CV, against the PDF.",
+        "required": [
+          "total",
+          "found",
+          "missing"
+        ],
+        "properties": {
+          "found": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many the PDF's text has.",
+            "minimum": 0
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many were on the CV.",
+            "minimum": 0
+          }
+        }
+      },
       "Language": {
         "type": "object",
         "description": "A language they speak.",
@@ -7470,6 +7951,33 @@
             ]
           }
         }
+      },
+      "LayoutRequest": {
+        "type": "object",
+        "description": "The look of a PDF.",
+        "properties": {
+          "length": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The most pages: 1 (the default) or 2.",
+            "minimum": 0
+          },
+          "template": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Template",
+                "description": "`clean` (the default) or `compact`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
       },
       "LeftOut": {
         "type": "object",
@@ -7638,6 +8146,27 @@
           }
         }
       },
+      "LinesCheck": {
+        "type": "object",
+        "description": "Every line of the CV against the PDF's text.",
+        "required": [
+          "total",
+          "missing"
+        ],
+        "properties": {
+          "missing": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MissingLine"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
       "Link": {
         "type": "object",
         "description": "A profile elsewhere.",
@@ -7725,6 +8254,23 @@
               "$ref": "#/components/schemas/Provider"
             },
             "description": "The providers that sign them in."
+          }
+        }
+      },
+      "MissingLine": {
+        "type": "object",
+        "description": "A line the PDF did not give back.",
+        "required": [
+          "id",
+          "text"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The line (its id on the CV), or the head of a role or school."
+          },
+          "text": {
+            "type": "string"
           }
         }
       },
@@ -8199,6 +8745,39 @@
                 "type": "null"
               }
             ]
+          }
+        }
+      },
+      "PdfChecks": {
+        "type": "object",
+        "description": "What was checked on a PDF, kept with its version.",
+        "required": [
+          "sections",
+          "keywords",
+          "lines",
+          "text_layer",
+          "contact",
+          "size"
+        ],
+        "properties": {
+          "contact": {
+            "$ref": "#/components/schemas/ContactCheck"
+          },
+          "keywords": {
+            "$ref": "#/components/schemas/KeywordsCheck"
+          },
+          "lines": {
+            "$ref": "#/components/schemas/LinesCheck"
+          },
+          "sections": {
+            "$ref": "#/components/schemas/SectionsCheck"
+          },
+          "size": {
+            "$ref": "#/components/schemas/SizeCheck"
+          },
+          "text_layer": {
+            "type": "boolean",
+            "description": "There is text, and no picture: one text layer."
           }
         }
       },
@@ -9257,6 +9836,30 @@
           "nightly"
         ]
       },
+      "SectionsCheck": {
+        "type": "object",
+        "description": "The section headings of the CV against the PDF's text.",
+        "required": [
+          "expected",
+          "missing"
+        ],
+        "properties": {
+          "expected": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The headings the CV has."
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The ones the PDF's text does not have as whole words."
+          }
+        }
+      },
       "Seniority": {
         "type": "string",
         "description": "Which levels fit.",
@@ -9294,6 +9897,33 @@
           }
         },
         "additionalProperties": false
+      },
+      "SizeCheck": {
+        "type": "object",
+        "description": "The pages and the size.",
+        "required": [
+          "pages",
+          "length",
+          "bytes"
+        ],
+        "properties": {
+          "bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "length": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The length the person chose, in pages.",
+            "minimum": 0
+          },
+          "pages": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
       },
       "Skill": {
         "type": "object",
@@ -9648,6 +10278,14 @@
             "description": "Where the review is (the same review as the questions')."
           }
         }
+      },
+      "Template": {
+        "type": "string",
+        "description": "How the CV looks.",
+        "enum": [
+          "clean",
+          "compact"
+        ]
       },
       "Today": {
         "type": "object",

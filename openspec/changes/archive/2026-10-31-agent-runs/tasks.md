@@ -12,7 +12,7 @@
 - [x] 3.1 `crates/agent` runner + the `runs.probe` kind and its `probe_echo` tool; agent image in `publish.yml`
 - [x] 3.2 `policies/probe.yaml` + `cargo xtask policies` in CI
 ## 4. Client
-- [ ] 4.1 Agents page: run list, live console (SSE), sandbox log, run facts, Run a check, Stop
+- [x] 4.1 Agents page: run list, live console (SSE), sandbox log, run facts, Run a check, Stop
 ## 5. Finish
-- [ ] 5.1 Tests: lifecycle with the fake runtime (success, failure, timeout, cancel, sweep), token checks (wrong run, finished run, expired, tool not allowed, cap reached, bad arguments), cap enforcement on `complete`; e2e: Run a check → succeeded with its events and a blocked request visible (desktop + phone)
-- [ ] 5.2 OpenAPI + client types regenerated, changelog entry, gates green in CI, recording at 375px and desktop
+- [x] 5.1 Tests: lifecycle with the fake runtime (success, failure, timeout, cancel, sweep), token checks (wrong run, finished run, expired, tool not allowed, cap reached, bad arguments), cap enforcement on `complete`; e2e: Run a check → succeeded with its events and a blocked request visible (desktop + phone)
+- [x] 5.2 OpenAPI + client types regenerated, changelog entry, gates green in CI, recording at 375px and desktop

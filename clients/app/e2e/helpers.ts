@@ -110,3 +110,22 @@ export function boardBySlug(page: Page, slug: string) {
     };
   }, slug);
 }
+
+/**
+ * Calls the API from the signed-in page like {@link callApi} and gives the
+ * answer's status and JSON body.
+ */
+export function callApiJson(page: Page, method: string, path: string, body?: unknown) {
+  return page.evaluate(
+    async ({ method, path, body }) => {
+      const response = await fetch(path, {
+        method,
+        headers: { "content-type": "application/json", "X-Applicamp-CSRF": "1" },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+      const text = await response.text();
+      return { status: response.status, body: (text === "" ? null : JSON.parse(text)) as unknown };
+    },
+    { method, path, body },
+  );
+}

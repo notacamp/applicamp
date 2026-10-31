@@ -256,6 +256,116 @@ pub async fn matching(db: &PgPool, account: Uuid) -> Result<Option<Matching>> {
     }))
 }
 
+/// One position of a profile, as the job analysis is shown it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DigestRole {
+    /// Its place in the profile's `work` list.
+    pub index: usize,
+    /// The title.
+    pub position: Option<String>,
+    /// The company.
+    pub company: Option<String>,
+    /// `YYYY`, `YYYY-MM` or `YYYY-MM-DD`.
+    pub start_date: Option<String>,
+    /// As `start_date`; none for a current position.
+    pub end_date: Option<String>,
+    /// The texts of the facts the person kept on it.
+    pub facts: Vec<String>,
+}
+
+/// A profile in the fewest words a job can be read against: roles with
+/// dates and their kept facts, and skill names. No name, no contact
+/// details, no links.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Digest {
+    /// The positions, in the profile's order.
+    pub roles: Vec<DigestRole>,
+    /// The skills' names.
+    pub skills: Vec<String>,
+    /// The most recent position (its place in `roles`' `index`): the one
+    /// facts go on when a question names none.
+    pub latest: Option<usize>,
+    /// Skills the person said are not theirs (lower case): never asked
+    /// about again.
+    pub dismissed_skills: Vec<String>,
+}
+
+/// The most recent position of `work`: one without an end date, else the
+/// latest end; ties go to the latest start, then the first listed.
+fn latest_position(work: &[crate::schema::Work]) -> Option<usize> {
+    work.iter()
+        .enumerate()
+        .max_by(|(ia, a), (ib, b)| {
+            let key = |w: &crate::schema::Work| {
+                (
+                    w.end_date.clone().unwrap_or_else(|| "9999".to_owned()),
+                    w.start_date.clone().unwrap_or_default(),
+                )
+            };
+            key(a).cmp(&key(b)).then(ib.cmp(ia))
+        })
+        .map(|(index, _)| index)
+}
+
+/// `account`'s profile as a [`Digest`]; none until there is a profile.
+pub async fn digest(db: &PgPool, account: Uuid) -> Result<Option<Digest>> {
+    let Some((profile, _)) = profile_of(db, account).await? else {
+        return Ok(None);
+    };
+    let dismissed: Vec<String> =
+        sqlx::query_scalar("SELECT name_key FROM profile.skill_dismissals WHERE account_id = $1")
+            .bind(account)
+            .fetch_all(db)
+            .await?;
+    Ok(Some(Digest {
+        latest: latest_position(&profile.work),
+        roles: profile
+            .work
+            .iter()
+            .enumerate()
+            .map(|(index, work)| DigestRole {
+                index,
+                position: work.position.clone(),
+                company: work.name.clone(),
+                start_date: work.start_date.clone(),
+                end_date: work.end_date.clone(),
+                facts: work.facts.iter().map(|f| f.text.clone()).collect(),
+            })
+            .collect(),
+        skills: profile
+            .skills
+            .iter()
+            .map(|skill| skill.name.trim().to_owned())
+            .filter(|name| !name.is_empty())
+            .collect(),
+        dismissed_skills: dismissed,
+    }))
+}
+
+/// Say `name` is not one of the person's skills: it is not suggested or
+/// asked about again, whatever the profile says later.
+pub async fn dismiss_skill(
+    db: &PgPool,
+    account: Uuid,
+    name: &str,
+    now: DateTime<Utc>,
+) -> Result<()> {
+    let key = name.trim().to_lowercase();
+    if key.is_empty() {
+        return Ok(());
+    }
+    sqlx::query(
+        "INSERT INTO profile.skill_dismissals (account_id, name_key, created_at)
+         VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+    )
+    .bind(account)
+    .bind(&key)
+    .bind(now)
+    .execute(db)
+    .await?;
+    Ok(())
+}
+
 /// The accounts with a profile and at least one goal answered: the ones a
 /// nightly search runs for.
 pub async fn accounts_with_goals(db: &PgPool) -> Result<Vec<Uuid>> {

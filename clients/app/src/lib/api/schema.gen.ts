@@ -343,6 +343,180 @@ export interface paths {
         patch: operations["pipeline.update"];
         trace?: never;
     };
+    "/api/v1/opportunities/{id}/brief": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The brief of an opportunity.
+         * @description What a tailored CV for it would be based on, as it is now: the company's
+         *     site (or that the person has to type it), the facts read on it, what the
+         *     job wants most, the questions where the profile is thin, what each step
+         *     costs and what was spent. **Never calls the model and never fetches.**
+         *     Another account's opportunity is not found.
+         */
+        get: operations["pipeline.brief"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/brief/facts/{fact_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a fact: "Wrong, remove".
+         * @description It stays removed on later reads, and Undo (`…/restore`) brings it back.
+         */
+        delete: operations["pipeline.brief_remove_fact"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/brief/facts/{fact_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Undo a removal: the fact is back. */
+        post: operations["pipeline.brief_restore_fact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/brief/questions/{question_id}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer a question.
+         * @description **One small model call** reads the answer as Grill me does, with the same
+         *     checks: each fact quotes the person's own words and says nothing they or
+         *     their profile do not. The facts wait on the position the question is about
+         *     (the most recent one when it names none: `defaulted`), to be kept, fixed or
+         *     dropped with Grill me's endpoints (`/api/v1/profile/grill/proposals/{id}/…`).
+         *     Nothing reaches the profile until a click.
+         */
+        post: operations["pipeline.brief_answer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/brief/questions/{question_id}/dont-have": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * "I don't have it."
+         * @description For a question about a skill: the skill is recorded as not theirs (like a
+         *     dismissed suggestion), and neither it nor this question is asked about
+         *     again. No model call. A question with no skill is a 400.
+         */
+        post: operations["pipeline.brief_dont_have"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/brief/questions/{question_id}/skip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Skip a question: it is hidden for this opportunity. No model call. */
+        post: operations["pipeline.brief_skip"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/brief/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Read about the company and compare the job.
+         * @description Reads the company's own pages (the posting, its home page and up to five
+         *     pages it links to about the company; the same site only, where robots.txt
+         *     allows) and makes the facts: **one model call**, reused for 30 days per
+         *     company unless `again=true`. Then compares the posting with those facts and
+         *     a compact profile: **one more call**, reused until the posting changes.
+         *     Each fact must quote the page it cites, or it is left out. At most
+         *     20 company reads per account per UTC day, fetches included.
+         */
+        post: operations["pipeline.brief_read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/brief/site": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Type the company's website.
+         * @description Only its host (and port) is kept, on the company: it is asked once, and
+         *     wins over every guess. The address must be one the server may ask (a public
+         *     https address). A different site than before forgets the facts read on the
+         *     old one.
+         */
+        put: operations["pipeline.brief_set_site"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/profile": {
         parameters: {
             query?: never;
@@ -1090,6 +1264,41 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description A fact taken from an answer, waiting for Keep, Fix or Drop. */
+        AnswerProposal: {
+            /** @description What it is about (Grill me's areas). */
+            area: string;
+            /** Format: date-time */
+            expires_at: string;
+            /**
+             * Format: uuid
+             * @description For `POST /api/v1/profile/grill/proposals/{id}/keep` (and `…/drop`).
+             */
+            id: string;
+            /** @description The person's exact words. */
+            quote: string;
+            text: string;
+        };
+        /** @description The person's answer. */
+        AnswerRequest: {
+            /** @description In their own words, 1 to 2000 characters. */
+            text: string;
+        };
+        /** @description What an answer came to. */
+        AnswerResult: {
+            /** @description The question named no position, so the most recent one was used. */
+            defaulted: boolean;
+            /**
+             * Format: int32
+             * @description Lines the checks left out.
+             */
+            dropped: number;
+            /** @description The facts, checked against the person's words and the profile. */
+            proposals: components["schemas"]["AnswerProposal"][];
+            question: components["schemas"]["BriefQuestion"];
+            /** @description The position the facts are about. */
+            role: components["schemas"]["RoleRef"];
+        };
         /** @description How to apply a draft. */
         ApplyImport: {
             /** @description Replace the profile, or merge into it. */
@@ -1398,6 +1607,98 @@ export interface components {
              */
             read: number;
         };
+        /** @description The brief of an opportunity. */
+        Brief: {
+            /** @description The company, as the opportunity names it. */
+            company: string;
+            estimates: components["schemas"]["Estimates"];
+            /** @description The facts, removed ones included (marked), oldest first. */
+            facts: components["schemas"]["BriefFact"][];
+            latest_role?: components["schemas"]["RoleRef"] | null;
+            /** Format: uuid */
+            opportunity_id: string;
+            /** @description The questions, in the order they are asked. */
+            questions: components["schemas"]["BriefQuestion"][];
+            read?: components["schemas"]["CompanyRead"] | null;
+            /** @description Its website (an origin); none until it is known. */
+            site?: string | null;
+            /** @description The person has to type the site (once). */
+            site_needed: boolean;
+            site_source?: components["schemas"]["SiteOrigin"] | null;
+            spend: components["schemas"]["BriefSpend"];
+            /** @description What the job wants most; none until it was compared. */
+            wants?: components["schemas"]["BriefWant"][] | null;
+        };
+        /** @description A fact read on the company's own site. */
+        BriefFact: {
+            /**
+             * Format: date-time
+             * @description When that page was fetched.
+             */
+            fetched_at?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** @description The page's own words that say it. */
+            quote: string;
+            /** @description The person removed it ("Wrong, remove"); Undo restores it. */
+            removed: boolean;
+            /** @description The fact. */
+            text: string;
+            /** @description The page it was read on. */
+            url: string;
+        };
+        /** @description A page that was fetched. */
+        BriefPage: {
+            /** Format: date-time */
+            fetched_at: string;
+            /** @description `posting`, `home` or `linked`. */
+            kind: string;
+            url: string;
+        };
+        /** @description A question where the profile is thin for what the job wants. */
+        BriefQuestion: {
+            about?: components["schemas"]["RoleRef"] | null;
+            /** Format: uuid */
+            id: string;
+            /** @description It names the company fact or the posting line it comes from. */
+            question: string;
+            /**
+             * @description The skill it is about, if it is about one: "I don't have it" is
+             *     offered.
+             */
+            skill?: string | null;
+            state: components["schemas"]["QuestionState"];
+        };
+        /** @description What was spent, and the cap on company reads. */
+        BriefSpend: {
+            /** Format: double */
+            day_limit_eur?: number | null;
+            /** Format: double */
+            month_eur: number;
+            /** Format: double */
+            month_limit_eur?: number | null;
+            /**
+             * Format: int32
+             * @description The most company reads an account can start in a UTC day.
+             */
+            reads_cap: number;
+            /**
+             * Format: int32
+             * @description Company reads started today (UTC).
+             */
+            reads_today: number;
+            /** Format: double */
+            today_eur: number;
+        };
+        /** @description Something the job wants, with the posting's words. */
+        BriefWant: {
+            /** @description Short. */
+            label: string;
+            /** @description `must` when the posting requires it, `nice` when it only prefers it. */
+            level: string;
+            /** @description The posting's exact words for it. */
+            quote: string;
+        };
         /** @description The least they would take, before tax. */
         CashFloor: {
             /**
@@ -1420,6 +1721,31 @@ export interface components {
             name: string;
             /** @description Where it can be checked. */
             url?: string | null;
+        };
+        /** @description The last read of the company's pages. */
+        CompanyRead: {
+            /**
+             * Format: int32
+             * @description Facts left out because their quote is not on the page they cite.
+             */
+            facts_dropped: number;
+            /**
+             * Format: date-time
+             * @description The facts are reused until then; "Read again" reads sooner.
+             */
+            fresh_until: string;
+            /** @description The pages fetched. */
+            pages: components["schemas"]["BriefPage"][];
+            /**
+             * Format: int32
+             * @description Pages left alone because the site's robots.txt forbids us.
+             */
+            pages_blocked: number;
+            /**
+             * Format: date-time
+             * @description When.
+             */
+            read_at: string;
         };
         /**
          * @description What kind of company.
@@ -1499,6 +1825,24 @@ export interface components {
             startDate?: string | null;
             /** @description The degree ("Master's"). */
             studyType?: string | null;
+        };
+        /** @description What each step costs, in euros, about. */
+        Estimates: {
+            /**
+             * Format: double
+             * @description Comparing the job: one call, reused until the posting changes.
+             */
+            analysis_eur: number;
+            /**
+             * Format: double
+             * @description Answering one question: one small call.
+             */
+            answer_eur: number;
+            /**
+             * Format: double
+             * @description Reading the company's pages: one call, reused for 30 days.
+             */
+            company_read_eur: number;
         };
         /**
          * @description What a posting says about a fact a requirement is checked on.
@@ -2178,6 +2522,11 @@ export interface components {
          * @enum {string}
          */
         QuestionSection: "work" | "basics.label" | "basics.summary" | "education" | "links";
+        /**
+         * @description Where a question is.
+         * @enum {string}
+         */
+        QuestionState: "open" | "answered" | "skipped" | "dont_have";
         /** @description The questions that would fill the profile's gaps. */
         QuestionsView: {
             /**
@@ -2256,6 +2605,18 @@ export interface components {
             position?: string | null;
             /** @description `YYYY`, `YYYY-MM` or `YYYY-MM-DD`. */
             start_date?: string | null;
+        };
+        /** @description A position of the profile. */
+        RoleRef: {
+            /** @description Its company. */
+            company?: string | null;
+            /**
+             * Format: int32
+             * @description Its place in the profile's `work` list.
+             */
+            position: number;
+            /** @description Its title. */
+            title?: string | null;
         };
         /** @description A job a check read as a sample. */
         SampleJob: {
@@ -2411,6 +2772,16 @@ export interface components {
          * @enum {string}
          */
         Seniority: "junior" | "mid" | "senior" | "staff" | "principal" | "lead" | "manager" | "director" | "founding";
+        /**
+         * @description Where the company's site came from.
+         * @enum {string}
+         */
+        SiteOrigin: "board" | "apply_host" | "person";
+        /** @description The company's website, typed. */
+        SiteRequest: {
+            /** @description An http or https address; only its host (and port) is kept. */
+            url: string;
+        };
         /** @description A skill. */
         Skill: {
             /** @description How well, in their words. */
@@ -3546,6 +3917,459 @@ export interface operations {
             };
             /** @description `not_editable`: its title, company and place come from the job board */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.brief": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The brief. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Brief"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.brief_remove_fact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+                /** @description The fact. */
+                fact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The brief. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Brief"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.brief_restore_fact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+                /** @description The fact. */
+                fact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The brief. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Brief"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.brief_answer": {
+        parameters: {
+            query?: {
+                /** @description A language tag such as `pt-PT`; English when left out. */
+                locale?: string;
+            };
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+                /** @description The question. */
+                question_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnswerRequest"];
+            };
+        };
+        responses: {
+            /** @description What the answer came to. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnswerResult"];
+                };
+            };
+            /** @description `invalid_answer` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `question_closed`; `profile_needed` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.brief_dont_have": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+                /** @description The question. */
+                question_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The brief. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Brief"];
+                };
+            };
+            /** @description `no_skill`: the question is not about a skill */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `question_closed` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.brief_skip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+                /** @description The question. */
+                question_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The brief. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Brief"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `question_closed` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.brief_read": {
+        parameters: {
+            query?: {
+                /** @description A language tag such as `pt-PT`; English when left out. */
+                locale?: string;
+                /** @description Read the company's pages again, even though its facts are fresh. */
+                again?: boolean;
+            };
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The brief, after the read. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Brief"];
+                };
+            };
+            /** @description `site_needed`; `company_unknown` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `robots_disallows`; `no_pages_readable` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `company_reads_daily_cap` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `site_unreachable`; `ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.brief_set_site": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteRequest"];
+            };
+        };
+        responses: {
+            /** @description The brief. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Brief"];
+                };
+            };
+            /** @description `invalid_site`; `site_not_allowed`; `company_unknown` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

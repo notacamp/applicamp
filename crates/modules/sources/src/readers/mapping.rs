@@ -284,6 +284,7 @@ pub fn job_of(item: &impl Item, config: &BoardConfig, board: &BoardRef) -> Optio
                 url: url.clone(),
             }],
             apply_url: get(&f.apply_url).as_deref().and_then(link_of),
+            company_url: get(&f.company_url).as_deref().and_then(link),
             regions,
             expires_at,
             pay,

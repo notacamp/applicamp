@@ -10,3 +10,10 @@ export {
 } from "./api/opportunities";
 export { todayQuery, useToday, type NextStep, type Today, type TodaySearch } from "./api/today";
 export { PipelinePage, type PipelinePageProps } from "./components/PipelinePage/PipelinePage";
+export { PreparePage, type PreparePageProps } from "./components/Prepare/PreparePage";
+export {
+  canPrepare,
+  type AnswerProposal,
+  type AnswerResult,
+  type RoleRef as BriefRole,
+} from "./api/brief";

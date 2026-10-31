@@ -21,8 +21,10 @@ import {
   useUndoToast,
 } from "~/lib/ui";
 
+import { canPrepare, PREPARE_ESTIMATE_EUR } from "../../api/brief";
 import {
   factsText,
+  formatCost,
   formatShortDate,
   hiddenReasonText,
   sourceHue,
@@ -44,6 +46,8 @@ export interface OpportunityPeekProps {
   /** The opportunity open; none closes the peek. */
   id: string | null;
   onClose: () => void;
+  /** Open the page that prepares a tailored CV for it; none hides the Tailored CV block. */
+  onPrepare?: ((id: string) => void) | undefined;
 }
 
 /**
@@ -52,7 +56,7 @@ export interface OpportunityPeekProps {
  * gaps, the posting's text and link, notes, and Not for me. One that doesn't
  * meet the requirements says so. Opening it once marks a new match seen.
  */
-export function OpportunityPeek({ id, onClose }: OpportunityPeekProps) {
+export function OpportunityPeek({ id, onClose, onPrepare }: OpportunityPeekProps) {
   const { t } = useTranslation("pipeline");
   const opportunity = useOpportunity(id);
   const data = id === null ? undefined : opportunity.data;
@@ -75,12 +79,22 @@ export function OpportunityPeek({ id, onClose }: OpportunityPeekProps) {
       {data === undefined && !opportunity.isError ? (
         <Text tone="secondary">{t("loading")}</Text>
       ) : null}
-      {data === undefined ? null : <PeekBody key={data.id} opportunity={data} onClose={onClose} />}
+      {data === undefined ? null : (
+        <PeekBody key={data.id} opportunity={data} onClose={onClose} onPrepare={onPrepare} />
+      )}
     </SidePeek>
   );
 }
 
-function PeekBody({ opportunity, onClose }: { opportunity: Opportunity; onClose: () => void }) {
+function PeekBody({
+  opportunity,
+  onClose,
+  onPrepare,
+}: {
+  opportunity: Opportunity;
+  onClose: () => void;
+  onPrepare: ((id: string) => void) | undefined;
+}) {
   const { t, i18n } = useTranslation("pipeline");
   const update = useUpdateOpportunity();
   const undo = useUndoToast();
@@ -258,6 +272,29 @@ function PeekBody({ opportunity, onClose }: { opportunity: Opportunity; onClose:
       {opportunity.gaps.length === 0 ? null : (
         <Section title={t("peek.gaps")} testId="peek-gaps">
           <Bullets items={opportunity.gaps} />
+        </Section>
+      )}
+      {onPrepare === undefined || !canPrepare(opportunity.stage) ? null : (
+        <Section
+          title={t("peek.tailored.title")}
+          description={t("peek.tailored.lead")}
+          testId="peek-tailored"
+        >
+          <Cluster>
+            <Button
+              variant="primary"
+              icon="arrow-right"
+              data-testid="peek-prepare"
+              onClick={() => {
+                onPrepare(opportunity.id);
+              }}
+            >
+              {t("peek.tailored.prepare")}
+            </Button>
+            <Text tone="secondary" size="sm">
+              {t("peek.tailored.cost", { cost: formatCost(PREPARE_ESTIMATE_EUR, i18n.language) })}
+            </Text>
+          </Cluster>
         </Section>
       )}
       <Section title={t("peek.notes")} testId="peek-notes">

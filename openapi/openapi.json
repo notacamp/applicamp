@@ -1268,6 +1268,683 @@
         ]
       }
     },
+    "/api/v1/opportunities/{id}/brief": {
+      "get": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "The brief of an opportunity.",
+        "description": "What a tailored CV for it would be based on, as it is now: the company's\nsite (or that the person has to type it), the facts read on it, what the\njob wants most, the questions where the profile is thin, what each step\ncosts and what was spent. **Never calls the model and never fetches.**\nAnother account's opportunity is not found.",
+        "operationId": "pipeline.brief",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The brief.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Brief"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/brief/facts/{fact_id}": {
+      "delete": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Remove a fact: \"Wrong, remove\".",
+        "description": "It stays removed on later reads, and Undo (`…/restore`) brings it back.",
+        "operationId": "pipeline.brief_remove_fact",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fact_id",
+            "in": "path",
+            "description": "The fact.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The brief.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Brief"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/brief/facts/{fact_id}/restore": {
+      "post": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Undo a removal: the fact is back.",
+        "operationId": "pipeline.brief_restore_fact",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fact_id",
+            "in": "path",
+            "description": "The fact.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The brief.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Brief"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/brief/questions/{question_id}/answer": {
+      "post": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Answer a question.",
+        "description": "**One small model call** reads the answer as Grill me does, with the same\nchecks: each fact quotes the person's own words and says nothing they or\ntheir profile do not. The facts wait on the position the question is about\n(the most recent one when it names none: `defaulted`), to be kept, fixed or\ndropped with Grill me's endpoints (`/api/v1/profile/grill/proposals/{id}/…`).\nNothing reaches the profile until a click.",
+        "operationId": "pipeline.brief_answer",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "question_id",
+            "in": "path",
+            "description": "The question.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "description": "A language tag such as `pt-PT`; English when left out.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnswerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "What the answer came to.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnswerResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_answer`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`question_closed`; `profile_needed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/brief/questions/{question_id}/dont-have": {
+      "post": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "\"I don't have it.\"",
+        "description": "For a question about a skill: the skill is recorded as not theirs (like a\ndismissed suggestion), and neither it nor this question is asked about\nagain. No model call. A question with no skill is a 400.",
+        "operationId": "pipeline.brief_dont_have",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "question_id",
+            "in": "path",
+            "description": "The question.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The brief.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Brief"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`no_skill`: the question is not about a skill",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`question_closed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/brief/questions/{question_id}/skip": {
+      "post": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Skip a question: it is hidden for this opportunity. No model call.",
+        "operationId": "pipeline.brief_skip",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "question_id",
+            "in": "path",
+            "description": "The question.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The brief.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Brief"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`question_closed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/brief/read": {
+      "post": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Read about the company and compare the job.",
+        "description": "Reads the company's own pages (the posting, its home page and up to five\npages it links to about the company; the same site only, where robots.txt\nallows) and makes the facts: **one model call**, reused for 30 days per\ncompany unless `again=true`. Then compares the posting with those facts and\na compact profile: **one more call**, reused until the posting changes.\nEach fact must quote the page it cites, or it is left out. At most\n20 company reads per account per UTC day, fetches included.",
+        "operationId": "pipeline.brief_read",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "description": "A language tag such as `pt-PT`; English when left out.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "again",
+            "in": "query",
+            "description": "Read the company's pages again, even though its facts are fresh.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The brief, after the read.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Brief"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`site_needed`; `company_unknown`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`robots_disallows`; `no_pages_readable`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`company_reads_daily_cap`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`site_unreachable`; `ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/brief/site": {
+      "put": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Type the company's website.",
+        "description": "Only its host (and port) is kept, on the company: it is asked once, and\nwins over every guess. The address must be one the server may ask (a public\nhttps address). A different site than before forgets the facts read on the\nold one.",
+        "operationId": "pipeline.brief_set_site",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The brief.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Brief"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_site`; `site_not_allowed`; `company_unknown`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/v1/profile": {
       "get": {
         "tags": [
@@ -3392,6 +4069,90 @@
   },
   "components": {
     "schemas": {
+      "AnswerProposal": {
+        "type": "object",
+        "description": "A fact taken from an answer, waiting for Keep, Fix or Drop.",
+        "required": [
+          "id",
+          "text",
+          "quote",
+          "area",
+          "expires_at"
+        ],
+        "properties": {
+          "area": {
+            "type": "string",
+            "description": "What it is about (Grill me's areas)."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "For `POST /api/v1/profile/grill/proposals/{id}/keep` (and `…/drop`)."
+          },
+          "quote": {
+            "type": "string",
+            "description": "The person's exact words."
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "AnswerRequest": {
+        "type": "object",
+        "description": "The person's answer.",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "In their own words, 1 to 2000 characters."
+          }
+        },
+        "additionalProperties": false
+      },
+      "AnswerResult": {
+        "type": "object",
+        "description": "What an answer came to.",
+        "required": [
+          "question",
+          "role",
+          "defaulted",
+          "proposals",
+          "dropped"
+        ],
+        "properties": {
+          "defaulted": {
+            "type": "boolean",
+            "description": "The question named no position, so the most recent one was used."
+          },
+          "dropped": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Lines the checks left out.",
+            "minimum": 0
+          },
+          "proposals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnswerProposal"
+            },
+            "description": "The facts, checked against the person's words and the profile."
+          },
+          "question": {
+            "$ref": "#/components/schemas/BriefQuestion"
+          },
+          "role": {
+            "$ref": "#/components/schemas/RoleRef",
+            "description": "The position the facts are about."
+          }
+        }
+      },
       "ApplyImport": {
         "type": "object",
         "description": "How to apply a draft.",
@@ -4162,6 +4923,274 @@
           }
         }
       },
+      "Brief": {
+        "type": "object",
+        "description": "The brief of an opportunity.",
+        "required": [
+          "opportunity_id",
+          "company",
+          "site_needed",
+          "facts",
+          "questions",
+          "estimates",
+          "spend"
+        ],
+        "properties": {
+          "company": {
+            "type": "string",
+            "description": "The company, as the opportunity names it."
+          },
+          "estimates": {
+            "$ref": "#/components/schemas/Estimates"
+          },
+          "facts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BriefFact"
+            },
+            "description": "The facts, removed ones included (marked), oldest first."
+          },
+          "latest_role": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RoleRef",
+                "description": "The most recent position of the profile: where an answer goes when\nits question names none."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "opportunity_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BriefQuestion"
+            },
+            "description": "The questions, in the order they are asked."
+          },
+          "read": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CompanyRead",
+                "description": "The last read; none until the company was read."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "site": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its website (an origin); none until it is known."
+          },
+          "site_needed": {
+            "type": "boolean",
+            "description": "The person has to type the site (once)."
+          },
+          "site_source": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SiteOrigin"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "spend": {
+            "$ref": "#/components/schemas/BriefSpend"
+          },
+          "wants": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/BriefWant"
+            },
+            "description": "What the job wants most; none until it was compared."
+          }
+        }
+      },
+      "BriefFact": {
+        "type": "object",
+        "description": "A fact read on the company's own site.",
+        "required": [
+          "id",
+          "text",
+          "quote",
+          "url",
+          "removed"
+        ],
+        "properties": {
+          "fetched_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When that page was fetched."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quote": {
+            "type": "string",
+            "description": "The page's own words that say it."
+          },
+          "removed": {
+            "type": "boolean",
+            "description": "The person removed it (\"Wrong, remove\"); Undo restores it."
+          },
+          "text": {
+            "type": "string",
+            "description": "The fact."
+          },
+          "url": {
+            "type": "string",
+            "description": "The page it was read on."
+          }
+        }
+      },
+      "BriefPage": {
+        "type": "object",
+        "description": "A page that was fetched.",
+        "required": [
+          "url",
+          "fetched_at",
+          "kind"
+        ],
+        "properties": {
+          "fetched_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "kind": {
+            "type": "string",
+            "description": "`posting`, `home` or `linked`."
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "BriefQuestion": {
+        "type": "object",
+        "description": "A question where the profile is thin for what the job wants.",
+        "required": [
+          "id",
+          "question",
+          "state"
+        ],
+        "properties": {
+          "about": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RoleRef",
+                "description": "The position an answer is about; none: the most recent one\n(`latest_role` of the brief) and the page says so."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "question": {
+            "type": "string",
+            "description": "It names the company fact or the posting line it comes from."
+          },
+          "skill": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The skill it is about, if it is about one: \"I don't have it\" is\noffered."
+          },
+          "state": {
+            "$ref": "#/components/schemas/QuestionState"
+          }
+        }
+      },
+      "BriefSpend": {
+        "type": "object",
+        "description": "What was spent, and the cap on company reads.",
+        "required": [
+          "today_eur",
+          "month_eur",
+          "reads_today",
+          "reads_cap"
+        ],
+        "properties": {
+          "day_limit_eur": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "month_eur": {
+            "type": "number",
+            "format": "double"
+          },
+          "month_limit_eur": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "reads_cap": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The most company reads an account can start in a UTC day.",
+            "minimum": 0
+          },
+          "reads_today": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Company reads started today (UTC).",
+            "minimum": 0
+          },
+          "today_eur": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "BriefWant": {
+        "type": "object",
+        "description": "Something the job wants, with the posting's words.",
+        "required": [
+          "label",
+          "quote",
+          "level"
+        ],
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "Short."
+          },
+          "level": {
+            "type": "string",
+            "description": "`must` when the posting requires it, `nice` when it only prefers it."
+          },
+          "quote": {
+            "type": "string",
+            "description": "The posting's exact words for it."
+          }
+        }
+      },
       "CashFloor": {
         "type": "object",
         "description": "The least they would take, before tax.",
@@ -4222,6 +5251,48 @@
           }
         },
         "additionalProperties": false
+      },
+      "CompanyRead": {
+        "type": "object",
+        "description": "The last read of the company's pages.",
+        "required": [
+          "read_at",
+          "fresh_until",
+          "pages",
+          "pages_blocked",
+          "facts_dropped"
+        ],
+        "properties": {
+          "facts_dropped": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Facts left out because their quote is not on the page they cite.",
+            "minimum": 0
+          },
+          "fresh_until": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The facts are reused until then; \"Read again\" reads sooner."
+          },
+          "pages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BriefPage"
+            },
+            "description": "The pages fetched."
+          },
+          "pages_blocked": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Pages left alone because the site's robots.txt forbids us.",
+            "minimum": 0
+          },
+          "read_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When."
+          }
+        }
       },
       "CompanyStage": {
         "type": "string",
@@ -4412,6 +5483,32 @@
           }
         },
         "additionalProperties": false
+      },
+      "Estimates": {
+        "type": "object",
+        "description": "What each step costs, in euros, about.",
+        "required": [
+          "company_read_eur",
+          "analysis_eur",
+          "answer_eur"
+        ],
+        "properties": {
+          "analysis_eur": {
+            "type": "number",
+            "format": "double",
+            "description": "Comparing the job: one call, reused until the posting changes."
+          },
+          "answer_eur": {
+            "type": "number",
+            "format": "double",
+            "description": "Answering one question: one small call."
+          },
+          "company_read_eur": {
+            "type": "number",
+            "format": "double",
+            "description": "Reading the company's pages: one call, reused for 30 days."
+          }
+        }
       },
       "Fact": {
         "type": "string",
@@ -6041,6 +7138,16 @@
           "links"
         ]
       },
+      "QuestionState": {
+        "type": "string",
+        "description": "Where a question is.",
+        "enum": [
+          "open",
+          "answered",
+          "skipped",
+          "dont_have"
+        ]
+      },
       "QuestionsView": {
         "type": "object",
         "description": "The questions that would fill the profile's gaps.",
@@ -6220,6 +7327,35 @@
               "null"
             ],
             "description": "`YYYY`, `YYYY-MM` or `YYYY-MM-DD`."
+          }
+        }
+      },
+      "RoleRef": {
+        "type": "object",
+        "description": "A position of the profile.",
+        "required": [
+          "position"
+        ],
+        "properties": {
+          "company": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its company."
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Its place in the profile's `work` list.",
+            "minimum": 0
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its title."
           }
         }
       },
@@ -6577,6 +7713,29 @@
           "director",
           "founding"
         ]
+      },
+      "SiteOrigin": {
+        "type": "string",
+        "description": "Where the company's site came from.",
+        "enum": [
+          "board",
+          "apply_host",
+          "person"
+        ]
+      },
+      "SiteRequest": {
+        "type": "object",
+        "description": "The company's website, typed.",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "An http or https address; only its host (and port) is kept."
+          }
+        },
+        "additionalProperties": false
       },
       "Skill": {
         "type": "object",

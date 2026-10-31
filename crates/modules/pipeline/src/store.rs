@@ -14,7 +14,10 @@ use chrono::{DateTime, Utc};
 use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
-use crate::events::OpportunityAdded;
+use crate::{
+    companies::{self, SiteSource},
+    events::OpportunityAdded,
+};
 
 /// Longest title, company, location, next step or pay, in characters.
 pub const MAX_SHORT: usize = 300;
@@ -184,6 +187,8 @@ pub struct Found {
     pub dedupe_key: Option<String>,
     /// Every job board it was seen on.
     pub sources: Vec<SourceLink>,
+    /// The company's own website, when the board gives it.
+    pub company_site: Option<String>,
 }
 
 /// A new opportunity, checked and trimmed, ready to insert.
@@ -208,6 +213,7 @@ pub(crate) struct NewRow {
     pub canonical_url: Option<String>,
     pub dedupe_key: Option<String>,
     pub sources: Vec<SourceLink>,
+    pub company_site: Option<String>,
 }
 
 impl NewRow {
@@ -247,6 +253,7 @@ impl NewRow {
                 .filter_map(SourceLink::tidied)
                 .take(MAX_SOURCES)
                 .collect(),
+            company_site: tidy(found.company_site.as_deref(), MAX_URL),
         })
     }
 }
@@ -329,6 +336,12 @@ pub(crate) async fn insert(
     .await?;
     if let Some(opportunity) = id {
         add_sources(conn, opportunity, &row.sources, now).await?;
+        // The board gave the company's website: it is asked of the person
+        // never.
+        if let Some(site) = row.company_site.as_deref().and_then(companies::origin_of) {
+            companies::note_site(conn, account, &row.company, &site, SiteSource::Board, now)
+                .await?;
+        }
         events
             .publish(
                 conn,

@@ -60,6 +60,7 @@ pub mod job_boards;
 pub mod lisbon;
 pub mod matching;
 pub mod net;
+pub mod pages;
 pub mod pay;
 pub mod places;
 pub mod ports;

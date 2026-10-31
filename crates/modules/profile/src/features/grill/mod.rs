@@ -11,6 +11,7 @@
 //! of [`DAILY_CAP`] calls per account per UTC day on top of the AI budget.
 //! What the model says is trusted only as far as [`judge`] allows.
 
+pub mod about;
 pub mod judge;
 pub mod prompt;
 #[cfg(test)]
@@ -633,16 +634,18 @@ async fn store_proposals(
     turn_seq: i32,
     facts: &[NewFact],
     now: DateTime<Utc>,
-) -> Result<Option<DateTime<Utc>>> {
+) -> Result<Vec<FactProposal>> {
     let expires_at = now + DRAFT_LIFETIME;
+    let mut stored = Vec::with_capacity(facts.len());
     for fact in facts {
+        let id = Uuid::now_v7();
         sqlx::query(
             "INSERT INTO profile.grill_proposals
                 (id, session_id, account_id, position, turn_seq, text, quote, area, status,
                  created_at, expires_at)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'ready', $9, $10)",
         )
-        .bind(Uuid::now_v7())
+        .bind(id)
         .bind(session)
         .bind(account)
         .bind(position)
@@ -654,12 +657,20 @@ async fn store_proposals(
         .bind(expires_at)
         .execute(&mut *tx)
         .await?;
+        stored.push(FactProposal {
+            id,
+            text: fact.text.clone(),
+            quote: fact.quote.clone(),
+            area: fact.area,
+            turn_seq,
+            status: FactProposalStatus::Ready,
+            expires_at,
+        });
     }
-    if facts.is_empty() {
-        return Ok(None);
+    if !facts.is_empty() {
+        jobs::enqueue_at(&mut *tx, &ExpireImports {}, expires_at).await?;
     }
-    jobs::enqueue_at(&mut *tx, &ExpireImports {}, expires_at).await?;
-    Ok(Some(expires_at))
+    Ok(stored)
 }
 
 fn position_index(position: usize) -> Result<i32> {

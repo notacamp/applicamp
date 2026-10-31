@@ -12,10 +12,18 @@
 //! the profile is, the latest search) are [`ports::Neighbours`], which the
 //! server implements; modules never import each other.
 //!
+//! - **The brief** (`/api/v1/opportunities/{id}/brief`): what a tailored CV
+//!   is based on. The company's own pages (its site, asked once; read on a
+//!   click, cached 30 days) become facts that each quote their page; the
+//!   posting becomes what the job wants most and up to three questions where
+//!   the profile is thin; an answer becomes facts on a position, kept with
+//!   Grill me's Keep, Fix or Drop.
+//!
 //! Publishes `pipeline.opportunity_added` (ids only).
 
 #![forbid(unsafe_code)]
 
+pub mod companies;
 pub mod events;
 pub mod features;
 pub mod ports;
@@ -23,6 +31,7 @@ pub mod store;
 
 use std::sync::Arc;
 
+use applicamp_ai::Gateway;
 use applicamp_kernel::{Module, jobs::Background};
 use axum::Extension;
 use utoipa_axum::{router::OpenApiRouter, routes};
@@ -38,22 +47,35 @@ pub struct PipelineDeps {
     /// The other modules, through the server. Without them (a catalogue
     /// composition) links are never read and Today is unavailable.
     pub neighbours: Option<Arc<dyn Neighbours>>,
+    /// The AI gateway: its `complete` role reads a company's pages and
+    /// compares a job with the profile. Without it those say they are
+    /// unavailable.
+    pub ai: Option<Gateway>,
 }
 
 impl std::fmt::Debug for PipelineDeps {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("PipelineDeps")
             .field("neighbours", &self.neighbours.is_some())
+            .field("ai", &self.ai.is_some())
             .finish()
     }
 }
 
 /// The pipeline module, composed with `deps`.
 pub fn module(deps: PipelineDeps) -> Module {
-    use features::{opportunities, today};
+    use features::{brief, opportunities, today};
     let router = OpenApiRouter::new()
         .routes(routes!(opportunities::list, opportunities::add))
         .routes(routes!(opportunities::get, opportunities::update))
+        .routes(routes!(brief::get))
+        .routes(routes!(brief::set_site))
+        .routes(routes!(brief::read))
+        .routes(routes!(brief::remove_fact))
+        .routes(routes!(brief::restore_fact))
+        .routes(routes!(brief::answer))
+        .routes(routes!(brief::dont_have))
+        .routes(routes!(brief::skip))
         .routes(routes!(today::get))
         .layer(Extension(deps));
     Module {

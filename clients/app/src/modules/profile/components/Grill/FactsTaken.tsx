@@ -27,8 +27,8 @@ export interface FactsTakenProps {
   view: GrillView;
   /** The facts taken from one answer. */
   facts: readonly FactProposal[];
-  /** That answer's turn, for the test ids. */
-  turn: number;
+  /** That answer's turn (or another key), for the test ids. */
+  turn: number | string;
   /** The role's name, for "Saved to …". */
   role: string;
 }

@@ -19,6 +19,12 @@
 //!   the profile is thin; an answer becomes facts on a position, kept with
 //!   Grill me's Keep, Fix or Drop.
 //!
+//! - **The tailored CV** (`/api/v1/opportunities/{id}/cv`): a draft per
+//!   opportunity (one model call), every line citing the profile sources it
+//!   comes from, a fact check without a model that blocks Approve while a
+//!   line says what its sources do not, review (edit, remove, "it's true",
+//!   put back) and approval as a version.
+//!
 //! Publishes `pipeline.opportunity_added` (ids only).
 
 #![forbid(unsafe_code)]
@@ -64,7 +70,7 @@ impl std::fmt::Debug for PipelineDeps {
 
 /// The pipeline module, composed with `deps`.
 pub fn module(deps: PipelineDeps) -> Module {
-    use features::{brief, opportunities, today};
+    use features::{brief, cv, opportunities, today};
     let router = OpenApiRouter::new()
         .routes(routes!(opportunities::list, opportunities::add))
         .routes(routes!(opportunities::get, opportunities::update))
@@ -76,12 +82,21 @@ pub fn module(deps: PipelineDeps) -> Module {
         .routes(routes!(brief::answer))
         .routes(routes!(brief::dont_have))
         .routes(routes!(brief::skip))
+        .routes(routes!(cv::get))
+        .routes(routes!(cv::create))
+        .routes(routes!(cv::change_line))
+        .routes(routes!(cv::confirm_line))
+        .routes(routes!(cv::put_back))
+        .routes(routes!(cv::approve))
+        .routes(routes!(cv::discard))
         .routes(routes!(today::get))
         .layer(Extension(deps));
     Module {
         name: NAME,
         router,
-        background: Background::new().publishes::<events::OpportunityAdded>(),
+        background: Background::new()
+            .job::<cv::ExpireCvDrafts>()
+            .publishes::<events::OpportunityAdded>(),
     }
 }
 

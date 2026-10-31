@@ -5,7 +5,7 @@
 //! The summary a search sends to the model is compact and leaves out who
 //! the person is: no name, address, links or contact details.
 
-use applicamp_kernel::Result;
+use applicamp_kernel::{AppState, Error, Result};
 use chrono::{DateTime, Datelike as _, Utc};
 use serde_json::{Value, json};
 use sqlx::PgPool;
@@ -14,7 +14,7 @@ use uuid::Uuid;
 use crate::{
     features::completion,
     goals::Goals,
-    schema::Profile,
+    schema::{Area, Profile, ProfileFact, Skill},
     strength::{self, Strength},
 };
 
@@ -292,7 +292,7 @@ pub struct Digest {
 
 /// The most recent position of `work`: one without an end date, else the
 /// latest end; ties go to the latest start, then the first listed.
-fn latest_position(work: &[crate::schema::Work]) -> Option<usize> {
+pub fn latest_position(work: &[crate::schema::Work]) -> Option<usize> {
     work.iter()
         .enumerate()
         .max_by(|(ia, a), (ib, b)| {
@@ -340,6 +340,115 @@ pub async fn digest(db: &PgPool, account: Uuid) -> Result<Option<Digest>> {
             .collect(),
         dismissed_skills: dismissed,
     }))
+}
+
+/// `account`'s whole profile, as a tailored CV is made from it; none until
+/// there is one.
+pub async fn current_profile(db: &PgPool, account: Uuid) -> Result<Option<Profile>> {
+    Ok(profile_of(db, account).await?.map(|(profile, _)| profile))
+}
+
+/// The longest fact a person can add to a position from a CV.
+pub const MAX_CV_FACT: usize = 300;
+
+/// Keep `text` as a fact on position `position`, in the person's own words
+/// (it is its own quote), as Grill me's Keep does: a new profile version.
+/// The position must still be the one named (`title`, `company`), else the
+/// profile changed since the CV was made (409 `profile_changed`). Returns the
+/// fact's id.
+#[allow(clippy::too_many_arguments)]
+pub async fn keep_fact(
+    state: &AppState,
+    account: Uuid,
+    position: usize,
+    title: Option<&str>,
+    company: Option<&str>,
+    text: &str,
+    area: Area,
+) -> Result<String> {
+    let text = text.trim();
+    if text.is_empty() || text.chars().count() > MAX_CV_FACT {
+        return Err(Error::BadRequest(
+            "invalid_fact",
+            format!("Write between 1 and {MAX_CV_FACT} characters."),
+        ));
+    }
+    let mut tx = state.db.begin().await?;
+    let (mut profile, version) = lock(&mut tx, account).await?;
+    let stale = || {
+        Error::Conflict(
+            "profile_changed",
+            "That position changed since this CV was made. Make the CV again.".to_owned(),
+        )
+    };
+    let work = profile
+        .work
+        .get_mut(position)
+        .filter(|w| w.position.as_deref() == title && w.name.as_deref() == company)
+        .ok_or_else(stale)?;
+    let id = Uuid::now_v7().to_string();
+    work.facts.push(ProfileFact {
+        id: id.clone(),
+        text: text.to_owned(),
+        quote: text.to_owned(),
+        area,
+        kept_at: state.clock.now(),
+    });
+    let profile = profile.tidied();
+    profile.validate()?;
+    let new_version =
+        completion::write_profile(state, &mut tx, account, &profile, Some("answer")).await?;
+    completion::carry_forward(&mut tx, account, version, new_version, None).await?;
+    tx.commit().await?;
+    Ok(id)
+}
+
+/// Add `name` to the end of the person's skills (if they do not have it
+/// already, as an alias counts), and forget they ever said it is not theirs.
+pub async fn add_skill(state: &AppState, account: Uuid, name: &str) -> Result<()> {
+    let name = name.trim();
+    if name.is_empty() || name.chars().count() > crate::schema::MAX_SHORT {
+        return Err(Error::BadRequest(
+            "invalid_skill",
+            "Write a skill of up to 300 characters.".to_owned(),
+        ));
+    }
+    let mut tx = state.db.begin().await?;
+    let (mut profile, version) = lock(&mut tx, account).await?;
+    if !profile
+        .skills
+        .iter()
+        .any(|s| applicamp_kernel::tech::same_skill(&s.name, name))
+    {
+        profile.skills.push(Skill {
+            name: name.to_owned(),
+            level: None,
+        });
+        let profile = profile.tidied();
+        profile.validate()?;
+        let new_version =
+            completion::write_profile(state, &mut tx, account, &profile, None).await?;
+        completion::carry_forward(&mut tx, account, version, new_version, None).await?;
+    }
+    sqlx::query("DELETE FROM profile.skill_dismissals WHERE account_id = $1 AND name_key = $2")
+        .bind(account)
+        .bind(name.to_lowercase())
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(())
+}
+
+/// The locked profile of `account` and its version.
+async fn lock(tx: &mut sqlx::PgConnection, account: Uuid) -> Result<(Profile, i32)> {
+    let row: Option<(sqlx::types::Json<Profile>, i32)> = sqlx::query_as(
+        "SELECT data, version FROM profile.profiles WHERE account_id = $1 FOR UPDATE",
+    )
+    .bind(account)
+    .fetch_optional(&mut *tx)
+    .await?;
+    let (profile, version) = row.ok_or(Error::NotFound)?;
+    Ok((profile.0, version))
 }
 
 /// Say `name` is not one of the person's skills: it is not suggested or
@@ -783,5 +892,105 @@ mod tests {
         let mut said = bare;
         said.work[0].summary = Some("Built the billing platform in Rails.".into());
         assert!(!no_stack(&said));
+    }
+
+    async fn with_profile(db: sqlx::PgPool) -> (AppState, Uuid) {
+        let account = Uuid::now_v7();
+        let profile = Profile {
+            work: vec![Work {
+                name: Some("Example Org".into()),
+                position: Some("Engineer".into()),
+                ..Work::default()
+            }],
+            skills: vec![Skill {
+                name: "PostgreSQL".into(),
+                level: None,
+            }],
+            ..Profile::default()
+        };
+        sqlx::query(
+            "INSERT INTO profile.profiles (account_id, data, source, updated_at)
+             VALUES ($1, $2, 'manual', now())",
+        )
+        .bind(account)
+        .bind(sqlx::types::Json(&profile))
+        .execute(&db)
+        .await
+        .unwrap();
+        let state = AppState::new(
+            db,
+            applicamp_kernel::Config::for_database("postgres://unused"),
+            applicamp_kernel::crypto::SecretKey::from_bytes([7; 32]),
+        )
+        .with_events(applicamp_kernel::EventBus::default());
+        (state, account)
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_cv_adds_a_fact_in_the_persons_words_to_the_position_it_names(db: sqlx::PgPool) {
+        let (state, account) = with_profile(db).await;
+        let id = keep_fact(
+            &state,
+            account,
+            0,
+            Some("Engineer"),
+            Some("Example Org"),
+            "  Cut runs to 20 minutes  ",
+            Area::Results,
+        )
+        .await
+        .unwrap();
+        let profile = current_profile(&state.db, account).await.unwrap().unwrap();
+        let fact = &profile.work[0].facts[0];
+        assert_eq!(fact.id, id);
+        assert_eq!(fact.text, "Cut runs to 20 minutes");
+        assert_eq!(fact.quote, fact.text, "their words are their own quote");
+        assert_eq!(fact.area, Area::Results);
+
+        // The position changed since the CV was made, or the text is too long.
+        let stale = keep_fact(
+            &state,
+            account,
+            0,
+            Some("Manager"),
+            Some("Example Org"),
+            "x",
+            Area::Results,
+        )
+        .await;
+        assert!(matches!(stale, Err(Error::Conflict("profile_changed", _))));
+        let long = "x".repeat(MAX_CV_FACT + 1);
+        let long = keep_fact(
+            &state,
+            account,
+            0,
+            Some("Engineer"),
+            Some("Example Org"),
+            &long,
+            Area::Results,
+        )
+        .await;
+        assert!(matches!(long, Err(Error::BadRequest("invalid_fact", _))));
+        assert!(matches!(
+            keep_fact(&state, account, 5, None, None, "x", Area::Results).await,
+            Err(Error::Conflict("profile_changed", _))
+        ));
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_cv_adds_a_skill_once_and_forgets_a_dismissal(db: sqlx::PgPool) {
+        let (state, account) = with_profile(db).await;
+        dismiss_skill(&state.db, account, "Kubernetes", Utc::now())
+            .await
+            .unwrap();
+        add_skill(&state, account, "Kubernetes").await.unwrap();
+        // An alias of a skill they have is not added again.
+        add_skill(&state, account, "Postgres").await.unwrap();
+        add_skill(&state, account, "kubernetes").await.unwrap();
+        let profile = current_profile(&state.db, account).await.unwrap().unwrap();
+        let names: Vec<&str> = profile.skills.iter().map(|s| s.name.as_str()).collect();
+        assert_eq!(names, ["PostgreSQL", "Kubernetes"]);
+        let digest = digest(&state.db, account).await.unwrap().unwrap();
+        assert!(digest.dismissed_skills.is_empty());
     }
 }

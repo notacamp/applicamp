@@ -123,6 +123,40 @@ pub fn is_name(token: &str) -> bool {
     !folded.is_empty() && NAMES.contains(&folded.as_str())
 }
 
+/// Names that are one technology written differently, each group lower case.
+const ALIASES: &[&[&str]] = &[
+    &["postgres", "postgresql"],
+    &["golang", "go"],
+    &["node", "node.js", "nodejs"],
+    &["next.js", "nextjs"],
+    &["vue", "vue.js"],
+    &["k8s", "kubernetes"],
+    &[".net", "dotnet"],
+    &["javascript", "js"],
+    &["typescript", "ts"],
+    &["rails", "ruby on rails", "ror"],
+];
+
+/// A skill name as it is compared: lower case, edge punctuation trimmed,
+/// and the spelling every alias shares (`Postgres` and `PostgreSQL` are one
+/// skill).
+#[must_use]
+pub fn canonical(name: &str) -> String {
+    let folded = fold(name);
+    ALIASES
+        .iter()
+        .find(|group| group.contains(&folded.as_str()))
+        .and_then(|group| group.first())
+        .map_or(folded, |first| (*first).to_owned())
+}
+
+/// Whether `a` and `b` name the same skill: equal without case, or aliases.
+#[must_use]
+pub fn same_skill(a: &str, b: &str) -> bool {
+    let (a, b) = (canonical(a), canonical(b));
+    !a.is_empty() && a == b
+}
+
 /// Whether `text` names any known technology.
 #[must_use]
 pub fn mentions(text: &str) -> bool {
@@ -142,6 +176,15 @@ mod tests {
         assert!(is_name("C++"));
         assert!(!is_name("Remote"));
         assert!(!is_name(""));
+    }
+
+    #[test]
+    fn aliases_are_one_skill() {
+        assert!(same_skill("PostgreSQL", "postgres"));
+        assert!(same_skill("Node.js", "NodeJS"));
+        assert!(same_skill("Ruby on Rails", "Rails"));
+        assert!(!same_skill("Java", "JavaScript"));
+        assert!(!same_skill("", ""));
     }
 
     #[test]

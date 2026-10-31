@@ -8,6 +8,7 @@
 #![forbid(unsafe_code)]
 
 pub mod auth;
+pub mod claims;
 pub mod clock;
 pub mod config;
 pub mod crypto;

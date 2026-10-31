@@ -2,9 +2,11 @@
 //! (modules never import each other): reading a job-board posting from a
 //! link (sources), how far a person is (profile), their latest search
 //! (sources), a company's own pages (sources), the profile as a job is
-//! read against it, and facts from an answer (profile).
+//! read against it, and facts from an answer (profile); and, for a tailored CV,
+//! the whole profile and the two things the person may add to it from the CV
+//! (a fact, a skill).
 
-use applicamp_kernel::{BoxFuture, Result};
+use applicamp_kernel::{AppState, BoxFuture, Result};
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use url::Url;
@@ -173,6 +175,75 @@ pub struct AnswerFacts {
     pub dropped: u32,
 }
 
+/// How to reach the person, for the CV's head. The server fills it in; the
+/// model never sees it.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CvContact {
+    pub name: Option<String>,
+    pub email: Option<String>,
+    pub location: Option<String>,
+    pub url: Option<String>,
+    /// Profiles elsewhere, as `(network, address)`.
+    pub links: Vec<(Option<String>, String)>,
+}
+
+/// A fact the person kept on a position.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CvFact {
+    /// Its id in the profile.
+    pub id: String,
+    pub text: String,
+}
+
+/// A position of the profile, word for word.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CvPosition {
+    /// Its place in the profile's `work` list.
+    pub index: usize,
+    pub title: Option<String>,
+    pub company: Option<String>,
+    pub location: Option<String>,
+    pub start_date: Option<String>,
+    pub end_date: Option<String>,
+    pub summary: Option<String>,
+    pub highlights: Vec<String>,
+    pub facts: Vec<CvFact>,
+}
+
+/// A school or degree.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CvEducation {
+    pub institution: String,
+    pub area: Option<String>,
+    pub study_type: Option<String>,
+    pub start_date: Option<String>,
+    pub end_date: Option<String>,
+}
+
+/// A language the person speaks.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CvLanguage {
+    pub language: String,
+    pub fluency: Option<String>,
+}
+
+/// The whole profile as a tailored CV is made from it: the contact apart
+/// from the rest, so the part the model is shown can never hold it.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CvProfile {
+    pub contact: CvContact,
+    /// The person's own headline.
+    pub headline: Option<String>,
+    /// The person's own summary.
+    pub summary: Option<String>,
+    pub positions: Vec<CvPosition>,
+    pub skills: Vec<String>,
+    pub education: Vec<CvEducation>,
+    pub languages: Vec<CvLanguage>,
+    /// The most recent position (its `index`).
+    pub latest: Option<usize>,
+}
+
 /// The other modules, as the pipeline sees them.
 pub trait Neighbours: Send + Sync + 'static {
     /// The posting at `url` when it is a Greenhouse, Lever or Ashby posting
@@ -245,5 +316,36 @@ pub trait Neighbours: Send + Sync + 'static {
         account: Uuid,
         skill: &'a str,
         now: DateTime<Utc>,
+    ) -> BoxFuture<'a, Result<()>>;
+
+    /// `account`'s whole profile, for a tailored CV; none until there is one.
+    fn cv_profile<'a>(
+        &'a self,
+        db: &'a PgPool,
+        account: Uuid,
+    ) -> BoxFuture<'a, Result<Option<CvProfile>>>;
+
+    /// Keep `text`, in the person's own words, as a fact on position
+    /// `position` (which must still be `title` at `company`: else 409
+    /// `profile_changed`) in `area` (one of Grill me's, e.g. `results`).
+    /// Returns the fact's id.
+    #[allow(clippy::too_many_arguments)]
+    fn keep_fact<'a>(
+        &'a self,
+        state: &'a AppState,
+        account: Uuid,
+        position: usize,
+        title: Option<&'a str>,
+        company: Option<&'a str>,
+        text: &'a str,
+        area: &'a str,
+    ) -> BoxFuture<'a, Result<String>>;
+
+    /// Add `skill` to the person's skills.
+    fn add_skill<'a>(
+        &'a self,
+        state: &'a AppState,
+        account: Uuid,
+        skill: &'a str,
     ) -> BoxFuture<'a, Result<()>>;
 }

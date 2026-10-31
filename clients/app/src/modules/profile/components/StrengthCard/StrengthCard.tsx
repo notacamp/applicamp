@@ -27,6 +27,8 @@ export interface StrengthCardProps {
   onAction: (action: Action) => void;
   /** Open Grill me, the deep interview about each role; none hides the button. */
   onGrill?: (() => void) | undefined;
+  /** Open "Tell me about you"; it takes the place of "Improve my profile". */
+  onAbout?: (() => void) | undefined;
 }
 
 const ICONS: Record<StrengthItem["state"], IconName> = {
@@ -48,7 +50,7 @@ function hintOf(t: TFunction<"profile">, item: StrengthItem, suggested: number):
  * what to do about it, and the way into "Improve my profile". Reading the
  * profile for questions starts when this shows (once per profile version).
  */
-export function StrengthCard({ onAction, onGrill }: StrengthCardProps) {
+export function StrengthCard({ onAction, onGrill, onAbout }: StrengthCardProps) {
   const { t } = useTranslation("profile");
   const strength = useStrength();
   const questions = useQuestions();
@@ -80,13 +82,20 @@ export function StrengthCard({ onAction, onGrill }: StrengthCardProps) {
     </Button>
   );
 
+  const about =
+    onAbout === undefined ? null : (
+      <Button variant="primary" icon="arrow-right" data-testid="strength-about" onClick={onAbout}>
+        {t("strength.about")}
+      </Button>
+    );
+
   return (
     <Section
       title={t("strength.title")}
       description={t("strength.description")}
       action={
         <>
-          {strong && open === 0 ? null : improve}
+          {about ?? (strong && open === 0 ? null : improve)}
           {onGrill === undefined ? null : (
             <Button variant="secondary" data-testid="strength-grill" onClick={onGrill}>
               {t("strength.grill")}

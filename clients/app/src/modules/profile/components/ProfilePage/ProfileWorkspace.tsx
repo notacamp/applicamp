@@ -23,6 +23,8 @@ export interface ProfileWorkspaceProps {
   onAction: (action: Action) => void;
   /** Open Grill me: on a position, or on the list of roles when none is given. */
   onGrill: (position?: number) => void;
+  /** Open "Tell me about you". */
+  onAbout?: (() => void) | undefined;
 }
 
 /**
@@ -36,6 +38,7 @@ export function ProfileWorkspace({
   onStartGoals,
   onAction,
   onGrill,
+  onAbout,
 }: ProfileWorkspaceProps) {
   const { t } = useTranslation("profile");
   const profile = useProfile();
@@ -113,6 +116,7 @@ export function ProfileWorkspace({
     <Stack gap="lg">
       <StrengthCard
         onAction={onAction}
+        onAbout={onAbout}
         onGrill={
           view.profile.work.length > 0
             ? () => {

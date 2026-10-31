@@ -60,6 +60,16 @@ export { DataTable, type DataColumn, type DataTableProps } from "./components/Da
 export { Label, LABEL_HUES, type LabelHue, type LabelProps } from "./components/Label/Label";
 export { MatchBar, type MatchBarProps } from "./components/MatchBar/MatchBar";
 export { Page, type PageProps } from "./components/Page/Page";
+export {
+  Portrait,
+  PortraitLegend,
+  PortraitPanel,
+  PortraitSentence,
+  type PortraitKind,
+  type PortraitLegendProps,
+  type PortraitProps,
+  type PortraitSentenceProps,
+} from "./components/Portrait/Portrait";
 export { SidePeek, type SidePeekProps } from "./components/SidePeek/SidePeek";
 export { NARROW_QUERY, useNarrowScreen } from "./hooks/narrow";
 export {

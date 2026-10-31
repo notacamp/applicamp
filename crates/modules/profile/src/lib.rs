@@ -14,6 +14,10 @@
 //! - **Grill me** ([`features::grill`]): a deep interview about one position
 //!   at a time; the facts the person keeps live on the position.
 //!
+//! - **Tell me about you** ([`features::about`]): what Applicamp knows and
+//!   assumes about a person as one portrait, confirmed by them, then saved
+//!   in one write.
+//!
 //! - **Matching** ([`matching`]): how far a person is, and what a job search
 //!   matches against, for the ports the server wires to other modules.
 //!
@@ -31,6 +35,7 @@ pub mod events;
 pub mod features;
 pub mod goals;
 pub mod matching;
+pub mod ports;
 pub mod schema;
 pub mod strength;
 
@@ -50,11 +55,15 @@ pub struct ProfileDeps {
     /// The AI gateway; reading a PDF or pasted text needs its `complete`
     /// role. Without it only the LinkedIn export can be imported.
     pub ai: Option<Gateway>,
+    /// Reads a past employer's own website for "Tell me about you". Without
+    /// it no employer is researched; the portrait is made from the profile
+    /// and what is usual for the roles.
+    pub research: ports::Researcher,
 }
 
 /// The profile module, composed with `deps`.
 pub fn module(deps: ProfileDeps) -> Module {
-    use features::{completion, goals, grill, imports, profile};
+    use features::{about, completion, goals, grill, imports, profile};
     // Uploads take up to a 20 MB export; every other route keeps axum's
     // default body limit.
     let uploads = OpenApiRouter::new()
@@ -83,11 +92,21 @@ pub fn module(deps: ProfileDeps) -> Module {
         .routes(routes!(grill::keep_all))
         .routes(routes!(grill::keep_proposal))
         .routes(routes!(grill::drop_proposal))
+        .routes(routes!(about::get))
+        .routes(routes!(about::portrait))
+        .routes(routes!(about::choose))
+        .routes(routes!(about::accuracy))
+        .routes(routes!(about::employer_site))
+        .routes(routes!(about::extra))
+        .routes(routes!(about::change, about::remove_change))
+        .routes(routes!(about::review))
+        .routes(routes!(about::save))
         .routes(routes!(imports::get))
         .routes(routes!(imports::apply))
         .routes(routes!(imports::discard))
         .merge(uploads)
-        .layer(Extension(Ai(deps.ai.clone())));
+        .layer(Extension(Ai(deps.ai.clone())))
+        .layer(Extension(deps.research.clone()));
     Module {
         name: NAME,
         router,

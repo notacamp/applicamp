@@ -779,6 +779,203 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/profile/about": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The wizard's state: the portrait if one was made for this version of the
+         *     profile, the latest employers, what the person said, and the pending
+         *     changes. Never calls the model.
+         */
+        get: operations["profile.about"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/about/accuracy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * "Is this accurate?": stored; the questions that follow use it to decide
+         *     how many to ask.
+         */
+        put: operations["profile.about_accuracy"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/about/changes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Settle a change: *It's true*, *Fix* (or *Edit*) with a new value that is
+         *     checked again against their words, or *Use my own words*, which puts the
+         *     exact text they wrote into the field (for the summary, their whole
+         *     answer). Nothing is saved yet.
+         */
+        put: operations["profile.about_change"];
+        post?: never;
+        /** Take a change out of what will be saved. */
+        delete: operations["profile.about_remove_change"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/about/employers/{position}/site": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Type a past employer's own website. Nothing is read until the portrait is
+         *     made again (`POST …/portrait?again=true`).
+         */
+        put: operations["profile.about_employer_site"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/about/extra": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn what the person wrote into proposed changes to the profile.
+         * @description **One model call.** Each change quotes their words; a claim their words
+         *     do not say, or a quote that is not theirs, is a flag, shown and never
+         *     dropped. The changes also add sentences to the portrait, as *told*. A new
+         *     submission replaces the changes the last one made. Nothing is saved yet.
+         */
+        post: operations["profile.about_extra"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/about/portrait": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make the portrait, or take the one made for this profile version.
+         * @description Reads the latest five employers' own websites first (only where a site is
+         *     known; cached 30 days), then makes the portrait: **one model call** per
+         *     profile version, plus one per employer read. The model never sees the
+         *     person's name or contact details. Every `known` or `told` sentence is
+         *     checked against the sources it cites; one that fails is downgraded to
+         *     `assumed`, never dropped.
+         */
+        post: operations["profile.about_portrait"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/about/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What Save would do: every pending change and confirmed assumption,
+         *     grouped by the part of the profile it changes, and the portrait as it
+         *     will stand. Never calls the model.
+         */
+        get: operations["profile.about_review"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/about/save": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Save everything, atomically.
+         * @description Applies every pending change and every confirmed assumption in **one
+         *     write** of the profile (and of the goals, when they changed): one new
+         *     profile version, so the strength and the gap review refresh. Assumptions
+         *     that were never confirmed are not saved. A flag still waiting for the
+         *     person stops it (`changes_flagged`). Afterwards the pending state is gone.
+         */
+        post: operations["profile.about_save"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/about/sentences/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Say what you think of an assumption: *That's right*, *That's wrong* or
+         *     *Ask me later*. Nothing is saved yet.
+         */
+        put: operations["profile.about_choose"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/profile/drafts/{id}/discard": {
         parameters: {
             query?: never;
@@ -1500,6 +1697,73 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description What Save would do. */
+        AboutReview: {
+            groups: components["schemas"]["ReviewGroup"][];
+            /**
+             * Format: int32
+             * @description Assumptions left unconfirmed (not saved).
+             */
+            left_out: number;
+            /**
+             * Format: int32
+             * @description Flags still waiting for the person: Save waits for them.
+             */
+            open_flags: number;
+            /**
+             * @description The portrait as it will stand: what the profile says, what they told,
+             *     and the assumptions they confirmed. The rest is left out.
+             */
+            sentences: components["schemas"]["SentenceView"][];
+        };
+        /** @description The wizard's state. */
+        AboutView: {
+            accuracy?: components["schemas"]["Accuracy"] | null;
+            /** @description A portrait was made for this very version. */
+            built: boolean;
+            /**
+             * Format: int32
+             * @description Model calls made today by this account, of `daily_cap`.
+             */
+            calls_today: number;
+            /** @description The changes proposed from it. */
+            changes: components["schemas"]["ChangeView"][];
+            /**
+             * Format: int32
+             * @description The most model calls a wizard can make for an account in a UTC day.
+             */
+            daily_cap: number;
+            /** @description The latest employers and what reading them came to. */
+            employers: components["schemas"]["EmployerView"][];
+            /** @description What the person wrote under "Anything else". */
+            extra?: string | null;
+            /**
+             * Format: int32
+             * @description The longest "Anything else", in characters.
+             */
+            extra_max: number;
+            /** @description There is a profile to write about. */
+            has_profile: boolean;
+            /**
+             * Format: int32
+             * @description The profile's version now.
+             */
+            profile_version: number;
+            /**
+             * @description The portrait: sentences from the profile, what the person told, and
+             *     the assumptions, in the order they read; then what they just added.
+             */
+            sentences: components["schemas"]["SentenceView"][];
+        };
+        /**
+         * @description The person's answer to "Is this accurate?".
+         * @enum {string}
+         */
+        Accuracy: "yes" | "some" | "no";
+        /** @description "Is this accurate?". */
+        AccuracyRequest: {
+            accuracy: components["schemas"]["Accuracy"];
+        };
         /** @description A fact taken from an answer, waiting for Keep, Fix or Drop. */
         AnswerProposal: {
             /** @description What it is about (Grill me's areas). */
@@ -1559,6 +1823,12 @@ export interface components {
         Autonomy: "find_only" | "prepare" | "prepare_and_schedule";
         /** @description Who they are. */
         Basics: {
+            /**
+             * @description Where they come from: the domains and earlier careers behind their
+             *     work ("six years in events and restaurants"), in their words. Written
+             *     by "Tell me about you"; the import and the model never write it.
+             */
+            background?: string | null;
             /** @description The address for applications. */
             email?: string | null;
             /** @description Their headline ("Senior software engineer"). */
@@ -1968,6 +2238,36 @@ export interface components {
             /** @description Where it can be checked. */
             url?: string | null;
         };
+        /**
+         * @description What the person does with a change.
+         * @enum {string}
+         */
+        ChangeAction: "true" | "edit" | "own_words";
+        /** @description What the person does with a change. */
+        ChangeRequest: {
+            action: components["schemas"]["ChangeAction"];
+            /** @description For `edit`: the new value. */
+            value?: string | null;
+        };
+        /** @description A pending change, as the person sees it. */
+        ChangeView: {
+            /** @description What it changes. */
+            field: components["schemas"]["Field"];
+            /** @description What is wrong with it, if anything: shown, not dropped. */
+            flags: components["schemas"]["Flag"][];
+            /** @description Its id. */
+            id: string;
+            /**
+             * Format: int32
+             * @description For a fact: the position it is about.
+             */
+            position?: number | null;
+            /** @description Their words that support it. */
+            quote: string;
+            resolution?: components["schemas"]["Resolution"] | null;
+            /** @description The new value. */
+            value: string;
+        };
         /** @description What changed from the profile. */
         Changes: {
             /** Format: int32 */
@@ -1982,6 +2282,15 @@ export interface components {
             moved_up: number;
             /** Format: int32 */
             reworded: number;
+        };
+        /**
+         * @description What the person said about an assumption.
+         * @enum {string}
+         */
+        Choice: "right" | "wrong" | "later";
+        /** @description What the person says about an assumption. */
+        ChoiceRequest: {
+            choice?: components["schemas"]["Choice"] | null;
         };
         /** @description The last read of the company's pages. */
         CompanyRead: {
@@ -2305,6 +2614,32 @@ export interface components {
             start_date?: string | null;
             study_type?: string | null;
         };
+        /**
+         * @description What reading an employer came to.
+         * @enum {string}
+         */
+        EmployerState: "read" | "unread" | "no_site" | "failed";
+        /** @description A past employer, as researched. */
+        EmployerView: {
+            /** @description The company. */
+            company: string;
+            /** @description For a failed read, the problem code (`robots_disallows`, …). */
+            error?: string | null;
+            /**
+             * Format: int32
+             * @description Facts found on the site.
+             */
+            facts: number;
+            /**
+             * Format: int32
+             * @description The latest position there (its place in `work`).
+             */
+            position: number;
+            /** @description Its own site, when known. */
+            site?: string | null;
+            /** @description What came of it. */
+            state: components["schemas"]["EmployerState"];
+        };
         /** @description What each step costs, in euros, about. */
         Estimates: {
             /**
@@ -2322,6 +2657,11 @@ export interface components {
              * @description Reading the company's pages: one call, reused for 30 days.
              */
             company_read_eur: number;
+        };
+        /** @description "Anything else I should know about you?". */
+        ExtraRequest: {
+            /** @description In their own words, 1 to 4000 characters. */
+            text: string;
         };
         /**
          * @description What a posting says about a fact a requirement is checked on.
@@ -2359,6 +2699,27 @@ export interface components {
          * @enum {string}
          */
         FactProposalStatus: "ready" | "kept" | "dropped";
+        /**
+         * @description How a fact became the person's.
+         * @enum {string}
+         */
+        FactStatus: "told" | "confirmed_assumption";
+        /**
+         * @description What a change is about.
+         * @enum {string}
+         */
+        Field: "summary" | "headline" | "skill" | "background" | "goal_role" | "goal_avoid" | "goal_must_have" | "goal_location" | "role_fact";
+        /** @description A flag on a change: shown, never a reason to drop it. */
+        Flag: {
+            /** @description The claim (empty for a quote). */
+            claim: string;
+            kind: components["schemas"]["FlagKind"];
+        };
+        /**
+         * @description What is wrong with a change.
+         * @enum {string}
+         */
+        FlagKind: "claim" | "quote";
         /** @description The answers to the goals interview. Nothing is required. */
         Goals: {
             autonomy?: components["schemas"]["Autonomy"] | null;
@@ -2542,6 +2903,11 @@ export interface components {
             /** @description The conversation so far. */
             turns: components["schemas"]["GrillTurn"][];
         };
+        /**
+         * @description Which part of the profile a group of rows changes.
+         * @enum {string}
+         */
+        GroupKey: "summary" | "headline" | "skills" | "position" | "background" | "goals";
         /** @description The instance's health. */
         Health: {
             /** @description `ok`. */
@@ -3062,6 +3428,11 @@ export interface components {
         ProfileFact: {
             /** @description What it is about. */
             area: components["schemas"]["Area"];
+            /**
+             * @description For a confirmed assumption, what it was based on: the reason it was
+             *     assumed, or the page it was read on.
+             */
+            basis?: string | null;
             /** @description Its id. */
             id: string;
             /**
@@ -3071,6 +3442,11 @@ export interface components {
             kept_at: string;
             /** @description The person's exact words it was taken from. */
             quote: string;
+            /**
+             * @description What the person did to make it theirs: said it themselves (the
+             *     default), or confirmed an assumption Applicamp made about them.
+             */
+            status?: components["schemas"]["FactStatus"];
             /**
              * @description The fact, one short sentence. It says only what the quote or the
              *     profile says.
@@ -3217,6 +3593,33 @@ export interface components {
          */
         Relocate: "no" | "within_country" | "within_eu" | "anywhere";
         /**
+         * @description How the person settled a flagged change.
+         * @enum {string}
+         */
+        Resolution: "true" | "fixed" | "own_words";
+        /** @description The rows that change one part of the profile. */
+        ReviewGroup: {
+            key: components["schemas"]["GroupKey"];
+            /**
+             * Format: int32
+             * @description For a position: its place in `work`.
+             */
+            position?: number | null;
+            rows: components["schemas"]["ReviewRow"][];
+            /** @description For a position: its title and company, as the profile has them. */
+            title?: string | null;
+        };
+        /** @description One line of what will be saved. */
+        ReviewRow: {
+            field?: components["schemas"]["Field"] | null;
+            flags: components["schemas"]["Flag"][];
+            /** @description A change's id, or an assumption's sentence id. */
+            id: string;
+            resolution?: components["schemas"]["Resolution"] | null;
+            source: components["schemas"]["RowSource"];
+            text: string;
+        };
+        /**
          * @description Where the review is.
          * @enum {string}
          */
@@ -3280,6 +3683,11 @@ export interface components {
             start_date?: string | null;
             title?: string | null;
         };
+        /**
+         * @description Where a row comes from.
+         * @enum {string}
+         */
+        RowSource: "told" | "confirmed";
         /** @description A job a check read as a sample. */
         SampleJob: {
             company: string;
@@ -3288,6 +3696,30 @@ export interface components {
             regions?: string[];
             title: string;
             url: string;
+        };
+        /** @description What Save did. */
+        Saved: {
+            /**
+             * Format: int32
+             * @description The profile's new version.
+             */
+            profile_version: number;
+            /**
+             * Format: int32
+             * @description Changes and confirmed assumptions written.
+             */
+            saved: number;
+            /**
+             * Format: int32
+             * @description Items that no longer fit the profile (a position that was removed, a
+             *     list that is full) and were left out.
+             */
+            skipped: number;
+            /**
+             * Format: int32
+             * @description How strong the profile is now, 0 to 100.
+             */
+            strength: number;
         };
         /** @description One board's line of a run. */
         ScanLine: {
@@ -3442,11 +3874,49 @@ export interface components {
          */
         Seniority: "junior" | "mid" | "senior" | "staff" | "principal" | "lead" | "manager" | "director" | "founding";
         /**
+         * @description Where a sentence comes from.
+         * @enum {string}
+         */
+        SentenceKind: "known" | "told" | "assumed";
+        /** @description A sentence of the portrait. */
+        SentenceView: {
+            choice?: components["schemas"]["Choice"] | null;
+            /**
+             * @description For an assumption: what is saved as the fact if the person says
+             *     "That's right".
+             */
+            claim?: string | null;
+            /**
+             * @description The check could not find it in the profile in these words, so it
+             *     became an assumption.
+             */
+            downgraded: boolean;
+            /** @description Its id. */
+            id: string;
+            /** @description Where it comes from. */
+            kind: components["schemas"]["SentenceKind"];
+            /** @description Told just now, from "Anything else". */
+            new: boolean;
+            /**
+             * Format: int32
+             * @description The position it is about (its place in `work`).
+             */
+            position?: number | null;
+            /** @description What it says. */
+            text: string;
+            /** @description What it is about. */
+            topic: components["schemas"]["Area"];
+            /** @description The employer pages it was read on. */
+            urls: string[];
+            /** @description For an assumption, why it was assumed (the person's language). */
+            why?: string | null;
+        };
+        /**
          * @description Where the company's site came from.
          * @enum {string}
          */
         SiteOrigin: "board" | "apply_host" | "person";
-        /** @description The company's website, typed. */
+        /** @description An employer's own website, typed. */
         SiteRequest: {
             /** @description An http or https address; only its host (and port) is kept. */
             url: string;
@@ -5758,6 +6228,519 @@ export interface operations {
             };
             /** @description `session_required` */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.about": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The wizard's state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AboutView"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.about_accuracy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccuracyRequest"];
+            };
+        };
+        responses: {
+            /** @description The wizard's state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AboutView"];
+                };
+            };
+            /** @description `invalid_accuracy` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.about_change": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The change. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeRequest"];
+            };
+        };
+        responses: {
+            /** @description The wizard's state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AboutView"];
+                };
+            };
+            /** @description `invalid_change` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.about_remove_change": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The change. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The wizard's state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AboutView"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.about_employer_site": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A position of the profile's `work` list. */
+                position: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteRequest"];
+            };
+        };
+        responses: {
+            /** @description The wizard's state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AboutView"];
+                };
+            };
+            /** @description `invalid_site`; `site_not_allowed` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: no such position */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `research_unavailable` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.about_extra": {
+        parameters: {
+            query?: {
+                /** @description A language tag such as `pt-PT`; English when left out. */
+                locale?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtraRequest"];
+            };
+        };
+        responses: {
+            /** @description The wizard's state, with the changes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AboutView"];
+                };
+            };
+            /** @description `invalid_text` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `profile_needed` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `about_daily_cap` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.about_portrait": {
+        parameters: {
+            query?: {
+                /** @description A language tag such as `pt-PT`; English when left out. */
+                locale?: string;
+                /**
+                 * @description Make the portrait again, even though one exists for this version
+                 *     (after an employer's website was added).
+                 */
+                again?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The wizard's state, with the portrait. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AboutView"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `profile_needed` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `about_daily_cap` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.about_review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What would be saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AboutReview"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `profile_needed` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.about_save": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Saved"];
+                };
+            };
+            /** @description `invalid_profile`; `invalid_goals` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: nothing is pending */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `profile_needed`; `changes_flagged` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.about_choose": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The assumption's id in the portrait. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChoiceRequest"];
+            };
+        };
+        responses: {
+            /** @description The wizard's state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AboutView"];
+                };
+            };
+            /** @description `invalid_choice` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: no such assumption */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

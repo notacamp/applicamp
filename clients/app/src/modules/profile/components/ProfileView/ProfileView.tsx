@@ -86,7 +86,7 @@ export function ProfileView({ view, onImportAgain, goals, onGrill }: ProfileView
                 label={t(`basics.${key}`)}
                 value={profile.basics[key] ?? undefined}
                 placeholder={t(`placeholders.${key}`)}
-                multiline={key === "summary"}
+                multiline={key === "summary" || key === "background"}
                 counter={(left) => t("form.charactersLeft", { left })}
                 saveLabel={t("form.save")}
                 cancelLabel={t("form.cancel")}

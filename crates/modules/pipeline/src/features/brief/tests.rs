@@ -690,3 +690,73 @@ async fn a_changed_posting_is_compared_again_and_a_skipped_question_stays_skippe
         "the company was not read again"
     );
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_past_employer_is_read_like_any_company_and_only_where_a_site_is_known(db: PgPool) {
+    use applicamp_kernel::{AppState, Config, crypto::SecretKey, events::EventBus};
+
+    use super::employer;
+    use crate::PipelineDeps;
+
+    let fake = Arc::new(Fake::default());
+    fake.reads(reading());
+    let model = Model::new(facts_reply(), analysis_reply()).await;
+    let deps = PipelineDeps {
+        neighbours: Some(fake.clone()),
+        ai: Some(model.gateway()),
+    };
+    let state = AppState::new(
+        db.clone(),
+        Config::for_database("postgres://unused"),
+        SecretKey::from_bytes([7; 32]),
+    )
+    .with_events(EventBus::default());
+    let account = Uuid::now_v7();
+    let now = Utc::now();
+
+    // No known site, nothing fetched.
+    let none = employer::facts(&deps, &state, account, "Example Co", now)
+        .await
+        .unwrap();
+    assert!(none.site.is_none() && !none.read && none.facts.is_empty());
+    assert!(fake.sites_read.lock().unwrap().is_empty());
+
+    // The person types the site; the company is the one a job would use.
+    let site = employer::set_site(
+        &deps,
+        &state,
+        account,
+        "Example Co",
+        "https://example-co.test/about",
+    )
+    .await
+    .unwrap();
+    assert_eq!(site, "https://example-co.test/");
+    let read = employer::facts(&deps, &state, account, "  example   CO ", now)
+        .await
+        .unwrap();
+    assert!(read.read);
+    // Only facts whose quote is on the page they cite.
+    let texts: Vec<&str> = read.facts.iter().map(|f| f.text.as_str()).collect();
+    assert_eq!(
+        texts,
+        [
+            "Builds ledgers for small shops",
+            "Is moving from React to Hotwire"
+        ]
+    );
+    assert!(
+        read.facts
+            .iter()
+            .all(|f| f.url.starts_with("http://example-co.test/"))
+    );
+
+    // Fresh for 30 days: the second ask reads nothing and costs nothing.
+    let again = employer::facts(&deps, &state, account, "Example Co", now)
+        .await
+        .unwrap();
+    assert!(!again.read);
+    assert_eq!(again.facts, read.facts);
+    assert_eq!(fake.sites_read.lock().unwrap().len(), 1);
+    assert_eq!(model.server.received_requests().await.unwrap().len(), 1);
+}

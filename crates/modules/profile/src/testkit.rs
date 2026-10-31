@@ -79,7 +79,17 @@ fn multipart(parts: &[Part<'_>]) -> Vec<u8> {
 /// The module's background work, alone.
 /// The module's background work, with `ai` composed in.
 pub(crate) fn registry_with(ai: Option<Gateway>) -> Arc<Registry> {
-    Arc::new(Registry::build(vec![(crate::NAME, module(ProfileDeps { ai }).background)]).unwrap())
+    Arc::new(
+        Registry::build(vec![(
+            crate::NAME,
+            module(ProfileDeps {
+                ai,
+                ..ProfileDeps::default()
+            })
+            .background,
+        )])
+        .unwrap(),
+    )
 }
 
 impl Harness {
@@ -88,8 +98,26 @@ impl Harness {
         Self::as_account(db, ai, Uuid::now_v7())
     }
 
+    /// Signed in as a new account, with `ai` and an employer research port.
+    pub(crate) fn with_research(
+        db: PgPool,
+        ai: Option<Gateway>,
+        research: crate::ports::Researcher,
+    ) -> Self {
+        Self::build(db, ai, research, Uuid::now_v7())
+    }
+
     /// Signed in as `account`.
     pub(crate) fn as_account(db: PgPool, ai: Option<Gateway>, account: Uuid) -> Self {
+        Self::build(db, ai, crate::ports::Researcher::default(), account)
+    }
+
+    fn build(
+        db: PgPool,
+        ai: Option<Gateway>,
+        research: crate::ports::Researcher,
+        account: Uuid,
+    ) -> Self {
         let events = EventBus::new(registry_with(ai.clone()));
         let state = AppState::new(
             db.clone(),
@@ -97,9 +125,12 @@ impl Harness {
             SecretKey::from_bytes([7; 32]),
         )
         .with_events(events);
-        let (router, _) = module(ProfileDeps { ai: ai.clone() })
-            .router
-            .split_for_parts();
+        let (router, _) = module(ProfileDeps {
+            ai: ai.clone(),
+            research: research.clone(),
+        })
+        .router
+        .split_for_parts();
         let principal = Principal {
             account_id: account,
             session_id: Uuid::now_v7(),

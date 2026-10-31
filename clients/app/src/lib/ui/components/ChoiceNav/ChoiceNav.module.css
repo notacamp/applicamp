@@ -54,7 +54,7 @@
   font-weight: var(--weight-regular);
 }
 
-@media (width <= 980px) {
+@container workbench (width < 56rem) {
   .list {
     flex-direction: row;
     overflow-x: auto;

@@ -4,17 +4,16 @@ import type { DataAttributes } from "../Tagged/Tagged";
 
 import styles from "./PickList.module.css";
 
-/** A list of rows to choose one from (the runs beside their console). */
-export function PickList({
-  label,
-  testId,
-  children,
-}: {
+export interface PickListProps {
   /** The list's accessible name ("Runs"). */
   label: string;
   testId?: string | undefined;
+  /** The rows ({@link PickRow}). */
   children: ReactNode;
-}) {
+}
+
+/** A list of rows to choose one from (the runs beside their console). */
+export function PickList({ label, testId, children }: PickListProps) {
   return (
     <ul className={styles["list"]} aria-label={label} data-testid={testId}>
       {children}

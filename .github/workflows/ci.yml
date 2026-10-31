@@ -306,6 +306,15 @@ jobs:
           E2E_BASE_URL: http://localhost:8080
           E2E_HOST_RULES: MAP fake-oidc 127.0.0.1
         run: pnpm e2e
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        # The specs that film themselves (`test.use({ video: "on" })`): a
+        # PR's recording, demo data only.
+        if: always()
+        with:
+          name: e2e-recordings
+          path: clients/app/test-results/**/*.webm
+          retention-days: 7
+          if-no-files-found: ignore
       - name: The stack's logs
         if: failure()
         working-directory: deploy

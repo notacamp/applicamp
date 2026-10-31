@@ -1,7 +1,8 @@
 # The e2e stack: compose.yml with a fake Campbooks to sign in with
 # (clients/app/scripts/fake-oidc.ts), which approves every sign-in at once,
 # and a fake job board and AI model (clients/app/scripts/fake-jobs.ts), which
-# list invented jobs and score them, so Search now runs end to end.
+# list invented jobs and score them, so Search now runs end to end; agent
+# runs use the fake sandbox runtime, so Run a check does too.
 # Tests only, never a real instance.
 #
 #   printf 'POSTGRES_PASSWORD=e2e-only\n' > .env
@@ -91,6 +92,10 @@ services:
       APPLICAMP_SOURCES__NIGHTLY: "false"
       APPLICAMP_AI__COMPLETE__BASE_URL: http://fake-jobs:9020/v1
       APPLICAMP_AI__COMPLETE__MODEL: fake/model
+      # Agent runs (the Agents page's Run a check): the runner as a child
+      # process of the server behind a policy proxy, not a sandbox; tests
+      # only. The image carries the runner at /app/applicamp-agent.
+      APPLICAMP_SANDBOX__RUNTIME: fake
     volumes:
       - ./fake-jobs/boards.toml:/fake-jobs/boards.toml:ro
       - ./fake-jobs/job_boards.toml:/fake-jobs/job_boards.toml:ro

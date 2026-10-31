@@ -203,10 +203,28 @@ const boardsRoute = createRoute({
     );
   },
 });
+/** `?run=<id>` shows that run (on a phone, instead of the list). */
+const agentsSearch = z.object({ run: z.uuid() });
+
 const agentsRoute = createRoute({
   getParentRoute: () => frameRoute,
   path: "/agents",
-  component: Agents,
+  validateSearch: (search: Record<string, unknown>): { run?: string | undefined } => {
+    const parsed = agentsSearch.safeParse(search);
+    return { run: parsed.success ? parsed.data.run : undefined };
+  },
+  component: function AgentsRoute() {
+    const search = agentsRoute.useSearch();
+    const navigate = agentsRoute.useNavigate();
+    return (
+      <Agents
+        run={search.run}
+        onRun={(id) => {
+          void navigate({ search: id === null ? {} : { run: id } });
+        }}
+      />
+    );
+  },
 });
 /** `?import=new` opens the import panel (Today's "Set up your profile"). */
 const profileSearch = z.object({ import: z.literal("new") });

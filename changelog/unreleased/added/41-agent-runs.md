@@ -8,6 +8,6 @@
   LinkedIn, Indeed, a wildcard or a private address. One run at a time per account, three on
   the instance. "Run a check" starts a probe that calls its one tool, is refused a second
   call and sees a site outside its policy blocked; what it did and the sandbox's allow and
-  deny lines can be followed live. Self-hosters set `APPLICAMP_SANDBOX__RUNTIME=openshell`
+  deny lines can be followed live on the Agents page. Self-hosters set `APPLICAMP_SANDBOX__RUNTIME=openshell`
   with the gateway's address (the gateway trusts this server's own keys); without it, runs
   cannot start.

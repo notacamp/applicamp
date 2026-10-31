@@ -18,15 +18,25 @@ export interface SplitViewProps {
   showing: "list" | "detail";
   /** Above the detail on phones only: the way back to the list. */
   back?: ReactNode | undefined;
+  /** For tests: `data-testid` of the whole view. */
+  testId?: string | undefined;
 }
 
 /**
  * A list and the detail of its chosen item side by side, like a mail
  * client: one column at a time on a phone, both from 48rem.
  */
-export function SplitView({ listLabel, detailLabel, list, detail, showing, back }: SplitViewProps) {
+export function SplitView({
+  listLabel,
+  detailLabel,
+  list,
+  detail,
+  showing,
+  back,
+  testId,
+}: SplitViewProps) {
   return (
-    <div className={styles["split"]} data-showing={showing}>
+    <div className={styles["split"]} data-showing={showing} data-testid={testId}>
       <section className={styles["list"]} aria-label={listLabel}>
         {list}
       </section>

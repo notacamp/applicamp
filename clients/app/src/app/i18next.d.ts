@@ -6,6 +6,7 @@ import type { UiMessages } from "~/lib/ui";
 import type identity from "~/modules/identity/i18n/en.json";
 import type pipeline from "~/modules/pipeline/i18n/en.json";
 import type profile from "~/modules/profile/i18n/en.json";
+import type runs from "~/modules/runs/i18n/en.json";
 import type sources from "~/modules/sources/i18n/en.json";
 
 import type shell from "./i18n/en.json";
@@ -21,6 +22,7 @@ declare module "i18next" {
       profile: typeof profile;
       pipeline: typeof pipeline;
       sources: typeof sources;
+      runs: typeof runs;
     };
   }
 }

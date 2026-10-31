@@ -1,0 +1,96 @@
+{
+  "list": "Execuções",
+  "run": "Execução",
+  "back": "Todas as execuções",
+  "runCheck": "Fazer uma verificação",
+  "starting": "A iniciar…",
+  "stop": "Parar",
+  "loading": "A carregar as suas execuções…",
+  "loadFailed": "Não foi possível carregar as suas execuções.",
+  "retry": "Tentar de novo",
+  "emptyTitle": "Ainda não há execuções",
+  "emptyBody": "Quando uma pesquisa ou uma candidatura estiver a correr, pode ver aqui o que faz, em tempo real: cada passo, os sites a que acedeu e aquilo a que foi impedida de aceder.",
+  "emptyCheck": "Faça uma verificação para ver uma a trabalhar.",
+  "unavailableTitle": "Os agentes não podem correr nesta instância",
+  "unavailableBody": "Não tem uma sandbox onde os correr, por isso nenhuma verificação pode começar aqui. Quem gere esta instância pode configurar uma.",
+  "kinds": {
+    "probe": "Verificação",
+    "other": "Execução de {{kind}}"
+  },
+  "when": {
+    "today": "Hoje {{time}}"
+  },
+  "rowMeta": "{{status}} · {{when}}",
+  "status": {
+    "queued": "À espera de começar",
+    "starting": "A criar a sandbox",
+    "running": "A correr",
+    "stopping": "A parar…"
+  },
+  "outcome": {
+    "succeeded": "Concluída com sucesso",
+    "nothing_new": "Não encontrou nada de novo",
+    "needs_you": "Precisa de si",
+    "ended_max_steps": "Parada: deu passos a mais",
+    "ended_budget": "Parada: gastou o seu orçamento de tokens",
+    "ended_timeout": "Parada: ficou sem tempo",
+    "ended_loop": "Parada: estava a andar em círculos",
+    "failed": "Falhou",
+    "cancelled": "Parada por si"
+  },
+  "failure": {
+    "sandbox_create_failed": "Não foi possível criar a sandbox.",
+    "agent_exited": "O agente parou antes de terminar.",
+    "server_restarted": "O servidor reiniciou durante a execução.",
+    "runtime_failed": "A sandbox deixou de funcionar.",
+    "start_failed": "Não conseguiu começar.",
+    "generic": "Algo correu mal durante a execução."
+  },
+  "tabs": {
+    "label": "Mostrar",
+    "agent": "O que está a fazer",
+    "sandbox": "Registo da sandbox"
+  },
+  "level": {
+    "tool": "Ferramenta",
+    "model": "Modelo",
+    "deny": "Bloqueado",
+    "ask": "Precisa de si",
+    "error": "Problema",
+    "allowed": "Permitido"
+  },
+  "live": {
+    "connecting": "A ligar à execução…",
+    "lost": "A vista em tempo real parou.",
+    "reconnect": "Voltar a ligar"
+  },
+  "noEvents": {
+    "agent": "Ainda nada. Os passos aparecem aqui à medida que os dá.",
+    "sandbox": "Ainda sem pedidos. Cada site a que tentar aceder aparece aqui, permitido ou bloqueado."
+  },
+  "noEventsEnded": {
+    "agent": "Não escreveu nada.",
+    "sandbox": "Não tentou aceder a nenhum site."
+  },
+  "facts": {
+    "title": "Sobre esta execução",
+    "sandbox": "Sandbox",
+    "image": "Imagem",
+    "policy": "Política de rede",
+    "model": "Modelo",
+    "tokens": "Tokens",
+    "tokensValue": "{{in}} de entrada · {{out}} de saída",
+    "cost": "Custo",
+    "duration": "Duração",
+    "end": "Como terminou",
+    "notYet": "Ainda não",
+    "noModel": "Nenhum: não consultou nenhum modelo"
+  },
+  "errors": {
+    "too_many_runs": "Há demasiadas execuções à espera. Tente de novo quando uma terminar.",
+    "sandboxes_unavailable": "Os agentes não podem correr nesta instância: não há uma sandbox onde os correr.",
+    "unknown_kind": "Esta instância não consegue fazer essa verificação.",
+    "generic": "Não foi possível iniciar a verificação. Tente de novo."
+  },
+  "stopFailed": "Não foi possível parar. Tente de novo."
+}

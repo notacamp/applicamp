@@ -13,6 +13,10 @@ import profileEn from "~/modules/profile/i18n/en.json";
 import profileEs from "~/modules/profile/i18n/es-ES.json";
 import profileFr from "~/modules/profile/i18n/fr.json";
 import profilePt from "~/modules/profile/i18n/pt-PT.json";
+import runsEn from "~/modules/runs/i18n/en.json";
+import runsEs from "~/modules/runs/i18n/es-ES.json";
+import runsFr from "~/modules/runs/i18n/fr.json";
+import runsPt from "~/modules/runs/i18n/pt-PT.json";
 import sourcesEn from "~/modules/sources/i18n/en.json";
 import sourcesEs from "~/modules/sources/i18n/es-ES.json";
 import sourcesFr from "~/modules/sources/i18n/fr.json";
@@ -34,5 +38,6 @@ export const NAMESPACES: Record<string, Record<Locale, Messages>> = {
   profile: { en: profileEn, "pt-PT": profilePt, "es-ES": profileEs, fr: profileFr },
   pipeline: { en: pipelineEn, "pt-PT": pipelinePt, "es-ES": pipelineEs, fr: pipelineFr },
   sources: { en: sourcesEn, "pt-PT": sourcesPt, "es-ES": sourcesEs, fr: sourcesFr },
+  runs: { en: runsEn, "pt-PT": runsPt, "es-ES": runsEs, fr: runsFr },
   ...UI_NAMESPACES,
 };

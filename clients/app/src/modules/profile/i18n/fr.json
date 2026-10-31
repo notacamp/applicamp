@@ -424,7 +424,8 @@
         "partial": "{{have}} sur {{of}} répondues",
         "missing": "Dites aux agents ce que vous voulez ensuite"
       }
-    }
+    },
+    "grill": "Posez-moi des questions"
   },
   "improve": {
     "eyebrow": "Question {{n}} sur {{total}}",
@@ -524,6 +525,141 @@
       "skills": "Ajoutez les compétences que mentionnent vos postes : les recherches utilisent les trois premières.",
       "import": "Importez un profil plus complet : les correspondances sont notées d’après vos postes.",
       "goals": "Répondez à quelques questions sur ce que vous voulez : les recherches s’y tiennent."
+    }
+  },
+  "grill": {
+    "title": "Posez-moi des questions",
+    "lead": "Un CV ne peut dire que ce qu’Applicamp sait. Choisissez un poste et répondez à une question à la fois. Les réponses vagues sont relancées et on vous demande des chiffres. Chaque fait tiré de vos réponses vous est montré d’abord ; rien n’est enregistré tant que vous ne l’avez pas gardé.",
+    "open": "Posez-moi des questions",
+    "aboutRole": "M’interroger sur ce poste",
+    "rolesLabel": "Vos postes",
+    "loading": "Chargement de vos postes…",
+    "loadFailed": "Vos postes n’ont pas pu être chargés.",
+    "roleLoadFailed": "L’entretien de ce poste n’a pas pu être chargé.",
+    "back": "Retour à votre profil",
+    "noRolesTitle": "Aucun poste dont parler pour l’instant",
+    "noRolesLead": "Importez ou écrivez d’abord votre profil. L’entretien passe en revue un poste à la fois.",
+    "pickTitle": "Choisissez un poste",
+    "pickLead": "Un poste demande une douzaine de questions. Chacune est un seul petit appel à l’IA, environ 0,001 €, et rien ne tourne avant votre clic.",
+    "years": "{{from}}–{{to}}",
+    "yearsNow": "{{from}}–aujourd’hui",
+    "status": {
+      "not_started": "pas commencé",
+      "in_progress": "en cours",
+      "covered": "couvert"
+    },
+    "startTitle": "Quand vous voulez",
+    "startLead": "Cela commence par une question sur ce poste. Répondez avec vos mots ; la question revient si elle a besoin de plus.",
+    "start": "Commencer",
+    "starting": "Je pose la question…",
+    "continue": "Posez-moi une question",
+    "coveredBanner": "Les sept thèmes sont couverts pour ce poste.",
+    "coveredLead": "Les faits gardés sont sous ce poste, dans votre profil. Revenez pour en ajouter.",
+    "stoppedBanner": "Rien d’autre à demander pour l’instant.",
+    "labels": {
+      "question": "Question",
+      "push": "Relance",
+      "answer": "Vous"
+    },
+    "skippedNote": "Vous avez passé cette question.",
+    "doneNote": "Laissé pour l’instant. Recommencez quand vous voulez, cela reprend d’ici.",
+    "logLabel": "L’entretien jusqu’ici",
+    "answerLabel": "Votre réponse",
+    "answerHint": "Entrée l’envoie ; Maj et Entrée passent à la ligne.",
+    "answerPlaceholder": "Répondez avec vos mots. Approximatif suffit ; la question revient si elle a besoin de plus.",
+    "answer": "Répondre",
+    "answering": "Lecture de votre réponse…",
+    "skip": "Passer celle-ci",
+    "done": "En avoir fini avec ce poste pour l’instant",
+    "costLine": "Chaque question est un petit appel à l’IA, environ 0,001 €. Questions aujourd’hui : {{n}} sur {{cap}}.",
+    "facts": {
+      "title": "Faits tirés de votre réponse",
+      "yourWords": "Vos mots :",
+      "keep": "Garder",
+      "keepLabel": "Garder : {{text}}",
+      "fix": "Corriger",
+      "fixLabel": "Corriger : {{text}}",
+      "drop": "Écarter",
+      "dropLabel": "Écarter : {{text}}",
+      "keepAll": "Tout garder",
+      "kept": "Gardé",
+      "dropped": "Écarté",
+      "savedTo": "Enregistrés dans {{role}}, dans votre profil, quand vous les gardez. Un CV ne peut utiliser que les faits listés ici.",
+      "fixField": "Corriger le fait",
+      "fixHint": "Ne dites que ce que vos mots disent. Vos mots restent tels quels.",
+      "fixSave": "Garder cette version",
+      "fixCancel": "Annuler",
+      "leftOut_one": "{{count}} ligne écartée : elle disait quelque chose que vous n’avez pas écrit.",
+      "leftOut_other": "{{count}} lignes écartées : elles disaient quelque chose que vous n’avez pas écrit."
+    },
+    "coverage": {
+      "title": "Couverture",
+      "count": "{{n}}/7",
+      "label": "{{n}} thèmes sur 7 couverts",
+      "note": "Il compare aussi vos réponses entre elles et avec votre profil. Si deux se contredisent, il demande laquelle est juste.",
+      "state": {
+        "ok": "Couvert",
+        "part": "Couvert en partie",
+        "none": "Pas encore couvert"
+      },
+      "areas": {
+        "context": {
+          "name": "Contexte",
+          "hint": "ce que vendait l’entreprise, à qui, taille de l’équipe"
+        },
+        "your_part": {
+          "name": "Votre part",
+          "hint": "ce que vous avez fait vous-même, pas l’équipe"
+        },
+        "stack_scale": {
+          "name": "Technique et échelle",
+          "hint": "outils, volume de données, trafic"
+        },
+        "results": {
+          "name": "Résultats avec preuve",
+          "hint": "des chiffres, et comment vous les connaissez"
+        },
+        "hard_problems": {
+          "name": "Problèmes difficiles",
+          "hint": "ce qui a mal tourné et ce que vous avez fait"
+        },
+        "people": {
+          "name": "Personnes",
+          "hint": "diriger, encadrer, recruter"
+        },
+        "stories": {
+          "name": "Histoires d’entretien",
+          "hint": "des histoires à raconter en entretien"
+        }
+      }
+    },
+    "errors": {
+      "generic": "Cela n’a pas marché. Réessayez.",
+      "ai_unavailable": "Cet Applicamp n’a pas de modèle d’IA configuré, il ne peut donc pas poser de questions.",
+      "ai_daily_limit_reached": "Vous avez atteint la limite d’IA du jour. Réessayez demain.",
+      "ai_budget_reached": "Vous avez atteint la limite de dépenses d’IA, rien n’a donc été envoyé. Votre réponse est toujours dans la zone de saisie.",
+      "ai_failed": "Le modèle d’IA n’a pas pu répondre à l’instant. Votre réponse est toujours dans la zone de saisie ; réessayez dans une minute.",
+      "grill_daily_cap": "Cela fait 150 questions aujourd’hui, le maximum posé en un jour. Cela reprend demain.",
+      "invalid_answer": "Écrivez entre 1 et 2 000 caractères.",
+      "no_open_question": "Aucune question n’attend. Demandez-en une nouvelle.",
+      "grill_changed": "Cet entretien a changé pendant que vous répondiez. Il a été rechargé.",
+      "profile_changed": "Ce poste a changé dans votre profil. Recommencez.",
+      "fact_not_supported": "Vos mots et votre profil ne disent pas cela. Changez la ligne ou retirez les nouveaux détails.",
+      "invalid_fact": "Écrivez entre 1 et 300 caractères.",
+      "proposal_not_ready": "Ce fait a déjà été gardé ou écarté.",
+      "not_found": "Cela n’existe plus. Retournez à vos postes."
+    },
+    "roleFacts": {
+      "title": "Ce que vous nous avez dit de chaque poste",
+      "lead": "Les faits gardés dans « Posez-moi des questions », avec vos propres mots. Un CV ne peut utiliser que ceux-ci et ce que vous avez écrit plus haut.",
+      "none": "Aucun fait gardé pour l’instant",
+      "count_one": "{{count}} fait",
+      "count_other": "{{count}} faits",
+      "yourWords": "Vos mots :",
+      "remove": "Retirer",
+      "removeLabel": "Retirer ce fait : {{text}}",
+      "removed": "Fait retiré.",
+      "listLabel": "Faits gardés pour {{role}}"
     }
   }
 }

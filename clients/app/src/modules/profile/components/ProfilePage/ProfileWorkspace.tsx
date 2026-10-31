@@ -21,6 +21,8 @@ export interface ProfileWorkspaceProps {
   onStartGoals: (question: Question) => void;
   /** The person chose what to do about their profile's strength (Improve, a part's Add). */
   onAction: (action: Action) => void;
+  /** Open Grill me: on a position, or on the list of roles when none is given. */
+  onGrill: (position?: number) => void;
 }
 
 /**
@@ -33,6 +35,7 @@ export function ProfileWorkspace({
   onImporting,
   onStartGoals,
   onAction,
+  onGrill,
 }: ProfileWorkspaceProps) {
   const { t } = useTranslation("profile");
   const profile = useProfile();
@@ -108,9 +111,19 @@ export function ProfileWorkspace({
   }
   return (
     <Stack gap="lg">
-      <StrengthCard onAction={onAction} />
+      <StrengthCard
+        onAction={onAction}
+        onGrill={
+          view.profile.work.length > 0
+            ? () => {
+                onGrill();
+              }
+            : undefined
+        }
+      />
       <ProfileView
         view={view}
+        onGrill={onGrill}
         onImportAgain={() => {
           onImporting(true);
         }}

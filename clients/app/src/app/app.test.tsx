@@ -292,4 +292,57 @@ describe("the app", () => {
       "Aucune exécution pour l’instant",
     );
   });
+  it("opens Grill me on its roles and on one role, and does not know a role that is not a number", async () => {
+    signedIn({
+      "GET /api/v1/profile/grill": {
+        body: {
+          roles: [
+            {
+              position: 0,
+              role: {
+                position: "Senior Engineer",
+                company: "Example Org",
+                start_date: "2021-03",
+                end_date: null,
+              },
+              status: "not_started",
+              covered: 0,
+              kept: 0,
+            },
+          ],
+          calls_today: 0,
+          daily_cap: 150,
+        },
+      },
+      "GET /api/v1/profile/grill/0": {
+        body: {
+          position: 0,
+          role: {
+            position: "Senior Engineer",
+            company: "Example Org",
+            start_date: "2021-03",
+            end_date: null,
+          },
+          status: "not_started",
+          coverage: [],
+          covered: 0,
+          turns: [],
+          question: null,
+          proposals: [],
+          kept: 0,
+          calls_today: 0,
+          daily_cap: 150,
+        },
+      },
+    });
+    const { router } = renderApp("/profile/grill");
+    expect(await screen.findByTestId("grill-pick")).toBeVisible();
+    await userEvent.setup().click(await screen.findByTestId("grill-role-0"));
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe("/profile/grill/0");
+    });
+    expect(await screen.findByTestId("grill-start")).toBeVisible();
+    await router.navigate({ to: "/profile/grill/$position", params: { position: Number.NaN } });
+    expect(await screen.findByTestId("not-found")).toBeVisible();
+  });
 });

@@ -2,7 +2,8 @@
 // first match to offer, as a table and a board with a side peek; adding a
 // job by its link; Today's state (what to do next); the Prepare page (the real
 // facts a tailored CV is based on); and the review of the CV (every line traced
-// to the profile, approved only when none is blocked).
+// to the profile, approved only when none is blocked) and its PDF, read back and
+// kept as versions; the CVs page lists them all.
 export {
   invalidatePipeline,
   STAGES,
@@ -11,6 +12,7 @@ export {
   type OpportunitySummary,
 } from "./api/opportunities";
 export { todayQuery, useToday, type NextStep, type Today, type TodaySearch } from "./api/today";
+export { CvsPage, type CvsPageProps } from "./components/Cvs/CvsPage";
 export { PipelinePage, type PipelinePageProps } from "./components/PipelinePage/PipelinePage";
 export { PreparePage, type PreparePageProps } from "./components/Prepare/PreparePage";
 export { ReviewPage, type ReviewPageProps } from "./components/Review/ReviewPage";

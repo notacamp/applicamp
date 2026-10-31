@@ -13,6 +13,7 @@ use uuid::Uuid;
 use super::{
     check::{Checks, Reason, claims_of, flagged_in_order},
     model::{Content, Frame, Line, PositionInfo, SourceKind},
+    pdf::{Template, readback::PdfChecks},
 };
 use crate::features::brief::BriefWant;
 
@@ -254,13 +255,29 @@ pub struct CvDraftView {
     pub changes: Changes,
 }
 
-/// An approved version.
+/// An approved version: the approved text as a PDF.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct CvVersion {
+    /// The draft it renders.
     pub n: u32,
     pub version: u32,
     pub language: String,
+    /// When the draft was approved.
     pub approved_at: DateTime<Utc>,
+    pub template: Template,
+    /// The most pages it may take: 1 or 2.
+    pub length: u8,
+    /// The pages it takes.
+    pub pages: u32,
+    pub size_bytes: u64,
+    /// When this PDF was made.
+    pub created_at: DateTime<Utc>,
+    /// The last time it was downloaded; none if it never was.
+    pub downloaded_at: Option<DateTime<Utc>>,
+    /// The newest version of the opportunity.
+    pub current: bool,
+    /// What the read-back found.
+    pub checks: PdfChecks,
 }
 
 fn role_of(info: &PositionInfo) -> String {
@@ -381,7 +398,7 @@ pub fn left_out(content: &Content, frame: &Frame) -> LeftOut {
 
 /// Words of `text`, lower case: letters and digits, and the `+ # .` a tool's
 /// name may hold.
-fn words(text: &str) -> HashSet<String> {
+pub(crate) fn words(text: &str) -> HashSet<String> {
     text.split(|c: char| !(c.is_alphanumeric() || matches!(c, '+' | '#')))
         .filter(|w| !w.is_empty())
         .map(str::to_lowercase)
@@ -427,7 +444,7 @@ fn terms(label: &str) -> Vec<String> {
 }
 
 /// Whether most of the terms of `label` are among `words`.
-fn found(label: &str, words: &HashSet<String>) -> bool {
+pub(crate) fn found(label: &str, words: &HashSet<String>) -> bool {
     let terms = terms(label);
     if terms.is_empty() {
         return false;

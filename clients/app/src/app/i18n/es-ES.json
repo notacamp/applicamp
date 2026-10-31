@@ -6,7 +6,9 @@
   },
   "commands": {
     "account": "Cuenta",
-    "signOut": "Cerrar sesión"
+    "signOut": "Cerrar sesión",
+    "go": "Ir a",
+    "goCvs": "CV"
   },
   "today": {
     "title": "Hoy",
@@ -66,5 +68,9 @@
     "eyebrow": "Perfil y objetivos",
     "title": "Habilidades",
     "lead": "Las habilidades con las que los agentes comparan las ofertas, en el orden en que cuentan, y las que mencionan tus propios puestos."
+  },
+  "cvs": {
+    "title": "CV",
+    "lead": "Todos los CV que has hecho: los PDF que puedes abrir y enviar, y los borradores que aún se revisan."
   }
 }

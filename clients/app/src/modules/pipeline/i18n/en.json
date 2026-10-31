@@ -117,7 +117,9 @@
       "needsYou_other": "Draft {{n}}: {{count}} lines need you.",
       "clean": "Draft {{n}}: every line traces to your profile.",
       "approvedBefore": "v{{version}} is approved; this newer draft isn’t yet.",
-      "review": "Review the CV"
+      "review": "Review the CV",
+      "viewPdf": "View PDF",
+      "download": "Download"
     }
   },
   "hidden": {
@@ -332,7 +334,7 @@
       "clean": "Every line traces to your profile",
       "cleanBody": "Approve to keep this draft as v{{version}}.",
       "approvedTitle": "Approved · v{{version}}",
-      "approvedBody": "This version can’t change. Make the CV again for another one. The PDF comes next.",
+      "approvedBody": "This text can’t change, and the PDF is made from it. Make the CV again for another draft.",
       "toPipeline": "Back to the pipeline"
     },
     "keywords": {
@@ -381,7 +383,106 @@
       "lines_flagged": "Some lines can’t be traced to your profile yet. Fix or remove them first.",
       "already_on_cv": "That is on the CV already.",
       "not_found": "This CV wasn’t found.",
-      "generic": "Something went wrong. Try again."
+      "generic": "Something went wrong. Try again.",
+      "cv_doesnt_fit_one": "Doesn’t fit on 1 page: switch to 2 pages or remove a few lines",
+      "cv_doesnt_fit_other": "Doesn’t fit on {{count}} pages: remove a few lines",
+      "cv_pdf_check_failed": "The PDF didn’t pass its check, so nothing was approved. What went wrong:",
+      "cv_pdf_unavailable": "The PDF couldn’t be made right now. Nothing was approved; try again.",
+      "cv_versions_cap": "You’ve kept 20 PDF versions of this CV. That’s the most.",
+      "not_approved": "Approve the CV first: a PDF is made from the approved text.",
+      "same_layout": "That is the layout of the newest version already.",
+      "invalid_length": "Choose 1 or 2 pages.",
+      "invalid_layout": "Choose a template and 1 or 2 pages."
+    },
+    "layout": {
+      "template": "Template",
+      "templates": {
+        "clean": "Clean",
+        "compact": "Compact"
+      },
+      "length": "Length",
+      "pages_one": "{{count}} page",
+      "pages_other": "{{count}} pages",
+      "language": "Language",
+      "note": "Template and length make a PDF from the same approved text, with no AI. A different language is a new draft: one AI call and a review. Use Make again.",
+      "confirmTitle": "Make a new version?",
+      "confirmBody": "This keeps v{{version}} as it is and makes v{{next}} from the same approved text, as {{template}} on {{pages}}. No AI is used.",
+      "confirm": "Make v{{next}}",
+      "cancel": "Cancel",
+      "making": "Making the PDF…"
+    },
+    "pdf": {
+      "open": "Open the PDF",
+      "download": "Download",
+      "checksTitle": "Read back from the PDF",
+      "sections_one": "{{count}} section found under its standard heading",
+      "sections_other": "All {{count}} sections found under standard headings",
+      "keywords_one": "The {{count}} job keyword on the CV survived",
+      "keywords_other": "All {{count}} job keywords on the CV survived",
+      "noKeywords": "No job keywords were on the CV to keep",
+      "textLayer": "One text layer, no text in images",
+      "contact": "Name, email and links are real text",
+      "size_one": "{{count}} page · {{size}}",
+      "size_other": "{{count}} pages · {{size}}"
+    },
+    "versions": {
+      "title": "Versions",
+      "lead": "Every PDF made from this CV is kept, so you can always see exactly what you sent. Stored privately with your account.",
+      "name": "v{{version}} · {{template}}",
+      "current": "Current",
+      "facts_one": "{{count}} page · {{size}} · made {{made}}",
+      "facts_other": "{{count}} pages · {{size}} · made {{made}}",
+      "neverDownloaded": "Not downloaded yet",
+      "downloaded": "Downloaded {{date}}",
+      "view": "View PDF"
+    },
+    "viewer": {
+      "title": "CV · v{{version}}",
+      "subtitle": "{{date}} · {{template}} · {{pages}} · {{size}}",
+      "close": "Close",
+      "loading": "Loading the PDF…",
+      "failed": "The PDF couldn’t be opened. You can still download it.",
+      "page": "Page {{page}} of {{pages}}"
+    }
+  },
+  "cvs": {
+    "label": "Your CVs",
+    "filter": {
+      "label": "Show",
+      "all": "All",
+      "approved": "Approved",
+      "drafts": "Drafts"
+    },
+    "title": "{{role}} · {{company}}",
+    "version": "v{{version}}",
+    "draftN": "Draft {{n}}",
+    "approved": "Approved",
+    "draft": "Draft",
+    "current": "Current",
+    "noPdf": "Approved, no PDF yet",
+    "facts_one": "{{template}} · {{count}} page · {{size}}",
+    "facts_other": "{{template}} · {{count}} pages · {{size}}",
+    "made": "Made {{date}}",
+    "started": "Started {{date}}",
+    "neverDownloaded": "Not downloaded yet",
+    "downloaded": "Downloaded {{date}}",
+    "viewPdf": "View PDF",
+    "download": "Download",
+    "review": "Review",
+    "opportunity": "Open the job",
+    "empty": {
+      "title": "No CVs yet",
+      "body": "Shortlist a job, open Prepare and draft the CV. Once you approve it, its PDF is kept here.",
+      "action": "Go to the pipeline"
+    },
+    "emptyFiltered": {
+      "title": "Nothing here",
+      "body": "No CVs match this filter."
+    },
+    "loading": "Loading your CVs…",
+    "loadFailed": "Your CVs couldn’t be loaded.",
+    "viewer": {
+      "title": "{{company}} · v{{version}}"
     }
   }
 }

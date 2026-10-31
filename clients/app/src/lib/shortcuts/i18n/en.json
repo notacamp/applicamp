@@ -4,7 +4,8 @@
     "pipeline": "Pipeline",
     "boards": "Boards",
     "agents": "Agents",
-    "profile": "Profile & goals"
+    "profile": "Profile & goals",
+    "cvs": "CVs"
   },
   "command": {
     "open": "Command menu"

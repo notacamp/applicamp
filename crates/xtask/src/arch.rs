@@ -20,6 +20,9 @@ pub enum Kind {
     Ai,
     /// `crates/server`
     Server,
+    /// `crates/agent`: the runner inside sandboxes, which depends on no
+    /// Applicamp crate (it talks to the server over the agent API only).
+    Agent,
     /// `crates/modules/<name>`
     Module(String),
     /// `crates/xtask`
@@ -37,6 +40,7 @@ impl Kind {
             ["crates", "kernel"] => Self::Kernel,
             ["crates", "ai"] => Self::Ai,
             ["crates", "server"] => Self::Server,
+            ["crates", "agent"] => Self::Agent,
             ["crates", "modules", name] => Self::Module((*name).to_owned()),
             ["crates", "xtask"] => Self::Xtask,
             _ => Self::Unknown,
@@ -50,6 +54,7 @@ impl fmt::Display for Kind {
             Self::Kernel => f.write_str("kernel"),
             Self::Ai => f.write_str("AI gateway"),
             Self::Server => f.write_str("server"),
+            Self::Agent => f.write_str("agent runner"),
             Self::Module(name) => write!(f, "module `{name}`"),
             Self::Xtask => f.write_str("xtask"),
             Self::Unknown => f.write_str("unclassified crate"),
@@ -114,7 +119,8 @@ pub fn check_dependencies(crates: &[Crate], allow: &[Allow]) -> Vec<String> {
         if from == Kind::Unknown {
             violations.push(format!(
                 "`{}` lives at `{}`, which is not a known crate location \
-                 (crates/kernel, crates/ai, crates/server, crates/modules/<name>, crates/xtask)",
+                 (crates/kernel, crates/ai, crates/server, crates/agent, crates/modules/<name>, \
+                 crates/xtask)",
                 krate.name, krate.path
             ));
             continue;
@@ -141,6 +147,12 @@ fn edge_violation(from: &Kind, to: &Kind, allow: &[Allow]) -> Option<&'static st
     if *to == Kind::Server && *from != Kind::Xtask {
         return Some("only xtask may depend on the server");
     }
+    if *to == Kind::Agent {
+        return Some("nothing depends on the agent runner; it reaches the server over HTTP");
+    }
+    if *from == Kind::Agent {
+        return Some("the agent runner depends on no Applicamp crate (ADR 0009)");
+    }
     match (from, to) {
         (Kind::Kernel, _) => Some("the kernel depends on no workspace crate"),
         (Kind::Module(_) | Kind::Ai, Kind::Kernel)
@@ -159,6 +171,7 @@ fn edge_violation(from: &Kind, to: &Kind, allow: &[Allow]) -> Option<&'static st
         }
         (Kind::Module(_), _) => Some("modules may depend only on the kernel and the AI gateway"),
         (Kind::Unknown, _) => Some("unclassified crate"),
+        (Kind::Agent, _) => Some("the agent runner depends on no Applicamp crate (ADR 0009)"),
     }
 }
 
@@ -369,16 +382,30 @@ static OPERATION_ID: LazyLock<Regex> = LazyLock::new(|| {
         .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
 });
 
+/// The schemes operations may require: the session cookie everywhere, a
+/// run's token only under the agent API's prefix.
+#[derive(Debug, Clone, Copy)]
+pub struct Schemes<'a> {
+    /// The session cookie scheme (`session`).
+    pub session: &'a str,
+    /// The run token scheme (`run_token`).
+    pub run_token: &'a str,
+    /// The only paths the run token is for (`/api/agent/`).
+    pub agent_prefix: &'a str,
+}
+
 /// Every operation of the generated OpenAPI document states its security
-/// explicitly, as public (`security(())`, i.e. `[{}]`) or the session
-/// cookie scheme `session` (no scopes); nothing is left to a document-wide
-/// default. Its `operationId` is a unique `<owner>.<verb>` whose owner is a
-/// module or the server (`system`, `bff`).
+/// explicitly, as public (`security(())`, i.e. `[{}]`), the session cookie
+/// scheme `session`, or (only under the agent API, where it is the only
+/// one) the run token scheme `run_token`, with no scopes; nothing is left to
+/// a document-wide default. Its `operationId` is a unique `<owner>.<verb>`
+/// whose owner is a module or the server (`system`, `bff`).
 pub fn check_operations(
     spec: &serde_json::Value,
-    session_scheme: &str,
+    schemes: Schemes<'_>,
     modules: &BTreeSet<String>,
 ) -> Vec<String> {
+    let session_scheme = schemes.session;
     let mut violations = Vec::new();
     let mut ids = BTreeSet::new();
     let Some(paths) = spec.get("paths").and_then(serde_json::Value::as_object) else {
@@ -400,13 +427,36 @@ pub fn check_operations(
                      `security((\"{session_scheme}\" = []))`"
                 )),
                 Some(requirements) => {
+                    let agent = path.starts_with(schemes.agent_prefix);
+                    let allowed = if agent {
+                        schemes.run_token
+                    } else {
+                        session_scheme
+                    };
                     for requirement in requirements {
-                        if !valid_requirement(requirement, session_scheme) {
-                            violations.push(format!(
-                                "OpenAPI operation `{name}`: security requirement {requirement} \
-                                 is neither public (`{{}}`) nor `{{\"{session_scheme}\": []}}`"
-                            ));
+                        if !valid_requirement(requirement, allowed) {
+                            violations.push(if agent {
+                                format!(
+                                    "OpenAPI operation `{name}`: the agent API takes only \
+                                     `{{\"{allowed}\": []}}`, got {requirement}"
+                                )
+                            } else {
+                                format!(
+                                    "OpenAPI operation `{name}`: security requirement \
+                                     {requirement} is neither public (`{{}}`) nor \
+                                     `{{\"{allowed}\": []}}`"
+                                )
+                            });
                         }
+                    }
+                    if agent
+                        && requirements
+                            .iter()
+                            .any(|r| r.as_object().is_some_and(serde_json::Map::is_empty))
+                    {
+                        violations.push(format!(
+                            "OpenAPI operation `{name}`: the agent API is never public"
+                        ));
                     }
                 }
             }
@@ -620,7 +670,7 @@ mod tests {
             "/healthz": { "get": { "operationId": "system.health", "security": [{}] } },
             "/api/v1/me": { "get": { "operationId": "identity.me", "security": [{ "session": [] }] } },
         }});
-        assert!(check_operations(&spec, "session", &modules(&["identity"])).is_empty());
+        assert!(check_operations(&spec, SCHEMES, &modules(&["identity"])).is_empty());
 
         let bad = serde_json::json!({ "paths": {
             "/a": { "get": { "operationId": "identity.a" } },
@@ -628,8 +678,45 @@ mod tests {
             "/c": { "get": { "operationId": "elsewhere.c", "security": [{ "session": ["x"] }] } },
             "/d": { "get": { "security": [{}] } },
         }});
-        let violations = check_operations(&bad, "session", &modules(&["identity"]));
+        let violations = check_operations(&bad, SCHEMES, &modules(&["identity"]));
         assert_eq!(violations.len(), 6, "{violations:?}");
+    }
+
+    const SCHEMES: Schemes<'static> = Schemes {
+        session: "session",
+        run_token: "run_token",
+        agent_prefix: "/api/agent/",
+    };
+
+    #[test]
+    fn the_run_token_is_for_the_agent_api_alone() {
+        let modules = modules(&["runs"]);
+        let ok = serde_json::json!({ "paths": {
+            "/api/agent/v1/context": { "get": { "operationId": "runs.agent_context", "security": [{ "run_token": [] }] } },
+            "/api/v1/runs": { "get": { "operationId": "runs.list", "security": [{ "session": [] }] } },
+        }});
+        assert!(check_operations(&ok, SCHEMES, &modules).is_empty());
+        let bad = serde_json::json!({ "paths": {
+            "/api/agent/v1/a": { "get": { "operationId": "runs.a", "security": [{ "session": [] }] } },
+            "/api/agent/v1/b": { "get": { "operationId": "runs.b", "security": [{}] } },
+            "/api/v1/c": { "get": { "operationId": "runs.c", "security": [{ "run_token": [] }] } },
+        }});
+        let violations = check_operations(&bad, SCHEMES, &modules);
+        assert_eq!(violations.len(), 3, "{violations:?}");
+    }
+
+    #[test]
+    fn the_agent_runner_stands_alone() {
+        let crates = [
+            krate("applicamp-kernel", "crates/kernel", &[]),
+            krate("applicamp-agent", "crates/agent", &["applicamp-kernel"]),
+            krate("applicamp-server", "crates/server", &["applicamp-agent"]),
+        ];
+        let violations = check_dependencies(&crates, &[]);
+        assert_eq!(violations.len(), 2, "{violations:?}");
+        assert!(
+            check_dependencies(&[krate("applicamp-agent", "crates/agent", &[])], &[]).is_empty()
+        );
     }
 
     #[test]

@@ -8,6 +8,8 @@
 //!   sign-in cookie, stored refresh tokens) has its own key. Each value gets
 //!   a fresh random nonce, and the caller's context (table, column, row) is
 //!   the associated data, so a ciphertext cannot be moved to another row.
+//! - **Derived keys** ([`SecretKey::derive`]): 32 bytes (HKDF-SHA256) for
+//!   one purpose label, e.g. the seed of the Ed25519 key the gateway trusts.
 //! - Cookie tokens are 256-bit random values ([`random_token`]); the
 //!   database keeps only their SHA-256 ([`hash`]), compared in constant time
 //!   ([`same_hash`]).
@@ -78,6 +80,31 @@ impl SecretKey {
         })?;
         Self::decode(secret.expose_secret())
             .map_err(|why| ConfigError(format!("APPLICAMP_SECRET_KEY {why}")))
+    }
+}
+
+/// The length of a key [`SecretKey::derive`] makes.
+struct KeyLen;
+
+impl hkdf::KeyType for KeyLen {
+    fn len(&self) -> usize {
+        SECRET_KEY_LEN
+    }
+}
+
+impl SecretKey {
+    /// 32 bytes derived (HKDF-SHA256) from the instance secret for
+    /// `purpose`, a fixed, versioned label per use
+    /// (`b"applicamp gateway oidc v1"`): the same secret and label give the
+    /// same bytes, another label unrelated ones. Never change a label in use.
+    pub fn derive(&self, purpose: &'static [u8]) -> [u8; SECRET_KEY_LEN] {
+        let prk = hkdf::Salt::new(hkdf::HKDF_SHA256, &[]).extract(&self.0);
+        let info = [purpose];
+        let mut out = [0_u8; SECRET_KEY_LEN];
+        prk.expand(&info, KeyLen)
+            .and_then(|okm| okm.fill(&mut out))
+            .unwrap_or_else(|_| unreachable!("HKDF can expand to 32 bytes"));
+        out
     }
 }
 
@@ -241,6 +268,15 @@ mod tests {
         assert_eq!(format!("{key:?}"), "SecretKey(<redacted>)");
         assert!(SecretKey::decode("c2hvcnQ=").unwrap_err().contains("32"));
         assert!(SecretKey::decode("%%%").is_err());
+    }
+
+    #[test]
+    fn derived_keys_depend_on_the_secret_and_the_purpose() {
+        let a = SecretKey::from_bytes([1; SECRET_KEY_LEN]);
+        let b = SecretKey::from_bytes([2; SECRET_KEY_LEN]);
+        assert_eq!(a.derive(b"test v1"), a.derive(b"test v1"));
+        assert_ne!(a.derive(b"test v1"), a.derive(b"other v1"));
+        assert_ne!(a.derive(b"test v1"), b.derive(b"test v1"));
     }
 
     #[test]

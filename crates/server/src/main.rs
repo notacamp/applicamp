@@ -117,10 +117,17 @@ fn serve() -> ExitCode {
         Ok(web) => web,
         Err(e) => return fail(&e.to_string()),
     };
-    let composition = match applicamp_server::Composition::from_env() {
-        Ok(composition) => composition.with_secret(&secret),
+    let composition = match applicamp_server::Composition::from_env().and_then(|composition| {
+        composition
+            .with_secret(&secret)
+            .with_sandboxes(&secret, &config.public_url)
+    }) {
+        Ok(composition) => composition,
         Err(e) => return fail(&e),
     };
+    if let Err(problems) = applicamp_server::kinds() {
+        return fail(&format!("run kinds: {}", problems.join("; ")));
+    }
     let runtime = match runtime() {
         Ok(runtime) => runtime,
         Err(e) => return fail(&e),
@@ -152,6 +159,16 @@ async fn run(
     }
     applicamp_sources::start(&db, &composition.sources).await?;
     let events = EventBus::new(Arc::clone(&registry));
+    let (stop, stopped) = watch::channel(false);
+    let runs = applicamp_server::runs_with(composition);
+    let orchestrator = applicamp_runs::start(&db, &events, &runs, stopped.clone()).await?;
+    match runs.runtime_name() {
+        Some(runtime) => tracing::info!(runtime, "agent runs on"),
+        None => tracing::info!(
+            "APPLICAMP_SANDBOX__RUNTIME is unset: agent runs cannot start (set it to openshell, or \
+             fake for local development)"
+        ),
+    }
     let addr: SocketAddr = config
         .bind_addr
         .parse()
@@ -178,7 +195,6 @@ async fn run(
         ),
     }
 
-    let (stop, stopped) = watch::channel(false);
     let worker = Worker::new(db.clone(), registry, events);
     let workers: Vec<_> = (0..WORKERS)
         .map(|_| tokio::spawn(worker.clone().run(stopped.clone())))
@@ -197,6 +213,12 @@ async fn run(
         let _ = worker.await;
     }
     let _ = pruner.await;
+    if let Some(orchestrator) = orchestrator {
+        // It stops claiming; runs still going are left to their claims,
+        // which lapse, and the next start ends them and sweeps their
+        // sandboxes.
+        let _ = orchestrator.await;
+    }
     tracing::info!("stopped");
     Ok(())
 }

@@ -1,12 +1,14 @@
 //! `cargo xtask`: repository automation.
 //!
 //! - `cargo xtask arch` enforces the architecture rules in `AGENTS.md`.
+//! - `cargo xtask policies` lints the sandbox policies in `policies/`.
 //! - `cargo xtask openapi [--check]` regenerates (or verifies) `openapi/openapi.json`.
 
 #![forbid(unsafe_code)]
 
 mod arch;
 mod openapi;
+mod policies;
 
 use std::{
     collections::BTreeSet,
@@ -34,6 +36,10 @@ enum Command {
     /// work, that every OpenAPI operation declares its security and owner,
     /// and that no route is registered outside the OpenAPI document.
     Arch,
+    /// Lint the sandbox policies (`policies/*.yaml`): every inspected
+    /// endpoint enforced, Landlock required, no wildcard, forbidden or
+    /// internal host; and every run kind's policy is one of them.
+    Policies,
     /// Write openapi/openapi.json from the server's routes.
     Openapi {
         /// Fail if the committed document is stale instead of writing it.
@@ -47,6 +53,7 @@ fn main() -> ExitCode {
     let root = workspace_root();
     let result = match cli.command {
         Command::Arch => run_arch(&root),
+        Command::Policies => run_policies(&root),
         Command::Openapi { check } => openapi::run(&root, check),
     };
     match result {
@@ -110,9 +117,16 @@ fn run_arch(root: &Path) -> Result<String> {
                 .map(|p| format!("background work: {p}")),
         );
     }
+    if let Err(problems) = applicamp_server::kinds() {
+        violations.extend(problems.into_iter().map(|p| format!("run kinds: {p}")));
+    }
     violations.extend(arch::check_operations(
         &spec,
-        applicamp_server::bff::SESSION_SCHEME,
+        arch::Schemes {
+            session: applicamp_server::bff::SESSION_SCHEME,
+            run_token: applicamp_runs::RUN_TOKEN_SCHEME,
+            agent_prefix: applicamp_runs::AGENT_API_PREFIX,
+        },
         &modules,
     ));
     violations.extend(arch::check_undocumented_routes(&sources));
@@ -143,6 +157,50 @@ fn run_arch(root: &Path) -> Result<String> {
     anyhow::bail!(
         "{} architecture violation(s) (see AGENTS.md → Architecture rules):\n{}",
         violations.len(),
+        list.join("\n")
+    )
+}
+
+fn run_policies(root: &Path) -> Result<String> {
+    let dir = root.join("policies");
+    let files: Vec<String> = file_names(&dir)?
+        .into_iter()
+        .filter(|name| name.ends_with(".yaml"))
+        .collect();
+    let mut problems = Vec::new();
+    let mut texts = BTreeSet::new();
+    for name in &files {
+        let path = dir.join(name);
+        let yaml =
+            fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
+        problems.extend(policies::lint(&format!("policies/{name}"), &yaml));
+        texts.insert(yaml);
+    }
+    let modules = applicamp_server::modules();
+    let kinds: Vec<_> = modules
+        .iter()
+        .flat_map(|module| module.kinds.iter())
+        .collect();
+    for kind in &kinds {
+        if !texts.contains(kind.policy) {
+            problems.push(format!(
+                "run kind `{}`: its policy is not one of the files in policies/ (embed it with \
+                 include_str!)",
+                kind.name
+            ));
+        }
+    }
+    if problems.is_empty() {
+        return Ok(format!(
+            "policies OK: {} file(s), {} run kind(s), every endpoint enforced",
+            files.len(),
+            kinds.len()
+        ));
+    }
+    let list: Vec<String> = problems.iter().map(|p| format!("  - {p}")).collect();
+    anyhow::bail!(
+        "{} policy problem(s) (see AGENTS.md → Agent and sandbox rules):\n{}",
+        problems.len(),
         list.join("\n")
     )
 }

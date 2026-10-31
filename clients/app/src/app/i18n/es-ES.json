@@ -49,9 +49,7 @@
   },
   "agents": {
     "title": "Agentes",
-    "lead": "Cada ejecución trabaja en su propio sandbox, creado para una tarea y eliminado al terminar.",
-    "emptyTitle": "Todavía no hay ejecuciones",
-    "emptyBody": "Cuando se ejecute una búsqueda o una candidatura, podrás ver aquí lo que hace en tiempo real: cada paso, los sitios a los que accedió y aquellos a los que se le impidió acceder."
+    "lead": "Cada ejecución trabaja en su propio sandbox, creado para una tarea y eliminado al terminar."
   },
   "profile": {
     "title": "Perfil y objetivos",

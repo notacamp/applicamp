@@ -1,0 +1,41 @@
+/* One column on phones (the list, or the chosen item); two from 48rem. */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.list,
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.split[data-showing="list"] .detail,
+.split[data-showing="detail"] .list {
+  display: none;
+}
+
+.back {
+  display: flex;
+}
+
+@media (width >= 48rem) {
+  .split {
+    grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr);
+    gap: var(--space-6);
+    align-items: start;
+  }
+
+  .split[data-showing] .list,
+  .split[data-showing] .detail {
+    display: flex;
+  }
+
+  .back {
+    display: none;
+  }
+}

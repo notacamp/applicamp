@@ -123,6 +123,7 @@ pub fn module(deps: ProfileDeps) -> Module {
             .job_with::<completion::review::GapReview, _>(Ai(deps.ai.clone()))
             .publishes::<events::ProfileUpdated>()
             .publishes::<events::GoalsUpdated>(),
+        kinds: Vec::new(),
     }
 }
 

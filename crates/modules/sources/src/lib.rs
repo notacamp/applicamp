@@ -200,6 +200,7 @@ pub fn module(deps: SourcesDeps) -> Module {
             .job_with::<discovery::CheckBoard, _>(deps.clone())
             .job_with::<discovery::CheckSeeded, _>(deps)
             .publishes::<events::SearchFinished>(),
+        kinds: Vec::new(),
     }
 }
 

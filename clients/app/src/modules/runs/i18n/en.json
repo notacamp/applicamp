@@ -1,0 +1,96 @@
+{
+  "list": "Runs",
+  "run": "Run",
+  "back": "All runs",
+  "runCheck": "Run a check",
+  "starting": "Starting…",
+  "stop": "Stop",
+  "loading": "Loading your runs…",
+  "loadFailed": "Your runs couldn’t be loaded.",
+  "retry": "Try again",
+  "emptyTitle": "No runs yet",
+  "emptyBody": "When a search or an application runs, you can watch what it does here as it happens: each step, the sites it reached and anything it was stopped from reaching.",
+  "emptyCheck": "Run a check to see one at work.",
+  "unavailableTitle": "Agents can’t run on this instance",
+  "unavailableBody": "It has no sandbox to run them in, so no check can start here. Whoever runs this instance can set one up.",
+  "kinds": {
+    "probe": "Check",
+    "other": "Run of {{kind}}"
+  },
+  "when": {
+    "today": "Today {{time}}"
+  },
+  "rowMeta": "{{status}} · {{when}}",
+  "status": {
+    "queued": "Waiting to start",
+    "starting": "Making its sandbox",
+    "running": "Running",
+    "stopping": "Stopping…"
+  },
+  "outcome": {
+    "succeeded": "Succeeded",
+    "nothing_new": "Found nothing new",
+    "needs_you": "Needs you",
+    "ended_max_steps": "Stopped: it took too many steps",
+    "ended_budget": "Stopped: it used up its token budget",
+    "ended_timeout": "Stopped: it ran out of time",
+    "ended_loop": "Stopped: it was going round in circles",
+    "failed": "Failed",
+    "cancelled": "Stopped by you"
+  },
+  "failure": {
+    "sandbox_create_failed": "Its sandbox couldn’t be made.",
+    "agent_exited": "Its agent stopped before it finished.",
+    "server_restarted": "The server restarted while it ran.",
+    "runtime_failed": "Its sandbox stopped working.",
+    "start_failed": "It couldn’t start.",
+    "generic": "Something went wrong while it ran."
+  },
+  "tabs": {
+    "label": "Show",
+    "agent": "What it’s doing",
+    "sandbox": "Sandbox log"
+  },
+  "level": {
+    "tool": "Tool",
+    "model": "Model",
+    "deny": "Blocked",
+    "ask": "Needs you",
+    "error": "Problem",
+    "allowed": "Allowed"
+  },
+  "live": {
+    "connecting": "Connecting to the run…",
+    "lost": "The live view stopped.",
+    "reconnect": "Reconnect"
+  },
+  "noEvents": {
+    "agent": "Nothing yet. Its steps appear here as it takes them.",
+    "sandbox": "No requests yet. Each site it tries to reach appears here, allowed or blocked."
+  },
+  "noEventsEnded": {
+    "agent": "It wrote nothing.",
+    "sandbox": "It tried to reach no site."
+  },
+  "facts": {
+    "title": "About this run",
+    "sandbox": "Sandbox",
+    "image": "Image",
+    "policy": "Network policy",
+    "model": "Model",
+    "tokens": "Tokens",
+    "tokensValue": "{{in}} in · {{out}} out",
+    "cost": "Cost",
+    "duration": "Duration",
+    "end": "End state",
+    "notYet": "Not yet",
+    "noModel": "None: it asked no model"
+  },
+  "errors": {
+    "too_many_runs": "Too many runs are waiting. Try again once one has ended.",
+    "sandboxes_unavailable": "Agents can’t run on this instance: it has no sandbox to run them in.",
+    "unknown_kind": "This instance can’t run that check.",
+    "generic": "The check couldn’t start. Try again."
+  },
+  "stopFailed": "It couldn’t be stopped. Try again."
+}

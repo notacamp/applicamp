@@ -21,6 +21,7 @@ import { Pipeline } from "./routes/pipeline";
 import { PipelineCv } from "./routes/pipeline-cv";
 import { PipelinePrepare } from "./routes/pipeline-prepare";
 import { Profile } from "./routes/profile";
+import { ProfileAbout } from "./routes/profile-about";
 import { ProfileGrill } from "./routes/profile-grill";
 import { ProfileImprove } from "./routes/profile-improve";
 import { ProfileSkills } from "./routes/profile-skills";
@@ -214,6 +215,9 @@ const profileRoute = createRoute({
             void navigate({ to: "/profile/grill/$position", params: { position } });
           }
         }}
+        onAbout={() => {
+          void navigate({ to: "/profile/about" });
+        }}
         onAction={(action) => {
           switch (action.kind) {
             case "improve": {
@@ -255,6 +259,22 @@ const profileSkillsRoute = createRoute({
     const navigate = profileSkillsRoute.useNavigate();
     return (
       <ProfileSkills
+        onBack={() => {
+          void navigate({ to: "/profile" });
+        }}
+      />
+    );
+  },
+});
+
+/** Tell me about you: the portrait, what else to know, and the review, in the app frame. */
+const profileAboutRoute = createRoute({
+  getParentRoute: () => frameRoute,
+  path: "/profile/about",
+  component: function ProfileAboutRoute() {
+    const navigate = profileAboutRoute.useNavigate();
+    return (
+      <ProfileAbout
         onBack={() => {
           void navigate({ to: "/profile" });
         }}
@@ -378,6 +398,7 @@ const routeTree = rootRoute.addChildren([
     agentsRoute,
     profileRoute,
     profileSkillsRoute,
+    profileAboutRoute,
     profileGrillRoute,
     profileGrillRoleRoute,
   ]),

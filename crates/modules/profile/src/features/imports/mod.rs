@@ -610,6 +610,11 @@ impl Job for ExpireImports {
             .execute(&ctx.db)
             .await?
             .rows_affected();
+        // And what "Tell me about you" kept for a week.
+        deleted += sqlx::query("DELETE FROM profile.about_you WHERE expires_at <= now()")
+            .execute(&ctx.db)
+            .await?
+            .rows_affected();
         if deleted > 0 {
             tracing::info!(deleted, "expired profile imports and drafts deleted");
         }

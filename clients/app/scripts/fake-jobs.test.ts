@@ -76,6 +76,24 @@ async function cv(prompt: string): Promise<Cv> {
   return JSON.parse(body.choices[0]?.message.content ?? "{}") as Cv;
 }
 
+async function model<T>(system: string, user: string): Promise<T> {
+  const response = await fetch(`${base}/v1/chat/completions`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+    }),
+  });
+  const body = (await response.json()) as { choices: { message: { content: string } }[] };
+  return JSON.parse(body.choices[0]?.message.content ?? "{}") as T;
+}
+
+const PORTRAIT_SYSTEM = "You write what a job-hunting app knows about one person, as a portrait.";
+const EXTRA_SYSTEM = "You read what a person wrote about themselves, to fit it into a profile.";
+
 describe("the fake CV writer", () => {
   let child: ChildProcess | undefined;
 
@@ -143,5 +161,57 @@ Company: Example Co
     expect(draft.summary.text).toBe("Built ingestion for 3 partner feeds.");
     expect(draft.experience).toHaveLength(1);
     expect(draft.skills).toEqual(["Rust", "Kubernetes"]);
+  });
+
+  it("writes a portrait with every kind, a known claim no source makes, and an assumption from the employer's own site", async () => {
+    const portrait = await model<{
+      sentences: { text: string; kind: string; position: number | null }[];
+    }>(
+      PORTRAIT_SYSTEM,
+      `<language>en</language>
+<positions>
+[{"index":0,"title":"Senior Engineer","company":"Example Co"},{"index":1,"title":"Engineer","company":"Sample Labs"}]
+</positions>
+<sources>
+[{"id":"w0","kind":"profile","text":"Senior Engineer at Example Co"},
+ {"id":"w0f0","kind":"told","text":"Moved invoicing onto PostgreSQL"},
+ {"id":"r0.0","kind":"research","text":"Builds ledgers for small shops","quote":"builds invented ledgers","url":"http://example-co.test:9020/"}]
+</sources>`,
+    );
+    const kinds = new Set(portrait.sentences.map((sentence) => sentence.kind));
+    expect([...kinds].toSorted()).toEqual(["assumed", "known", "told"]);
+    expect(portrait.sentences.map((sentence) => sentence.text)).toContain(
+      "You also run Kubernetes clusters in production.",
+    );
+    expect(
+      portrait.sentences.some((sentence) => sentence.text.includes("according to its own website")),
+    ).toBe(true);
+    expect(
+      portrait.sentences.filter(
+        (sentence) => sentence.kind === "assumed" && sentence.position === 0,
+      ).length,
+    ).toBeGreaterThan(1);
+  });
+
+  it("reads what a person wrote into changes across the profile, with a summary that says one thing they did not", async () => {
+    const text =
+      "I ran events and a restaurant for 6 years. I want a senior Rails role, ideally for restaurants. I use Rails, Elixir and Postgres. I led 4 engineers at Example Co.";
+    const read = await model<{ changes: { field: string; value: string; quote: string }[] }>(
+      EXTRA_SYSTEM,
+      `<language>en</language>\n<profile>\n{}\n</profile>\n<text>\n${text}\n</text>`,
+    );
+    expect(read.changes.map((change) => `${change.field}:${change.value}`)).toEqual([
+      "summary:I ran events and a restaurant for 6 years. Now building hospitality products at Acme.",
+      "headline:Senior Rails engineer",
+      "skill:Rails",
+      "skill:Elixir",
+      "skill:Postgres",
+      "background:I ran events and a restaurant for 6 years",
+      "goal_role:Senior Rails engineer",
+      "role_fact:Led 4 engineers",
+    ]);
+    for (const change of read.changes) {
+      expect(text).toContain(change.quote);
+    }
   });
 });

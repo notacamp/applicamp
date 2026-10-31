@@ -105,8 +105,16 @@ export function RoleFacts({ profile, onGrill }: RoleFactsProps) {
                     <FactRow
                       key={fact.id}
                       text={fact.text}
-                      quoteLabel={t("grill.roleFacts.yourWords")}
-                      quote={fact.quote}
+                      quoteLabel={
+                        fact.status === "confirmed_assumption"
+                          ? t("grill.roleFacts.confirmed")
+                          : t("grill.roleFacts.yourWords")
+                      }
+                      quote={
+                        fact.status === "confirmed_assumption" && fact.basis
+                          ? fact.basis
+                          : fact.quote
+                      }
                       testId={`role-fact-${fact.id}`}
                       actions={
                         <IconButton

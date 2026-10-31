@@ -297,7 +297,7 @@ pub struct KeepFactRequest {
 
 /// The position `work` as an interview is tied to it: renamed or moved
 /// positions never lend their interview to another.
-fn role_key(work: &Work) -> String {
+pub(crate) fn role_key(work: &Work) -> String {
     squash(&format!(
         "{}|{}|{}",
         work.name.as_deref().unwrap_or_default(),
@@ -1418,6 +1418,8 @@ async fn keep_proposals(
                 quote: proposal.quote.clone(),
                 area: proposal.area,
                 kept_at: now,
+                status: Default::default(),
+                basis: None,
             });
         }
     }

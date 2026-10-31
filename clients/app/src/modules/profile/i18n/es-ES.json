@@ -101,7 +101,8 @@
     "email": "Correo",
     "url": "Sitio web",
     "summary": "Resumen",
-    "section": "Sobre ti"
+    "section": "Sobre ti",
+    "background": "Trayectoria"
   },
   "placeholders": {
     "name": "Añade tu nombre",
@@ -109,7 +110,8 @@
     "location": "Añade dónde estás",
     "email": "Añade un correo para candidaturas",
     "url": "Añade tu sitio web",
-    "summary": "Añade unas frases sobre ti"
+    "summary": "Añade unas frases sobre ti",
+    "background": "Cuenta de dónde vienes"
   },
   "sections": {
     "work": "Experiencia",
@@ -425,7 +427,8 @@
         "missing": "Dile a los agentes qué quieres a continuación"
       }
     },
-    "grill": "Pregúntame todo"
+    "grill": "Pregúntame todo",
+    "about": "Cuéntame de ti"
   },
   "improve": {
     "eyebrow": "Pregunta {{n}} de {{total}}",
@@ -659,7 +662,152 @@
       "remove": "Quitar",
       "removeLabel": "Quitar este dato: {{text}}",
       "removed": "Dato quitado.",
-      "listLabel": "Datos conservados de {{role}}"
+      "listLabel": "Datos conservados de {{role}}",
+      "confirmed": "Confirmaste esta suposición."
+    }
+  },
+  "about": {
+    "eyebrow": "Perfil y objetivos",
+    "title": "Esto es lo que sé de ti",
+    "addedTitle": "Lo que he añadido de lo que escribiste",
+    "reviewTitle": "Así eres ahora",
+    "lead": "Escrito a partir de tu perfil, de lo que tus antiguos empleadores dicen de sí mismos en sus propias webs y de lo que suele ser cierto para quien tiene tus puestos. Solo te pregunto lo que no puedo averiguar yo. Las partes resaltadas son suposiciones mías. Selecciona una para decirme si es correcta.",
+    "loading": "Cargando…",
+    "loadFailed": "No se pudo cargar.",
+    "making": "Leyendo tu perfil y las webs de tus antiguos empleadores…",
+    "noProfileTitle": "Añade primero tu perfil",
+    "noProfileLead": "Necesito tu perfil para escribir sobre ti. Impórtalo o escríbelo y vuelve después.",
+    "back": "Volver a Perfil y objetivos",
+    "portraitLabel": "Lo que sé de ti",
+    "legend": {
+      "label": "Qué significan los colores",
+      "known": "De tu perfil",
+      "told": "Me lo dijiste",
+      "assumed": "Supuse",
+      "confirmed": "Lo confirmaste"
+    },
+    "panel": {
+      "label": "Sobre esta suposición",
+      "assumed": "Supuse:",
+      "why": "Por qué:",
+      "downgraded": "Esto no figura en tu perfil con estas palabras.",
+      "guess": "Lo supongo por tu puesto.",
+      "right": "Es correcto",
+      "wrong": "Es incorrecto",
+      "later": "Pregúntamelo más tarde"
+    },
+    "employers": {
+      "title": "Antiguos empleadores que miré",
+      "lead": "Solo leo la web de un empleador cuando la conozco, y solo las páginas que permite. Añade una web para que la lea.",
+      "state": {
+        "read_one": "Leí su web: {{count}} dato encontrado",
+        "read_other": "Leí su web: {{count}} datos encontrados",
+        "unread": "Web conocida: {{site}}. La leeré cuando actualices el retrato.",
+        "no_site": "No conozco su web, así que no leí nada.",
+        "failed": "No se pudo leer ({{error}})."
+      },
+      "siteLabel": "Web de {{company}}",
+      "sitePlaceholder": "https://ejemplo.com",
+      "add": "Añadir web",
+      "update": "Actualizar el retrato",
+      "updateCost": "1 llamada pequeña de IA por web leída · unos 0,002 €"
+    },
+    "accuracy": {
+      "title": "¿Es correcto?",
+      "yes": "Sí, en su mayoría",
+      "some": "Una parte es incorrecta",
+      "no": "Casi nada"
+    },
+    "extra": {
+      "title": "¿Hay algo más que deba saber de ti?",
+      "lead": "Tu trayectoria, en qué eres bueno, qué quieres después. Escríbelo como te salga. Lo encajo en tu perfil y te enseño qué cambió.",
+      "label": "Algo más que deba saber",
+      "hint": "{{left}} caracteres restantes",
+      "reading": "Leyendo lo que escribiste…"
+    },
+    "continue": "Continuar",
+    "cost": "1 llamada pequeña de IA · unos 0,002 €",
+    "yourWords": "Tus palabras:",
+    "fields": {
+      "summary": "Resumen",
+      "headline": "Titular",
+      "skill": "Habilidad",
+      "background": "Trayectoria",
+      "goal_role": "Puesto que quieres",
+      "goal_avoid": "Evitar",
+      "goal_must_have": "Imprescindible",
+      "goal_location": "Lugar",
+      "role_fact": "En el trabajo"
+    },
+    "added": {
+      "title": "Añadido de lo que escribiste",
+      "savedLater": "Pasa a tu perfil cuando guardes.",
+      "none": "Nada de lo que escribiste exigía cambiar tu perfil.",
+      "questionsNext": "Las preguntas sobre las lagunas vienen después.",
+      "open_one": "{{count}} afirmación necesita tu respuesta antes de poder guardar.",
+      "open_other": "{{count}} afirmaciones necesitan tu respuesta antes de poder guardar.",
+      "review": "Revisar y guardar",
+      "back": "Volver"
+    },
+    "flag": {
+      "claim": "«{{claim}}» no está en tus palabras.",
+      "quote": "No encuentro en lo que escribiste las palabras que cité."
+    },
+    "resolution": {
+      "true": "Dijiste que esto es cierto.",
+      "fixed": "Lo corregiste.",
+      "own_words": "Con tus propias palabras."
+    },
+    "change": {
+      "true": "Es cierto",
+      "fix": "Corregir",
+      "edit": "Editar",
+      "ownWords": "Usar mis palabras",
+      "remove": "Quitar",
+      "editLabel": "Lo que debe decir",
+      "recheck": "Comprobar y mantener",
+      "cancel": "Cancelar"
+    },
+    "groups": {
+      "summary": "Resumen",
+      "headline": "Titular",
+      "skills": "Habilidades",
+      "position": "Puesto",
+      "background": "Trayectoria",
+      "goals": "Objetivos"
+    },
+    "review": {
+      "lead": "Esto es lo que guardaré en tu perfil. Cada línea viene de tu perfil, de algo que me dijiste o de una suposición que confirmaste. No se guarda nada que no hayas confirmado.",
+      "changes": "Cambios en tu perfil",
+      "nothing": "Todavía no hay nada que guardar.",
+      "told": "Me lo dijiste",
+      "confirmed": "Confirmado",
+      "leftOut_one": "Queda fuera {{count}} suposición que no confirmaste.",
+      "leftOut_other": "Quedan fuera {{count}} suposiciones que no confirmaste.",
+      "save": "Guardar en mi perfil",
+      "back": "Volver"
+    },
+    "saved": {
+      "title": "Guardado",
+      "banner": "Guardado en tu perfil.",
+      "lead": "Tu perfil está ahora al {{score}}% de fuerza. Los agentes y los CV lo usarán desde ahora. Puedes volver cuando quieras para añadir más.",
+      "done": "Volver a Perfil y objetivos"
+    },
+    "errors": {
+      "generic": "No funcionó. Inténtalo de nuevo.",
+      "ai_unavailable": "Este Applicamp no tiene un modelo de IA configurado, así que no puede escribir sobre ti.",
+      "ai_daily_limit_reached": "Has alcanzado el límite de IA de hoy. Inténtalo mañana.",
+      "ai_budget_reached": "Has alcanzado el límite de gasto de IA, así que no se envió nada. Lo que escribiste sigue en el cuadro.",
+      "ai_failed": "El modelo de IA no pudo responder ahora. Lo que escribiste sigue en el cuadro; inténtalo en un minuto.",
+      "about_daily_cap": "Esto está limitado a 30 pasos de IA al día. Continúa mañana.",
+      "profile_needed": "Añade primero tu perfil y luego cuéntame de ti.",
+      "changes_flagged": "Algo de lo que escribiste tiene una afirmación que no encuentro en tus palabras. Resuélvelo primero.",
+      "invalid_text": "Escribe entre 1 y 4000 caracteres.",
+      "invalid_site": "Escribe la web de la empresa, empezando por https://.",
+      "site_not_allowed": "Esa dirección no se puede leer. Usa la web pública de la empresa.",
+      "invalid_change": "Escribe lo que debe decir.",
+      "research_unavailable": "La lectura de webs no está configurada aquí.",
+      "not_found": "Esto ya no está aquí. Vuelve y mira de nuevo."
     }
   }
 }

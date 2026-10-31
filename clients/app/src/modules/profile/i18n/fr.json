@@ -101,7 +101,8 @@
     "email": "E-mail",
     "url": "Site web",
     "summary": "Résumé",
-    "section": "À propos de vous"
+    "section": "À propos de vous",
+    "background": "Parcours"
   },
   "placeholders": {
     "name": "Ajoutez votre nom",
@@ -109,7 +110,8 @@
     "location": "Ajoutez où vous êtes",
     "email": "Ajoutez un e-mail pour vos candidatures",
     "url": "Ajoutez votre site web",
-    "summary": "Ajoutez quelques phrases sur vous"
+    "summary": "Ajoutez quelques phrases sur vous",
+    "background": "Dites d’où vous venez"
   },
   "sections": {
     "work": "Expérience",
@@ -425,7 +427,8 @@
         "missing": "Dites aux agents ce que vous voulez ensuite"
       }
     },
-    "grill": "Posez-moi des questions"
+    "grill": "Posez-moi des questions",
+    "about": "Parlez-moi de vous"
   },
   "improve": {
     "eyebrow": "Question {{n}} sur {{total}}",
@@ -659,7 +662,152 @@
       "remove": "Retirer",
       "removeLabel": "Retirer ce fait : {{text}}",
       "removed": "Fait retiré.",
-      "listLabel": "Faits gardés pour {{role}}"
+      "listLabel": "Faits gardés pour {{role}}",
+      "confirmed": "Vous avez confirmé cette hypothèse."
+    }
+  },
+  "about": {
+    "eyebrow": "Profil et objectifs",
+    "title": "Voici ce que je sais de vous",
+    "addedTitle": "Ce que j’ai ajouté de ce que vous avez écrit",
+    "reviewTitle": "Voici où vous en êtes",
+    "lead": "Écrit à partir de votre profil, de ce que vos anciens employeurs disent d’eux sur leurs propres sites et de ce qui est généralement vrai pour vos postes. Je ne vous demande que ce que je ne peux pas trouver seul. Les passages surlignés sont mes hypothèses. Sélectionnez-en un pour me dire s’il est juste.",
+    "loading": "Chargement…",
+    "loadFailed": "Impossible de charger.",
+    "making": "Lecture de votre profil et des sites de vos anciens employeurs…",
+    "noProfileTitle": "Ajoutez d’abord votre profil",
+    "noProfileLead": "J’ai besoin de votre profil pour écrire sur vous. Importez-le ou écrivez-le, puis revenez.",
+    "back": "Retour à Profil et objectifs",
+    "portraitLabel": "Ce que je sais de vous",
+    "legend": {
+      "label": "Signification des couleurs",
+      "known": "De votre profil",
+      "told": "Vous me l’avez dit",
+      "assumed": "J’ai supposé",
+      "confirmed": "Vous avez confirmé"
+    },
+    "panel": {
+      "label": "À propos de cette hypothèse",
+      "assumed": "J’ai supposé :",
+      "why": "Pourquoi :",
+      "downgraded": "Cela ne figure pas dans votre profil avec ces mots.",
+      "guess": "Je le devine d’après votre poste.",
+      "right": "C’est juste",
+      "wrong": "C’est faux",
+      "later": "Me le demander plus tard"
+    },
+    "employers": {
+      "title": "Anciens employeurs que j’ai regardés",
+      "lead": "Je ne lis le site d’un employeur que si je le connais, et seulement les pages qu’il autorise. Ajoutez un site pour que je le lise.",
+      "state": {
+        "read_one": "Site lu : {{count}} fait trouvé",
+        "read_other": "Site lu : {{count}} faits trouvés",
+        "unread": "Site connu : {{site}}. Je le lirai quand vous mettrez le portrait à jour.",
+        "no_site": "Site inconnu, donc je n’ai rien lu.",
+        "failed": "Il n’a pas pu être lu ({{error}})."
+      },
+      "siteLabel": "Site de {{company}}",
+      "sitePlaceholder": "https://exemple.com",
+      "add": "Ajouter le site",
+      "update": "Mettre le portrait à jour",
+      "updateCost": "1 petit appel IA par site lu · environ 0,002 €"
+    },
+    "accuracy": {
+      "title": "Est-ce exact ?",
+      "yes": "Oui, pour l’essentiel",
+      "some": "Une partie est fausse",
+      "no": "Pas vraiment"
+    },
+    "extra": {
+      "title": "Y a-t-il autre chose que je devrais savoir sur vous ?",
+      "lead": "Votre parcours, ce que vous faites bien, ce que vous voulez ensuite. Écrivez comme cela vient. Je l’intègre à votre profil et je vous montre ce qui a changé.",
+      "label": "Autre chose que je devrais savoir",
+      "hint": "{{left}} caractères restants",
+      "reading": "Lecture de ce que vous avez écrit…"
+    },
+    "continue": "Continuer",
+    "cost": "1 petit appel IA · environ 0,002 €",
+    "yourWords": "Vos mots :",
+    "fields": {
+      "summary": "Résumé",
+      "headline": "Titre",
+      "skill": "Compétence",
+      "background": "Parcours",
+      "goal_role": "Poste souhaité",
+      "goal_avoid": "À éviter",
+      "goal_must_have": "Indispensable",
+      "goal_location": "Lieu",
+      "role_fact": "Au travail"
+    },
+    "added": {
+      "title": "Ajouté d’après ce que vous avez écrit",
+      "savedLater": "Cela entre dans votre profil quand vous enregistrez.",
+      "none": "Rien de ce que vous avez écrit ne demandait de modifier votre profil.",
+      "questionsNext": "Les questions sur les manques viennent ensuite.",
+      "open_one": "{{count}} affirmation attend votre réponse avant que vous puissiez enregistrer.",
+      "open_other": "{{count}} affirmations attendent votre réponse avant que vous puissiez enregistrer.",
+      "review": "Relire et enregistrer",
+      "back": "Retour"
+    },
+    "flag": {
+      "claim": "« {{claim}} » ne figure pas dans vos mots.",
+      "quote": "Je ne retrouve pas dans votre texte les mots que j’ai cités."
+    },
+    "resolution": {
+      "true": "Vous avez dit que c’est vrai.",
+      "fixed": "Vous l’avez corrigé.",
+      "own_words": "Avec vos propres mots."
+    },
+    "change": {
+      "true": "C’est vrai",
+      "fix": "Corriger",
+      "edit": "Modifier",
+      "ownWords": "Utiliser mes mots",
+      "remove": "Retirer",
+      "editLabel": "Ce que cela doit dire",
+      "recheck": "Vérifier et garder",
+      "cancel": "Annuler"
+    },
+    "groups": {
+      "summary": "Résumé",
+      "headline": "Titre",
+      "skills": "Compétences",
+      "position": "Poste",
+      "background": "Parcours",
+      "goals": "Objectifs"
+    },
+    "review": {
+      "lead": "Voici ce que j’enregistrerai dans votre profil. Chaque ligne vient de votre profil, de quelque chose que vous m’avez dit ou d’une hypothèse que vous avez confirmée. Rien de ce que vous n’avez pas confirmé n’est enregistré.",
+      "changes": "Modifications de votre profil",
+      "nothing": "Il n’y a encore rien à enregistrer.",
+      "told": "Vous me l’avez dit",
+      "confirmed": "Confirmé",
+      "leftOut_one": "{{count}} hypothèse que vous n’avez pas confirmée est laissée de côté.",
+      "leftOut_other": "{{count}} hypothèses que vous n’avez pas confirmées sont laissées de côté.",
+      "save": "Enregistrer dans mon profil",
+      "back": "Retour"
+    },
+    "saved": {
+      "title": "Enregistré",
+      "banner": "Enregistré dans votre profil.",
+      "lead": "Votre profil est maintenant solide à {{score}} %. Les agents et les CV l’utilisent désormais. Vous pouvez revenir quand vous voulez pour en ajouter.",
+      "done": "Retour à Profil et objectifs"
+    },
+    "errors": {
+      "generic": "Cela n’a pas marché. Réessayez.",
+      "ai_unavailable": "Cet Applicamp n’a pas de modèle d’IA configuré, il ne peut donc pas écrire sur vous.",
+      "ai_daily_limit_reached": "Vous avez atteint la limite d’IA d’aujourd’hui. Réessayez demain.",
+      "ai_budget_reached": "Vous avez atteint la limite de dépense d’IA, donc rien n’a été envoyé. Ce que vous avez écrit est toujours dans la zone de texte.",
+      "ai_failed": "Le modèle d’IA n’a pas pu répondre à l’instant. Ce que vous avez écrit est toujours dans la zone de texte ; réessayez dans une minute.",
+      "about_daily_cap": "Cette fonction est limitée à 30 étapes d’IA par jour. Elle reprend demain.",
+      "profile_needed": "Ajoutez d’abord votre profil, puis parlez-moi de vous.",
+      "changes_flagged": "Quelque chose de ce que vous avez écrit contient une affirmation que je ne retrouve pas dans vos mots. Réglez-le d’abord.",
+      "invalid_text": "Écrivez entre 1 et 4 000 caractères.",
+      "invalid_site": "Écrivez le site de l’entreprise, en commençant par https://.",
+      "site_not_allowed": "Cette adresse ne peut pas être lue. Utilisez le site public de l’entreprise.",
+      "invalid_change": "Écrivez ce que cela doit dire.",
+      "research_unavailable": "La lecture de sites n’est pas configurée ici.",
+      "not_found": "Ce n’est plus là. Revenez en arrière et regardez à nouveau."
     }
   }
 }

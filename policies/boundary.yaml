@@ -1,0 +1,31 @@
+# The boundary every run kind's policy must stay within (OpenShell policy
+# v1), checked in CI by `openshell-prover check <kind>.yaml --boundary
+# boundary.yaml`: the agent runner may reach the Applicamp agent API and
+# nothing else, and reads and writes no more of the filesystem than this.
+# A kind that needs more (a job board, a company's site) widens this file in
+# its own change, reviewed like an ADR. Not a kind's policy itself.
+#
+# `applicamp.example.com:443` stands for this instance's agent API, as in
+# the kinds' policies.
+version: 1
+
+filesystem_policy:
+  include_workdir: true
+  read_only: [/app, /usr, /lib, /etc, /proc, /dev/urandom]
+  read_write: [/sandbox, /tmp, /dev/null]
+landlock:
+  compatibility: hard_requirement
+
+network_policies:
+  agent_api:
+    name: applicamp-agent-api
+    endpoints:
+      - host: applicamp.example.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: GET, path: "/api/agent/v1/**" }
+          - allow: { method: POST, path: "/api/agent/v1/**" }
+    binaries:
+      - { path: /app/applicamp-agent }

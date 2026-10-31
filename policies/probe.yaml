@@ -1,0 +1,33 @@
+# The `runs.probe` kind (OpenShell sandbox policy v1): the agent runner may
+# reach the Applicamp agent API and nothing else. Every rule enforces, and
+# the sandbox does not start without its filesystem rules.
+#
+# `applicamp.example.com:443` stands for this instance's agent API: the runs
+# module puts the configured address (`APPLICAMP_SANDBOX__AGENT_API_URL`,
+# else `APPLICAMP_PUBLIC_URL`) in its place when it creates the sandbox.
+# Checked in CI by `cargo xtask policies`.
+version: 1
+
+filesystem_policy:
+  include_workdir: true
+  read_only: [/app, /usr, /lib, /etc, /proc, /dev/urandom]
+  read_write: [/sandbox, /tmp, /dev/null]
+landlock:
+  compatibility: hard_requirement
+
+network_policies:
+  agent_api:
+    name: applicamp-agent-api
+    endpoints:
+      - host: applicamp.example.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: GET, path: /api/agent/v1/context }
+          - allow: { method: POST, path: /api/agent/v1/events }
+          - allow: { method: POST, path: "/api/agent/v1/tools/*" }
+          - allow: { method: POST, path: /api/agent/v1/complete }
+          - allow: { method: POST, path: /api/agent/v1/finish }
+    binaries:
+      - { path: /app/applicamp-agent }

@@ -23,6 +23,7 @@ function signedIn(extra: Record<string, StubAnswer | (() => StubAnswer)> = {}) {
     "GET /api/v1/opportunities": { body: { opportunities: [] } },
     "GET /api/v1/searches/latest": { body: { search: null } },
     "GET /api/v1/searches/estimate": { body: estimate() },
+    "GET /api/v1/runs": { body: { runs: [], available: true, startable: ["runs.probe"] } },
     ...extra,
   });
 }

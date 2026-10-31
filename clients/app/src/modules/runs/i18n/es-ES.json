@@ -1,0 +1,96 @@
+{
+  "list": "Ejecuciones",
+  "run": "Ejecución",
+  "back": "Todas las ejecuciones",
+  "runCheck": "Hacer una comprobación",
+  "starting": "Iniciando…",
+  "stop": "Detener",
+  "loading": "Cargando tus ejecuciones…",
+  "loadFailed": "No se pudieron cargar tus ejecuciones.",
+  "retry": "Reintentar",
+  "emptyTitle": "Todavía no hay ejecuciones",
+  "emptyBody": "Cuando se ejecute una búsqueda o una candidatura, podrás ver aquí lo que hace en tiempo real: cada paso, los sitios a los que accedió y aquellos a los que se le impidió acceder.",
+  "emptyCheck": "Haz una comprobación para ver una en marcha.",
+  "unavailableTitle": "Los agentes no pueden ejecutarse en esta instancia",
+  "unavailableBody": "No tiene un sandbox donde ejecutarlos, así que aquí no puede empezar ninguna comprobación. Quien gestiona esta instancia puede configurar uno.",
+  "kinds": {
+    "probe": "Comprobación",
+    "other": "Ejecución de {{kind}}"
+  },
+  "when": {
+    "today": "Hoy {{time}}"
+  },
+  "rowMeta": "{{status}} · {{when}}",
+  "status": {
+    "queued": "Esperando para empezar",
+    "starting": "Creando su sandbox",
+    "running": "En marcha",
+    "stopping": "Deteniendo…"
+  },
+  "outcome": {
+    "succeeded": "Completada",
+    "nothing_new": "No encontró nada nuevo",
+    "needs_you": "Te necesita",
+    "ended_max_steps": "Detenida: dio demasiados pasos",
+    "ended_budget": "Detenida: agotó su presupuesto de tokens",
+    "ended_timeout": "Detenida: se quedó sin tiempo",
+    "ended_loop": "Detenida: estaba dando vueltas en círculo",
+    "failed": "Falló",
+    "cancelled": "Detenida por ti"
+  },
+  "failure": {
+    "sandbox_create_failed": "No se pudo crear su sandbox.",
+    "agent_exited": "Su agente se detuvo antes de terminar.",
+    "server_restarted": "El servidor se reinició mientras se ejecutaba.",
+    "runtime_failed": "Su sandbox dejó de funcionar.",
+    "start_failed": "No pudo empezar.",
+    "generic": "Algo salió mal mientras se ejecutaba."
+  },
+  "tabs": {
+    "label": "Mostrar",
+    "agent": "Qué está haciendo",
+    "sandbox": "Registro del sandbox"
+  },
+  "level": {
+    "tool": "Herramienta",
+    "model": "Modelo",
+    "deny": "Bloqueado",
+    "ask": "Te necesita",
+    "error": "Problema",
+    "allowed": "Permitido"
+  },
+  "live": {
+    "connecting": "Conectando con la ejecución…",
+    "lost": "La vista en directo se detuvo.",
+    "reconnect": "Volver a conectar"
+  },
+  "noEvents": {
+    "agent": "Nada todavía. Sus pasos aparecen aquí a medida que los da.",
+    "sandbox": "Todavía no hay peticiones. Cada sitio al que intente acceder aparece aquí, permitido o bloqueado."
+  },
+  "noEventsEnded": {
+    "agent": "No escribió nada.",
+    "sandbox": "No intentó acceder a ningún sitio."
+  },
+  "facts": {
+    "title": "Sobre esta ejecución",
+    "sandbox": "Sandbox",
+    "image": "Imagen",
+    "policy": "Política de red",
+    "model": "Modelo",
+    "tokens": "Tokens",
+    "tokensValue": "{{in}} de entrada · {{out}} de salida",
+    "cost": "Coste",
+    "duration": "Duración",
+    "end": "Cómo terminó",
+    "notYet": "Todavía no",
+    "noModel": "Ninguno: no consultó ningún modelo"
+  },
+  "errors": {
+    "too_many_runs": "Hay demasiadas ejecuciones esperando. Vuelve a intentarlo cuando termine una.",
+    "sandboxes_unavailable": "Los agentes no pueden ejecutarse en esta instancia: no tiene un sandbox donde ejecutarlos.",
+    "unknown_kind": "Esta instancia no puede hacer esa comprobación.",
+    "generic": "No se pudo iniciar la comprobación. Inténtalo de nuevo."
+  },
+  "stopFailed": "No se pudo detener. Inténtalo de nuevo."
+}

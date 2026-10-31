@@ -1,0 +1,96 @@
+{
+  "list": "Exécutions",
+  "run": "Exécution",
+  "back": "Toutes les exécutions",
+  "runCheck": "Lancer une vérification",
+  "starting": "Lancement…",
+  "stop": "Arrêter",
+  "loading": "Chargement de vos exécutions…",
+  "loadFailed": "Vos exécutions n’ont pas pu être chargées.",
+  "retry": "Réessayer",
+  "emptyTitle": "Aucune exécution pour l’instant",
+  "emptyBody": "Quand une recherche ou une candidature s’exécute, vous pouvez suivre ici ce qu’elle fait, en direct : chaque étape, les sites qu’elle a atteints et ceux qu’on l’a empêchée d’atteindre.",
+  "emptyCheck": "Lancez une vérification pour en voir une à l’œuvre.",
+  "unavailableTitle": "Les agents ne peuvent pas s’exécuter sur cette instance",
+  "unavailableBody": "Elle n’a pas de bac à sable où les exécuter : aucune vérification ne peut donc démarrer ici. La personne qui gère cette instance peut en configurer un.",
+  "kinds": {
+    "probe": "Vérification",
+    "other": "Exécution de {{kind}}"
+  },
+  "when": {
+    "today": "Aujourd’hui {{time}}"
+  },
+  "rowMeta": "{{status}} · {{when}}",
+  "status": {
+    "queued": "En attente de démarrage",
+    "starting": "Création de son bac à sable",
+    "running": "En cours",
+    "stopping": "Arrêt en cours…"
+  },
+  "outcome": {
+    "succeeded": "Réussie",
+    "nothing_new": "Rien de nouveau trouvé",
+    "needs_you": "Vous attend",
+    "ended_max_steps": "Arrêtée : trop d’étapes",
+    "ended_budget": "Arrêtée : budget de tokens épuisé",
+    "ended_timeout": "Arrêtée : temps écoulé",
+    "ended_loop": "Arrêtée : elle tournait en rond",
+    "failed": "Échouée",
+    "cancelled": "Arrêtée par vous"
+  },
+  "failure": {
+    "sandbox_create_failed": "Son bac à sable n’a pas pu être créé.",
+    "agent_exited": "Son agent s’est arrêté avant d’avoir fini.",
+    "server_restarted": "Le serveur a redémarré pendant l’exécution.",
+    "runtime_failed": "Son bac à sable a cessé de fonctionner.",
+    "start_failed": "Elle n’a pas pu démarrer.",
+    "generic": "Un problème est survenu pendant l’exécution."
+  },
+  "tabs": {
+    "label": "Afficher",
+    "agent": "Ce qu’elle fait",
+    "sandbox": "Journal du bac à sable"
+  },
+  "level": {
+    "tool": "Outil",
+    "model": "Modèle",
+    "deny": "Bloqué",
+    "ask": "Vous attend",
+    "error": "Problème",
+    "allowed": "Autorisé"
+  },
+  "live": {
+    "connecting": "Connexion à l’exécution…",
+    "lost": "Le suivi en direct s’est arrêté.",
+    "reconnect": "Se reconnecter"
+  },
+  "noEvents": {
+    "agent": "Rien pour l’instant. Ses étapes apparaissent ici au fur et à mesure.",
+    "sandbox": "Aucune requête pour l’instant. Chaque site qu’elle tente d’atteindre apparaît ici, autorisé ou bloqué."
+  },
+  "noEventsEnded": {
+    "agent": "Elle n’a rien écrit.",
+    "sandbox": "Elle n’a tenté d’atteindre aucun site."
+  },
+  "facts": {
+    "title": "À propos de cette exécution",
+    "sandbox": "Bac à sable",
+    "image": "Image",
+    "policy": "Politique réseau",
+    "model": "Modèle",
+    "tokens": "Tokens",
+    "tokensValue": "{{in}} en entrée · {{out}} en sortie",
+    "cost": "Coût",
+    "duration": "Durée",
+    "end": "Fin",
+    "notYet": "Pas encore",
+    "noModel": "Aucun : elle n’a interrogé aucun modèle"
+  },
+  "errors": {
+    "too_many_runs": "Trop d’exécutions sont en attente. Réessayez quand l’une d’elles sera terminée.",
+    "sandboxes_unavailable": "Les agents ne peuvent pas s’exécuter sur cette instance : elle n’a pas de bac à sable où les exécuter.",
+    "unknown_kind": "Cette instance ne peut pas lancer cette vérification.",
+    "generic": "La vérification n’a pas pu démarrer. Réessayez."
+  },
+  "stopFailed": "Elle n’a pas pu être arrêtée. Réessayez."
+}

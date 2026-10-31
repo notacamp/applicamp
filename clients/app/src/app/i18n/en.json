@@ -49,9 +49,7 @@
   },
   "agents": {
     "title": "Agents",
-    "lead": "Each run works in its own sandbox, made for one job and deleted after.",
-    "emptyTitle": "No runs yet",
-    "emptyBody": "When a search or an application runs, you can watch what it does here as it happens: each step, the sites it reached and anything it was stopped from reaching."
+    "lead": "Each run works in its own sandbox, made for one job and deleted after."
   },
   "profile": {
     "title": "Profile & goals",

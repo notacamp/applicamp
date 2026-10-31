@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Applicamp API",
-    "description": "The Applicamp HTTP API. Errors are RFC 9457 `application/problem+json` with a stable `code`. Operations either are public or take the web app's session cookie (`session`); unsafe methods also need the `X-Applicamp-CSRF: 1` header and the app's own `Origin`.",
+    "description": "The Applicamp HTTP API. Errors are RFC 9457 `application/problem+json` with a stable `code`. Operations either are public or take the web app's session cookie (`session`); unsafe methods also need the `X-Applicamp-CSRF: 1` header and the app's own `Origin`. The agent API (`/api/agent/…`) takes a run's token instead (`run_token`), never a cookie.",
     "license": {
       "name": "Sustainable Use License",
       "identifier": "LicenseRef-Sustainable-Use"
@@ -10,6 +10,441 @@
     "version": "0.0.0"
   },
   "paths": {
+    "/.well-known/openid-configuration": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "The issuer's discovery document.",
+        "description": "The issuer (this instance's public origin) and where its keys are. Only\nwhen sandboxes run on OpenShell; not found otherwise.",
+        "operationId": "runs.oidc_discovery",
+        "responses": {
+          "200": {
+            "description": "The discovery document.",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {}
+        ]
+      }
+    },
+    "/api/agent/v1/complete": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Ask the model.",
+        "description": "One completion of the `complete` role through the AI gateway, for the\nrun's account: refused when the account reached its daily tokens or a\nspending limit (`ai_daily_limit_reached`, `ai_budget_reached`), and\nwhen the run's tokens, with what its calls in flight reserved and this\ncall's worst case (its prompt at about four characters a token, and its\nwhole `max_tokens` answer), would pass its kind's budget\n(`run_budget_reached`). The worst case is reserved before the call is\nforwarded and settled to what it used. The run's tokens and cost grow by\nwhat it used.",
+        "operationId": "runs.agent_complete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Completion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompletionAnswer"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_request`, `invalid_completion`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`run_token_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`run_budget_reached`, `rate_limited`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`ai_unavailable`, `ai_daily_limit_reached`, `ai_budget_reached`, `ai_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "run_token": []
+          }
+        ]
+      }
+    },
+    "/api/agent/v1/context": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "The run's context.",
+        "description": "The run, its kind, inputs, subject, limits, and the tools the agent may\ncall with their schemas and caps.",
+        "operationId": "runs.agent_context",
+        "responses": {
+          "200": {
+            "description": "The context.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentContext"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`cookies_refused`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`run_token_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such run going",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`rate_limited`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "run_token": []
+          }
+        ]
+      }
+    },
+    "/api/agent/v1/events": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Record the agent's events.",
+        "description": "At most 50 a call, each numbered by the agent, its message at most\n2 000 characters, its data at most 8 KB, none with a NUL character; all\nor none are recorded. A run keeps at most 5 000 events.",
+        "operationId": "runs.agent_events",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AgentEvent"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Recorded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recorded"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_request`, `invalid_event`, `cookies_refused`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`run_token_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`rate_limited`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "run_token": []
+          }
+        ]
+      }
+    },
+    "/api/agent/v1/finish": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Finish.",
+        "description": "The agent's outcome and summary (checked against the kind's output\nschema: `invalid_summary`). The token stops working; the server ends the\nrun once the sandbox is gone.",
+        "operationId": "runs.agent_finish",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Finish"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Recorded."
+          },
+          "400": {
+            "description": "`invalid_request`, `invalid_summary`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`run_token_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`rate_limited`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "run_token": []
+          }
+        ]
+      }
+    },
+    "/api/agent/v1/tools/{name}": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Call a tool.",
+        "description": "One call of one of the kind's tools. A tool the kind does not have is\nnot found; arguments that do not match its schema are refused\n(`invalid_arguments`, saying where) and do not count; past its cap the\ncall is refused (`tool_cap_reached`).",
+        "operationId": "runs.agent_tool",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "The tool.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolCall"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Its answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_request`, `invalid_arguments`, or the tool's own refusal",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`run_token_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`tool_cap_reached`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`rate_limited`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "run_token": []
+          }
+        ]
+      }
+    },
     "/api/v1/boards": {
       "get": {
         "tags": [
@@ -5531,6 +5966,435 @@
         ]
       }
     },
+    "/api/v1/runs": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "The signed-in person's runs.",
+        "description": "Newest first, at most 100, with whether runs can start here and which\nkinds a person may start.",
+        "operationId": "runs.list",
+        "responses": {
+          "200": {
+            "description": "The runs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Start a run.",
+        "description": "Queues a run of a kind a person may start (`runs.probe`, \"Run a\ncheck\"). It starts when it is its turn: one run at a time per account,\nthree on the instance. At most three may wait.",
+        "operationId": "runs.start",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewRun"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Queued.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_request`, `unknown_kind`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`too_many_runs`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`sandboxes_unavailable`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/runs/{id}": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "A run.",
+        "description": "One of the signed-in person's, with its facts. Anyone else's is not\nfound.",
+        "operationId": "runs.get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The run.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The run.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/runs/{id}/cancel": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Stop a run.",
+        "description": "A waiting run ends `cancelled` at once; a going one is asked to stop:\nits sandbox is removed and it ends `cancelled` with what it had used\n(`stopping` until then).",
+        "operationId": "runs.cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The run.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Stopping, or stopped.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`run_finished`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/runs/{id}/events": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "What a run did.",
+        "description": "Its events, oldest first: the agent's own (`agent`: what it's doing) and\nthe sandbox's allow and deny lines (`sandbox`). Kept 30 days after the\nrun ends.",
+        "operationId": "runs.events",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The run.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "Only those after this number.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "layer",
+            "in": "query",
+            "description": "Only the agent's (`agent`) or the sandbox's (`sandbox`).",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Layer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The events.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunEvents"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_query`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/runs/{id}/events/stream": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "What a run does, live.",
+        "description": "Server-sent events: each event is `event: run_event`, `id: <seq>`,\n`data:` a `RunEvent` as JSON. Once the run has ended and every event was\nsent, one `event: end` with the `Run` as `data`, and the stream closes.\nResumes after `Last-Event-ID` (or `?after=`).",
+        "operationId": "runs.stream",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The run.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "Only those after this number.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "layer",
+            "in": "query",
+            "description": "Only the agent's (`agent`) or the sandbox's (`sandbox`).",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Layer"
+            }
+          },
+          {
+            "name": "Last-Event-ID",
+            "in": "header",
+            "description": "The last event seen.",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The live events.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_query`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/v1/searches": {
       "post": {
         "tags": [
@@ -5943,6 +6807,39 @@
           {}
         ]
       }
+    },
+    "/oauth2/jwks": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "The issuer's keys.",
+        "description": "One Ed25519 key (JWK, `OKP`), derived from the instance secret for the\ngateway only. Only when sandboxes run on OpenShell; not found otherwise.",
+        "operationId": "runs.oidc_jwks",
+        "responses": {
+          "200": {
+            "description": "The key set.",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {}
+        ]
+      }
     }
   },
   "components": {
@@ -6255,6 +7152,121 @@
           }
         },
         "additionalProperties": false
+      },
+      "AgentContext": {
+        "type": "object",
+        "description": "What the agent works on.",
+        "required": [
+          "run",
+          "kind",
+          "inputs",
+          "limits",
+          "tools"
+        ],
+        "properties": {
+          "inputs": {
+            "description": "Ids and settings, never personal data."
+          },
+          "kind": {
+            "type": "string"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/RunLimits"
+          },
+          "run": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "subject": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentTool"
+            }
+          }
+        }
+      },
+      "AgentEvent": {
+        "type": "object",
+        "description": "One event line of the agent's.",
+        "required": [
+          "seq",
+          "level",
+          "message"
+        ],
+        "properties": {
+          "data": {
+            "description": "At most 8 KB as JSON."
+          },
+          "level": {
+            "$ref": "#/components/schemas/Level"
+          },
+          "message": {
+            "type": "string",
+            "description": "At most 2 000 characters."
+          },
+          "operation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "seq": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The agent's own number for it, from 1; the same line sent twice is\nkept once."
+          },
+          "tool_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentOutcome": {
+        "type": "string",
+        "description": "How the agent says it ended.",
+        "enum": [
+          "succeeded",
+          "nothing_new",
+          "needs_you",
+          "failed"
+        ]
+      },
+      "AgentTool": {
+        "type": "object",
+        "description": "A tool the agent may call.",
+        "required": [
+          "name",
+          "class",
+          "schema",
+          "cap"
+        ],
+        "properties": {
+          "cap": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Calls the run may make.",
+            "minimum": 0
+          },
+          "class": {
+            "$ref": "#/components/schemas/ToolClass"
+          },
+          "name": {
+            "type": "string"
+          },
+          "schema": {
+            "description": "The JSON schema its arguments match."
+          }
+        }
       },
       "AnswerProposal": {
         "type": "object",
@@ -7687,6 +8699,141 @@
           "nonprofit"
         ]
       },
+      "Completion": {
+        "type": "object",
+        "description": "One completion.",
+        "required": [
+          "messages",
+          "max_tokens"
+        ],
+        "properties": {
+          "max_tokens": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Longest answer, at most 16 000.",
+            "minimum": 0
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompletionMessage"
+            },
+            "description": "At most 50."
+          },
+          "response_format": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CompletionFormat"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "CompletionAnswer": {
+        "type": "object",
+        "description": "A model's answer.",
+        "required": [
+          "content",
+          "model",
+          "tokens_in",
+          "tokens_out"
+        ],
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "finish_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "model": {
+            "type": "string"
+          },
+          "tokens_in": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "tokens_out": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "CompletionFormat": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "Any JSON object.",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "json_object"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "JSON matching `schema`, named `name`.",
+            "required": [
+              "name",
+              "schema",
+              "type"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "schema": {},
+              "type": {
+                "type": "string",
+                "enum": [
+                  "json_schema"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "The shape the answer must take."
+      },
+      "CompletionMessage": {
+        "type": "object",
+        "description": "A message of a completion.",
+        "required": [
+          "role",
+          "content"
+        ],
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/CompletionRole"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CompletionRole": {
+        "type": "string",
+        "description": "Who said a message.",
+        "enum": [
+          "system",
+          "user",
+          "assistant"
+        ]
+      },
       "ConfirmRequest": {
         "type": "object",
         "description": "\"It's true\": the person's words.",
@@ -8628,6 +9775,23 @@
           "role_fact"
         ]
       },
+      "Finish": {
+        "type": "object",
+        "description": "The agent's end.",
+        "required": [
+          "outcome",
+          "summary"
+        ],
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/AgentOutcome"
+          },
+          "summary": {
+            "description": "Matching the kind's output schema."
+          }
+        },
+        "additionalProperties": false
+      },
       "Flag": {
         "type": "object",
         "description": "A flag on a change: shown, never a reason to drop it.",
@@ -9498,6 +10662,14 @@
           }
         }
       },
+      "Layer": {
+        "type": "string",
+        "description": "Who wrote an event.",
+        "enum": [
+          "agent",
+          "sandbox"
+        ]
+      },
       "LayoutRequest": {
         "type": "object",
         "description": "The look of a PDF.",
@@ -9626,6 +10798,18 @@
             ]
           }
         }
+      },
+      "Level": {
+        "type": "string",
+        "description": "What kind of line an event is.",
+        "enum": [
+          "info",
+          "tool",
+          "model",
+          "deny",
+          "ask",
+          "error"
+        ]
       },
       "LineChange": {
         "type": "object",
@@ -9844,6 +11028,20 @@
           "url": {
             "type": "string",
             "description": "The posting's address (http or https, up to 2 000 characters)."
+          }
+        },
+        "additionalProperties": false
+      },
+      "NewRun": {
+        "type": "object",
+        "description": "A run to start.",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "A kind a person may start (`runs.probe`: \"Run a check\")."
           }
         },
         "additionalProperties": false
@@ -10293,6 +11491,21 @@
             ]
           }
         }
+      },
+      "Outcome": {
+        "type": "string",
+        "description": "How a run ended.",
+        "enum": [
+          "succeeded",
+          "nothing_new",
+          "needs_you",
+          "ended_max_steps",
+          "ended_budget",
+          "ended_timeout",
+          "ended_loop",
+          "failed",
+          "cancelled"
+        ]
       },
       "PdfChecks": {
         "type": "object",
@@ -10855,6 +12068,20 @@
         ],
         "description": "Why a line cannot be traced to the profile."
       },
+      "Recorded": {
+        "type": "object",
+        "description": "What was recorded.",
+        "required": [
+          "recorded"
+        ],
+        "properties": {
+          "recorded": {
+            "type": "integer",
+            "description": "New lines (a line already recorded is not counted).",
+            "minimum": 0
+          }
+        }
+      },
       "Relocate": {
         "type": "string",
         "description": "Whether they would move for the right job.",
@@ -11157,6 +12384,274 @@
         "enum": [
           "told",
           "confirmed"
+        ]
+      },
+      "Run": {
+        "type": "object",
+        "description": "A run, with its facts.",
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "created_at",
+          "tokens_in",
+          "tokens_out",
+          "cost_eur",
+          "stopping"
+        ],
+        "properties": {
+          "cost_eur": {
+            "type": "number",
+            "format": "double",
+            "description": "What its model calls cost, in euros."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deadline": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it is ended if still going."
+          },
+          "duration_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "From start to end (or to now, while it goes), in milliseconds."
+          },
+          "error_kind": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why it failed, as a code (`sandbox_create_failed`, `agent_exited`,\n`server_restarted`)."
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "image": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The image its agent ran in."
+          },
+          "kind": {
+            "type": "string",
+            "description": "Its kind (`runs.probe`)."
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The model that answered it, if it asked one."
+          },
+          "outcome": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Outcome",
+                "description": "How it ended, once it has."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "policy": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its network policy (`policies/probe.yaml`)."
+          },
+          "sandbox": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its sandbox's name at the runtime."
+          },
+          "started_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "stopping": {
+            "type": "boolean",
+            "description": "Someone pressed Stop and it has not ended yet."
+          },
+          "summary": {
+            "description": "What its agent finished with."
+          },
+          "tokens_in": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "tokens_out": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "RunEvent": {
+        "type": "object",
+        "description": "A recorded event.",
+        "required": [
+          "seq",
+          "at",
+          "layer",
+          "level",
+          "message"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "data": {
+            "description": "What the agent attached to it."
+          },
+          "layer": {
+            "$ref": "#/components/schemas/Layer"
+          },
+          "level": {
+            "$ref": "#/components/schemas/Level"
+          },
+          "message": {
+            "type": "string",
+            "description": "The line, at most 2 000 characters. Written by the agent or the\nsandbox: text to show, never markup."
+          },
+          "operation": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What it was (`NET:OPEN`, `context`), when it says."
+          },
+          "seq": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Its number in the run: the live stream's `Last-Event-ID`."
+          },
+          "tool_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The tool it is about, if any."
+          }
+        }
+      },
+      "RunEvents": {
+        "type": "object",
+        "description": "A page of a run's events.",
+        "required": [
+          "events"
+        ],
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunEvent"
+            },
+            "description": "Oldest first, at most 500; ask again with `after` the last `seq`."
+          }
+        }
+      },
+      "RunLimits": {
+        "type": "object",
+        "description": "The limits of the run.",
+        "required": [
+          "max_steps",
+          "wall_clock_secs",
+          "max_tokens"
+        ],
+        "properties": {
+          "deadline": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "max_steps": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "max_tokens": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Model tokens the run may use.",
+            "minimum": 0
+          },
+          "wall_clock_secs": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Seconds from start to the deadline.",
+            "minimum": 0
+          }
+        }
+      },
+      "RunList": {
+        "type": "object",
+        "description": "A person's runs.",
+        "required": [
+          "runs",
+          "available",
+          "startable"
+        ],
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "description": "Whether runs can start on this instance (a sandbox runtime is\nconfigured)."
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Run"
+            },
+            "description": "Newest first, at most 100."
+          },
+          "startable": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The kinds a person may start here (`runs.probe`)."
+          }
+        }
+      },
+      "RunStatus": {
+        "type": "string",
+        "description": "Where a run is.",
+        "enum": [
+          "queued",
+          "starting",
+          "running",
+          "finished"
         ]
       },
       "SampleJob": {
@@ -12248,6 +13743,35 @@
           }
         }
       },
+      "ToolCall": {
+        "type": "object",
+        "description": "One tool call.",
+        "properties": {
+          "args": {
+            "description": "The arguments, matching the tool's schema."
+          }
+        },
+        "additionalProperties": false
+      },
+      "ToolClass": {
+        "type": "string",
+        "description": "What a tool does to the world.",
+        "enum": [
+          "read",
+          "draft",
+          "outward"
+        ]
+      },
+      "ToolResult": {
+        "type": "object",
+        "description": "What a tool answered.",
+        "required": [
+          "result"
+        ],
+        "properties": {
+          "result": {}
+        }
+      },
       "Work": {
         "type": "object",
         "description": "A position.",
@@ -12325,6 +13849,11 @@
       }
     },
     "securitySchemes": {
+      "run_token": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "A run's token, sent once into its sandbox: it names the run and the tools its kind may call, and works only while the run goes. Never with a cookie."
+      },
       "session": {
         "type": "apiKey",
         "in": "cookie",
@@ -12353,6 +13882,10 @@
     {
       "name": "sources",
       "description": "The job search: the job boards the owner approved (remote jobs anywhere: Himalayas, Jobicy, Remote OK, Arbeitnow, HN Who is hiring, and the ones a weekly discovery finds), credited and read within their terms, ranked by average salary, and scored against your profile and goals within the spending limits; and what each search scanned."
+    },
+    {
+      "name": "runs",
+      "description": "Agent runs: every agent in its own sandbox, removed when the run ends, and what it did (its events, live). The agent API (`/api/agent/v1/…`) is the only way a sandbox reaches the server, with its run's token. And the keys the sandbox gateway trusts this server's own tokens with."
     },
     {
       "name": "bff",

@@ -3,6 +3,9 @@ name: Publish
 # Every push to main builds the server image on amd64 and arm64 (natively),
 # publishes it as ghcr.io/notacamp/applicamp:main-<sha> (12 characters) and
 # :main, scans the published manifest with Trivy and attests its provenance.
+# The agent runner's image (the Dockerfile's `agent` target, what OpenShell
+# sandboxes run) is built from the same layers and published the same way as
+# ghcr.io/notacamp/applicamp-agent.
 #
 # TODO(notacamp/applicamp-cloud#1): dispatch the staging deploy of the new
 # tag to the private cloud repo once its pipeline exists (Campbooks Next's
@@ -22,6 +25,7 @@ concurrency:
 
 env:
   REGISTRY_IMAGE: ghcr.io/${{ github.repository_owner }}/applicamp
+  AGENT_IMAGE: ghcr.io/${{ github.repository_owner }}/applicamp-agent
 
 jobs:
   build:
@@ -68,16 +72,36 @@ jobs:
           cache-from: type=registry,ref=${{ env.REGISTRY_IMAGE }}:buildcache-${{ matrix.pair }}
           cache-to: type=registry,ref=${{ env.REGISTRY_IMAGE }}:buildcache-${{ matrix.pair }},mode=max
           outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
-      - name: Export digest
+      - id: agent
+        # The agent runner alone, from the builder layers above (cached).
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: .
+          target: agent
+          platforms: ${{ matrix.platform }}
+          build-args: GIT_SHA=${{ steps.sha.outputs.short }}
+          secrets: |
+            node_auth_token=${{ secrets.GITHUB_TOKEN }}
+          provenance: false
+          sbom: false
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ steps.sha.outputs.short }}
+            org.opencontainers.image.licenses=LicenseRef-Sustainable-Use
+          cache-from: type=registry,ref=${{ env.REGISTRY_IMAGE }}:buildcache-${{ matrix.pair }}
+          outputs: type=image,name=${{ env.AGENT_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+      - name: Export digests
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
+          AGENT_DIGEST: ${{ steps.agent.outputs.digest }}
         run: |
-          mkdir -p "$RUNNER_TEMP/digests"
-          touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
+          mkdir -p "$RUNNER_TEMP/digests/server" "$RUNNER_TEMP/digests/agent"
+          touch "$RUNNER_TEMP/digests/server/${DIGEST#sha256:}"
+          touch "$RUNNER_TEMP/digests/agent/${AGENT_DIGEST#sha256:}"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: digests--${{ matrix.pair }}
-          path: ${{ runner.temp }}/digests/*
+          path: ${{ runner.temp }}/digests/
           if-no-files-found: error
           retention-days: 1
 
@@ -104,7 +128,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Create the multi-arch manifest
         id: manifest
-        working-directory: ${{ runner.temp }}/digests
+        working-directory: ${{ runner.temp }}/digests/server
         env:
           SHA: ${{ github.sha }}
         run: |
@@ -116,6 +140,19 @@ jobs:
           digest=$(docker buildx imagetools inspect "$REGISTRY_IMAGE:$tag" --format '{{json .Manifest}}' | jq -r .digest)
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
           echo "Published $REGISTRY_IMAGE:$tag and :main → $digest" >> "$GITHUB_STEP_SUMMARY"
+      - name: Create the agent image's multi-arch manifest
+        id: agent-manifest
+        working-directory: ${{ runner.temp }}/digests/agent
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          tag="main-${SHA:0:12}"
+          # shellcheck disable=SC2046
+          docker buildx imagetools create -t "$AGENT_IMAGE:$tag" -t "$AGENT_IMAGE:main" \
+            $(printf "$AGENT_IMAGE@sha256:%s " *)
+          digest=$(docker buildx imagetools inspect "$AGENT_IMAGE:$tag" --format '{{json .Manifest}}' | jq -r .digest)
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "Published $AGENT_IMAGE:$tag and :main → $digest" >> "$GITHUB_STEP_SUMMARY"
       # Only the Trivy exceptions file: this job publishes what the build jobs
       # made and needs nothing else from the repository.
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -132,9 +169,23 @@ jobs:
           ignore-unfixed: true
           trivyignores: .trivyignore.yaml
           exit-code: "1"
+      - name: Trivy on the agent image (HIGH/CRITICAL, fixable)
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: ${{ env.AGENT_IMAGE }}@${{ steps.agent-manifest.outputs.digest }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: .trivyignore.yaml
+          exit-code: "1"
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-name: ${{ env.REGISTRY_IMAGE }}
           subject-digest: ${{ steps.manifest.outputs.digest }}
+          push-to-registry: true
+      - name: Attest the agent image's provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.AGENT_IMAGE }}
+          subject-digest: ${{ steps.agent-manifest.outputs.digest }}
           push-to-registry: true

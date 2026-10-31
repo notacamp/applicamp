@@ -49,9 +49,7 @@
   },
   "agents": {
     "title": "Agents",
-    "lead": "Chaque exécution travaille dans son propre bac à sable, créé pour une tâche et supprimé ensuite.",
-    "emptyTitle": "Aucune exécution pour l’instant",
-    "emptyBody": "Quand une recherche ou une candidature s’exécute, vous pouvez suivre ici ce qu’elle fait, en direct : chaque étape, les sites qu’elle a atteints et ceux qu’on l’a empêchée d’atteindre."
+    "lead": "Chaque exécution travaille dans son propre bac à sable, créé pour une tâche et supprimé ensuite."
   },
   "profile": {
     "title": "Profil et objectifs",

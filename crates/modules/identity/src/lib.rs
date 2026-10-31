@@ -51,5 +51,6 @@ pub fn module() -> Module {
         background: Background::new()
             .publishes::<events::AccountCreated>()
             .publishes::<events::InviteRevoked>(),
+        kinds: Vec::new(),
     }
 }

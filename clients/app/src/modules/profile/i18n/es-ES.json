@@ -69,7 +69,21 @@
     "replace": "Sustituir",
     "merge": "Combinar",
     "discard": "Descartar",
-    "failed": "No ha funcionado. Inténtalo de nuevo."
+    "failed": "No ha funcionado. Inténtalo de nuevo.",
+    "empty": {
+      "title_one": "No encontrado en este archivo: {{count}} parte",
+      "title_other": "No encontrado en este archivo: {{count}} partes",
+      "label": "No se encontró ningún titular en este archivo",
+      "summary": "No se encontró ningún resumen en este archivo",
+      "work": "No se encontró ningún puesto en este archivo",
+      "education": "No se encontró ninguna formación en este archivo",
+      "skills": "No se encontró ninguna habilidad en este archivo",
+      "languages": "No se encontró ningún idioma en este archivo",
+      "certificates": "No se encontró ninguna certificación en este archivo",
+      "projects": "No se encontró ningún proyecto en este archivo",
+      "hint": "Añádelos a mano después de aplicar, o importa tu exportación de datos de LinkedIn, que incluye habilidades, formación e idiomas.",
+      "hintZip": "Añádelos a mano después de aplicar."
+    }
   },
   "source": {
     "label": "Origen del perfil",
@@ -77,7 +91,8 @@
     "pdf": "Un PDF",
     "text": "Texto pegado",
     "manual": "Escrito aquí",
-    "updated": "{{source}} · actualizado el {{date}}"
+    "updated": "{{source}} · actualizado el {{date}}",
+    "answer": "Tus respuestas a las preguntas"
   },
   "basics": {
     "name": "Nombre",
@@ -85,7 +100,8 @@
     "location": "Ubicación",
     "email": "Correo",
     "url": "Sitio web",
-    "summary": "Resumen"
+    "summary": "Resumen",
+    "section": "Sobre ti"
   },
   "placeholders": {
     "name": "Añade tu nombre",
@@ -331,6 +347,319 @@
         "year": "al año",
         "month": "al mes"
       }
+    }
+  },
+  "strength": {
+    "title": "Fuerza del perfil",
+    "description": "Los agentes solo usan lo que está escrito aquí, y cada línea de un CV se remonta a ello. Un perfil más fuerte da mejores coincidencias y mejores CV.",
+    "loading": "Comprobando tu perfil…",
+    "score": "{{score}}%",
+    "scoreLabel": "Fuerza del perfil: {{score}} por ciento",
+    "strong": "Fuerte. Mantenlo al día.",
+    "growing": "Faltan {{left}} puntos para un perfil fuerte.",
+    "reading": "La IA está leyendo tu perfil para ver qué falta…",
+    "checklist": "De qué se compone la fuerza de tu perfil",
+    "improve": "Mejorar mi perfil",
+    "improveCount_one": "Mejorar mi perfil · {{count}} pregunta",
+    "improveCount_other": "Mejorar mi perfil · {{count}} preguntas",
+    "add": "Añadir",
+    "improveItem": "Mejorar",
+    "skillsFound_one": "{{count}} encontrada en tus puestos",
+    "skillsFound_other": "{{count}} encontradas en tus puestos",
+    "note": "La fuerza es lo que los agentes pueden usar: un titular y un resumen, resultados en tus puestos recientes, habilidades, formación, idiomas, un enlace, tus puestos y tus objetivos. Nunca cuenta lo que prefieras dejar fuera.",
+    "parts": {
+      "headline": "Titular",
+      "summary": "Resumen",
+      "achievements": "Logros",
+      "skills": "Habilidades",
+      "education": "Formación",
+      "languages": "Idiomas",
+      "links": "Enlaces",
+      "positions": "Puestos",
+      "goals": "Objetivos"
+    },
+    "hint": {
+      "headline": {
+        "ok": "Escrito",
+        "partial": "Escrito",
+        "missing": "Lo primero que lee un reclutador"
+      },
+      "summary": {
+        "ok": "Escrito",
+        "partial": "Escrito",
+        "missing": "Tres o cuatro frases sobre lo que mejor haces"
+      },
+      "achievements": {
+        "ok": "Tus puestos recientes muestran resultados",
+        "partial": "{{have}} de {{of}} puestos recientes tienen resultados",
+        "missing": "Tus puestos recientes dicen lo que hiciste, no lo que lograste"
+      },
+      "skills": {
+        "ok": "{{have}} en la lista",
+        "partial": "{{have}} en la lista; cinco dan un perfil fuerte",
+        "missing": "Ninguna en la lista"
+      },
+      "education": {
+        "ok": "Indicada",
+        "partial": "Indicada",
+        "missing": "Tu centro de estudios o titulación"
+      },
+      "languages": {
+        "ok": "{{have}} en la lista",
+        "partial": "{{have}} en la lista",
+        "missing": "Los idiomas que hablas"
+      },
+      "links": {
+        "ok": "Con enlace",
+        "partial": "Con enlace",
+        "missing": "GitHub, un portafolio o un sitio personal"
+      },
+      "positions": {
+        "ok": "{{have}} en tu perfil",
+        "partial": "{{have}} en tu perfil; tres con fechas forman una trayectoria completa",
+        "missing": "Aún sin puestos: importa tu exportación de LinkedIn o un CV"
+      },
+      "goals": {
+        "ok": "{{have}} de {{of}} respondidas",
+        "partial": "{{have}} de {{of}} respondidas",
+        "missing": "Dile a los agentes qué quieres a continuación"
+      }
+    },
+    "grill": "Pregúntame todo"
+  },
+  "improve": {
+    "eyebrow": "Pregunta {{n}} de {{total}}",
+    "readingTitle": "Leyendo tu perfil…",
+    "readingLead": "La IA busca lo que falta o es escaso. Tarda unos segundos.",
+    "loadFailed": "No se pudieron cargar las preguntas.",
+    "later": "Terminar más tarde",
+    "skip": "Omitir",
+    "draft": "Redactar a partir de mi respuesta",
+    "drafting": "Redactando…",
+    "answerLabel": "Tu respuesta",
+    "answerHint": "Intro redacta a partir de tu respuesta; Mayús e Intro hacen un salto de línea.",
+    "answerPlaceholder": "Responde con tus palabras. No hace falta que quede pulido.",
+    "strengthNow": "Fuerza {{from}}% → {{to}}% si respondes",
+    "contextRole": "De tu puesto · {{role}}",
+    "years": "{{from}}–{{to}}",
+    "yearsNow": "{{from}}–actual",
+    "context": {
+      "label": "Tu titular",
+      "summary": "Tu resumen",
+      "education": "Tu formación",
+      "links": "Tus enlaces"
+    },
+    "draftTitle": "Borrador a partir de tu respuesta",
+    "draftSource": "Usa solo lo que escribiste y lo que dice tu perfil. No se guarda nada hasta que lo conserves.",
+    "nothingDrafted": "Nada de tu respuesta se pudo redactar sin añadir algo que no escribiste. Añade detalle y vuelve a redactar.",
+    "dropped_one": "{{count}} línea omitida: mencionaba algo que no escribiste.",
+    "dropped_other": "{{count}} líneas omitidas: mencionaban algo que no escribiste.",
+    "keep": "Conservar",
+    "edit": "Editar",
+    "discard": "Descartar",
+    "editLabel": "Edita el borrador, una línea por elemento",
+    "kept": "Conservado. Tu perfil tiene ahora una fuerza del {{score}}%.",
+    "doneTitle": "Eso es todo por ahora",
+    "doneLead": "Has respondido u omitido todas las preguntas. Tu perfil tiene una fuerza del {{score}}%.",
+    "backToProfile": "Volver a tu perfil",
+    "unavailableTitle": "Las preguntas necesitan un modelo de IA",
+    "unavailableLead": "Esta instalación de Applicamp no tiene un modelo de IA configurado, así que no puede leer tu perfil en busca de lagunas. La lista de tu perfil sigue mostrando qué añadir.",
+    "noProfile": "Todavía no hay nada que leer. Importa o escribe primero tu perfil.",
+    "failedTitle": "No se pudieron hacer las preguntas",
+    "reasons": {
+      "ai_unavailable": "Esta instalación de Applicamp no tiene un modelo de IA configurado, así que no puede leer tu perfil en busca de lagunas.",
+      "ai_daily_limit_reached": "Has alcanzado el límite de IA de hoy. Inténtalo mañana.",
+      "ai_budget_reached": "Has alcanzado el límite de gasto de IA, así que no se envió nada. Se restablece con el día o el mes; la lista de tu perfil sigue mostrando qué añadir.",
+      "ai_failed": "El modelo de IA no pudo leer tu perfil ahora. Inténtalo de nuevo en un minuto."
+    },
+    "errors": {
+      "generic": "No ha funcionado. Inténtalo de nuevo.",
+      "ai_unavailable": "Esta instalación de Applicamp no tiene un modelo de IA configurado, así que no puede redactar a partir de tu respuesta.",
+      "ai_daily_limit_reached": "Has alcanzado el límite de IA de hoy. Inténtalo mañana.",
+      "ai_budget_reached": "Has alcanzado el límite de gasto de IA, así que no se envió nada. Puedes escribir esto tú en tu perfil.",
+      "ai_failed": "El modelo de IA no pudo redactar esto ahora. Inténtalo de nuevo en un minuto.",
+      "profile_changed": "Tu perfil cambió desde que se hizo este borrador. Descártalo y vuelve a redactar.",
+      "draft_not_ready": "Este borrador ya se conservó o se descartó.",
+      "invalid_answer": "Escribe entre 1 y 2000 caracteres.",
+      "invalid_items": "Revisa las líneas: ninguna puede estar vacía ni ser demasiado larga.",
+      "not_found": "Esta pregunta ya no existe. Termina más tarde y vuelve."
+    }
+  },
+  "skills": {
+    "yours": "Tus habilidades",
+    "order": "Las tres primeras guían las búsquedas en los portales de empleo; pon primero aquellas por las que más quieres que te contraten.",
+    "top": "Usada en búsquedas",
+    "empty": "Aún no hay habilidades. Añade las encontradas en tus puestos más abajo, o en tu perfil.",
+    "moveUp": "Subir {{name}}",
+    "moveDown": "Bajar {{name}}",
+    "foundTitle": "Habilidades encontradas en tus puestos",
+    "foundLead": "Aparecen en las descripciones de tus puestos pero aún no están en la lista de habilidades. Añade aquellas sobre las que no te importaría que te preguntaran en una entrevista.",
+    "found": "Habilidades encontradas en tus puestos",
+    "inRoles_one": "en {{count}} puesto",
+    "inRoles_other": "en {{count}} puestos",
+    "add": "Añadir",
+    "addLabel": "Añadir {{name}}",
+    "notMine": "No es mía",
+    "notMineLabel": "{{name}} no es mía",
+    "foundNote": "Encontradas leyendo tus propios puestos, con el número de puestos que mencionan cada una. No se añade nada sin tu clic.",
+    "noneFound": "No queda nada que sugerir: todas las habilidades que mencionan tus puestos están en la lista o apartadas.",
+    "reading": "Leyendo tus puestos en busca de habilidades…",
+    "unavailable": "Encontrar habilidades en tus puestos necesita un modelo de IA, que no está configurado aquí. Aun así puedes añadir habilidades a mano en tu perfil.",
+    "loadFailed": "No se pudieron cargar las habilidades encontradas en tus puestos.",
+    "back": "Volver a tu perfil",
+    "reasons": {
+      "ai_unavailable": "Encontrar habilidades en tus puestos necesita un modelo de IA, que no está configurado aquí.",
+      "ai_daily_limit_reached": "Has alcanzado el límite de IA de hoy. Inténtalo mañana.",
+      "ai_budget_reached": "Has alcanzado el límite de gasto de IA, así que no se envió nada. Aun así puedes añadir habilidades a mano en tu perfil.",
+      "ai_failed": "El modelo de IA no pudo leer tus puestos ahora. Inténtalo de nuevo en un minuto."
+    }
+  },
+  "nudge": {
+    "title": "Tu perfil tiene una fuerza del {{score}}%.",
+    "continue": "Continuar",
+    "notNow": "Ahora no",
+    "bodyQuestions_one": "{{count}} pregunta rápida mejoraría tus coincidencias y los CV que escriben los agentes.",
+    "bodyQuestions_other": "{{count}} preguntas rápidas mejorarían tus coincidencias y los CV que escriben los agentes.",
+    "body": {
+      "improve": "Unas preguntas rápidas mejorarían tus coincidencias y los CV que escriben los agentes.",
+      "skills": "Añade las habilidades que mencionan tus puestos: las búsquedas usan las tres primeras.",
+      "import": "Importa un perfil más completo: las coincidencias se puntúan con base en tus puestos.",
+      "goals": "Responde unas preguntas sobre lo que quieres: las búsquedas se ciñen a ellas."
+    }
+  },
+  "grill": {
+    "title": "Pregúntame todo",
+    "lead": "Un CV solo puede decir lo que Applicamp sabe. Elige un puesto y responde una pregunta cada vez. A las respuestas vagas se les insiste y se piden cifras. Cada dato sacado de tus respuestas se te muestra primero; no se guarda nada hasta que lo conserves.",
+    "open": "Pregúntame todo",
+    "aboutRole": "Preguntarme sobre este puesto",
+    "rolesLabel": "Tus puestos",
+    "loading": "Cargando tus puestos…",
+    "loadFailed": "No se pudieron cargar tus puestos.",
+    "roleLoadFailed": "No se pudo cargar la entrevista de este puesto.",
+    "back": "Volver a tu perfil",
+    "noRolesTitle": "Aún no hay puestos de los que hablar",
+    "noRolesLead": "Importa o escribe primero tu perfil. Pregúntame todo repasa un puesto cada vez.",
+    "pickTitle": "Elige un puesto",
+    "pickLead": "Un puesto lleva una docena de preguntas. Cada una es una sola llamada pequeña a la IA, unos 0,001 €, y no se ejecuta nada hasta que hagas clic.",
+    "years": "{{from}}–{{to}}",
+    "yearsNow": "{{from}}–actual",
+    "status": {
+      "not_started": "sin empezar",
+      "in_progress": "en curso",
+      "covered": "cubierto"
+    },
+    "startTitle": "Cuando quieras",
+    "startLead": "Empieza con una pregunta sobre este puesto. Responde con tus palabras; vuelve a preguntar si necesita más.",
+    "start": "Empezar",
+    "starting": "Preguntando…",
+    "continue": "Hazme una pregunta",
+    "coveredBanner": "Las siete áreas están cubiertas para este puesto.",
+    "coveredLead": "Los datos que conservaste están bajo este puesto en tu perfil. Vuelve para añadir más.",
+    "stoppedBanner": "Por ahora no queda nada que preguntar.",
+    "labels": {
+      "question": "Pregunta",
+      "push": "Insistiendo",
+      "answer": "Tú"
+    },
+    "skippedNote": "Omitiste esta pregunta.",
+    "doneNote": "Dejado por ahora. Empieza de nuevo cuando quieras y sigue desde aquí.",
+    "logLabel": "La entrevista hasta ahora",
+    "answerLabel": "Tu respuesta",
+    "answerHint": "Intro la envía; Mayús e Intro hacen un salto de línea.",
+    "answerPlaceholder": "Responde con tus palabras. Puede ser a grandes rasgos; vuelve a preguntar si necesita más.",
+    "answer": "Responder",
+    "answering": "Leyendo tu respuesta…",
+    "skip": "Omitir esta",
+    "done": "Terminar este puesto por ahora",
+    "costLine": "Cada pregunta es una llamada pequeña a la IA, unos 0,001 €. Preguntas hoy: {{n}} de {{cap}}.",
+    "facts": {
+      "title": "Datos sacados de tu respuesta",
+      "yourWords": "Tus palabras:",
+      "keep": "Conservar",
+      "keepLabel": "Conservar: {{text}}",
+      "fix": "Corregir",
+      "fixLabel": "Corregir: {{text}}",
+      "drop": "Descartar",
+      "dropLabel": "Descartar: {{text}}",
+      "keepAll": "Conservar todo",
+      "kept": "Conservado",
+      "dropped": "Descartado",
+      "savedTo": "Se guardan en {{role}}, en tu perfil, cuando los conserves. Un CV solo puede usar los datos que aparecen aquí.",
+      "fixField": "Corregir el dato",
+      "fixHint": "Di solo lo que dicen tus palabras. Tus palabras se quedan como están.",
+      "fixSave": "Conservar esta versión",
+      "fixCancel": "Cancelar",
+      "leftOut_one": "{{count}} línea omitida: decía algo que no escribiste.",
+      "leftOut_other": "{{count}} líneas omitidas: decían algo que no escribiste."
+    },
+    "coverage": {
+      "title": "Cobertura",
+      "count": "{{n}}/7",
+      "label": "{{n}} de 7 áreas cubiertas",
+      "note": "También compara tus respuestas entre sí y con tu perfil. Si dos dicen cosas distintas, pregunta cuál es la correcta.",
+      "state": {
+        "ok": "Cubierta",
+        "part": "Cubierta en parte",
+        "none": "Aún sin cubrir"
+      },
+      "areas": {
+        "context": {
+          "name": "Contexto",
+          "hint": "qué vendía la empresa, a quién, tamaño del equipo"
+        },
+        "your_part": {
+          "name": "Tu parte",
+          "hint": "lo que hiciste tú, no el equipo"
+        },
+        "stack_scale": {
+          "name": "Tecnología y escala",
+          "hint": "herramientas, volumen de datos, tráfico"
+        },
+        "results": {
+          "name": "Resultados con prueba",
+          "hint": "cifras, y cómo sabes que son esas"
+        },
+        "hard_problems": {
+          "name": "Problemas difíciles",
+          "hint": "qué salió mal y qué hiciste"
+        },
+        "people": {
+          "name": "Personas",
+          "hint": "liderar, orientar, contratar"
+        },
+        "stories": {
+          "name": "Historias de entrevista",
+          "hint": "historias que contarías en una entrevista"
+        }
+      }
+    },
+    "errors": {
+      "generic": "No ha funcionado. Inténtalo de nuevo.",
+      "ai_unavailable": "Este Applicamp no tiene un modelo de IA configurado, así que no puede hacer preguntas.",
+      "ai_daily_limit_reached": "Has alcanzado el límite de IA de hoy. Inténtalo mañana.",
+      "ai_budget_reached": "Has alcanzado el límite de gasto de IA, así que no se envió nada. Tu respuesta sigue en el cuadro.",
+      "ai_failed": "El modelo de IA no pudo responder ahora. Tu respuesta sigue en el cuadro; inténtalo de nuevo en un minuto.",
+      "grill_daily_cap": "Son 150 preguntas hoy, el máximo que hace Pregúntame todo en un día. Sigue mañana.",
+      "invalid_answer": "Escribe entre 1 y 2000 caracteres.",
+      "no_open_question": "No hay ninguna pregunta esperando. Pide una nueva.",
+      "grill_changed": "Esta entrevista cambió mientras respondías. Se ha cargado de nuevo.",
+      "profile_changed": "Este puesto cambió en tu perfil. Empieza de nuevo.",
+      "fact_not_supported": "Tus palabras y tu perfil no dicen eso. Cambia la línea o quita los detalles nuevos.",
+      "invalid_fact": "Escribe entre 1 y 300 caracteres.",
+      "proposal_not_ready": "Este dato ya se conservó o se descartó.",
+      "not_found": "Ya no está aquí. Vuelve a tus puestos."
+    },
+    "roleFacts": {
+      "title": "Lo que nos contaste de cada puesto",
+      "lead": "Datos que conservaste en Pregúntame todo, con tus propias palabras. Un CV solo puede usar estos y lo que escribiste arriba.",
+      "none": "Aún no hay datos conservados",
+      "count_one": "{{count}} dato",
+      "count_other": "{{count}} datos",
+      "yourWords": "Tus palabras:",
+      "remove": "Quitar",
+      "removeLabel": "Quitar este dato: {{text}}",
+      "removed": "Dato quitado.",
+      "listLabel": "Datos conservados de {{role}}"
     }
   }
 }

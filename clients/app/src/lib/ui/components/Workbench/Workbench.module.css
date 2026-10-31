@@ -1,0 +1,50 @@
+/* The named container ChoiceNav asks too: one width decides how the page is laid out. */
+.frame {
+  container: workbench / inline-size;
+  min-width: 0;
+}
+
+.workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "nav"
+    "aside"
+    "main";
+  gap: var(--space-6);
+  align-items: start;
+  min-width: 0;
+}
+
+.workbench[data-aside="none"] {
+  grid-template-areas:
+    "nav"
+    "main";
+}
+
+.nav {
+  grid-area: nav;
+  min-width: 0;
+}
+
+.main {
+  grid-area: main;
+  min-width: 0;
+}
+
+.aside {
+  grid-area: aside;
+  min-width: 0;
+}
+
+@container workbench (width >= 56rem) {
+  .workbench {
+    grid-template-columns: 12rem minmax(0, 1fr) 15rem;
+    grid-template-areas: "nav main aside";
+  }
+
+  .workbench[data-aside="none"] {
+    grid-template-columns: 12rem minmax(0, 1fr);
+    grid-template-areas: "nav main";
+  }
+}

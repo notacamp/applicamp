@@ -1,0 +1,18 @@
+[
+  {
+    "absolute_url": "https://job-boards.greenhouse.io/exampleco/jobs/301",
+    "id": 301,
+    "location": { "name": "Portugal" },
+    "title": "Senior Backend Engineer, Payments",
+    "company_name": "Example Co",
+    "content": "&lt;p&gt;Example Co is growing its payments team in Portugal. You will build and run the Rust services that settle our customers&amp;#39; payments.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Five years of backend work&lt;/li&gt;&lt;li&gt;Postgres in production&lt;/li&gt;&lt;/ul&gt;"
+  },
+  {
+    "absolute_url": "https://job-boards.greenhouse.io/exampleco/jobs/302",
+    "id": 302,
+    "location": { "name": "Remote (EU)" },
+    "title": "Senior Backend Engineer, Platform",
+    "company_name": "Example Co",
+    "content": "&lt;p&gt;This role is fully remote, anywhere in Europe. You will build the platform our product teams ship on, in Rust and Postgres.&lt;/p&gt;"
+  }
+]

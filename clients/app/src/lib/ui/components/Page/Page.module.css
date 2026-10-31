@@ -28,6 +28,10 @@
   padding: var(--space-6) var(--space-4) var(--space-12);
 }
 
+.column[data-wide] {
+  max-width: var(--page-width-wide);
+}
+
 @media (width >= 48rem) {
   .column {
     padding: var(--space-8) var(--space-12) var(--space-12);

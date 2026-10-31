@@ -1,0 +1,6 @@
+# The e2e stack's one job board, served by the fake (clients/app/scripts/fake-jobs.ts).
+# Invented: no real company. Tests only.
+[[board]]
+kind = "greenhouse"
+token = "exampleco"
+company = "Example Co"

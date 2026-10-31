@@ -1,0 +1,166 @@
+# The e2e stack's (and a laptop demo's) job boards, served by the fake
+# (clients/app/scripts/fake-jobs.ts). Invented: no real board. Tests only.
+#
+# One approved remote board, shaped like Himalayas' API, and one candidate
+# waiting for the owner with its check, for the Boards page. Then the boards
+# of #26, at host names the fake answers to (compose.e2e.yml): one the check
+# at start makes approvable, one that needs a key, one whose terms forbid
+# reading it, and two sites with no config whose RSS link the check finds
+# (one per Playwright project).
+
+[[board]]
+slug = "fake-remote"
+name = "Fake Remote Board"
+homepage = "http://fake-jobs:9020"
+kind = "json_api"
+priority = "high"
+status = "approved"
+
+[board.config]
+endpoint = "http://fake-jobs:9020/himalayas/jobs/api"
+items = "/jobs"
+cursor = { param = "cursor", from = "/nextCursor" }
+poll_minutes = 15
+remote_only = true
+# Its keyword search, one query per top skill of the person's profile.
+skill_search = { param = "q", separator = " ", endpoint = "http://fake-jobs:9020/himalayas/jobs/api/search" }
+
+[board.config.fields]
+ref = "/guid"
+title = "/title"
+company = "/companyName"
+url = "/guid"
+apply_url = "/applicationLink"
+regions = "/locationRestrictions"
+description = "/description"
+posted_at = "/pubDate"
+expires_at = "/expiryDate"
+salary_min = "/minSalary"
+salary_max = "/maxSalary"
+salary_currency = "/currency"
+salary_period = "/salaryPeriod"
+
+[board.terms]
+attribution = "Fake Remote Board"
+link_back = true
+follow = true
+apply_unchanged = true
+drop_expired = true
+notes = "An invented board for tests."
+
+[[board]]
+slug = "fake-waiting"
+name = "Fake Waiting Board"
+homepage = "https://waiting-board.example"
+kind = "rss"
+priority = "low"
+status = "candidate"
+country = "CH"
+
+[board.config]
+endpoint = "https://waiting-board.example/feed.xml"
+
+[board.config.fields]
+title = "title"
+url = "link"
+description = "description"
+posted_at = "pubDate"
+
+[board.report]
+checked_at = "2026-10-26T04:00:00Z"
+terms_url = "https://waiting-board.example/terms"
+terms_sentences = ["You may not scrape this site with automated tools.", "Please link back to the original posting."]
+found_kind = "rss"
+found_url = "https://waiting-board.example/feed.xml"
+sample = [{ title = "Senior Backend Engineer", company = "Example Co", location = "Zurich", url = "https://waiting-board.example/jobs/1", regions = [] }]
+remote_share = 0.2
+worldwide_share = 0.0
+language = "en"
+attribution = "Fake Waiting Board"
+flags = ["its terms mention scraping or automated access: read them"]
+notes = "Country-scoped (Switzerland), found by discovery. Invented for tests."
+
+[board.report.robots]
+host = "waiting-board.example"
+found = true
+rules = [{ allow = false, pattern = "/private" }]
+endpoint_allowed = true
+fingerprint = "e2e"
+
+[[board]]
+slug = "fake-seeded"
+name = "Fake Seeded Board"
+homepage = "http://seeded-board.test:9020"
+kind = "json_api"
+priority = "low"
+status = "candidate"
+
+[board.config]
+endpoint = "http://seeded-board.test:9020/api/jobs"
+items = "/jobs"
+poll_minutes = 360
+
+[board.config.fields]
+ref = "/id"
+title = "/title"
+company = "/company"
+url = "/url"
+location = "/location"
+
+[board.report]
+notes = "Invented for tests: checked at start, then approvable."
+
+[[board]]
+slug = "fake-keyed"
+name = "Fake Keyed Board"
+homepage = "http://keyed-board.test:9020"
+kind = "json_api"
+priority = "low"
+status = "candidate"
+
+[board.config]
+endpoint = "http://keyed-board.test:9020/api/jobs"
+items = "/jobs"
+poll_minutes = 360
+key = { params = ["api_key"], how = "Ask the fake for one (it is e2e-key).", url = "https://keys.example/fake" }
+
+[board.config.fields]
+ref = "/id"
+title = "/title"
+company = "/company"
+url = "/url"
+
+[board.report]
+notes = "Invented for tests: its API answers only with a key."
+
+[[board]]
+slug = "fake-forbidding"
+name = "Fake Forbidding Board"
+homepage = "https://forbidding-board.example"
+kind = "json_api"
+priority = "low"
+status = "candidate"
+
+[[board.blockers]]
+code = "terms_forbid"
+detail = "You may not \"read this invented site with robots of any kind\"."
+source = "https://forbidding-board.example/terms"
+
+[board.report]
+notes = "Invented for tests: its terms forbid automated reading."
+
+[[board]]
+slug = "fake-feed-desktop"
+name = "Fake Feed Site (desktop)"
+homepage = "http://feed-site-desktop.test:9020"
+kind = "json_api"
+priority = "low"
+status = "candidate"
+
+[[board]]
+slug = "fake-feed-phone"
+name = "Fake Feed Site (phone)"
+homepage = "http://feed-site-phone.test:9020"
+kind = "json_api"
+priority = "low"
+status = "candidate"

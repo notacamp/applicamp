@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Banner, Button, Tagged, Text } from "~/lib/ui";
+import { Banner, Button, Stack, Tagged, Text } from "~/lib/ui";
 
+import type { Action } from "../../api/completion";
 import { isEmptyProfile, useProfile } from "../../api/profile";
 import type { Question } from "../../api/questions";
 import { ImportPanel } from "../ImportPanel/ImportPanel";
 import { ImportReview } from "../ImportReview/ImportReview";
 import { GoalsSection } from "../GoalsSection/GoalsSection";
 import { ProfileView } from "../ProfileView/ProfileView";
+import { StrengthCard } from "../StrengthCard/StrengthCard";
 
 export interface ProfileWorkspaceProps {
   /** The import panel is asked for (`/profile?import=new`, Today's "Set up your profile"). */
@@ -17,6 +19,10 @@ export interface ProfileWorkspaceProps {
   onImporting: (open: boolean) => void;
   /** Open the goals interview at a question (the Goals section's buttons). */
   onStartGoals: (question: Question) => void;
+  /** The person chose what to do about their profile's strength (Improve, a part's Add). */
+  onAction: (action: Action) => void;
+  /** Open Grill me: on a position, or on the list of roles when none is given. */
+  onGrill: (position?: number) => void;
 }
 
 /**
@@ -24,7 +30,13 @@ export interface ProfileWorkspaceProps {
  * profile (or one is asked for), the review of a draft, else the profile
  * itself, edited in place.
  */
-export function ProfileWorkspace({ importing, onImporting, onStartGoals }: ProfileWorkspaceProps) {
+export function ProfileWorkspace({
+  importing,
+  onImporting,
+  onStartGoals,
+  onAction,
+  onGrill,
+}: ProfileWorkspaceProps) {
   const { t } = useTranslation("profile");
   const profile = useProfile();
   const [review, setReview] = useState<string | null>(null);
@@ -98,20 +110,33 @@ export function ProfileWorkspace({ importing, onImporting, onStartGoals }: Profi
     );
   }
   return (
-    <ProfileView
-      view={view}
-      onImportAgain={() => {
-        onImporting(true);
-      }}
-      goals={
-        <GoalsSection
-          offer={offer}
-          onDismissOffer={() => {
-            setOffer(false);
-          }}
-          onStart={onStartGoals}
-        />
-      }
-    />
+    <Stack gap="lg">
+      <StrengthCard
+        onAction={onAction}
+        onGrill={
+          view.profile.work.length > 0
+            ? () => {
+                onGrill();
+              }
+            : undefined
+        }
+      />
+      <ProfileView
+        view={view}
+        onGrill={onGrill}
+        onImportAgain={() => {
+          onImporting(true);
+        }}
+        goals={
+          <GoalsSection
+            offer={offer}
+            onDismissOffer={() => {
+              setOffer(false);
+            }}
+            onStart={onStartGoals}
+          />
+        }
+      />
+    </Stack>
   );
 }

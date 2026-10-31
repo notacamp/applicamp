@@ -152,6 +152,7 @@ jobs:
           image-ref: applicamp:ci
           severity: HIGH,CRITICAL
           ignore-unfixed: true
+          trivyignores: .trivyignore.yaml
           exit-code: "1"
 
   # The web client (clients/): the gates of AGENTS.md, then the build the

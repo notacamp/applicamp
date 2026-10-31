@@ -259,3 +259,26 @@ export function withList<K extends ListKey>(
   next[list] = entries;
   return next;
 }
+
+/** A part of a draft that came back with nothing in it. */
+export type EmptySection = "label" | "summary" | ListKey;
+
+/**
+ * What a draft has nothing of: the headline, the summary and each list. The
+ * review says so, so the person knows what to fill in by hand.
+ */
+export function emptySections(draft: Profile): EmptySection[] {
+  const empty: EmptySection[] = [];
+  if (!present(draft.basics.label)) {
+    empty.push("label");
+  }
+  if (!present(draft.basics.summary)) {
+    empty.push("summary");
+  }
+  for (const list of LISTS) {
+    if (draft[list].length === 0) {
+      empty.push(list);
+    }
+  }
+  return empty;
+}

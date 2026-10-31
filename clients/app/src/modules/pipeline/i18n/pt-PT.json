@@ -1,0 +1,387 @@
+{
+  "loading": "A carregar as oportunidades…",
+  "loadFailed": "Não foi possível carregar as oportunidades.",
+  "retry": "Tentar de novo",
+  "untitled": "Função sem nome",
+  "views": {
+    "label": "Vista",
+    "table": "Todas as oportunidades",
+    "board": "Por fase"
+  },
+  "filter": {
+    "search": "Pesquisar nas oportunidades",
+    "stage": "Fase",
+    "allStages": "Todas as fases",
+    "newOnly": "A mostrar apenas as novas correspondências.",
+    "showAll": "Mostrar tudo",
+    "hidden": "Ocultas: não cumprem os teus requisitos",
+    "hiddenOnly": "Estas não cumprem os teus requisitos, por isso estão fora das oportunidades. Nada foi apagado."
+  },
+  "columns": {
+    "role": "Função",
+    "company": "Empresa",
+    "match": "Correspondência",
+    "stage": "Fase",
+    "source": "Origem",
+    "nextStep": "Próximo passo",
+    "updated": "Atualizada",
+    "hiddenReason": "Porque está oculta"
+  },
+  "stages": {
+    "found": "Encontrada",
+    "shortlisted": "Pré-selecionada",
+    "applying": "A candidatar",
+    "applied": "Candidatura enviada",
+    "talking": "Em conversa",
+    "interview": "Entrevista",
+    "offer": "Proposta",
+    "closed": "Fechada"
+  },
+  "sources": {
+    "greenhouse": "Greenhouse",
+    "lever": "Lever",
+    "ashby": "Ashby",
+    "arbeitnow": "Arbeitnow",
+    "hn": "HN “Who is hiring”",
+    "link": "Ligação"
+  },
+  "workModes": {
+    "remote": "Remoto",
+    "hybrid": "Híbrido",
+    "onsite": "Presencial"
+  },
+  "empty": {
+    "title": "Ainda não há oportunidades",
+    "body": "As ofertas chegam aqui com o grau de correspondência com o seu perfil, a fase em que estão e o passo seguinte, para que nada escape. Pesquise agora nos sites de emprego ou adicione uma oferta pela ligação.",
+    "filteredTitle": "Nada por aqui",
+    "filteredBody": "Nenhuma oportunidade corresponde a estes filtros."
+  },
+  "board": {
+    "empty": "Nada por aqui"
+  },
+  "new": {
+    "button": "Nova",
+    "title": "Adicionar uma oferta pela ligação",
+    "description": "Cole a ligação de um anúncio. Os anúncios do Greenhouse, Lever e Ashby são lidos automaticamente; para qualquer outro site, escreva a função e a empresa.",
+    "url": "Ligação do anúncio",
+    "add": "Adicionar",
+    "adding": "A adicionar…",
+    "cancel": "Cancelar",
+    "invalid": "Cole uma ligação que comece por https://.",
+    "failed": "Não foi possível adicionar a oferta. Tente de novo."
+  },
+  "peek": {
+    "eyebrow": "Oportunidade",
+    "close": "Fechar",
+    "role": "Função",
+    "addRole": "Escreva a função",
+    "company": "Empresa",
+    "addCompany": "Escreva a empresa",
+    "where": "Onde",
+    "addWhere": "Escreva onde é",
+    "unknown": "Não indicado",
+    "pay": "Remuneração",
+    "match": "Correspondência",
+    "notScored": "Sem avaliação",
+    "stage": "Fase",
+    "source": "Origem",
+    "nextStep": "Próximo passo",
+    "addNextStep": "Adicione o próximo passo",
+    "posted": "Publicada",
+    "why": "Porque corresponde",
+    "gaps": "Lacunas",
+    "reasonsUpdated": "Motivos atualizados: os que o seu perfil não sustenta foram removidos.",
+    "notes": "Notas",
+    "addNotes": "Adicione notas só para si",
+    "charactersLeft": "Faltam {{left}} caracteres",
+    "description": "Do anúncio",
+    "open": "Abrir o anúncio",
+    "notForMe": "Não é para mim",
+    "dismissed": "Não é para mim · {{title}}",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "saveFailed": "Não foi possível guardar a alteração. Tente de novo.",
+    "requirements": "Os teus requisitos",
+    "hidden": "Oculta: não cumpre os teus requisitos",
+    "sources": "Encontrado em",
+    "from": "Em {{name}}",
+    "apply": "Candidatar",
+    "tailored": {
+      "title": "CV à medida",
+      "lead": "Um CV para esta vaga, baseado em factos reais sobre a empresa e a vaga.",
+      "prepare": "Preparar: empresa e vaga",
+      "cost": "Cerca de {{cost}}. Nada é enviado para lado nenhum.",
+      "none": "Ainda sem rascunho.",
+      "approved": "v{{version}} aprovada.",
+      "needsYou_one": "Rascunho {{n}}: {{count}} linha precisa de si.",
+      "needsYou_other": "Rascunho {{n}}: {{count}} linhas precisam de si.",
+      "clean": "Rascunho {{n}}: todas as linhas têm origem no seu perfil.",
+      "approvedBefore": "A v{{version}} está aprovada; este rascunho mais recente ainda não.",
+      "review": "Rever o CV"
+    }
+  },
+  "hidden": {
+    "reasons": {
+      "not_remote": "Não é remota, ou não diz",
+      "not_open_to_location": "Não está aberta a onde vives",
+      "language": "Pede uma língua em que não trabalhas",
+      "below_floor": "Paga menos do que o teu mínimo"
+    }
+  },
+  "facts": {
+    "remote": {
+      "yes": "Remota",
+      "no": "Não remota",
+      "unclear": "Não diz se é remota"
+    },
+    "open": {
+      "yes": "Aberta a onde vives",
+      "no": "Não está aberta a onde vives",
+      "unclear": "Não diz a quem está aberta"
+    }
+  },
+  "prepare": {
+    "title": "Preparar",
+    "eyebrow": "CV à medida",
+    "heading": "{{title}} · {{company}}",
+    "lead": "No que se baseia um CV para esta vaga: factos lidos no site da própria empresa e o que o anúncio diz. Nada vem da memória de um modelo.",
+    "back": "Voltar ao pipeline",
+    "loading": "A carregar…",
+    "loadFailed": "Não foi possível carregar esta página.",
+    "thisCompany": "esta empresa",
+    "companyTitle": "Sobre {{company}}",
+    "site": {
+      "label": "Site de {{company}}",
+      "hint": "O site da própria empresa, não uma plataforma de emprego. Só o endereço é guardado, uma vez, para todas as vagas dela.",
+      "save": "Guardar o site",
+      "cancel": "Cancelar",
+      "is": "Site de {{company}}: {{site}}",
+      "change": "Alterar"
+    },
+    "readLead": "Lê o anúncio e o site da própria empresa (só esse site, onde o robots.txt permite) e cria os factos: uma chamada à IA, reutilizada durante 30 dias. Depois, outra compara a vaga com o seu perfil.",
+    "read": "Ler sobre {{company}} · cerca de {{cost}}",
+    "reading": "A ler…",
+    "readingLead": "A ler as páginas de {{company}} e a comparar a vaga com o seu perfil. Demora alguns segundos.",
+    "readAgain": "Ler outra vez · cerca de {{cost}}",
+    "noFacts": "Não foi possível citar nada sobre {{company}} nas suas páginas.",
+    "facts": {
+      "title": "O que dizem as páginas de {{company}}",
+      "count_one": "{{count}} facto, cada um com as palavras da própria página.",
+      "count_other": "{{count}} factos, cada um com as palavras da própria página.",
+      "pageSays": "A página diz:",
+      "removed": "Removido",
+      "undo": "Anular",
+      "remove": "Errado, remover",
+      "removeLabel": "Errado, remover: {{text}}",
+      "fetched": "lida em {{date}}"
+    },
+    "pages": {
+      "line_one": "Leu {{count}} página em {{date}}: {{pages}}. Reutilizada até {{until}}, para todas as vagas desta empresa.",
+      "line_other": "Leu {{count}} páginas em {{date}}: {{pages}}. Reutilizadas até {{until}}, para todas as vagas desta empresa.",
+      "blocked_one": "{{count}} página ficou por ler: o site pede aos robôs que não a leiam.",
+      "blocked_other": "{{count}} páginas ficaram por ler: o site pede aos robôs que não as leiam.",
+      "dropped_one": "{{count}} facto ficou de fora: a citação não está na página indicada.",
+      "dropped_other": "{{count}} factos ficaram de fora: as citações não estão nas páginas indicadas."
+    },
+    "wants": {
+      "title": "O que esta vaga mais pede",
+      "pending": "Leia sobre a empresa para ver o que a vaga mais pede.",
+      "noText": "O anúncio não tem texto para ler.",
+      "none": "Nada do que o anúncio pede pôde ser citado.",
+      "nice": "{{label}} · é um plus"
+    },
+    "questions": {
+      "title_one": "{{count}} pergunta para esta vaga",
+      "title_other": "{{count}} perguntas para esta vaga",
+      "titleNone": "Perguntas para esta vaga",
+      "lead": "Só se pergunta onde o seu perfil é fraco para o que a vaga pede. Uma resposta só chega ao seu perfil quando a guarda.",
+      "goesTo": "A sua resposta vai para {{role}}.",
+      "goesToLatest": "Esta pergunta não indica nenhuma função, por isso a resposta vai para a mais recente: {{role}}.",
+      "noPosition": "Acrescente primeiro uma função ao seu perfil: a resposta precisa de uma onde ficar.",
+      "yourAnswer": "A sua resposta",
+      "cost": "Uma chamada pequena à IA · cerca de {{cost}}",
+      "answer": "Responder",
+      "answering": "A ler a sua resposta…",
+      "dontHave": "Não tenho",
+      "dontHaveHint": "“Não” é uma boa resposta: {{skill}} fica fora dos seus CVs e não volta a ser perguntado.",
+      "skip": "Saltar",
+      "wentTo": "Retirado da sua resposta, para {{role}}.",
+      "wentToLatest": "Retirado da sua resposta, para a sua função mais recente: {{role}}.",
+      "nothing": "Nada nessa resposta pôde ser guardado como facto.",
+      "dropped_one": "{{count}} linha ficou de fora: as verificações não a conseguiram ligar às suas palavras.",
+      "dropped_other": "{{count}} linhas ficaram de fora: as verificações não as conseguiram ligar às suas palavras."
+    },
+    "draft": {
+      "title": "Redigir o CV",
+      "lead": "O CV é redigido a partir destes factos e do seu perfil, e cada linha é verificada contra o que o seu perfil diz."
+    },
+    "costLine": "Ler uma empresa: uma chamada à IA, cerca de {{read}}, reutilizada durante 30 dias. Comparar a vaga: uma chamada, cerca de {{analysis}}. Cada resposta: uma chamada pequena, cerca de {{answer}}. Nada corre em segundo plano.",
+    "spend": {
+      "reads": "Empresas lidas hoje: {{n}} de {{cap}}."
+    },
+    "errors": {
+      "site_needed": "Escreva primeiro o site da empresa.",
+      "invalid_site": "Isso não é um endereço de site. Escreva-o a começar por https://.",
+      "site_not_allowed": "Esse endereço não pode ser lido. Use o site público da empresa.",
+      "site_unreachable": "Não é possível chegar ao site da empresa neste momento. Verifique o endereço ou tente mais tarde.",
+      "robots_disallows": "O site da empresa pede aos robôs que não o leiam, por isso nada foi lido.",
+      "no_pages_readable": "Nenhuma das páginas da empresa tinha texto para ler.",
+      "company_reads_daily_cap": "Já leu 20 empresas hoje. A leitura continua amanhã.",
+      "company_unknown": "Esta oportunidade ainda não tem o nome da empresa. Escreva-o primeiro.",
+      "ai_unavailable": "A IA não está configurada neste servidor, por isso nada pode ser lido.",
+      "ai_daily_limit_reached": "Atingiu o limite de IA de hoje. Continua amanhã.",
+      "ai_budget_reached": "Atingiu o seu limite de gasto em IA. Continua quando o limite for reposto.",
+      "ai_failed": "A IA não conseguiu responder desta vez. Nada se perdeu; tente outra vez.",
+      "invalid_answer": "Escreva entre 1 e 2000 caracteres.",
+      "question_closed": "Esta pergunta já foi respondida ou posta de parte.",
+      "profile_needed": "Acrescente primeiro uma função ao seu perfil: a resposta precisa de uma onde ficar.",
+      "no_skill": "Esta pergunta não é sobre uma competência.",
+      "not_found": "Esta oportunidade não foi encontrada.",
+      "generic": "Algo correu mal. Tente outra vez."
+    }
+  },
+  "cv": {
+    "eyebrow": "CV à medida",
+    "title": "Rever o CV",
+    "heading": "Reveja o seu CV para {{company}}",
+    "lead": "Feito a partir do seu perfil para esta vaga. Cada linha indica de onde vem. As linhas que não se conseguem ligar ao seu perfil ficam bloqueadas até as corrigir.",
+    "back": "Voltar a Preparar",
+    "loading": "A carregar o CV…",
+    "loadFailed": "Não foi possível carregar o CV.",
+    "empty": {
+      "body": "Ainda sem rascunho. O CV é redigido a partir do seu perfil, dos factos da empresa e do que a vaga pede: uma chamada de IA. Depois, cada linha é verificada sem IA."
+    },
+    "toolbar": {
+      "draft": "Rascunho {{n}}",
+      "draftPill": "Rascunho",
+      "approvedPill": "Aprovado · v{{version}}",
+      "language": "Escrito em {{language}}",
+      "makeAgain": "Refazer · cerca de {{cost}}",
+      "making": "A redigir…",
+      "approve": "Aprovar v{{version}}",
+      "approving": "A aprovar…",
+      "approveWhy": "Aprovar fica disponível quando todas as linhas bloqueadas forem corrigidas ou removidas."
+    },
+    "draft": {
+      "draft": "Redigir o CV · cerca de {{cost}}",
+      "drafting": "A redigir…",
+      "review": "Rever o CV",
+      "hint": "Uma chamada de IA. Depois, cada linha é verificada contra o seu perfil, sem IA.",
+      "blocked": {
+        "stage_too_early": "Selecione primeiro esta vaga: o CV faz-se para as vagas a que se candidata.",
+        "per_opportunity_cap": "Já fez 10 rascunhos para esta vaga. Reveja um deles.",
+        "daily_cap": "Já fez 20 rascunhos hoje. Pode continuar amanhã.",
+        "ai_unavailable": "A IA não está configurada neste servidor, por isso não é possível redigir nada."
+      }
+    },
+    "sheet": {
+      "label": "O seu CV à medida",
+      "summary": "Resumo",
+      "experience": "Experiência",
+      "skills": "Competências",
+      "education": "Formação",
+      "languages": "Línguas",
+      "now": "atual"
+    },
+    "marks": {
+      "as_in_profile": "Como no perfil",
+      "moved_up": "Subiu",
+      "reworded": "Reformulada",
+      "edited": "Editada"
+    },
+    "from": {
+      "show": "Do seu perfil",
+      "title": "Do seu perfil:",
+      "companyPage": "(lido em {{page}})"
+    },
+    "flag": {
+      "label": "Não está no seu perfil",
+      "claim": "«{{claim}}» não está nas fontes que esta linha cita.",
+      "noSource": "Esta linha não cita nada do seu perfil.",
+      "company": "Os factos da empresa não podem ser conquistas suas. Só podem aparecer no resumo.",
+      "skill": "{{skill}} não é uma das suas competências."
+    },
+    "actions": {
+      "edit": "Editar",
+      "removeLine": "Remover a linha",
+      "itsTrue": "É verdade: acrescentar ao meu perfil",
+      "editLabel": "Editar a linha",
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "confirmLabel": "Diga-o com as suas palavras",
+      "confirmHint": "Isto guarda as suas palavras em {{role}} no seu perfil e depois volta a verificar a linha.",
+      "confirmHintNoRole": "Isto guarda as suas palavras no seu perfil e depois volta a verificar a linha.",
+      "confirmSave": "Guardar no meu perfil e verificar de novo",
+      "removeSkill": "Remover",
+      "addSkill": "Tenho: acrescentar às minhas competências"
+    },
+    "leftOut": {
+      "title_one": "Deixado de fora para esta vaga · {{count}} item",
+      "title_other": "Deixado de fora para esta vaga · {{count}} itens",
+      "lead": "Isto está no seu perfil e não neste CV. Repor um usa as palavras do seu perfil.",
+      "role_one": "{{role}} · {{count}} linha",
+      "role_other": "{{role}} · {{count}} linhas",
+      "line": "«{{text}}» · {{role}}",
+      "putBack": "Repor"
+    },
+    "aside": {
+      "flagged_one": "{{count}} linha não se consegue ligar ao seu perfil",
+      "flagged_other": "{{count}} linhas não se conseguem ligar ao seu perfil",
+      "flaggedBody": "Aprovar fica disponível quando cada uma for corrigida, removida ou acrescentada ao seu perfil.",
+      "goFirst": "Ir à primeira",
+      "clean": "Todas as linhas têm origem no seu perfil",
+      "cleanBody": "Aprove para guardar este rascunho como v{{version}}.",
+      "approvedTitle": "Aprovado · v{{version}}",
+      "approvedBody": "Esta versão não pode mudar. Refaça o CV para ter outra. O PDF vem a seguir.",
+      "toPipeline": "Voltar ao pipeline"
+    },
+    "keywords": {
+      "title": "Palavras-chave da vaga no CV",
+      "count": "{{on}}/{{total}}",
+      "on_cv": "No CV",
+      "in_profile": "No seu perfil, mas não neste CV",
+      "not_in_profile": "Não está no seu perfil",
+      "nice": "{{label}} · é um plus",
+      "none": "O anúncio não nomeia nada a procurar.",
+      "note": "As palavras-chave que não tem nunca são acrescentadas por si. Se tiver uma, acrescente-a ao seu perfil e refaça o CV."
+    },
+    "changes": {
+      "title": "O que mudou em relação ao seu perfil",
+      "reworded_one": "{{count}} linha reformulada",
+      "reworded_other": "{{count}} linhas reformuladas",
+      "movedUp_one": "{{count}} linha subiu",
+      "movedUp_other": "{{count}} linhas subiram",
+      "edited_one": "{{count}} linha editada por si",
+      "edited_other": "{{count}} linhas editadas por si",
+      "asIs_one": "{{count}} linha como escrita",
+      "asIs_other": "{{count}} linhas como escritas",
+      "leftOutRoles_one": "{{count}} posição deixada de fora",
+      "leftOutRoles_other": "{{count}} posições deixadas de fora",
+      "leftOutLines_one": "{{count}} linha deixada de fora",
+      "leftOutLines_other": "{{count}} linhas deixadas de fora"
+    },
+    "spend": {
+      "drafts": "Rascunhos hoje: {{n}} de {{cap}}",
+      "day": "IA hoje: {{spent}} de {{limit}}",
+      "dayNoLimit": "IA hoje: {{spent}}"
+    },
+    "errors": {
+      "stage_too_early": "Selecione primeiro esta vaga: o CV faz-se para as vagas a que se candidata.",
+      "profile_needed": "Acrescente primeiro uma posição ao seu perfil: o CV é feito a partir dela.",
+      "cv_drafts_per_opportunity_cap": "Já fez 10 rascunhos para esta vaga. Reveja um deles.",
+      "cv_drafts_daily_cap": "Já fez 20 rascunhos hoje. Pode continuar amanhã.",
+      "ai_unavailable": "A IA não está configurada neste servidor, por isso não é possível redigir nada.",
+      "ai_daily_limit_reached": "Atingiu o limite diário de IA. Continua amanhã.",
+      "ai_budget_reached": "Atingiu o seu limite de gastos de IA. Continua quando o limite for reposto.",
+      "ai_failed": "A IA não conseguiu responder desta vez. Nada se perdeu; tente outra vez.",
+      "invalid_text": "Escreva entre 1 e 700 caracteres.",
+      "invalid_fact": "Escreva entre 1 e 300 caracteres.",
+      "profile_changed": "Essa posição mudou no seu perfil desde que este rascunho foi feito. Refaça o CV.",
+      "draft_frozen": "Este rascunho foi aprovado ou posto de parte, por isso não pode mudar. Refaça o CV.",
+      "lines_flagged": "Algumas linhas ainda não se conseguem ligar ao seu perfil. Corrija-as ou remova-as primeiro.",
+      "already_on_cv": "Isso já está no CV.",
+      "not_found": "Este CV não foi encontrado.",
+      "generic": "Algo correu mal. Tente outra vez."
+    }
+  }
+}

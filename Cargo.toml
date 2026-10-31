@@ -6,7 +6,6 @@ members = [
     "crates/kernel",
     "crates/ai",
     "crates/server",
-    "crates/agent",
     "crates/modules/*",
     "crates/xtask",
 ]
@@ -28,7 +27,8 @@ applicamp-ai = { path = "crates/ai" }
 applicamp-server = { path = "crates/server" }
 applicamp-identity = { path = "crates/modules/identity" }
 applicamp-profile = { path = "crates/modules/profile" }
-applicamp-runs = { path = "crates/modules/runs" }
+applicamp-pipeline = { path = "crates/modules/pipeline" }
+applicamp-sources = { path = "crates/modules/sources" }
 
 # The same versions and features as Campbooks Next, trimmed to what is used.
 
@@ -76,16 +76,6 @@ zip = { version = "9.1.1", default-features = false, features = ["deflate-flate2
 csv = "1.4.0"
 pdf-extract = "0.12.1"
 schemars = "1.2.3"
-
-# Sandboxes (the runs module, ADR 0002): NVIDIA OpenShell's Rust SDK and its
-# policy parser, pinned to the tag the spike passed on (issue #2). Both come
-# from the same git tag, so they share one `openshell-core`.
-openshell-sdk = { git = "https://github.com/NVIDIA/OpenShell", tag = "v0.1.4" }
-openshell-policy = { git = "https://github.com/NVIDIA/OpenShell", tag = "v0.1.4" }
-# The SDK's token refresher trait is an `async_trait`; streams for the run
-# log and the live console.
-async-trait = "0.1"
-futures = "0.3"
 
 # Tooling (xtask)
 cargo_metadata = "0.23.1"

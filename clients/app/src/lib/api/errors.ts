@@ -48,6 +48,24 @@ export function problemCode(error: unknown): string | undefined {
   return undefined;
 }
 
+/**
+ * What the server said went wrong, in English: the problem's `detail` (which
+ * field of a config, which robots rule). Shown beside a translated message,
+ * never branched on.
+ */
+export function problemDetail(error: unknown): string | undefined {
+  if (!(error instanceof ApiError)) {
+    return undefined;
+  }
+  const { problem } = error;
+  if (typeof problem === "object" && problem !== null && "detail" in problem) {
+    return typeof problem.detail === "string" && problem.detail.trim() !== ""
+      ? problem.detail
+      : undefined;
+  }
+  return undefined;
+}
+
 /** The HTTP status of a failed request, if it got an answer. */
 export function errorStatus(error: unknown): number | undefined {
   return error instanceof ApiError ? error.status : undefined;

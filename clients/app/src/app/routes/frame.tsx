@@ -31,7 +31,7 @@ export function SignedInFrame() {
 }
 
 /**
- * The app frame: the sidebar (Today, Pipeline, Agents, Profile & goals, the
+ * The app frame: the sidebar (Today, Pipeline, Boards, Agents, Profile & goals, the
  * shortcuts and the account), or the phone header and tab bar below 48rem;
  * ⌘K's command menu and the `?` sheet.
  */
@@ -53,8 +53,17 @@ function Frame() {
   };
   useShortcut("nav.today", go("/"));
   useShortcut("nav.pipeline", go("/pipeline"));
+  useShortcut("nav.boards", go("/boards"));
   useShortcut("nav.agents", go("/agents"));
   useShortcut("nav.profile", go("/profile"));
+  // ⌘K's "Search now" and "New opportunity" (and their keys) from any page:
+  // the Pipeline starts the search, or opens New, once it is shown.
+  useShortcut("sources.start", () => {
+    void navigate({ to: "/pipeline", search: { run: "search" } });
+  });
+  useShortcut("pipeline.add", () => {
+    void navigate({ to: "/pipeline", search: { run: "add" } });
+  });
   useShortcut("command.open", () => {
     setSheetOpen(false);
     setMenuOpen((open) => !open);

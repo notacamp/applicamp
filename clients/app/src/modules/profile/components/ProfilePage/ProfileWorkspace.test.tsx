@@ -3,6 +3,8 @@ import { userEvent } from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
+import { UndoProvider } from "~/lib/ui";
+
 import { renderWithProviders, stubApi, type Stub } from "../../../../../test/render";
 import { EMPTY_GOALS } from "../../api/goals";
 import { EMPTY_PROFILE, type Profile, type ProfileView } from "../../api/profile";
@@ -65,7 +67,15 @@ function draftOf(draft: Profile, dropped = 0) {
 function Workspace({ startImporting = false }: { startImporting?: boolean }) {
   const [importing, setImporting] = useState(startImporting);
   return (
-    <ProfileWorkspace importing={importing} onImporting={setImporting} onStartGoals={vi.fn()} />
+    <UndoProvider>
+      <ProfileWorkspace
+        importing={importing}
+        onImporting={setImporting}
+        onStartGoals={vi.fn()}
+        onAction={vi.fn()}
+        onGrill={vi.fn()}
+      />
+    </UndoProvider>
   );
 }
 
@@ -108,6 +118,10 @@ describe("the profile workspace", () => {
     expect(screen.getByTestId("review-basics")).toHaveTextContent("Alex Demo");
     expect(screen.queryByTestId("review-dropped")).toBeNull();
     expect(screen.queryByTestId("review-merge")).toBeNull();
+    // FILLED has no summary, certifications or projects: only those are listed.
+    expect(screen.getByTestId("review-empty")).toHaveTextContent("3 parts");
+    expect(screen.getByTestId("review-empty")).toHaveTextContent("Add them by hand");
+    expect(screen.queryByTestId("review-empty-skills")).toBeNull();
 
     await user.click(screen.getByTestId("review-replace"));
     expect(await screen.findByTestId("profile-view")).toHaveTextContent("Example Org");
@@ -419,5 +433,39 @@ describe("a draft's review", () => {
     expect(await screen.findByTestId("review-education")).toHaveTextContent("Same");
     await user.click(screen.getByTestId("review-replace"));
     expect(await screen.findByTestId("review-error")).toHaveTextContent("That didn’t work");
+  });
+
+  it("lists the parts a PDF import came back without, and how to fill them", async () => {
+    const onlyPositions: Profile = {
+      ...EMPTY_PROFILE,
+      basics: { profiles: [], name: "Sam Sample" },
+      work: FILLED.work,
+    };
+    stub({
+      [`GET /api/v1/profile/imports/${IMPORT_ID}`]: {
+        body: { ...draftOf(onlyPositions), kind: "pdf" },
+      },
+    });
+    renderWithProviders(
+      <ImportReview id={IMPORT_ID} current={EMPTY_PROFILE} onDone={vi.fn()} onRestart={vi.fn()} />,
+    );
+
+    const empty = await screen.findByTestId("review-empty");
+    expect(empty).toHaveTextContent("Not found in this file: 7 parts");
+    expect(screen.getByTestId("review-empty-skills")).toHaveTextContent(
+      "No skills found in this file",
+    );
+    for (const section of [
+      "label",
+      "summary",
+      "education",
+      "languages",
+      "certificates",
+      "projects",
+    ]) {
+      expect(screen.getByTestId(`review-empty-${section}`)).toBeInTheDocument();
+    }
+    expect(screen.queryByTestId("review-empty-work")).toBeNull();
+    expect(empty).toHaveTextContent("import your LinkedIn data export");
   });
 });

@@ -2,7 +2,8 @@ import { useTranslation } from "react-i18next";
 
 import { Fact, FactList, Page, Tagged } from "~/lib/ui";
 import { PROVIDER_NAMES, useMe } from "~/modules/identity";
-import { ProfileWorkspace, type Question } from "~/modules/profile";
+import { ProfileWorkspace, type Action, type Question } from "~/modules/profile";
+import { SpendLine } from "~/modules/sources";
 
 export interface ProfileProps {
   /** The import panel is asked for (`?import=new`). */
@@ -10,10 +11,14 @@ export interface ProfileProps {
   onImporting: (open: boolean) => void;
   /** Open the goals interview at a question. */
   onStartGoals: (question: Question) => void;
+  /** What to do about the profile's strength (Improve, a part's Add). */
+  onAction: (action: Action) => void;
+  /** Open Grill me, on a position or (none) on the list of roles. */
+  onGrill: (position?: number) => void;
 }
 
-/** `/profile`: what agents know about you, and how you sign in. */
-export function Profile({ importing, onImporting, onStartGoals }: ProfileProps) {
+/** `/profile`: what agents know about you, how you sign in, and what the AI cost this month. */
+export function Profile({ importing, onImporting, onStartGoals, onAction, onGrill }: ProfileProps) {
   const { t } = useTranslation();
   const me = useMe();
   return (
@@ -22,6 +27,8 @@ export function Profile({ importing, onImporting, onStartGoals }: ProfileProps) 
         importing={importing}
         onImporting={onImporting}
         onStartGoals={onStartGoals}
+        onAction={onAction}
+        onGrill={onGrill}
       />
       {me.data === undefined ? null : (
         <Tagged testId="profile-account">
@@ -33,6 +40,7 @@ export function Profile({ importing, onImporting, onStartGoals }: ProfileProps) 
           </FactList>
         </Tagged>
       )}
+      <SpendLine />
     </Page>
   );
 }

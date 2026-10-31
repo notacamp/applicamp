@@ -2,10 +2,17 @@
   "nav": {
     "today": "Today",
     "pipeline": "Pipeline",
+    "boards": "Boards",
     "agents": "Agents",
     "profile": "Profile & goals"
   },
   "command": {
     "open": "Command menu"
+  },
+  "sources": {
+    "start": "Search now"
+  },
+  "pipeline": {
+    "add": "New opportunity"
   }
 }

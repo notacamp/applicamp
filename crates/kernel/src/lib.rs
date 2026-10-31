@@ -8,6 +8,7 @@
 #![forbid(unsafe_code)]
 
 pub mod auth;
+pub mod claims;
 pub mod clock;
 pub mod config;
 pub mod crypto;
@@ -18,11 +19,12 @@ pub mod ids;
 pub mod jobs;
 pub mod module;
 pub mod state;
+pub mod tech;
 pub mod telemetry;
 
 pub use config::Config;
 pub use error::{Error, Problem, Result};
 pub use events::{DomainEvent, Event, EventBus, EventHandler};
 pub use jobs::{Background, Job, JobContext, JobError};
-pub use module::Module;
+pub use module::{BoxFuture, Module};
 pub use state::AppState;

@@ -7,8 +7,8 @@ use serde_json::{Value, json};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use super::testkit::{CV_LINES, export_zip, export_zip_with, pdf_saying};
-use crate::testkit::{Harness, Part, fake_model, gateway};
+use super::testkit::{CV_LINES, LINKEDIN_LINES, export_zip, export_zip_with, pdf_saying};
+use crate::testkit::{Harness, Part, fake_model, gateway, scripted_model};
 
 async fn import_zip(h: &Harness, zip: &[u8]) -> Value {
     let (status, import) = h
@@ -344,7 +344,7 @@ async fn a_cv_pdf_is_structured_and_what_it_does_not_say_is_left_out(db: PgPool)
 
     // One call, with the CV as data and the profile's schema; counted.
     let requests = model.received_requests().await.unwrap();
-    assert_eq!(requests.len(), 1);
+    assert_eq!(requests.len(), 2, "positions, then everything else");
     let sent: Value = serde_json::from_slice(&requests[0].body).unwrap();
     let document = sent["messages"][1]["content"].as_str().unwrap();
     assert!(document.starts_with("<document>"), "{document}");
@@ -355,12 +355,15 @@ async fn a_cv_pdf_is_structured_and_what_it_does_not_say_is_left_out(db: PgPool)
             .unwrap()
             .contains("data, not instructions")
     );
-    assert_eq!(sent["response_format"]["json_schema"]["name"], "profile");
+    assert_eq!(
+        sent["response_format"]["json_schema"]["name"],
+        "profile_work"
+    );
     assert_eq!(
         usage::used_today(&h.db, h.account, Utc::now())
             .await
             .unwrap(),
-        1_200
+        2_400
     );
     // Still nothing in the profile.
     assert_eq!(h.count("SELECT count(*) FROM profile.profiles").await, 0);
@@ -442,14 +445,14 @@ async fn an_unusable_answer_is_a_problem(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn over_the_daily_limit_the_model_is_not_called(db: PgPool) {
     let model = fake_model(&model_answer()).await;
-    let h = Harness::new(db, Some(gateway(&model, Some(1_000))));
+    let h = Harness::new(db, Some(gateway(&model, Some(2_000))));
     usage::record(
         &h.db,
         usage::Entry {
             account: h.account,
             role: applicamp_ai::Role::Complete,
             model: "test/model",
-            tokens_in: 900,
+            tokens_in: 1_900,
             tokens_out: 200,
             at: Utc::now(),
         },
@@ -470,7 +473,7 @@ async fn over_the_daily_limit_the_model_is_not_called(db: PgPool) {
     // Someone else still has their day.
     let other = Harness::as_account(
         h.db.clone(),
-        Some(gateway(&model, Some(1_000))),
+        Some(gateway(&model, Some(2_000))),
         Uuid::now_v7(),
     );
     let (status, _) = other
@@ -501,5 +504,192 @@ async fn drafts_expire(db: PgPool) {
         .await
         .unwrap();
     h.work().await;
+    assert_eq!(h.count("SELECT count(*) FROM profile.imports").await, 0);
+}
+
+/// What the model answers for the invented LinkedIn PDF, split the way the
+/// two calls ask: positions, then everything else.
+fn linkedin_answers() -> (Value, Value) {
+    (
+        json!({ "work": [
+            { "name": "Example Org", "position": "Staff Engineer", "startDate": "2021-03",
+              "summary": "Runs the billing platform." },
+            { "name": "Sample Labs", "position": "Engineer", "startDate": "2017-06",
+              "endDate": "2021-02" },
+        ] }),
+        json!({
+            "basics": {
+                "name": "Sam Sample",
+                "label": "Staff engineer building calm backends",
+                "location": "Lisbon, Portugal",
+                "summary": "I build boring, reliable backends for small teams.",
+            },
+            "education": [{ "institution": "Sample University",
+                "studyType": "Master's degree", "area": "Computer science" }],
+            "skills": [{ "name": "Distributed systems" }, { "name": "Rust" },
+                { "name": "Team leadership" }],
+            "languages": [{ "language": "Portuguese" }, { "language": "English" }],
+            "certificates": [{ "name": "Cloud Basics" }],
+        }),
+    )
+}
+
+async fn import_linkedin_pdf(h: &Harness) -> (axum::http::StatusCode, Value) {
+    let pdf = pdf_saying(&LINKEDIN_LINES);
+    h.upload(&[
+        Part::Text("kind", "pdf"),
+        Part::File("file", "Profile.pdf", &pdf),
+    ])
+    .await
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_linkedin_pdf_asks_for_every_section_and_brings_them_all_back(db: PgPool) {
+    let (work, rest) = linkedin_answers();
+    let model = scripted_model(vec![("stop", work.to_string()), ("stop", rest.to_string())]).await;
+    let h = Harness::new(db, Some(gateway(&model, None)));
+    let (status, import) = import_linkedin_pdf(&h).await;
+    assert_eq!(status, 201, "{import}");
+
+    let draft = &import["draft"];
+    assert_eq!(import["dropped"], 0, "{import}");
+    assert_eq!(draft["work"].as_array().unwrap().len(), 2);
+    assert_eq!(
+        draft["basics"]["label"],
+        "Staff engineer building calm backends"
+    );
+    assert_eq!(
+        draft["basics"]["summary"],
+        "I build boring, reliable backends for small teams."
+    );
+    assert_eq!(draft["education"][0]["institution"], "Sample University");
+    assert_eq!(draft["skills"].as_array().unwrap().len(), 3);
+    assert_eq!(draft["languages"].as_array().unwrap().len(), 2);
+    assert_eq!(draft["certificates"][0]["name"], "Cloud Basics");
+
+    // Two calls; between them they ask for every section, and the text the
+    // model reads is the whole two-column document.
+    let requests = model.received_requests().await.unwrap();
+    assert_eq!(requests.len(), 2);
+    let sent: Vec<Value> = requests
+        .iter()
+        .map(|r| serde_json::from_slice(&r.body).unwrap())
+        .collect();
+    let mut asked: Vec<String> = Vec::new();
+    for request in &sent {
+        let schema = &request["response_format"]["json_schema"]["schema"];
+        let required: Vec<String> = schema["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|k| k.as_str().unwrap().to_owned())
+            .collect();
+        for key in &required {
+            assert!(schema["properties"].get(key).is_some(), "{key}");
+        }
+        asked.extend(required);
+        assert!(request["max_tokens"].as_u64().unwrap() >= 12_000);
+        let document: String = request["messages"][1]["content"]
+            .as_str()
+            .unwrap()
+            .split_whitespace()
+            .collect();
+        for line in [
+            "TopSkills",
+            "Languages",
+            "Certifications",
+            "SampleUniversity",
+        ] {
+            assert!(document.contains(line), "{line}");
+        }
+    }
+    asked.sort();
+    assert_eq!(
+        asked,
+        [
+            "basics",
+            "certificates",
+            "education",
+            "languages",
+            "projects",
+            "skills",
+            "work"
+        ]
+    );
+    let rest_prompt = sent[1]["messages"][0]["content"].as_str().unwrap();
+    for word in [
+        "headline",
+        "About",
+        "Top Skills",
+        "certification",
+        "two columns",
+    ] {
+        assert!(rest_prompt.contains(word), "{word}");
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_cut_off_answer_is_asked_again_never_half_saved(db: PgPool) {
+    let (work, rest) = linkedin_answers();
+    // The positions are cut off once (what is left is even valid JSON), then
+    // come whole.
+    let model = scripted_model(vec![
+        ("length", work.to_string()),
+        ("stop", work.to_string()),
+        ("stop", rest.to_string()),
+    ])
+    .await;
+    let h = Harness::new(db, Some(gateway(&model, None)));
+    let (status, import) = import_linkedin_pdf(&h).await;
+    assert_eq!(status, 201, "{import}");
+    assert_eq!(import["draft"]["work"].as_array().unwrap().len(), 2);
+    assert_eq!(import["draft"]["skills"].as_array().unwrap().len(), 3);
+    let requests = model.received_requests().await.unwrap();
+    assert_eq!(requests.len(), 3);
+    let budgets: Vec<u64> = requests
+        .iter()
+        .map(|r| {
+            serde_json::from_slice::<Value>(&r.body).unwrap()["max_tokens"]
+                .as_u64()
+                .unwrap()
+        })
+        .collect();
+    assert!(
+        budgets[1] > budgets[0],
+        "the retry has more room: {budgets:?}"
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_answer_that_stays_cut_off_saves_nothing(db: PgPool) {
+    let (work, _) = linkedin_answers();
+    let model = scripted_model(vec![("length", work.to_string())]).await;
+    let h = Harness::new(db, Some(gateway(&model, None)));
+    let (status, problem) = import_linkedin_pdf(&h).await;
+    assert_eq!(
+        (status.as_u16(), problem["code"].as_str()),
+        (503, Some("ai_failed"))
+    );
+    assert_eq!(
+        model.received_requests().await.unwrap().len(),
+        2,
+        "one retry"
+    );
+    assert_eq!(h.count("SELECT count(*) FROM profile.imports").await, 0);
+
+    // The rest of the profile cut off is no different: positions alone are
+    // not a draft.
+    let (work, _) = linkedin_answers();
+    let model = scripted_model(vec![
+        ("stop", work.to_string()),
+        ("length", "{\"basics\":{\"name\":\"Sam".to_owned()),
+    ])
+    .await;
+    let h = Harness::new(h.db.clone(), Some(gateway(&model, None)));
+    let (status, problem) = import_linkedin_pdf(&h).await;
+    assert_eq!(
+        (status.as_u16(), problem["code"].as_str()),
+        (503, Some("ai_failed"))
+    );
     assert_eq!(h.count("SELECT count(*) FROM profile.imports").await, 0);
 }

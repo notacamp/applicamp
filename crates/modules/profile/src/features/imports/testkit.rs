@@ -151,3 +151,35 @@ pub(crate) const CV_LINES: [&str; 9] = [
     "Sample University - Master's degree, 2012 to 2017",
     "SKILLS: Rust, PostgreSQL, TypeScript. LANGUAGES: Portuguese, English",
 ];
+
+/// An invented LinkedIn profile saved as PDF, in the order a two-column
+/// layout extracts: the sidebar first, then the main column.
+pub(crate) const LINKEDIN_LINES: [&str; 27] = [
+    "Contact",
+    "www.example.com/in/sam-sample",
+    "Top Skills",
+    "Distributed systems",
+    "Rust",
+    "Team leadership",
+    "Languages",
+    "Portuguese (Native or Bilingual)",
+    "English (Full Professional)",
+    "Certifications",
+    "Cloud Basics",
+    "Sam Sample",
+    "Staff engineer building calm backends",
+    "Lisbon, Portugal",
+    "Summary",
+    "I build boring, reliable backends for small teams.",
+    "Experience",
+    "Example Org",
+    "Staff Engineer",
+    "March 2021 - Present (5 years)",
+    "Runs the billing platform.",
+    "Sample Labs",
+    "Engineer",
+    "June 2017 - February 2021 (3 years 9 months)",
+    "Education",
+    "Sample University",
+    "Master's degree, Computer science, 2012 - 2017",
+];

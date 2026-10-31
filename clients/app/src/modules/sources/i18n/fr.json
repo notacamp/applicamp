@@ -1,0 +1,255 @@
+{
+  "searchNow": "Rechercher maintenant",
+  "starting": "Démarrage…",
+  "confirm": {
+    "title": "Lancer une recherche sur les sites d’emploi ?",
+    "body": "Cette recherche coûtera environ {{cost}} d’IA pour évaluer environ {{jobs}} offres. On y va ?",
+    "go": "Rechercher",
+    "cancel": "Pas maintenant"
+  },
+  "progress": {
+    "label": "Recherche sur les sites d’emploi",
+    "queued": "Démarrage de la recherche…",
+    "running": "{{fetched}} offres lues · {{scored}} évaluées · {{added}} ajoutées"
+  },
+  "line": {
+    "running": "Recherche en cours sur les sites d’emploi…",
+    "failed": "La dernière recherche a échoué. Réessayez dans un moment.",
+    "counts": "{{fetched}} offres lues, {{added}} retenues",
+    "lastNight": "Cette nuit : {{counts}}",
+    "today": "Aujourd’hui à {{time}} : {{counts}}",
+    "on": "{{date}} : {{counts}}",
+    "cost": "IA {{cost}}",
+    "countsDropped": "{{fetched}} offres lues, {{added}} retenues, {{dropped}} écartées selon vos critères"
+  },
+  "stopped": {
+    "ai_budget_reached": "Arrêtée à la limite de dépenses d’IA. Les offres déjà évaluées sont conservées.",
+    "ai_unavailable": "Arrêtée : aucun modèle d’IA n’est configuré pour évaluer les offres.",
+    "ai_failed": "Arrêtée : le modèle d’IA n’a pas répondu. Les offres déjà évaluées sont conservées.",
+    "no_profile": "Arrêtée : configurez d’abord votre profil et vos objectifs.",
+    "sources_failed": "Arrêtée : les sites d’emploi n’ont pas pu être lus."
+  },
+  "errors": {
+    "profile_needed": "Configurez d’abord votre profil et répondez à quelques objectifs : la recherche évalue les offres par rapport à eux.",
+    "search_running": "Une recherche est déjà en cours.",
+    "search_limit_reached": "C’est la limite de recherches pour l’instant : 3 par jour, une toutes les 15 minutes.",
+    "ai_unavailable": "La recherche a besoin d’un modèle d’IA, et aucun n’est configuré ici.",
+    "ai_budget_reached": "La limite de dépenses d’IA est atteinte : aucune recherche ne peut tourner avant sa remise à zéro.",
+    "ai_daily_limit_reached": "Vous avez utilisé l’IA disponible pour aujourd’hui. Réessayez demain.",
+    "ai_failed": "Le modèle d’IA n’a pas répondu. Réessayez dans un instant.",
+    "generic": "La recherche n’a pas pu démarrer. Réessayez."
+  },
+  "spend": {
+    "month": "IA ce mois-ci : {{spent}} sur {{limit}}",
+    "monthNoLimit": "IA ce mois-ci : {{spent}}"
+  },
+  "boards": {
+    "tabs": {
+      "label": "Vue des sites d’emploi",
+      "boards": "Sites",
+      "scanned": "Analysé"
+    },
+    "loading": "Chargement des sites d’emploi…",
+    "loadFailed": "Les sites d’emploi n’ont pas pu être chargés.",
+    "retry": "Réessayer",
+    "sections": {
+      "approved": {
+        "title": "Approuvés",
+        "description": "Chaque recherche les lit, dans le respect de leurs conditions. Le salaire moyen le plus élevé d’abord.",
+        "empty": "Aucun site n’est encore approuvé."
+      },
+      "waiting": {
+        "title": "En attente de vous",
+        "description": "Trouvés par la découverte hebdomadaire ou suggérés. Rien n’y est lu avant leur approbation.",
+        "empty": "Rien ne vous attend."
+      },
+      "declined": {
+        "title": "Refusés",
+        "description": "Jamais lus, chacun avec sa raison.",
+        "empty": "Aucun site n’est refusé."
+      }
+    },
+    "status": {
+      "candidate": "En attente",
+      "approved": "Approuvé",
+      "paused": "En pause",
+      "declined": "Refusé"
+    },
+    "priority": {
+      "high": "Télétravail d’abord",
+      "low": "Priorité basse"
+    },
+    "salary": {
+      "own": "moyenne {{avg}}/an · sur {{salaried}} de {{relevant}} offres ({{share}} % indiquent un salaire)",
+      "few": "moyenne {{avg}}/an · sur {{salaried}} de {{relevant}} offres ({{share}} % indiquent un salaire)",
+      "benchmark": "≈ {{pay}}/an (référence {{country}})",
+      "none": "Pas de données de salaire",
+      "fewLabel": "Peu de salaires",
+      "noneLabel": "Pas de données de salaire"
+    },
+    "flags": "À vérifier : {{n}}",
+    "lastError": "La dernière lecture a échoué : {{error}}",
+    "lastFetch": "Lu {{when}} : {{jobs}} offres · {{matched}} correspondances cette semaine",
+    "totals": "{{label}} : {{read}} lues · {{matched}} correspondances · IA {{cost}}",
+    "fit": "correspond à vos compétences {{share}} %",
+    "suggest": {
+      "label": "Suggérer un site",
+      "button": "Suggérer",
+      "done": "{{name}} vous attend : sa vérification est en cours."
+    },
+    "errors": {
+      "not_board_owner": "Seuls les responsables des sites de cette instance peuvent faire cela.",
+      "not_waiting": "Seul un site en attente, ou en pause, peut être approuvé.",
+      "not_approved": "Seul un site approuvé peut être mis en pause.",
+      "check_needed": "Vérifiez d’abord le site : ses règles robots ne sont pas encore connues.",
+      "robots_disallowed": "Les règles robots du site interdisent de lire ce flux. Modifiez sa configuration vers un chemin autorisé.",
+      "config_invalid": "La configuration du site ne se lit pas. Modifiez-la d’abord.",
+      "invalid_config": "Cette configuration n’est pas valide pour ce site.",
+      "invalid_url": "Collez l’adresse du site, commençant par https://.",
+      "suggestion_limit_reached": "Cela fait 10 suggestions aujourd’hui. Réessayez demain.",
+      "terms_forbid": "Ses conditions interdisent la lecture automatique : il ne peut pas être approuvé.",
+      "needs_key": "Il lui faut d’abord une clé d’API : ajoutez-la ci-dessous.",
+      "no_endpoint": "Il n’a pas encore d’adresse de flux. Vérifiez le site pour en chercher une.",
+      "invalid_key": "Cette clé ne peut pas être utilisée.",
+      "no_key_needed": "Ce site n’a pas besoin de clé.",
+      "kind_locked": "Un site approuvé garde sa façon d’être lu. Mettez-le d’abord en pause.",
+      "generic": "Cela n’a pas fonctionné. Réessayez."
+    }
+  },
+  "board": {
+    "eyebrow": "Site d’emploi",
+    "close": "Fermer",
+    "status": "Statut",
+    "salary": "Salaire moyen",
+    "fitValue": "correspond à vos compétences {{share}} % ({{jobs}} offres)",
+    "fit": "Adéquation à vos compétences",
+    "priority": "Priorité",
+    "credit": "Crédité comme",
+    "endpoint": "Lu depuis",
+    "lastFetch": "Dernière lecture",
+    "lastFetchValue": "{{when}} · {{jobs}} offres",
+    "lastError": "Dernière erreur",
+    "totals": "Vos recherches",
+    "days7": "7 jours",
+    "days30": "30 jours",
+    "flagsTitle": "À vérifier",
+    "homepage": "Ouvrir le site",
+    "robots": {
+      "unchecked": "Pas encore vérifié.",
+      "none": "Pas de robots.txt : tout est autorisé.",
+      "disallowed": "Le robots.txt interdit son flux ({{rule}}).",
+      "allowed": "Le robots.txt autorise son flux."
+    },
+    "report": {
+      "title": "Ce que la vérification a trouvé",
+      "found": "Flux ou API : {{url}}",
+      "remote": "{{share}} en télétravail",
+      "worldwide": "{{share}} ouvertes au monde entier",
+      "language": "Langue du site : {{language}}",
+      "sentences": "Extraits de ses conditions",
+      "sentencesHint": "Copiés mot pour mot de la page des conditions du site.",
+      "sample": "Offres d’exemple"
+    },
+    "terms": {
+      "title": "Ses conditions",
+      "linkBack": "Un lien vers chaque offre sur le site (suivi).",
+      "applyUnchanged": "Les liens de candidature sont utilisés tels que le site les donne.",
+      "noRedistribution": "Ses offres ne sont jamais republiées.",
+      "dropExpired": "Les offres expirées quittent le pipeline.",
+      "noLogo": "Ne jamais afficher son logo.",
+      "maxFetches": "Au plus {{n}} lectures par jour."
+    },
+    "blocked": {
+      "title": "Pourquoi il ne peut pas encore être approuvé",
+      "check_needed": "Vérifiez le site avant de l’approuver : ses règles robots ne sont pas encore connues.",
+      "robots_disallowed": "Ses règles robots interdisent de le lire : {{detail}}",
+      "config_invalid": "Sa configuration ne fonctionne pas : {{detail}}",
+      "terms_forbid": "Ses conditions interdisent la lecture automatique : {{detail}}",
+      "needs_key": "Il faut une clé d’API de {{board}} : {{how}}",
+      "no_endpoint": "Il n’a pas encore d’adresse de flux. La vérification en cherche une et propose une configuration.",
+      "unknown": "Il ne peut pas encore être approuvé : {{detail}}",
+      "source": "Où c’est écrit"
+    },
+    "manage": {
+      "title": "Votre décision",
+      "approve": "Approuver",
+      "pause": "Mettre en pause",
+      "check": "Vérifier à nouveau",
+      "reason": "Pourquoi le refuser ?",
+      "decline": "Refuser",
+      "checkStarted": "La vérification est en cours. Cette page montrera ce qu’elle trouve dans une minute."
+    },
+    "key": {
+      "title": "Clé d’API",
+      "how": "{{board}} fournit une clé : {{how}}",
+      "get": "Obtenir une clé",
+      "none": "Aucune clé pour l’instant.",
+      "set": "Clé enregistrée.",
+      "setOn": "Clé enregistrée {{when}}.",
+      "field": "Clé ({{param}})",
+      "save": "Enregistrer la clé",
+      "replace": "Remplacer la clé",
+      "forget": "Retirer la clé"
+    },
+    "proposal": {
+      "title": "Configuration proposée",
+      "description": "La vérification a trouvé {{kind}}. Utilisez-la comme configuration du site, ou écrivez-en une sous Avancé.",
+      "address": "Lu depuis",
+      "items": "Offres dans",
+      "use": "Utiliser cette configuration",
+      "kind": {
+        "json_api": "une API JSON",
+        "rss": "un flux RSS",
+        "jsonld_sitemap": "des offres dans son sitemap",
+        "hn": "le fil HN"
+      },
+      "fields": {
+        "title": "Titre",
+        "company": "Entreprise",
+        "url": "Lien",
+        "apply_url": "Lien de candidature",
+        "location": "Lieu",
+        "regions": "Qui peut postuler",
+        "description": "Description",
+        "posted_at": "Publiée",
+        "expires_at": "Expire",
+        "salary_min": "Salaire à partir de",
+        "salary_max": "Salaire jusqu’à",
+        "salary_currency": "Devise",
+        "salary_period": "Période du salaire",
+        "salary_text": "Salaire",
+        "work_mode": "Mode de travail",
+        "ref": "Id"
+      }
+    },
+    "config": {
+      "label": "Configuration (JSON)",
+      "hint": "Comment le site est lu : son endpoint, ses pages, l’intervalle entre deux lectures et le mappage des champs.",
+      "save": "Enregistrer la configuration",
+      "notJson": "Ce n’est pas du JSON valide.",
+      "notObject": "La configuration est un objet JSON.",
+      "advanced": "Avancé : modifier la configuration en JSON"
+    }
+  },
+  "scanned": {
+    "lead": "Ce que chaque recherche et la découverte hebdomadaire ont analysé, site par site.",
+    "filter": "Site",
+    "allBoards": "Tous les sites",
+    "loading": "Chargement de ce qui a été analysé…",
+    "loadFailed": "Ce qui a été analysé n’a pas pu être chargé.",
+    "emptyTitle": "Rien d’analysé pour l’instant",
+    "emptyBody": "Après une recherche, chaque site lu apparaît ici : offres lues, conformes à vos exigences, notées par l’IA, correspondances et coût de l’IA.",
+    "more": "Afficher les précédentes",
+    "today": "Aujourd’hui {{time}}",
+    "discovery": "{{at}} · découverte",
+    "search": "{{at}} · {{kind}} · {{cost}}",
+    "nightlySearch": "recherche de nuit",
+    "manualSearch": "recherche",
+    "line": {
+      "read": "{{name}} : {{read}} lues → {{passed}} conformes à vos exigences → {{scored}} notées par l’IA → {{matched}} correspondances · IA {{cost}}",
+      "skipped": "{{name}} : ignoré (limite de lecture), sa dernière réponse utilisée : {{read}} lues → {{passed}} conformes → {{scored}} notées → {{matched}} correspondances",
+      "error": "{{name}} : lecture impossible ({{error}})",
+      "checked": "{{name}} : vérifié · {{note}}"
+    }
+  }
+}

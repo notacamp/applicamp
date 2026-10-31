@@ -1,5 +1,7 @@
 # The e2e stack: compose.yml with a fake Campbooks to sign in with
-# (clients/app/scripts/fake-oidc.ts), which approves every sign-in at once.
+# (clients/app/scripts/fake-oidc.ts), which approves every sign-in at once,
+# and a fake job board and AI model (clients/app/scripts/fake-jobs.ts), which
+# list invented jobs and score them, so Search now runs end to end.
 # Tests only, never a real instance.
 #
 #   printf 'POSTGRES_PASSWORD=e2e-only\n' > .env
@@ -35,6 +37,36 @@ services:
       timeout: 5s
       retries: 30
 
+  fake-jobs:
+    image: node:22-bookworm-slim
+    command: ["node", "/fake-jobs/fake-jobs.mts"]
+    # The waiting boards' sites (deploy/fake-jobs/job_boards.toml), each at
+    # its own host name, so each has its own robots rules and registry row.
+    networks:
+      default:
+        aliases:
+          - seeded-board.test
+          - keyed-board.test
+          - feed-site-desktop.test
+          - feed-site-phone.test
+          # A company's own site (#34): a posting pasted at
+          # http://example-co.test:9020/jobs/staff-engineer.
+          - example-co.test
+    environment:
+      FAKE_JOBS_HOST: 0.0.0.0
+      FAKE_JOBS_PORT: "9020"
+    volumes:
+      - ../clients/app/scripts/fake-jobs.ts:/fake-jobs/fake-jobs.mts:ro
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:9020/healthz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
   server:
     environment:
       APPLICAMP_PUBLIC_URL: http://localhost:8080
@@ -42,8 +74,30 @@ services:
       APPLICAMP_OIDC__CAMPBOOKS__CLIENT_ID: applicamp-e2e
       # Inline, for the fake only; real secrets are files (deploy/secrets).
       APPLICAMP_OIDC__CAMPBOOKS__CLIENT_SECRET: e2e-only-secret
+      # The job search reads only the fake's job boards (one approved, the
+      # others waiting for the demo person, who owns the boards; never
+      # discovery; the waiting ones are checked at start),
+      # and scores with the fake model; no limit spaces the searches of the
+      # two test projects. The company board stays off, as by default.
+      APPLICAMP_SOURCES__JOB_BOARDS_FILE: /fake-jobs/job_boards.toml
+      APPLICAMP_SOURCES__ALLOW_PRIVATE_HOSTS: "true"
+      APPLICAMP_SOURCES__DISCOVERY: "false"
+      APPLICAMP_SOURCES__BOARD_OWNERS: demo@example.com
+      APPLICAMP_SOURCES__GREENHOUSE_URL: http://fake-jobs:9020
+      APPLICAMP_SOURCES__BOARDS_FILE: /fake-jobs/boards.toml
+      APPLICAMP_SOURCES__CACHE_SECS: "0"
+      APPLICAMP_SOURCES__MANUAL_PER_DAY: "0"
+      APPLICAMP_SOURCES__MANUAL_EVERY_SECS: "0"
+      APPLICAMP_SOURCES__NIGHTLY: "false"
+      APPLICAMP_AI__COMPLETE__BASE_URL: http://fake-jobs:9020/v1
+      APPLICAMP_AI__COMPLETE__MODEL: fake/model
+    volumes:
+      - ./fake-jobs/boards.toml:/fake-jobs/boards.toml:ro
+      - ./fake-jobs/job_boards.toml:/fake-jobs/job_boards.toml:ro
     depends_on:
       fake-oidc:
+        condition: service_healthy
+      fake-jobs:
         condition: service_healthy
     # The image's check, more often, so the stack reports healthy sooner.
     healthcheck:

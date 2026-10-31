@@ -138,6 +138,7 @@ fn from_files(files: &[(String, String)]) -> Profile {
                 end_date: row.date("Finished On"),
                 summary: row.get("Description"),
                 highlights: Vec::new(),
+                facts: Vec::new(),
             })),
             "education.csv" => profile.education.extend(table.rows().filter_map(|row| {
                 Some(Education {

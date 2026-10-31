@@ -1,0 +1,865 @@
+// A tiny fake of the outside world a job search reads, for the e2e stack and
+// a laptop demo: a remote job board shaped like Himalayas' JSON API (the job
+// board the search reads), a Greenhouse company board (off in searches by
+// default, kept for watchers), and an OpenAI-compatible model that scores
+// every job it is shown. Never for production: its jobs and scores are
+// invented.
+//
+//   node scripts/fake-jobs.ts
+//
+// Settings (environment):
+//   FAKE_JOBS_PORT   port to listen on (9020)
+//   FAKE_JOBS_HOST   address to bind (127.0.0.1; 0.0.0.0 in a container)
+//
+// Point the server at it with (deploy/fake-jobs/job_boards.toml names the
+// fake board, at http://fake-jobs:9020; for a laptop, copy it with
+// localhost:9020):
+//   APPLICAMP_SOURCES__JOB_BOARDS_FILE=<that job_boards.toml>
+//   APPLICAMP_SOURCES__ALLOW_PRIVATE_HOSTS=true
+//   APPLICAMP_SOURCES__DISCOVERY=false
+//   APPLICAMP_SOURCES__BOARD_OWNERS=<your address, to approve boards>
+//   APPLICAMP_AI__COMPLETE__BASE_URL=http://localhost:9020/v1
+//   APPLICAMP_AI__COMPLETE__MODEL=fake/model
+//
+// Boards waiting for the owner (#26), each at its own host name (aliases of
+// this fake on the e2e network), every one with robots rules that allow it:
+//   seeded-board.test     a JSON API the seed list names: checked at start,
+//                         then approvable;
+//   keyed-board.test      a JSON API that answers only with the key `e2e-key`;
+//   feed-site-<p>.test    a site with no config whose homepage links its RSS
+//                         feed: the check proposes a config (one per
+//                         Playwright project, desktop and phone).
+//
+// The company and job facts of a tailored CV (#34): example-co.test is a
+// company's own site (an alias of this fake on the e2e network, so a pasted
+// posting at http://example-co.test:9020/jobs/staff-engineer is a link to a
+// site that is not a job board). Its robots.txt forbids /private, which the
+// home page links to anyway and which must never be read; the model reads the
+// pages it is shown and answers with facts quoting them (plus one whose quote
+// is on no page, which the server drops), then with what the posting wants
+// and up to three questions; an answer about a job becomes facts quoting it.
+//
+// The tailored CV (#37): the model answers the CV prompt ("You write a
+// one-page CV…") from the sources it is shown, by fixed rules: a bullet
+// reworded from a kept fact, a highlight word for word, a bullet with a number
+// no source says (it is flagged), a bullet that cites a company fact outside
+// the summary (flagged), a summary that cites a company fact, a skill that is
+// not on the profile (flagged), and every position after the second left out.
+//
+// Every list answers with four new jobs (new ids each time); a board keeps to
+// its polling interval, so a search within it reads the last answer. The
+// fourth is remote only from Germany or Austria, in the words of the posting
+// that made #19: the model reads that fact and the search drops it ("… 1
+// dropped for your requirements") for someone who works remote only from
+// Portugal.
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+
+const env = process.env;
+const port = Number(env["FAKE_JOBS_PORT"] ?? "9020");
+const host = env["FAKE_JOBS_HOST"] ?? "127.0.0.1";
+
+/** The invented roles every board lists; the last is open only to Germany and Austria. */
+const ROLES = [
+  "Staff Engineer",
+  "Founding Engineer",
+  "Platform Engineer",
+  "Staff Engineer (m/w/d)",
+] as const;
+
+/** The role at `index` is the one remote only from Germany or Austria. */
+const DACH = ROLES.length - 1;
+
+let lists = 0;
+
+interface FakeJob {
+  id: number;
+  title: string;
+  updated_at: string;
+  first_published: string;
+  location: { name: string };
+  absolute_url: string;
+  company_name: string;
+}
+
+function job(id: number, title: string): FakeJob {
+  const now = new Date().toISOString();
+  return {
+    id,
+    title,
+    updated_at: now,
+    first_published: now,
+    location: { name: title === ROLES[DACH] ? "Berlin" : "Remote - Europe" },
+    absolute_url: `https://example.com/jobs/${String(id)}`,
+    company_name: "Example Co",
+  };
+}
+
+/** HTML as Greenhouse sends it: entity-escaped. */
+function escaped(html: string): string {
+  return html
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function json(response: ServerResponse, status: number, body: unknown) {
+  response.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
+  response.end(JSON.stringify(body));
+}
+
+async function body(request: IncomingMessage): Promise<string> {
+  let text = "";
+  for await (const chunk of request) {
+    text += String(chunk);
+    if (text.length > 2 * 1024 * 1024) {
+      break;
+    }
+  }
+  return text;
+}
+
+/** A posting in the scoring request's `<jobs>` block. */
+interface Posting {
+  ref?: string;
+  posting?: string;
+}
+
+/** The postings of the last user message's `<jobs>` block. */
+function postingsOf(content: string): Posting[] {
+  const block = content.split("<jobs>", 2)[1]?.split("</jobs>", 1)[0] ?? "[]";
+  try {
+    const parsed: unknown = JSON.parse(block);
+    return Array.isArray(parsed) ? (parsed as Posting[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** The eligibility facts of a posting, as a model reads them from its words. */
+function factsOf(posting: Posting) {
+  return (posting.posting ?? "").includes("Deutschland oder Österreich")
+    ? {
+        remote: "yes",
+        open_to_candidate: "no",
+        region_note: "Germany or Austria only",
+        working_languages: ["en"],
+        salary: null,
+      }
+    : {
+        remote: "yes",
+        open_to_candidate: "yes",
+        region_note: "Europe",
+        working_languages: ["en"],
+        salary: null,
+      };
+}
+
+/** A position as the profile review is shown it. */
+interface ReviewPosition {
+  index: number;
+  title?: string | null;
+  company?: string | null;
+  summary?: string | null;
+  highlights?: string[];
+}
+
+/** The profile as the review is shown it (no name, no contact details). */
+interface ReviewView {
+  headline?: string | null;
+  summary?: string | null;
+  positions?: ReviewPosition[];
+  skills?: string[];
+  education?: unknown[];
+  links?: number;
+}
+
+/** Skills the review looks for in the positions' words. */
+const KNOWN_SKILLS = ["Rust", "PostgreSQL", "Kafka", "Terraform", "Kubernetes"] as const;
+
+/** The text between `<tag>` and `</tag>` in `content`. */
+function between(content: string, tag: string): string {
+  return content.split(`<${tag}>`, 2)[1]?.split(`</${tag}>`, 1)[0]?.trim() ?? "";
+}
+
+/**
+ * The profile review (system prompt "You review a person's job-search
+ * profile…"): a question for each gap it can see, and the skills the
+ * positions mention that the skills list lacks.
+ */
+function gapReview(userContent: string) {
+  let view: ReviewView = {};
+  try {
+    view = JSON.parse(between(userContent, "profile")) as ReviewView;
+  } catch {
+    // An unreadable profile has no gaps to name.
+  }
+  const positions = view.positions ?? [];
+  const questions: {
+    section: string;
+    role_ref: number | null;
+    question: string;
+    why: string;
+  }[] = [];
+  for (const position of positions.slice(0, 3)) {
+    if ((position.highlights ?? []).length === 0) {
+      questions.push({
+        section: "work",
+        role_ref: position.index,
+        question: `What did you ship at ${position.company ?? "that company"} that you are proud of?`,
+        why: "Your recent role has no results yet.",
+      });
+    }
+  }
+  if ((view.headline ?? "") === "") {
+    questions.push({
+      section: "basics.label",
+      role_ref: null,
+      question: "In one line, what do you want to be known for?",
+      why: "There is no headline yet.",
+    });
+  }
+  if ((view.summary ?? "") === "") {
+    questions.push({
+      section: "basics.summary",
+      role_ref: null,
+      question: "What do you do best, in three or four sentences?",
+      why: "There is no summary yet.",
+    });
+  }
+  const listed = new Set((view.skills ?? []).map((skill) => skill.toLowerCase()));
+  const skills_in_roles = KNOWN_SKILLS.filter((name) => !listed.has(name.toLowerCase()))
+    .map((name) => ({
+      name,
+      roles: positions
+        .filter((position) =>
+          [position.title, position.summary, ...(position.highlights ?? [])]
+            .join(" ")
+            .toLowerCase()
+            .includes(name.toLowerCase()),
+        )
+        .map((position) => position.index),
+    }))
+    .filter((skill) => skill.roles.length > 0);
+  return { questions, skills_in_roles };
+}
+
+/**
+ * A draft from an answer (system prompt "You turn a person's answer…"): the
+ * answer's own sentences, so it says nothing the answer does not.
+ */
+function draftOf(system: string, userContent: string) {
+  const answer = between(userContent, "answer");
+  const sentences = answer
+    .split(/[.;]\s+|\n/)
+    .map((sentence) => sentence.trim().replace(/\.$/, ""))
+    .filter((sentence) => sentence !== "");
+  if (system.includes("achievements for the position")) {
+    return { items: sentences.slice(0, 3), education: null };
+  }
+  if (system.includes("exactly one headline")) {
+    return { items: sentences.slice(0, 1), education: null };
+  }
+  if (system.includes("exactly one summary")) {
+    return { items: [answer], education: null };
+  }
+  return { items: [], education: null };
+}
+
+/** The seven areas "Grill me" works through, in order. */
+const GRILL_AREAS = [
+  "context",
+  "your_part",
+  "stack_scale",
+  "results",
+  "hard_problems",
+  "people",
+  "stories",
+] as const;
+
+/** What the fake interviewer asks about each area. */
+const GRILL_QUESTIONS: Record<(typeof GRILL_AREAS)[number], (company: string) => string> = {
+  context: (company) => `What did ${company} sell, to whom, and how big was the team?`,
+  your_part: () => "What did you do yourself, as against the rest of the team?",
+  stack_scale: () => "Which tools did you use, and how much data or traffic did they carry?",
+  results: () => "What changed because of your work? Give a number, and say how you know it.",
+  hard_problems: () => "What was the hardest problem, and what did you do about it?",
+  people: () => "Who did you lead, mentor or hire, and what changed for them?",
+  stories: () => "Which moment here would you tell in an interview?",
+};
+
+/** `JSON.parse` of the text between `<tag>` tags, or `fallback`. */
+function parsedBetween<T>(content: string, tag: string, fallback: T): T {
+  try {
+    return JSON.parse(between(content, tag)) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * The interviewer (system prompt "You are interviewing a person about one
+ * position…"): the first question of the first area not covered; an answer
+ * without a digit is pushed back on; an answer with one yields up to three
+ * facts quoted from it (plus one the quote check must drop), marks the area
+ * covered and asks about the next.
+ */
+function interview(userContent: string) {
+  const event = between(userContent, "event");
+  const answer = between(userContent, "answer");
+  const coverage = parsedBetween<Record<string, string>>(userContent, "coverage", {});
+  const skipped = parsedBetween<string[]>(userContent, "skipped", []);
+  const role = parsedBetween<{ company?: string | null }>(userContent, "role", {});
+  const company = role.company ?? "the company";
+  const open = GRILL_AREAS.filter((area) => coverage[area] !== "ok" && !skipped.includes(area));
+  const current = open[0];
+  const ask = (area: (typeof GRILL_AREAS)[number] | undefined, push: boolean) =>
+    area === undefined ? null : { question: GRILL_QUESTIONS[area](company), area, push };
+
+  if (event !== "answer" || current === undefined) {
+    return { facts: [], coverage: [], next: ask(current, false), conflict: null };
+  }
+  if (!/\d/.test(answer)) {
+    return {
+      facts: [],
+      coverage: [],
+      next: {
+        question:
+          "That won’t hold up in an interview. Who decided, how many people were involved, and how long did it take?",
+        area: current,
+        push: true,
+      },
+      conflict: null,
+    };
+  }
+  const quotes = answer
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.replace(/[.!?]+$/, "").trim())
+    .filter((sentence) => sentence !== "")
+    .slice(0, 3);
+  const facts = [
+    ...quotes.map((quote) => ({ text: quote, quote, area: current })),
+    // Never said: the quote check drops it, and the person is told a line was left out.
+    { text: "Saved the company 30% of its costs", quote: "we saved 30% of costs", area: current },
+  ];
+  return {
+    facts,
+    coverage: [{ area: current, level: "ok" }],
+    next: ask(open[1], false),
+    conflict: null,
+  };
+}
+
+/** An OpenAI-compatible chat completion whose message is `content` (as JSON text). */
+function completion(content: unknown) {
+  return {
+    id: `fake-${String(Date.now())}`,
+    object: "chat.completion",
+    model: "fake/model",
+    choices: [
+      {
+        index: 0,
+        message: { role: "assistant", content: JSON.stringify(content) },
+        finish_reason: "stop",
+      },
+    ],
+    usage: { prompt_tokens: 1200, completion_tokens: 300, total_tokens: 1500, cost: 0.0004 },
+  };
+}
+
+/**
+ * Answers a chat completion as the model would, by what it is asked: the
+ * profile review, a draft from an answer, or (any other) the scoring of
+ * every posting of the last user message, with its facts.
+ */
+async function complete(request: IncomingMessage, response: ServerResponse) {
+  let postings: Posting[] = [];
+  try {
+    const parsed = JSON.parse(await body(request)) as {
+      messages?: { role?: string; content?: string }[];
+    };
+    const messages = parsed.messages ?? [];
+    const system = messages.find((message) => message.role === "system")?.content ?? "";
+    const user = messages.findLast((message) => message.role === "user");
+    if (system.startsWith("You review a person's job-search profile")) {
+      json(response, 200, completion(gapReview(user?.content ?? "")));
+      return;
+    }
+    if (system.startsWith("You are interviewing a person about one position")) {
+      json(response, 200, completion(interview(user?.content ?? "")));
+      return;
+    }
+    if (system.startsWith("You read pages from a company")) {
+      json(response, 200, completion(companyFacts(user?.content ?? "")));
+      return;
+    }
+    if (system.startsWith("You compare a job posting")) {
+      json(response, 200, completion(jobAnalysis(user?.content ?? "")));
+      return;
+    }
+    if (system.startsWith("You write a one-page CV")) {
+      json(response, 200, completion(tailoredCv(user?.content ?? "")));
+      return;
+    }
+    if (system.startsWith("You read a person's answer to one question about a job")) {
+      json(response, 200, completion(jobAnswer(user?.content ?? "")));
+      return;
+    }
+    if (system.startsWith("You turn a person's answer")) {
+      json(response, 200, completion(draftOf(system, user?.content ?? "")));
+      return;
+    }
+    postings = postingsOf(user?.content ?? "").filter((posting) => (posting.ref ?? "") !== "");
+  } catch {
+    json(response, 400, { error: { message: "not JSON" } });
+    return;
+  }
+  const jobs = postings.map((posting, index) => ({
+    ref: posting.ref,
+    match: 90 - ((index * 7) % 21),
+    why: ["Your roles name this one", "Remote within Europe, as you asked"],
+    gaps: ["The posting asks for on-call duty; your profile does not mention it"],
+    ...factsOf(posting),
+  }));
+  json(response, 200, completion({ jobs }));
+}
+
+/** A job as Himalayas' API lists it (`/jobs/api`), with the posting's words. */
+function remoteJob(id: number, title: string) {
+  const dach = title === ROLES[DACH];
+  const slug = `${title.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-")}-${String(id)}`;
+  const seconds = Math.floor(Date.now() / 1000);
+  return {
+    title,
+    excerpt: "Example Co builds invented software for invented customers.",
+    companyName: "Example Co",
+    companySlug: "example-co",
+    employmentType: "Full Time",
+    minSalary: dach ? 70_000 : 110_000,
+    maxSalary: dach ? 90_000 : 140_000,
+    currency: "EUR",
+    salaryPeriod: "annual",
+    seniority: ["Senior"],
+    locationRestrictions: [],
+    timezoneRestrictions: [],
+    categories: ["Software-Engineer"],
+    description: `<p>Example Co builds invented software for invented customers.</p><ul><li>Work with a small team</li>${
+      dach
+        ? "<li>Standort: Remote-first aus Deutschland oder Österreich</li>"
+        : "<li>Remote within Europe</li>"
+    }</ul>`,
+    pubDate: seconds,
+    expiryDate: seconds + 30 * 24 * 3600,
+    applicationLink: `https://example.com/apply/${String(id)}?utm_source=api`,
+    guid: `https://example.com/remote-board/jobs/${slug}`,
+  };
+}
+
+/** A few invented jobs of a waiting board, as a JSON API lists them. */
+function waitingJobs(site: string) {
+  return {
+    jobs: ["Senior Backend Engineer", "Staff Platform Engineer"].map((title, index) => ({
+      id: `${site}-${String(index + 1)}`,
+      title,
+      company: "Example Co",
+      url: `https://example.com/${site}/jobs/${String(index + 1)}`,
+      location: "Remote",
+    })),
+  };
+}
+
+/** The same jobs as an RSS feed. */
+function waitingFeed(site: string): string {
+  const items = waitingJobs(site)
+    .jobs.map(
+      (job) =>
+        `<item><title>${job.title}</title><link>${job.url}</link><guid>${job.id}</guid>` +
+        `<description>Invented.</description></item>`,
+    )
+    .join("");
+  return `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel>${items}</channel></rss>`;
+}
+
+function text(response: ServerResponse, type: string, body: string) {
+  response.writeHead(200, { "content-type": type, "cache-control": "no-store" });
+  response.end(body);
+}
+
+/** A waiting board's site, by its host name; whether it answered. */
+function waitingBoard(site: string, url: URL, response: ServerResponse): boolean {
+  if (url.pathname === "/robots.txt") {
+    text(response, "text/plain", "User-agent: *\nDisallow: /private\n");
+    return true;
+  }
+  if (site.startsWith("feed-site-")) {
+    if (url.pathname === "/") {
+      text(
+        response,
+        "text/html",
+        `<html lang="en"><head><link rel="alternate" type="application/rss+xml" href="/jobs.rss"></head><body>Invented jobs.</body></html>`,
+      );
+      return true;
+    }
+    if (url.pathname === "/jobs.rss") {
+      text(response, "application/rss+xml", waitingFeed(site));
+      return true;
+    }
+    return false;
+  }
+  if (url.pathname === "/") {
+    text(response, "text/html", `<html lang="en"><body>Invented jobs.</body></html>`);
+    return true;
+  }
+  if (url.pathname === "/api/jobs") {
+    if (site === "keyed-board.test" && url.searchParams.get("api_key") !== "e2e-key") {
+      json(response, 401, { error: "API key required." });
+      return true;
+    }
+    console.log(`fake-jobs: listed the waiting board ${site}`);
+    json(response, 200, waitingJobs(site));
+    return true;
+  }
+  return false;
+}
+
+/** The company's own site (#34): invented, at its own host name. */
+const COMPANY_HOST = "example-co.test";
+
+const COMPANY_PAGES: Record<string, string> = {
+  "/": `<html><head><title>Example Co</title></head><body><h1>Example Co</h1>
+    <p>Example Co builds invented ledgers for small shops.</p>
+    <nav><a href="/about">About us</a> <a href="/customers">Customers</a>
+    <a href="/blog/hotwire">Engineering blog</a> <a href="/contact">Contact</a>
+    <a href="/private/roadmap">Customers roadmap</a>
+    <a href="http://elsewhere.test/about">About them</a></nav></body></html>`,
+  "/about": `<html><body><h1>About us</h1><p>Founded in an invented year. We are 40 people in Porto.</p></body></html>`,
+  "/customers": `<html><body><h1>Customers</h1><p>Our customers are small shops and cafés in Portugal and Spain.</p></body></html>`,
+  "/blog/hotwire": `<html><body><h1>Why we left React</h1><p>In March 2026 we started moving our dashboard from React to Hotwire.</p></body></html>`,
+  "/contact": `<html><body><p>Write to hello at example-co dot test.</p></body></html>`,
+  // Forbidden by robots.txt: the server must never ask for it.
+  "/private/roadmap": `<html><body><p>SECRET ROADMAP: never read.</p></body></html>`,
+};
+
+/**
+ * The posting (`/jobs/staff-engineer`): it asks for a skill in production,
+ * Hotwire unless `?skill=` names another (a test that puts a skill away asks
+ * for one of its own, so the next run still has its question).
+ */
+function posting(skill: string): string {
+  return `<html><body><h1>Staff Engineer</h1>
+    <p>You will own billing at Example Co.</p>
+    <ul><li>5+ years of Rails required</li><li>${skill} in production</li><li>Kafka is a plus</li></ul></body></html>`;
+}
+
+/** The company's site, by its host name; whether it answered. */
+function companySite(url: URL, response: ServerResponse): boolean {
+  if (url.pathname === "/jobs/staff-engineer") {
+    const skill = (url.searchParams.get("skill") ?? "Hotwire").replaceAll(/[^\w-]/g, "");
+    text(response, "text/html", posting(skill === "" ? "Hotwire" : skill));
+    return true;
+  }
+  if (url.pathname === "/robots.txt") {
+    text(response, "text/plain", "User-agent: *\nDisallow: /private\n");
+    return true;
+  }
+  const page = COMPANY_PAGES[url.pathname];
+  if (page === undefined) {
+    return false;
+  }
+  if (url.pathname.startsWith("/private")) {
+    console.log("fake-jobs: a page robots.txt forbids was asked for!");
+  }
+  text(response, "text/html", page);
+  return true;
+}
+
+/** The `<page url="…">` blocks of the company prompt's user message. */
+function pagesOf(content: string): { url: string; text: string }[] {
+  return [...content.matchAll(/<page url="([^"]*)">\n([\s\S]*?)\n<\/page>/g)].map((match) => ({
+    url: match[1] ?? "",
+    text: match[2] ?? "",
+  }));
+}
+
+/** What the fake company reader finds on a page, as `[fact, words on the page]`. */
+const COMPANY_FACTS: readonly [string, string][] = [
+  ["Builds ledgers for small shops", "builds invented ledgers for small shops"],
+  ["Has about 40 people, in Porto", "We are 40 people in Porto"],
+  [
+    "Sells to small shops and cafés in Portugal and Spain",
+    "small shops and cafés in Portugal and Spain",
+  ],
+  ["Is moving its dashboard from React to Hotwire", "moving our dashboard from React to Hotwire"],
+];
+
+/**
+ * The company reader (system prompt "You read pages from a company's own
+ * website…"): a fact for each known sentence the pages hold, quoted from the
+ * page it is on, plus one whose quote is on no page, which the server drops.
+ */
+function companyFacts(userContent: string) {
+  const pages = pagesOf(userContent);
+  const facts = COMPANY_FACTS.flatMap(([fact, quote]) => {
+    const page = pages.find((candidate) => candidate.text.includes(quote));
+    return page === undefined ? [] : [{ text: fact, quote, url: page.url }];
+  });
+  const about = pages.find((page) => page.url.endsWith("/about"));
+  return {
+    facts:
+      about === undefined
+        ? facts
+        : [...facts, { text: "Has 900 employees", quote: "We are 900 people", url: about.url }],
+  };
+}
+
+/**
+ * The job reader (system prompt "You compare a job posting…"): what the
+ * posting asks for, quoting it, and up to three questions: the Hotwire one
+ * (a skill, on the first position), one about owning billing (no position
+ * named) and a Kafka one (no skill, no position).
+ */
+function jobAnalysis(userContent: string) {
+  const posting = between(userContent, "posting");
+  const profile = parsedBetween<{ positions?: { index: number }[] }>(userContent, "profile", {});
+  const first = profile.positions?.[0]?.index ?? null;
+  const skill = /([\w-]+) in production/.exec(posting)?.[1] ?? "Hotwire";
+  const dismissed = parsedBetween<string[]>(userContent, "dismissed", []);
+  const wants = (
+    [
+      ["Rails", "5+ years of Rails required", "must"],
+      [`${skill} in production`, `${skill} in production`, "must"],
+      ["Kafka", "Kafka is a plus", "nice"],
+    ] as const
+  )
+    .filter(([, quote]) => posting.includes(quote))
+    .map(([label, quote, level]) => ({ label, quote, level }));
+  const questions = [
+    {
+      question: `They are moving from React to Hotwire (their blog). Have you worked with ${skill}?`,
+      about: first,
+      skill,
+    },
+    {
+      question: "The posting says you will own billing. What did you own at your last job?",
+      about: null,
+      skill: null,
+    },
+    {
+      question: "Kafka is a plus for this job. Have you run it in production?",
+      about: null,
+      skill: null,
+    },
+  ].filter(
+    (question) =>
+      (question.skill === null || !dismissed.includes(question.skill.toLowerCase())) &&
+      (wants.length > 0 || question.skill === null),
+  );
+  return { wants, questions };
+}
+
+/**
+ * An answer about a job (system prompt "You read a person's answer to one
+ * question about a job opening…"): up to three facts quoted from the answer,
+ * plus one whose quote the answer never says, which the server drops.
+ */
+function jobAnswer(userContent: string) {
+  const answer = between(userContent, "answer");
+  const quotes = answer
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.replace(/[.!?]+$/, "").trim())
+    .filter((sentence) => sentence !== "")
+    .slice(0, 3);
+  return {
+    facts: [
+      ...quotes.map((quote) => ({ text: quote, quote, area: "your_part" })),
+      {
+        text: "Saved the company 30% of its costs",
+        quote: "we saved 30% of costs",
+        area: "results",
+      },
+    ],
+  };
+}
+
+/** A source of the CV prompt: `[w0.h1] text`. */
+interface CvSource {
+  id: string;
+  text: string;
+}
+
+/** The `[id] text` lines of the CV prompt's user message. */
+function cvSourcesOf(content: string): CvSource[] {
+  return [...content.matchAll(/^\[([^\]\s]+)\] (.+)$/gm)].map((match) => ({
+    id: match[1] ?? "",
+    text: match[2] ?? "",
+  }));
+}
+
+/** `text` with its first whole number changed to one no source has. */
+function wrongNumber(text: string): string {
+  const number = /\b(\d+)\b/.exec(text);
+  if (number === null) {
+    return `${text.replace(/[.!?]+$/, "")} by 37%`;
+  }
+  const wrong = String(Number(number[1]) + 17);
+  return text.replace(number[0], wrong);
+}
+
+/**
+ * The CV writer (system prompt "You write a one-page CV…"): the rules at the
+ * head of this script, deterministic from the sources it is shown.
+ */
+function tailoredCv(userContent: string) {
+  const sources = cvSourcesOf(userContent);
+  const company = /^Company: (.+)$/m.exec(userContent)?.[1]?.trim() ?? "";
+  const positions = [...userContent.matchAll(/<position id="w(\d+)"/g)].map((match) =>
+    Number(match[1]),
+  );
+  const of = (position: number, kind: string) =>
+    sources.filter((source) => source.id.startsWith(`w${String(position)}.${kind}`));
+  const companyFact = sources.find((source) => /^c[0-9a-z]+$/.test(source.id));
+  const headline = sources.find((source) => source.id === "hl");
+  const [first, second] = positions;
+  const highlights = first === undefined ? [] : of(first, "h");
+  const facts = first === undefined ? [] : of(first, "f");
+  const stripped = (text: string) => text.replace(/[.!?]+$/, "");
+
+  const bullets: { text: string; sources: string[] }[] = [];
+  const kept = facts[0];
+  if (kept !== undefined) {
+    bullets.push({ text: `Delivered: ${stripped(kept.text)}`, sources: [kept.id] });
+  }
+  const one = highlights[0];
+  if (one !== undefined) {
+    bullets.push({ text: one.text, sources: [one.id] });
+  }
+  const counted = highlights.find((source) => /\d/.test(source.text)) ?? one;
+  if (counted !== undefined) {
+    // A number no source says: the check flags it.
+    bullets.push({ text: wrongNumber(counted.text), sources: [counted.id] });
+  }
+  const two = highlights[1];
+  if (two !== undefined && companyFact !== undefined) {
+    // A company fact used as the person's own achievement: the check flags it.
+    bullets.push({
+      text: `${stripped(two.text)} for customers like those of ${company}`,
+      sources: [two.id, companyFact.id],
+    });
+  }
+  const experience: { position: number; bullets: { text: string; sources: string[] }[] }[] = [];
+  if (first !== undefined) {
+    experience.push({ position: first, bullets });
+  }
+  const older = second === undefined ? undefined : of(second, "h")[0];
+  if (second !== undefined && older !== undefined) {
+    experience.push({ position: second, bullets: [{ text: older.text, sources: [older.id] }] });
+  }
+  const skills = (sources.find((source) => source.id === "sk")?.text ?? "")
+    .split(",")
+    .map((skill) => skill.trim())
+    .filter((skill) => skill !== "");
+  return {
+    headline: {
+      text: headline?.text ?? "Software engineer",
+      sources: headline === undefined ? [] : ["hl"],
+    },
+    summary: {
+      text: [
+        one === undefined ? "" : `${stripped(one.text)}.`,
+        companyFact === undefined ? "" : `A fit for what ${company} builds.`,
+      ]
+        .filter((part) => part !== "")
+        .join(" "),
+      sources: [...(one === undefined ? [] : [one.id]), ...(companyFact ? [companyFact.id] : [])],
+    },
+    experience,
+    // One skill the profile does not list: the check flags it.
+    skills: [...skills, "Kubernetes"],
+  };
+}
+
+const server = createServer((request, response) => {
+  const url = new URL(request.url ?? "/", `http://${host}:${String(port)}`);
+  const method = request.method ?? "GET";
+  const site = (request.headers.host ?? "").split(":", 1)[0] ?? "";
+  if (method === "GET" && site === COMPANY_HOST && companySite(url, response)) {
+    return;
+  }
+  if (method === "GET" && site.endsWith(".test") && waitingBoard(site, url, response)) {
+    return;
+  }
+  const board = /^\/v1\/boards\/([\w-]+)\/jobs\/?$/.exec(url.pathname);
+  const posting = /^\/v1\/boards\/([\w-]+)\/jobs\/(\d+)$/.exec(url.pathname);
+  if (method === "GET" && board !== null) {
+    lists += 1;
+    const base = Date.now() * 10 + lists;
+    console.log(`fake-jobs: listed board ${board[1] ?? ""}`);
+    json(response, 200, {
+      jobs: ROLES.map((title, index) => job(base * 10 + index, title)),
+      meta: { total: ROLES.length },
+    });
+    return;
+  }
+  if (method === "GET" && url.pathname === "/himalayas/jobs/api/search") {
+    // The remote board's keyword search (#28): one job naming the keyword.
+    const keyword = url.searchParams.get("q") ?? "";
+    console.log(`fake-jobs: searched the remote board for "${keyword}"`);
+    json(response, 200, {
+      offset: 0,
+      limit: 20,
+      totalCount: 1,
+      jobs: [remoteJob(7000 + keyword.length, `Senior ${keyword} Engineer`)],
+    });
+    return;
+  }
+  if (method === "GET" && url.pathname === "/himalayas/jobs/api") {
+    lists += 1;
+    const base = Date.now() * 10 + lists;
+    console.log("fake-jobs: listed the remote board");
+    json(response, 200, {
+      offset: 0,
+      limit: ROLES.length,
+      totalCount: ROLES.length,
+      nextCursor: null,
+      jobs: ROLES.map((title, index) => remoteJob(base * 10 + index, title)),
+    });
+    return;
+  }
+  if (method === "GET" && posting !== null) {
+    const id = Number(posting[2]);
+    const title = ROLES[id % 10] ?? ROLES[0];
+    const where =
+      title === ROLES[DACH]
+        ? "<li>Standort: Remote-first aus Deutschland oder Österreich</li>"
+        : "<li>Remote within Europe</li>";
+    json(response, 200, {
+      ...job(id, title),
+      content: escaped(
+        `<p>Example Co builds invented software for invented customers.</p><ul><li>Work with a small team</li>${where}</ul><script>alert("not run")</script>`,
+      ),
+    });
+    return;
+  }
+  if (method === "POST" && url.pathname === "/v1/chat/completions") {
+    complete(request, response).catch(() => {
+      json(response, 500, { error: { message: "server error" } });
+    });
+    return;
+  }
+  if (method === "GET" && url.pathname === "/healthz") {
+    json(response, 200, { status: "ok" });
+    return;
+  }
+  json(response, 404, { error: "not_found" });
+});
+
+server.listen(port, host, () => {
+  console.log(`fake-jobs: listening on http://${host}:${String(port)}`);
+});
+
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+  process.on(signal, () => {
+    server.closeAllConnections();
+    server.close();
+  });
+}

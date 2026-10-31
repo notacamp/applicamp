@@ -13,7 +13,8 @@ use uuid::Uuid;
 use crate::{
     AiConfig, Error, ProviderConfig, Role,
     config::bearer,
-    usage::{self, Entry},
+    price::{self, Price},
+    usage::{self, Limit, Limits, Reservation},
 };
 
 /// Default TCP connect timeout.
@@ -181,6 +182,9 @@ pub struct Usage {
 /// A chat completion.
 #[derive(Clone, PartialEq)]
 pub struct ChatResponse {
+    /// What the call cost in US dollars, as recorded in the ledger: the
+    /// provider's own figure, or the price table's. `None` until then.
+    pub cost_usd: Option<f64>,
     /// The answer's text.
     pub content: String,
     /// The model that answered.
@@ -198,6 +202,7 @@ impl std::fmt::Debug for ChatResponse {
             .field("model", &self.model)
             .field("finish_reason", &self.finish_reason)
             .field("usage", &self.usage)
+            .field("cost_usd", &self.cost_usd)
             .finish()
     }
 }
@@ -249,6 +254,39 @@ pub struct Caller<'a> {
     pub now: DateTime<Utc>,
 }
 
+/// What a person spent on AI, in euros, against their limits.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct Spend {
+    /// Today (UTC).
+    pub today_eur: f64,
+    /// Their daily limit; `None` is none.
+    pub day_limit_eur: Option<f64>,
+    /// This month (UTC).
+    pub month_eur: f64,
+    /// Their monthly limit; `None` is none.
+    pub month_limit_eur: Option<f64>,
+}
+
+/// What the whole instance spent this month, in euros.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct InstanceSpend {
+    /// This month (UTC).
+    pub month_eur: f64,
+    /// Today (UTC).
+    pub today_eur: f64,
+    /// The instance's monthly limit; `None` is none.
+    pub limit_eur: Option<f64>,
+    /// Calls this month.
+    pub calls: i64,
+    /// Accounts that made one.
+    pub accounts: i64,
+}
+
+#[derive(Serialize)]
+struct UsageRequest {
+    include: bool,
+}
+
 #[derive(Serialize)]
 struct WireRequest<'a> {
     model: &'a str,
@@ -260,6 +298,8 @@ struct WireRequest<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     response_format: Option<&'a ResponseFormat>,
     stream: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    usage: Option<UsageRequest>,
 }
 
 #[derive(Deserialize)]
@@ -267,7 +307,18 @@ struct WireResponse {
     #[serde(default)]
     model: String,
     choices: Vec<WireChoice>,
-    usage: Option<Usage>,
+    usage: Option<WireUsage>,
+}
+
+#[derive(Deserialize)]
+struct WireUsage {
+    #[serde(default)]
+    prompt_tokens: u32,
+    #[serde(default)]
+    completion_tokens: u32,
+    /// OpenRouter: what the call cost, in USD credits.
+    #[serde(default)]
+    cost: Option<f64>,
 }
 
 #[derive(Deserialize)]
@@ -332,10 +383,73 @@ impl Gateway {
         self.config.is_configured(role)
     }
 
+    /// The price of `role`'s model, if it is configured.
+    pub fn price(&self, role: Role) -> Option<Price> {
+        self.config.provider(role).ok().map(price::price_of)
+    }
+
+    /// Euros per US dollar.
+    pub fn usd_to_eur(&self) -> f64 {
+        self.config.budget.usd_to_eur()
+    }
+
+    /// The spending limits, in US dollars.
+    fn limits(&self) -> Limits {
+        let budget = &self.config.budget;
+        let rate = budget.usd_to_eur();
+        Limits {
+            account_day: budget.account_daily_eur().map(|eur| eur / rate),
+            account_month: budget.account_monthly_eur().map(|eur| eur / rate),
+            instance_month: budget.instance_monthly_eur().map(|eur| eur / rate),
+        }
+    }
+
+    /// What `account` spent today and this month, against its limits.
+    pub async fn spend(
+        &self,
+        db: &PgPool,
+        account: Uuid,
+        now: DateTime<Utc>,
+    ) -> Result<Spend, Error> {
+        let spent = usage::spent(db, account, now)
+            .await
+            .map_err(|_| Error::Metering)?;
+        let rate = self.usd_to_eur();
+        let budget = &self.config.budget;
+        Ok(Spend {
+            today_eur: spent.account_day * rate,
+            day_limit_eur: budget.account_daily_eur(),
+            month_eur: spent.account_month * rate,
+            month_limit_eur: budget.account_monthly_eur(),
+        })
+    }
+
+    /// What the instance spent this month, against its limit.
+    pub async fn instance_spend(
+        &self,
+        db: &PgPool,
+        now: DateTime<Utc>,
+    ) -> Result<InstanceSpend, Error> {
+        let month = usage::instance_month(db, now)
+            .await
+            .map_err(|_| Error::Metering)?;
+        let rate = self.usd_to_eur();
+        Ok(InstanceSpend {
+            month_eur: month.month_usd * rate,
+            today_eur: month.today_usd * rate,
+            limit_eur: self.config.budget.instance_monthly_eur(),
+            calls: month.calls,
+            accounts: month.accounts,
+        })
+    }
+
     /// One chat completion on the `complete` role, for `caller`: refused
     /// before anything is sent when the role is not configured
-    /// ([`Error::NotConfigured`]) or the account reached its daily cap
-    /// ([`Error::OverDailyCap`]); recorded in the ledger once answered.
+    /// ([`Error::NotConfigured`]), the account reached its daily token cap
+    /// ([`Error::OverDailyCap`]) or the call's worst case (its prompt and its
+    /// whole `max_tokens` answer at the model's price) would cross a
+    /// spending limit ([`Error::OverBudget`]). Recorded in the ledger with
+    /// its cost once answered; [`ChatResponse::cost_usd`] says what it was.
     pub async fn complete(
         &self,
         caller: Caller<'_>,
@@ -355,32 +469,126 @@ impl Gateway {
                 return Err(Error::OverDailyCap { cap });
             }
         }
-        let response = self.chat(provider, &request).await?;
-        let tokens = response.usage.unwrap_or_default();
-        let entry = Entry {
-            account: caller.account,
+        let price = price::price_of(provider);
+        let worst = price::worst_case(price, &request);
+        let limits = self.limits();
+        let reservation = match usage::reserve(
+            caller.db,
+            caller.account,
             role,
-            model: if response.model.is_empty() {
-                &provider.model
-            } else {
-                &response.model
-            },
-            tokens_in: tokens.prompt_tokens,
-            tokens_out: tokens.completion_tokens,
-            at: caller.now,
+            &provider.model,
+            worst,
+            &limits,
+            caller.now,
+        )
+        .await
+        {
+            Ok(Ok(reservation)) => reservation,
+            Ok(Err(limit)) => {
+                if limit == Limit::InstanceMonth {
+                    tracing::error!(
+                        %role,
+                        limit = limit.as_str(),
+                        "the instance reached its monthly AI spending limit: AI calls are refused"
+                    );
+                } else {
+                    tracing::info!(%role, limit = limit.as_str(), "an account reached an AI spending limit");
+                }
+                return Err(Error::OverBudget { limit });
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, %role, "AI spending could not be read; no call made");
+                return Err(Error::Metering);
+            }
         };
-        if let Err(e) = usage::record(caller.db, entry).await {
-            tracing::warn!(error = %e, %role, "an AI call's tokens could not be recorded");
+        let mut response = match self.chat(provider, &request).await {
+            Ok(response) => response,
+            Err(err) => {
+                self.unwind(caller.db, reservation, &err).await;
+                return Err(err);
+            }
+        };
+        let tokens = response.usage.unwrap_or_default();
+        let model = if response.model.is_empty() {
+            provider.model.clone()
+        } else {
+            response.model.clone()
+        };
+        let cost = response.cost_usd.unwrap_or_else(|| {
+            price.cost(
+                u64::from(tokens.prompt_tokens),
+                u64::from(tokens.completion_tokens),
+            )
+        });
+        if let Err(e) = usage::settle(
+            caller.db,
+            reservation,
+            &model,
+            tokens.prompt_tokens,
+            tokens.completion_tokens,
+            cost,
+        )
+        .await
+        {
+            // The reservation stays at the worst case: the limits still hold.
+            tracing::warn!(error = %e, %role, "an AI call's cost could not be recorded");
         }
+        response.cost_usd = Some(cost);
         tracing::info!(
             %role,
-            model = %entry.model,
+            model = %model,
             tokens_in = tokens.prompt_tokens,
             tokens_out = tokens.completion_tokens,
+            cost_usd = cost,
             finish = response.finish_reason.as_deref().unwrap_or("none"),
             "ai call"
         );
+        self.alert(caller.db, caller.now, cost).await;
         Ok(response)
+    }
+
+    /// After a failed call: release its reservation when it surely cost
+    /// nothing (the provider refused it, or it was never reached); keep the
+    /// worst case when it may have been charged (a timeout, an unreadable
+    /// answer).
+    async fn unwind(&self, db: &PgPool, reservation: Reservation, err: &Error) {
+        let maybe_charged = match err {
+            Error::Transport(e) => e.is_timeout() || e.is_body() || e.is_decode(),
+            Error::InvalidResponse(_) => true,
+            _ => false,
+        };
+        let done = if maybe_charged {
+            usage::keep(db, reservation).await
+        } else {
+            usage::release(db, reservation).await
+        };
+        if let Err(e) = done {
+            tracing::warn!(error = %e, "an AI reservation could not be settled");
+        }
+    }
+
+    /// A log line when this call took the instance past 80 % or 100 % of
+    /// its monthly limit (operations wire it to an alert).
+    async fn alert(&self, db: &PgPool, now: DateTime<Utc>, cost_usd: f64) {
+        let Some(limit) = self.limits().instance_month else {
+            return;
+        };
+        let Ok(month) = usage::instance_month(db, now).await else {
+            return;
+        };
+        let before = month.month_usd - cost_usd;
+        for (share, percent) in [(1.0, 100_u8), (0.8, 80)] {
+            let mark = limit * share;
+            if before < mark && month.month_usd >= mark {
+                tracing::warn!(
+                    percent,
+                    spent_usd = month.month_usd,
+                    limit_usd = limit,
+                    "the instance's AI spending reached {percent}% of its monthly limit"
+                );
+                break;
+            }
+        }
     }
 
     async fn chat(
@@ -395,6 +603,10 @@ impl Gateway {
             max_tokens: request.max_tokens,
             response_format: request.response_format.as_ref(),
             stream: false,
+            usage: provider
+                .include_usage
+                .unwrap_or(true)
+                .then_some(UsageRequest { include: true }),
         };
         let mut http = self
             .http
@@ -413,7 +625,15 @@ impl Gateway {
             content: choice.message.content.unwrap_or_default(),
             model: wire.model,
             finish_reason: choice.finish_reason,
-            usage: wire.usage,
+            cost_usd: wire
+                .usage
+                .as_ref()
+                .and_then(|u| u.cost)
+                .filter(|c| c.is_finite() && *c >= 0.0),
+            usage: wire.usage.map(|u| Usage {
+                prompt_tokens: u.prompt_tokens,
+                completion_tokens: u.completion_tokens,
+            }),
         })
     }
 
@@ -539,6 +759,7 @@ mod tests {
             model: "m".to_owned(),
             finish_reason: Some("stop".to_owned()),
             usage: None,
+            cost_usd: None,
         }
     }
 

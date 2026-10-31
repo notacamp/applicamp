@@ -1,0 +1,124 @@
+{
+  "apiVersion": "1",
+  "jobs": [
+    {
+      "id": "9b8a7c6d-1111-4e5f-8a9b-0c1d2e3f4a5b",
+      "title": "Senior Platform Engineer",
+      "department": "Engineering",
+      "team": "Platform",
+      "employmentType": "FullTime",
+      "location": "Remote (Europe)",
+      "shouldDisplayCompensationOnJobPostings": true,
+      "secondaryLocations": [
+        {
+          "location": "Portugal",
+          "address": {
+            "postalAddress": {
+              "addressCountry": "Portugal"
+            }
+          }
+        },
+        {
+          "location": "Spain",
+          "address": {
+            "postalAddress": {
+              "addressCountry": "Spain"
+            }
+          }
+        }
+      ],
+      "publishedAt": "2026-10-18T09:30:20.299+00:00",
+      "isListed": true,
+      "isRemote": true,
+      "workplaceType": "Remote",
+      "address": {
+        "postalAddress": {
+          "addressCountry": "Portugal",
+          "addressLocality": "Lisbon"
+        }
+      },
+      "jobUrl": "https://jobs.ashbyhq.com/samplelabs/9b8a7c6d-1111-4e5f-8a9b-0c1d2e3f4a5b",
+      "applyUrl": "https://jobs.ashbyhq.com/samplelabs/9b8a7c6d-1111-4e5f-8a9b-0c1d2e3f4a5b/application",
+      "descriptionHtml": "<p style=\"min-height:1.5em\">Sample Labs runs the infrastructure behind small online shops.</p><ul><li><p>Own our Kubernetes clusters.</p></li></ul>",
+      "descriptionPlain": "Sample Labs runs the infrastructure behind small online shops.\n\nOwn our Kubernetes clusters.",
+      "compensation": {
+        "compensationTierSummary": "€80K – €100K • Offers Equity",
+        "scrapeableCompensationSalarySummary": "€80K - €100K",
+        "compensationTiers": [
+          {
+            "id": "5a1b2c3d-0000-4000-8000-000000000001",
+            "tierSummary": "€80K – €100K • Offers Equity",
+            "title": null,
+            "additionalInformation": null,
+            "components": [
+              {
+                "id": "5a1b2c3d-0000-4000-8000-000000000002",
+                "summary": "€80K – €100K",
+                "compensationType": "Salary",
+                "interval": "1 YEAR",
+                "currencyCode": "EUR",
+                "minValue": 80000,
+                "maxValue": 100000
+              },
+              {
+                "id": "5a1b2c3d-0000-4000-8000-000000000003",
+                "summary": "Offers Equity",
+                "compensationType": "EquityPercentage",
+                "interval": "NONE",
+                "currencyCode": null,
+                "minValue": null,
+                "maxValue": null
+              }
+            ]
+          }
+        ],
+        "summaryComponents": [
+          {
+            "compensationType": "Salary",
+            "interval": "1 YEAR",
+            "currencyCode": "EUR",
+            "minValue": 80000,
+            "maxValue": 100000
+          },
+          {
+            "compensationType": "EquityPercentage",
+            "interval": "NONE",
+            "currencyCode": null,
+            "minValue": null,
+            "maxValue": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "9b8a7c6d-2222-4e5f-8a9b-0c1d2e3f4a5b",
+      "title": "Customer Success Manager",
+      "department": "Operations",
+      "team": "Customer Success",
+      "employmentType": "FullTime",
+      "location": "Amsterdam",
+      "shouldDisplayCompensationOnJobPostings": false,
+      "secondaryLocations": [],
+      "publishedAt": "2026-10-05T14:02:11.120+00:00",
+      "isListed": true,
+      "isRemote": false,
+      "workplaceType": "Hybrid",
+      "address": {
+        "postalAddress": {
+          "addressCountry": "Netherlands",
+          "addressLocality": "Amsterdam"
+        }
+      },
+      "jobUrl": "https://jobs.ashbyhq.com/samplelabs/9b8a7c6d-2222-4e5f-8a9b-0c1d2e3f4a5b",
+      "applyUrl": "https://jobs.ashbyhq.com/samplelabs/9b8a7c6d-2222-4e5f-8a9b-0c1d2e3f4a5b/application",
+      "descriptionHtml": "<p style=\"min-height:1.5em\">Help our customers get the most out of Sample Labs.</p>",
+      "descriptionPlain": "Help our customers get the most out of Sample Labs.",
+      "compensation": {
+        "compensationTierSummary": null,
+        "scrapeableCompensationSalarySummary": null,
+        "compensationTiers": [],
+        "summaryComponents": []
+      }
+    }
+  ]
+}

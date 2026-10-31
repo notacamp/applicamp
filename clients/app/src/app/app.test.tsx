@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { writePref } from "~/lib/storage/prefs";
 
+import { estimate, todayAnswer } from "../../test/pipeline";
 import { DEMO_ME, renderApp, SIGNED_OUT, stubApi, type StubAnswer } from "../../test/render";
 
 /** The element a `Tagged` test handle wraps (a nav item, a page). */
@@ -16,7 +17,14 @@ function tagged(testId: string): HTMLElement {
 }
 
 function signedIn(extra: Record<string, StubAnswer | (() => StubAnswer)> = {}) {
-  return stubApi({ "GET /api/v1/me": { body: DEMO_ME }, ...extra });
+  return stubApi({
+    "GET /api/v1/me": { body: DEMO_ME },
+    "GET /api/v1/today": { body: todayAnswer("set_up_profile") },
+    "GET /api/v1/opportunities": { body: { opportunities: [] } },
+    "GET /api/v1/searches/latest": { body: { search: null } },
+    "GET /api/v1/searches/estimate": { body: estimate() },
+    ...extra,
+  });
 }
 
 describe("the app", () => {
@@ -65,7 +73,9 @@ describe("the app", () => {
 
     const today = await screen.findByTestId("today");
     expect(today).toHaveTextContent("Today");
-    expect(screen.getByTestId("today-empty")).toHaveTextContent("Nothing needs you yet");
+    expect(await screen.findByTestId("today-setup")).toHaveTextContent(
+      "First, tell the agents who you are",
+    );
     expect(tagged("nav-today")).toHaveAttribute("aria-current", "page");
     expect(tagged("nav-pipeline")).not.toHaveAttribute("aria-current");
 
@@ -281,5 +291,58 @@ describe("the app", () => {
     expect(await screen.findByTestId("agents-empty")).toHaveTextContent(
       "Aucune exécution pour l’instant",
     );
+  });
+  it("opens Grill me on its roles and on one role, and does not know a role that is not a number", async () => {
+    signedIn({
+      "GET /api/v1/profile/grill": {
+        body: {
+          roles: [
+            {
+              position: 0,
+              role: {
+                position: "Senior Engineer",
+                company: "Example Org",
+                start_date: "2021-03",
+                end_date: null,
+              },
+              status: "not_started",
+              covered: 0,
+              kept: 0,
+            },
+          ],
+          calls_today: 0,
+          daily_cap: 150,
+        },
+      },
+      "GET /api/v1/profile/grill/0": {
+        body: {
+          position: 0,
+          role: {
+            position: "Senior Engineer",
+            company: "Example Org",
+            start_date: "2021-03",
+            end_date: null,
+          },
+          status: "not_started",
+          coverage: [],
+          covered: 0,
+          turns: [],
+          question: null,
+          proposals: [],
+          kept: 0,
+          calls_today: 0,
+          daily_cap: 150,
+        },
+      },
+    });
+    const { router } = renderApp("/profile/grill");
+    expect(await screen.findByTestId("grill-pick")).toBeVisible();
+    await userEvent.setup().click(await screen.findByTestId("grill-role-0"));
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe("/profile/grill/0");
+    });
+    expect(await screen.findByTestId("grill-start")).toBeVisible();
+    await router.navigate({ to: "/profile/grill/$position", params: { position: Number.NaN } });
+    expect(await screen.findByTestId("not-found")).toBeVisible();
   });
 });

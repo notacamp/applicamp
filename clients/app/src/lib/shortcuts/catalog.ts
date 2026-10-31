@@ -23,6 +23,13 @@ export const APP_SHORTCUTS = [
     label: "shortcuts:nav.pipeline",
   },
   {
+    id: "nav.boards",
+    keys: "g b",
+    scope: "global",
+    group: "navigation",
+    label: "shortcuts:nav.boards",
+  },
+  {
     id: "nav.agents",
     keys: "g a",
     scope: "global",
@@ -35,6 +42,23 @@ export const APP_SHORTCUTS = [
     scope: "global",
     group: "navigation",
     label: "shortcuts:nav.profile",
+  },
+  // Server operations, named by their OpenAPI operationId (ADR 0013 of the
+  // design system): bound by the app frame, so they are live everywhere and
+  // listed in ⌘K.
+  {
+    id: "sources.start",
+    keys: "shift+s",
+    scope: "global",
+    group: "general",
+    label: "shortcuts:sources.start",
+  },
+  {
+    id: "pipeline.add",
+    keys: "n",
+    scope: "global",
+    group: "general",
+    label: "shortcuts:pipeline.add",
   },
 ] as const satisfies readonly ShortcutDefinition[];
 

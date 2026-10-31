@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+mod ai_cli;
 mod invite_cli;
 
 use std::{
@@ -25,6 +26,9 @@ const DEFAULT_PORT: u16 = 8080;
 const HEALTHCHECK_TIMEOUT: Duration = Duration::from_secs(5);
 /// How often ended sessions are deleted.
 const PRUNE_EVERY: Duration = Duration::from_secs(15 * 60);
+/// Job workers: a search runs for minutes and must not hold up the rest of
+/// the queue (sign-outs, expiries).
+const WORKERS: usize = 4;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -48,6 +52,12 @@ enum Command {
         #[command(subcommand)]
         command: invite_cli::InviteCommand,
     },
+    /// What AI cost: `ai usage` prints the instance's spending this month
+    /// against its limit.
+    Ai {
+        #[command(subcommand)]
+        command: ai_cli::AiCommand,
+    },
     /// Print the OpenAPI document as JSON.
     Openapi,
     /// Exit 0 if the local server reports healthy, 1 otherwise. For container
@@ -65,6 +75,7 @@ fn main() -> ExitCode {
     match Cli::parse().command.unwrap_or(Command::Serve) {
         Command::Serve => serve(),
         Command::Invite { command } => invite_cli::run(command),
+        Command::Ai { command } => ai_cli::run(command),
         Command::Openapi => print_json(&applicamp_server::openapi()),
         Command::Healthcheck { port } => healthcheck(port.unwrap_or_else(port_from_env)),
     }
@@ -107,7 +118,7 @@ fn serve() -> ExitCode {
         Err(e) => return fail(&e.to_string()),
     };
     let composition = match applicamp_server::Composition::from_env() {
-        Ok(composition) => composition,
+        Ok(composition) => composition.with_secret(&secret),
         Err(e) => return fail(&e),
     };
     let runtime = match runtime() {
@@ -131,7 +142,7 @@ async fn run(
     composition: &applicamp_server::Composition,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let registry = Arc::new(
-        applicamp_server::registry()
+        applicamp_server::registry_with(composition)
             .map_err(|problems| format!("background work: {}", problems.join("; ")))?,
     );
     let db = db::connect(&config).await?;
@@ -139,6 +150,7 @@ async fn run(
         applicamp_server::migrate(&db).await?;
         tracing::info!("migrations applied");
     }
+    applicamp_sources::start(&db, &composition.sources).await?;
     let events = EventBus::new(Arc::clone(&registry));
     let addr: SocketAddr = config
         .bind_addr
@@ -167,7 +179,10 @@ async fn run(
     }
 
     let (stop, stopped) = watch::channel(false);
-    let worker = tokio::spawn(Worker::new(db.clone(), registry, events).run(stopped.clone()));
+    let worker = Worker::new(db.clone(), registry, events);
+    let workers: Vec<_> = (0..WORKERS)
+        .map(|_| tokio::spawn(worker.clone().run(stopped.clone())))
+        .collect();
     let pruner = tokio::spawn(prune_sessions(state.clone(), stopped));
 
     let app = applicamp_server::app_with(state, &bff, web, composition);
@@ -178,7 +193,9 @@ async fn run(
         .await?;
 
     let _ = stop.send(true);
-    let _ = worker.await;
+    for worker in workers {
+        let _ = worker.await;
+    }
     let _ = pruner.await;
     tracing::info!("stopped");
     Ok(())
@@ -275,6 +292,13 @@ mod tests {
             Some(Command::Invite {
                 command: invite_cli::InviteCommand::Add { ref email, note: None }
             }) if email == "someone@example.com"
+        ));
+        let cli = Cli::try_parse_from(["applicamp", "ai", "usage"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Some(Command::Ai {
+                command: ai_cli::AiCommand::Usage
+            })
         ));
         let cli = Cli::try_parse_from(["applicamp"]).unwrap();
         assert!(cli.command.is_none(), "serve is the default");

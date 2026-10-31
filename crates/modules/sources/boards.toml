@@ -1,0 +1,561 @@
+# Public job boards searched for every account: the seed list.
+#
+# Companies that publish their jobs on a public Greenhouse, Lever or Ashby
+# job-board API and hire in Europe (PT, ES, FR, DE, NL, UK, IE, ...) or
+# remotely. Every token was checked on 2026-10-26: its public API answered
+# 200 with at least one job, some of them in Europe or remote, in a body
+# under the readers' 2 MB cap. Company names are public business names.
+#
+# The APIs read (and nothing else):
+#   greenhouse  https://boards-api.greenhouse.io/v1/boards/<token>/jobs
+#   lever       https://api.lever.co/v0/postings/<token>?mode=json
+#               (https://api.eu.lever.co/... when `eu = true`)
+#   ashby       https://api.ashbyhq.com/posting-api/job-board/<token>
+#
+# To add a company: find its board token (the path segment after
+# boards.greenhouse.io/, jobs.lever.co/ or jobs.ashbyhq.com/), check the API
+# above answers 200 with jobs, and add a [[board]] below. Never add a board
+# that is not the company's own public ATS board. A board added by link in
+# the app is stored in the database, not here.
+
+# --- Greenhouse ---
+
+[[board]]
+kind = "greenhouse"
+token = "gitlab"
+company = "GitLab"
+
+[[board]]
+kind = "greenhouse"
+token = "cloudflare"
+company = "Cloudflare"
+
+[[board]]
+kind = "greenhouse"
+token = "datadog"
+company = "Datadog"
+
+[[board]]
+kind = "greenhouse"
+token = "elastic"
+company = "Elastic"
+
+[[board]]
+kind = "greenhouse"
+token = "mongodb"
+company = "MongoDB"
+
+[[board]]
+kind = "greenhouse"
+token = "twilio"
+company = "Twilio"
+
+[[board]]
+kind = "greenhouse"
+token = "contentful"
+company = "Contentful"
+
+[[board]]
+kind = "greenhouse"
+token = "n26"
+company = "N26"
+
+[[board]]
+kind = "greenhouse"
+token = "adyen"
+company = "Adyen"
+
+[[board]]
+kind = "greenhouse"
+token = "getyourguide"
+company = "GetYourGuide"
+
+[[board]]
+kind = "greenhouse"
+token = "deliveroo"
+company = "Deliveroo"
+
+[[board]]
+kind = "greenhouse"
+token = "monzo"
+company = "Monzo"
+
+[[board]]
+kind = "greenhouse"
+token = "celonis"
+company = "Celonis"
+
+[[board]]
+kind = "greenhouse"
+token = "hellofresh"
+company = "HelloFresh"
+
+[[board]]
+kind = "greenhouse"
+token = "sumup"
+company = "SumUp"
+
+[[board]]
+kind = "greenhouse"
+token = "gocardless"
+company = "GoCardless"
+
+[[board]]
+kind = "greenhouse"
+token = "typeform"
+company = "Typeform"
+
+[[board]]
+kind = "greenhouse"
+token = "catawiki"
+company = "Catawiki"
+
+[[board]]
+kind = "greenhouse"
+token = "truelayer"
+company = "TrueLayer"
+
+[[board]]
+kind = "greenhouse"
+token = "canonical"
+company = "Canonical"
+
+[[board]]
+kind = "greenhouse"
+token = "grafanalabs"
+company = "Grafana Labs"
+
+[[board]]
+kind = "greenhouse"
+token = "doctolib"
+company = "Doctolib"
+
+[[board]]
+kind = "greenhouse"
+token = "mirakl"
+company = "Mirakl"
+
+[[board]]
+kind = "greenhouse"
+token = "algolia"
+company = "Algolia"
+
+[[board]]
+kind = "greenhouse"
+token = "dashlane"
+company = "Dashlane"
+
+[[board]]
+kind = "greenhouse"
+token = "figma"
+company = "Figma"
+
+[[board]]
+kind = "greenhouse"
+token = "airtable"
+company = "Airtable"
+
+[[board]]
+kind = "greenhouse"
+token = "intercom"
+company = "Intercom"
+
+[[board]]
+kind = "greenhouse"
+token = "toast"
+company = "Toast"
+
+[[board]]
+kind = "greenhouse"
+token = "pagerduty"
+company = "PagerDuty"
+
+[[board]]
+kind = "greenhouse"
+token = "vercel"
+company = "Vercel"
+
+[[board]]
+kind = "greenhouse"
+token = "netlify"
+company = "Netlify"
+
+[[board]]
+kind = "greenhouse"
+token = "airbnb"
+company = "Airbnb"
+
+[[board]]
+kind = "greenhouse"
+token = "dropbox"
+company = "Dropbox"
+
+[[board]]
+kind = "greenhouse"
+token = "discord"
+company = "Discord"
+
+[[board]]
+kind = "greenhouse"
+token = "reddit"
+company = "Reddit"
+
+[[board]]
+kind = "greenhouse"
+token = "coinbase"
+company = "Coinbase"
+
+[[board]]
+kind = "greenhouse"
+token = "bitpanda"
+company = "Bitpanda"
+
+[[board]]
+kind = "greenhouse"
+token = "raisin"
+company = "Raisin"
+
+[[board]]
+kind = "greenhouse"
+token = "traderepublicbank"
+company = "Trade Republic"
+
+[[board]]
+kind = "greenhouse"
+token = "workato"
+company = "Workato"
+
+[[board]]
+kind = "greenhouse"
+token = "scandit"
+company = "Scandit"
+
+[[board]]
+kind = "greenhouse"
+token = "squarespace"
+company = "Squarespace"
+
+[[board]]
+kind = "greenhouse"
+token = "stripe"
+company = "Stripe"
+
+[[board]]
+kind = "greenhouse"
+token = "okta"
+company = "Okta"
+
+[[board]]
+kind = "greenhouse"
+token = "datacamp"
+company = "DataCamp"
+
+[[board]]
+kind = "greenhouse"
+token = "tide"
+company = "Tide"
+
+[[board]]
+kind = "greenhouse"
+token = "cleo"
+company = "Cleo"
+
+[[board]]
+kind = "greenhouse"
+token = "tines"
+company = "Tines"
+
+[[board]]
+kind = "greenhouse"
+token = "isomorphiclabs"
+company = "Isomorphic Labs"
+
+[[board]]
+kind = "greenhouse"
+token = "feedzai"
+company = "Feedzai"
+
+[[board]]
+kind = "greenhouse"
+token = "swordhealth"
+company = "Sword Health"
+
+[[board]]
+kind = "greenhouse"
+token = "wallapop"
+company = "Wallapop"
+
+[[board]]
+kind = "greenhouse"
+token = "cabify"
+company = "Cabify"
+
+[[board]]
+kind = "greenhouse"
+token = "dataiku"
+company = "Dataiku"
+
+# --- Lever ---
+
+[[board]]
+kind = "lever"
+token = "spotify"
+company = "Spotify"
+
+[[board]]
+kind = "lever"
+token = "aircall"
+company = "Aircall"
+
+[[board]]
+kind = "lever"
+token = "veepee"
+company = "Veepee"
+
+[[board]]
+kind = "lever"
+token = "swile"
+company = "Swile"
+
+[[board]]
+kind = "lever"
+token = "malt"
+company = "Malt"
+
+[[board]]
+kind = "lever"
+token = "contentsquare"
+company = "Contentsquare"
+
+[[board]]
+kind = "lever"
+token = "outreach"
+company = "Outreach"
+
+[[board]]
+kind = "lever"
+token = "zopa"
+company = "Zopa"
+
+[[board]]
+kind = "lever"
+token = "blablacar"
+company = "BlaBlaCar"
+
+[[board]]
+kind = "lever"
+token = "brevo"
+company = "Brevo"
+
+[[board]]
+kind = "lever"
+token = "scaleway"
+company = "Scaleway"
+
+[[board]]
+kind = "lever"
+token = "pipedrive"
+company = "Pipedrive"
+
+[[board]]
+kind = "lever"
+token = "kpler"
+company = "Kpler"
+
+[[board]]
+kind = "lever"
+token = "doctrine"
+company = "Doctrine"
+
+[[board]]
+kind = "lever"
+token = "finn"
+company = "FINN"
+
+[[board]]
+kind = "lever"
+token = "prima"
+company = "Prima"
+eu = true
+
+[[board]]
+kind = "lever"
+token = "toptal"
+company = "Toptal"
+
+[[board]]
+kind = "lever"
+token = "jumpcloud"
+company = "JumpCloud"
+
+# --- Ashby ---
+
+[[board]]
+kind = "ashby"
+token = "linear"
+company = "Linear"
+
+[[board]]
+kind = "ashby"
+token = "posthog"
+company = "PostHog"
+
+[[board]]
+kind = "ashby"
+token = "supabase"
+company = "Supabase"
+
+[[board]]
+kind = "ashby"
+token = "sentry"
+company = "Sentry"
+
+[[board]]
+kind = "ashby"
+token = "n8n"
+company = "n8n"
+
+[[board]]
+kind = "ashby"
+token = "photoroom"
+company = "Photoroom"
+
+[[board]]
+kind = "ashby"
+token = "dust"
+company = "Dust"
+
+[[board]]
+kind = "ashby"
+token = "zapier"
+company = "Zapier"
+
+[[board]]
+kind = "ashby"
+token = "vanta"
+company = "Vanta"
+
+[[board]]
+kind = "ashby"
+token = "synthesia"
+company = "Synthesia"
+
+[[board]]
+kind = "ashby"
+token = "lovable"
+company = "Lovable"
+
+[[board]]
+kind = "ashby"
+token = "attio"
+company = "Attio"
+
+[[board]]
+kind = "ashby"
+token = "incident"
+company = "incident.io"
+
+[[board]]
+kind = "ashby"
+token = "tldraw"
+company = "tldraw"
+
+[[board]]
+kind = "ashby"
+token = "hex"
+company = "Hex"
+
+[[board]]
+kind = "ashby"
+token = "docker"
+company = "Docker"
+
+[[board]]
+kind = "ashby"
+token = "poolside"
+company = "Poolside"
+
+[[board]]
+kind = "ashby"
+token = "gitbook"
+company = "GitBook"
+
+[[board]]
+kind = "ashby"
+token = "temporal"
+company = "Temporal"
+
+[[board]]
+kind = "ashby"
+token = "render"
+company = "Render"
+
+[[board]]
+kind = "ashby"
+token = "railway"
+company = "Railway"
+
+[[board]]
+kind = "ashby"
+token = "neon"
+company = "Neon"
+
+[[board]]
+kind = "ashby"
+token = "modal"
+company = "Modal"
+
+[[board]]
+kind = "ashby"
+token = "perplexity"
+company = "Perplexity"
+
+[[board]]
+kind = "ashby"
+token = "granola"
+company = "Granola"
+
+[[board]]
+kind = "ashby"
+token = "qonto"
+company = "Qonto"
+
+[[board]]
+kind = "ashby"
+token = "backmarket"
+company = "Back Market"
+
+[[board]]
+kind = "ashby"
+token = "ledger"
+company = "Ledger"
+
+[[board]]
+kind = "ashby"
+token = "sorare"
+company = "Sorare"
+
+[[board]]
+kind = "ashby"
+token = "pleo"
+company = "Pleo"
+
+[[board]]
+kind = "ashby"
+token = "moss"
+company = "Moss"
+
+[[board]]
+kind = "ashby"
+token = "forto"
+company = "Forto"
+
+[[board]]
+kind = "ashby"
+token = "parloa"
+company = "Parloa"
+
+[[board]]
+kind = "ashby"
+token = "deepl"
+company = "DeepL"

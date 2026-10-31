@@ -596,12 +596,22 @@ impl Job for ExpireImports {
     const NAME: &'static str = "profile.expire_imports";
 
     async fn run(self, ctx: JobContext) -> std::result::Result<(), JobError> {
-        let deleted = sqlx::query("DELETE FROM profile.imports WHERE expires_at <= now()")
+        let mut deleted = sqlx::query("DELETE FROM profile.imports WHERE expires_at <= now()")
+            .execute(&ctx.db)
+            .await?
+            .rows_affected();
+        // The drafts made from answers expire the same way.
+        deleted += sqlx::query("DELETE FROM profile.drafts WHERE expires_at <= now()")
+            .execute(&ctx.db)
+            .await?
+            .rows_affected();
+        // So do the facts "Grill me" took from an answer and nobody kept.
+        deleted += sqlx::query("DELETE FROM profile.grill_proposals WHERE expires_at <= now()")
             .execute(&ctx.db)
             .await?
             .rows_affected();
         if deleted > 0 {
-            tracing::info!(deleted, "expired profile imports deleted");
+            tracing::info!(deleted, "expired profile imports and drafts deleted");
         }
         Ok(())
     }

@@ -350,6 +350,157 @@ function interview(userContent: string) {
   };
 }
 
+/** What the portrait's sources look like in the prompt (`<sources>`). */
+interface AboutSource {
+  id: string;
+  kind: string;
+  text: string;
+  url?: string;
+}
+
+/**
+ * "Tell me about you" (#43), the portrait (system prompt "You write what a
+ * job-hunting app knows about one person…"): a known sentence for each
+ * position, one `known` sentence whose claim no source makes (the server must
+ * downgrade it to an assumption), a told sentence for each fact the person
+ * wrote, assumptions about the roles with their reasons, and an assumption
+ * for each fact read on an employer's own website.
+ */
+function aboutPortrait(userContent: string) {
+  const sources = parsedBetween<AboutSource[]>(userContent, "sources", []);
+  const positions = parsedBetween<
+    { index: number; title?: string | null; company?: string | null }[]
+  >(userContent, "positions", []);
+  const sentence = (
+    text: string,
+    kind: "known" | "told" | "assumed",
+    cited: string[],
+    why: string,
+    topic: string,
+    position: number | null,
+    claim = "",
+  ) => ({ text, kind, sources: cited, why, claim, topic, position });
+  const sentences = positions.slice(0, 3).flatMap((role) => {
+    const title = role.title ?? "an engineer";
+    const company = role.company ?? "an employer";
+    const lines = [
+      sentence(
+        `You were ${title} at ${company}.`,
+        "known",
+        [`w${String(role.index)}`],
+        "",
+        "context",
+        null,
+      ),
+      sentence(
+        `I assume you led a small team at ${company}, probably 3 to 6 people.`,
+        "assumed",
+        [],
+        `${title} often means leading people. Your profile doesn’t say how many.`,
+        "people",
+        role.index,
+        `Led a small team at ${company} (3 to 6 people)`,
+      ),
+    ];
+    if (role.index === 0) {
+      lines.push(
+        sentence(
+          `Companies like ${company} usually run on bookings, payments and building access, so I assume you worked on some of those.`,
+          "assumed",
+          [],
+          "That is what platforms like this are made of. Your role only says what it says.",
+          "your_part",
+          role.index,
+          `Worked on bookings, payments and building access at ${company}`,
+        ),
+      );
+    }
+    return lines;
+  });
+  const told = sources.filter((source) => source.kind === "told").slice(0, 2);
+  const research = sources.filter((source) => source.kind === "research").slice(0, 3);
+  return {
+    sentences: [
+      ...sentences.slice(0, 1),
+      // No source says it: the claim check must catch it.
+      sentence(
+        "You also run Kubernetes clusters in production.",
+        "known",
+        ["w0"],
+        "",
+        "stack_scale",
+        null,
+      ),
+      ...told.map((source) =>
+        sentence(`You told me: ${source.text}`, "told", [source.id], "", "your_part", null),
+      ),
+      ...research.map((source) =>
+        sentence(
+          `${source.text}, according to its own website. I assume that is the company you worked for.`,
+          "assumed",
+          [source.id],
+          "Read on the company’s own website, so I didn’t need to ask you. Tell me if your part was something else.",
+          "context",
+          0,
+          `${source.text} (read on its own website)`,
+        ),
+      ),
+      ...sentences.slice(1),
+    ],
+  };
+}
+
+const ABOUT_TECH = ["Rails", "Elixir", "Ruby", "TypeScript", "Postgres", "Terraform"] as const;
+
+/**
+ * "Tell me about you", "Anything else" (system prompt "You read what a person
+ * wrote about themselves…"): changes across the summary, the headline,
+ * skills, background, goals and a fact about the first position, each quoting
+ * the text; the summary also says one thing the text does not (the server
+ * must flag it).
+ */
+function aboutChanges(userContent: string) {
+  const text = between(userContent, "text");
+  const change = (
+    field: string,
+    value: string,
+    quote: string,
+    sentence: string,
+    position: number | null = null,
+    area = "context",
+  ) => ({ field, value, position, area, quote, sentence });
+  const found = (pattern: RegExp) => pattern.exec(text)?.[0];
+  const first = text.split(/(?<=[.!?])\s+/, 1)[0]?.replace(/[.!?]+$/, "") ?? "";
+  const role = found(/senior rails role/i);
+  const background = text
+    .split(/(?<=[.!?])\s+/)
+    .map((part) => part.replace(/[.!?]+$/, ""))
+    .find((part) => /before|\d+ years/i.test(part));
+  const led = found(/led \d+ engineers/i);
+  const changes = [
+    ...(text === ""
+      ? []
+      : [change("summary", `${first}. Now building hospitality products at Acme.`, first, "")]),
+    ...(role === undefined
+      ? []
+      : [change("headline", "Senior Rails engineer", role, `You describe yourself as a ${role}.`)]),
+    ...ABOUT_TECH.flatMap((name) => {
+      const written = found(new RegExp(String.raw`\b${name}\b`, "i"));
+      return written === undefined ? [] : [change("skill", name, written, "")];
+    }),
+    ...(background === undefined
+      ? []
+      : [change("background", background, background, `${background}.`)]),
+    ...(role === undefined
+      ? []
+      : [change("goal_role", "Senior Rails engineer", role, `You want a ${role}.`)]),
+    ...(led === undefined
+      ? []
+      : [change("role_fact", led.replace(/^l/, "L"), led, `You ${led}.`, 0, "people")]),
+  ];
+  return { changes };
+}
+
 /** An OpenAI-compatible chat completion whose message is `content` (as JSON text). */
 function completion(content: unknown) {
   return {
@@ -387,6 +538,14 @@ async function complete(request: IncomingMessage, response: ServerResponse) {
     }
     if (system.startsWith("You are interviewing a person about one position")) {
       json(response, 200, completion(interview(user?.content ?? "")));
+      return;
+    }
+    if (system.startsWith("You write what a job-hunting app knows about one person")) {
+      json(response, 200, completion(aboutPortrait(user?.content ?? "")));
+      return;
+    }
+    if (system.startsWith("You read what a person wrote about themselves")) {
+      json(response, 200, completion(aboutChanges(user?.content ?? "")));
       return;
     }
     if (system.startsWith("You read pages from a company")) {

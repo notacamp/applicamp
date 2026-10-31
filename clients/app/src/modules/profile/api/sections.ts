@@ -233,7 +233,15 @@ export function compareList(
 }
 
 /** The basics fields, in the order the page shows them. */
-export const BASICS = ["name", "label", "location", "email", "url", "summary"] as const;
+export const BASICS = [
+  "name",
+  "label",
+  "location",
+  "email",
+  "url",
+  "summary",
+  "background",
+] as const;
 export type BasicsKey = (typeof BASICS)[number];
 
 /** How the draft's `key` compares with the profile's (none when the draft has none). */

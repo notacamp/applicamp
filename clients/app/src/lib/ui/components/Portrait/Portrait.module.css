@@ -1,0 +1,105 @@
+.portrait {
+  border: var(--border-width) solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+  min-width: 0;
+}
+
+.text {
+  margin: 0;
+  max-width: none;
+  font-size: var(--text-md);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.sentence {
+  all: unset;
+  display: inline;
+  border-radius: var(--radius-sm);
+  padding: 1px 2px;
+  color: var(--text-primary);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+button.sentence {
+  cursor: pointer;
+}
+
+button.sentence:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.sentence[data-kind="told"] {
+  background: var(--tag-purple);
+}
+
+.sentence[data-kind="assumed"] {
+  background: var(--tag-yellow);
+  border-bottom: 2px dotted var(--text-tertiary);
+}
+
+.sentence[data-kind="confirmed"] {
+  background: var(--success-soft);
+}
+
+.sentence[data-kind="wrong"] {
+  text-decoration: line-through;
+  color: var(--text-tertiary);
+}
+
+.sentence[data-fresh] {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--border-subtle);
+  display: inline-block;
+}
+
+.swatch[data-kind="told"] {
+  background: var(--tag-purple);
+}
+
+.swatch[data-kind="assumed"] {
+  background: var(--tag-yellow);
+  border-bottom: 2px dotted var(--text-tertiary);
+}
+
+.swatch[data-kind="confirmed"] {
+  background: var(--success-soft);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  min-width: 0;
+}

@@ -1,5 +1,6 @@
 //! The profile module's use cases, one slice each.
 
+pub mod about;
 pub mod completion;
 pub mod goals;
 pub mod grill;

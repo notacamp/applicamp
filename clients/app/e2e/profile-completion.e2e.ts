@@ -83,8 +83,8 @@ test("someone sees how strong their profile is, answers a question, keeps the dr
   await expect(page.getByTestId("today-profile-nudge")).toHaveCount(0);
 
   // Improve my profile: the AI read the profile and asks about the first gap.
-  await page.goto("/profile");
-  await page.getByTestId("strength-improve").click();
+  // (Profile & goals now leads to "Tell me about you"; the questions stay a page of their own.)
+  await page.goto("/profile/improve");
   await expect(page).toHaveURL(/\/profile\/improve$/);
   await expect(page.getByTestId("improve-question")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("improve-context")).toContainText("Example Org");

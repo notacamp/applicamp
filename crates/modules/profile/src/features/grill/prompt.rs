@@ -241,6 +241,8 @@ mod tests {
                 quote: "It took 7 months".to_owned(),
                 area: Area::Results,
                 kept_at: Utc::now(),
+                status: Default::default(),
+                basis: None,
             }],
             ..Work::default()
         }

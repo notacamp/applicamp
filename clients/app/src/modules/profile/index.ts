@@ -28,3 +28,4 @@ export {
 } from "./components/StrengthNudge/StrengthNudge";
 export { GrillPage, type GrillPageProps } from "./components/Grill/GrillPage";
 export { JobAnswerFacts, type JobAnswerFactsProps } from "./components/Grill/JobAnswerFacts";
+export { AboutYouPage, type AboutYouPageProps } from "./components/AboutYou/AboutYouPage";

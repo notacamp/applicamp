@@ -24,6 +24,7 @@
 //! [`DAILY_READS_CAP`] per account per UTC day (its fetches count, whether or
 //! not the model was reached).
 
+pub mod employer;
 pub mod judge;
 pub mod prompt;
 pub mod site;
@@ -645,6 +646,38 @@ async fn read_company(
         ));
     };
     let source = choice.source.unwrap_or(SiteSource::Person);
+    let posting = Url::parse(&opp.url).ok();
+    fetch_and_store(
+        deps,
+        state,
+        account,
+        &opp.company,
+        &site,
+        source,
+        posting.as_ref(),
+        Some(opp),
+        now,
+    )
+    .await?;
+    Ok(true)
+}
+
+/// Read `company`'s pages at `site` and keep the facts (**one model call**):
+/// the one mechanism behind a job's company and a past employer. The read
+/// counts toward the daily cap whatever comes of it.
+#[allow(clippy::too_many_arguments)]
+async fn fetch_and_store(
+    deps: &PipelineDeps,
+    state: &AppState,
+    account: Uuid,
+    company: &str,
+    site: &Url,
+    source: SiteSource,
+    posting: Option<&Url>,
+    opp: Option<&Opp>,
+    now: DateTime<Utc>,
+) -> Result<()> {
+    let db = &state.db;
     let neighbours = neighbours(deps)?;
     let gateway = gateway(deps)?;
     if reads_today(db, account, now).await? >= DAILY_READS_CAP {
@@ -657,8 +690,8 @@ async fn read_company(
     // The company is on record from the first read, with the site it was
     // read at, and the read counts toward the cap whatever comes of it.
     let mut tx = db.begin().await?;
-    companies::note_site(&mut tx, account, &opp.company, &site, source, now).await?;
-    let company_id = companies::ensure(&mut tx, account, &opp.company, now).await?;
+    companies::note_site(&mut tx, account, company, site, source, now).await?;
+    let company_id = companies::ensure(&mut tx, account, company, now).await?;
     sqlx::query(
         "INSERT INTO pipeline.company_reads (id, account_id, company_id, started_at)
          VALUES ($1, $2, $3, $4)",
@@ -671,23 +704,24 @@ async fn read_company(
     .await?;
     tx.commit().await?;
 
-    let posting = Url::parse(&opp.url).ok();
-    let reading = neighbours
-        .read_site(&site, posting.as_ref(), now)
-        .await
-        .map_err(|failure| match failure {
-            SiteFailure::Unreachable => Error::Unavailable("site_unreachable"),
-            SiteFailure::RobotsDisallows => Error::Conflict(
-                "robots_disallows",
-                "The company's website asks robots not to read it, so nothing was read.".to_owned(),
-            ),
-            SiteFailure::NothingReadable => Error::Conflict(
-                "no_pages_readable",
-                "None of the company's pages had text to read.".to_owned(),
-            ),
-        })?;
+    let reading =
+        neighbours
+            .read_site(site, posting, now)
+            .await
+            .map_err(|failure| match failure {
+                SiteFailure::Unreachable => Error::Unavailable("site_unreachable"),
+                SiteFailure::RobotsDisallows => Error::Conflict(
+                    "robots_disallows",
+                    "The company's website asks robots not to read it, so nothing was read."
+                        .to_owned(),
+                ),
+                SiteFailure::NothingReadable => Error::Conflict(
+                    "no_pages_readable",
+                    "None of the company's pages had text to read.".to_owned(),
+                ),
+            })?;
 
-    let (message, shown) = prompt::facts_message(&opp.company, &reading.pages);
+    let (message, shown) = prompt::facts_message(company, &reading.pages);
     let raw: RawFacts = ask(
         gateway,
         db,
@@ -721,7 +755,7 @@ async fn read_company(
         dropped,
         "a company read"
     );
-    Ok(true)
+    Ok(())
 }
 
 /// Keep what a read found: the facts (a removed one stays removed), the text
@@ -736,7 +770,7 @@ async fn store_read(
     facts: &[NewFact],
     dropped: u32,
     now: DateTime<Utc>,
-    opp: &Opp,
+    opp: Option<&Opp>,
 ) -> Result<()> {
     let mut tx = db.begin().await?;
     let removed: Vec<String> = sqlx::query_scalar(
@@ -821,10 +855,11 @@ async fn store_read(
     .execute(&mut *tx)
     .await?;
     // A posting added by link has no text; the page just read is it.
-    if opp
-        .description
-        .as_deref()
-        .is_none_or(|d| d.trim().is_empty())
+    if let Some(opp) = opp
+        && opp
+            .description
+            .as_deref()
+            .is_none_or(|d| d.trim().is_empty())
         && let Some(posting) = pages.iter().find(|p| p.kind == "posting")
     {
         sqlx::query(

@@ -43,6 +43,9 @@ jobs:
       - name: Architecture (module boundaries, migrations, operation security, documented routes)
         if: always()
         run: cargo xtask arch
+      - name: Sandbox policies (enforced endpoints, Landlock required, no forbidden or internal host)
+        if: always()
+        run: cargo xtask policies
       - name: OpenAPI drift
         id: openapi
         if: always()
@@ -88,6 +91,10 @@ jobs:
         with: { save-if: "${{ github.ref == 'refs/heads/main' }}" }
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
         with: { tool: cargo-nextest }
+      # The runs module's lifecycle tests start the real agent runner under
+      # the fake sandbox runtime (target/debug/applicamp-agent).
+      - name: Build the agent runner
+        run: cargo build --locked --package applicamp-agent --bin applicamp-agent
       - name: Tests
         run: cargo nextest run --workspace --locked --no-tests=fail --no-fail-fast
 
@@ -138,6 +145,26 @@ jobs:
             node_auth_token=${{ secrets.GITHUB_TOKEN }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: .
+          target: agent
+          load: true
+          tags: applicamp-agent:ci
+          build-args: GIT_SHA=${{ github.sha }}
+          secrets: |
+            node_auth_token=${{ secrets.GITHUB_TOKEN }}
+          cache-from: type=gha
+      - name: The agent image's runner runs
+        run: docker run --rm applicamp-agent:ci --version
+      - name: Trivy on the agent image (HIGH/CRITICAL, fixable)
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: applicamp-agent:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: .trivyignore.yaml
+          exit-code: "1"
       - name: The image's binary runs and the web client is in it
         run: |
           docker run --rm applicamp:ci --version

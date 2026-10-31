@@ -4,7 +4,8 @@
 //! A path that names a file in the build gets that file; any other `GET`
 //! gets `index.html`, so the client's own routes (`/pipeline`, `/sign-in`)
 //! load the app, which routes in the browser. The API (`/api/…`), the BFF
-//! (`/bff/…`) and `/healthz` never fall through to the client: an unknown
+//! (`/bff/…`), `/.well-known/…`, `/oauth2/…` and `/healthz` never fall
+//! through to the client: an unknown
 //! path there is the API's problem+json 404, as is any other method.
 //!
 //! Vite names everything under `/assets/` after its content, so those
@@ -26,8 +27,9 @@ use tower_http::services::{ServeDir, ServeFile};
 
 /// The build's content-named files.
 const ASSETS: &str = "/assets/";
-/// Path prefixes the server answers itself.
-const SERVER_PREFIXES: [&str; 2] = ["/api", "/bff"];
+/// Path prefixes the server answers itself (`/.well-known` and `/oauth2`:
+/// the keys the sandbox gateway trusts).
+const SERVER_PREFIXES: [&str; 4] = ["/api", "/bff", "/.well-known", "/oauth2"];
 /// `Cache-Control` of a content-named asset.
 const IMMUTABLE: &str = "public, max-age=31536000, immutable";
 /// `Cache-Control` of everything else in the build.
@@ -234,6 +236,8 @@ mod tests {
             "/bff",
             "/bff/providers",
             "/healthz",
+            "/.well-known/openid-configuration",
+            "/oauth2/jwks",
         ] {
             assert!(is_server_path(path), "{path}");
         }

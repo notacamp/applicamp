@@ -1,0 +1,42 @@
+[package]
+name = "applicamp-runs"
+description = "Applicamp runs module: agent runs in throwaway sandboxes (OpenShell, or a local fake), their policies, the agent API, the run events and their live stream."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+applicamp-ai.workspace = true
+applicamp-kernel.workspace = true
+async-trait.workspace = true
+aws-lc-rs.workspace = true
+axum.workspace = true
+base64.workspace = true
+chrono.workspace = true
+figment.workspace = true
+futures.workspace = true
+jsonwebtoken.workspace = true
+openshell-policy.workspace = true
+openshell-sdk.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+# Child processes and the local proxy of the fake runtime.
+tokio = { workspace = true, features = ["process"] }
+tracing.workspace = true
+url.workspace = true
+utoipa.workspace = true
+utoipa-axum.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+http-body-util.workspace = true
+tower.workspace = true
+wiremock.workspace = true
+
+[lints]
+workspace = true

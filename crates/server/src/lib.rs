@@ -1,7 +1,8 @@
 //! `applicamp-server`: composes the modules into one HTTP application.
 //!
 //! This is the only crate that knows the full list of modules. Adding a
-//! module means adding one line to [`modules_with`]; what modules are
+//! module means adding one line to [`modules_with`] (the runs module, which
+//! executes every module's run kinds, comes last); what modules are
 //! composed with (the AI gateway) is the [`Composition`]. Their background work is
 //! collected by [`registry`]; their routes, the BFF's and `/healthz` form
 //! the OpenAPI document ([`openapi`]), and every route is declared through
@@ -16,7 +17,11 @@ pub mod wiring;
 
 use std::{convert::Infallible, sync::Arc, time::Instant};
 
-use applicamp_kernel::{AppState, Error, Module, Problem, Result, jobs::Registry};
+use applicamp_kernel::{
+    AppState, Error, Module, Problem, Result,
+    agent::{RunKind, check_kinds},
+    jobs::Registry,
+};
 use axum::{
     Json, Router,
     extract::{MatchedPath, Request, State},
@@ -54,6 +59,10 @@ pub struct Composition {
     /// The sources module: the boards' reader, the AI gateway that scores
     /// jobs, and its neighbours.
     pub sources: applicamp_sources::SourcesDeps,
+    /// The runs module: the sandbox runtime and the AI gateway behind the
+    /// agent API. Every module's run kinds are added when it is composed
+    /// ([`runs_with`]).
+    pub runs: applicamp_runs::RunsDeps,
 }
 
 impl Composition {
@@ -63,7 +72,28 @@ impl Composition {
     pub fn from_env() -> Result<Self, String> {
         let ai = applicamp_ai::AiConfig::from_env().map_err(|e| e.to_string())?;
         let sources = applicamp_sources::SourcesConfig::from_env()?;
-        Self::with(ai, sources)
+        let runs = applicamp_runs::RunsConfig::from_env()?;
+        Ok(Self::with(ai, sources)?.with_runs(runs))
+    }
+
+    /// The same, with the sandbox settings `config` (no runtime until
+    /// [`with_sandboxes`](Self::with_sandboxes)).
+    #[must_use]
+    pub fn with_runs(mut self, config: applicamp_runs::RunsConfig) -> Self {
+        self.runs = applicamp_runs::RunsDeps::new(config, self.pipeline.ai.clone());
+        self
+    }
+
+    /// The same, with the configured sandbox runtime, checked against the
+    /// public URL (no fake runtime in production) and, for OpenShell, the
+    /// gateway's issuer keyed from the instance `secret`.
+    pub fn with_sandboxes(
+        mut self,
+        secret: &applicamp_kernel::crypto::SecretKey,
+        public_url: &str,
+    ) -> Result<Self, String> {
+        self.runs = self.runs.with_secret(secret, public_url)?;
+        Ok(self)
     }
 
     /// Composed over `ai`, with the job boards' own APIs.
@@ -93,6 +123,10 @@ impl Composition {
             ai: Some(gateway),
         };
         Ok(Self {
+            runs: applicamp_runs::RunsDeps::new(
+                applicamp_runs::RunsConfig::default(),
+                pipeline.ai.clone(),
+            ),
             profile: applicamp_profile::ProfileDeps { ai: profile_ai },
             pipeline,
             sources,
@@ -129,14 +163,43 @@ pub fn modules() -> Vec<Module> {
     modules_with(&Composition::default())
 }
 
-/// Every module, in mount order, composed with `composition`.
+/// Every module, in mount order, composed with `composition`. The runs
+/// module comes last: it executes every other module's run kinds.
 pub fn modules_with(composition: &Composition) -> Vec<Module> {
+    let mut modules = domain_modules(composition);
+    modules.push(applicamp_runs::module(runs_with(composition)));
+    modules
+}
+
+/// Every module but `runs`.
+fn domain_modules(composition: &Composition) -> Vec<Module> {
     vec![
         applicamp_identity::module(),
         applicamp_profile::module(composition.profile.clone()),
         applicamp_pipeline::module(composition.pipeline.clone()),
         applicamp_sources::module(composition.sources.clone()),
     ]
+}
+
+/// The runs module's composition with every module's run kinds: what its
+/// routes and its orchestrator execute.
+pub fn runs_with(composition: &Composition) -> applicamp_runs::RunsDeps {
+    let kinds: Vec<RunKind> = domain_modules(composition)
+        .iter()
+        .flat_map(|module| module.kinds.iter().cloned())
+        .collect();
+    composition.runs.clone().with_kinds(kinds)
+}
+
+/// Every module's run kinds are well formed: named after their module,
+/// unique, and with no outward tool ([`check_kinds`]).
+pub fn kinds() -> Result<(), Vec<String>> {
+    let modules = modules();
+    check_kinds(
+        modules
+            .iter()
+            .map(|module| (module.name, module.kinds.as_slice())),
+    )
 }
 
 /// Every module's background work, composed inertly (the kinds there are).
@@ -172,7 +235,8 @@ pub async fn migrate(db: &PgPool) -> Result<(), sqlx::migrate::MigrateError> {
         description = "The Applicamp HTTP API. Errors are RFC 9457 \
             `application/problem+json` with a stable `code`. Operations either are public or \
             take the web app's session cookie (`session`); unsafe methods also need the \
-            `X-Applicamp-CSRF: 1` header and the app's own `Origin`.",
+            `X-Applicamp-CSRF: 1` header and the app's own `Origin`. The agent API \
+            (`/api/agent/…`) takes a run's token instead (`run_token`), never a cookie.",
         license(name = "Sustainable Use License", identifier = "LicenseRef-Sustainable-Use"),
     ),
     components(schemas(Problem)),
@@ -192,6 +256,10 @@ pub async fn migrate(db: &PgPool) -> Result<(), sqlx::migrate::MigrateError> {
             and the ones a weekly discovery finds), credited and read within their terms, \
             ranked by average salary, and scored against your profile and goals within the \
             spending limits; and what each search scanned."),
+        (name = "runs", description = "Agent runs: every agent in its own sandbox, \
+            removed when the run ends, and what it did (its events, live). The agent API \
+            (`/api/agent/v1/…`) is the only way a sandbox reaches the server, with its run's \
+            token. And the keys the sandbox gateway trusts this server's own tokens with."),
         (name = "bff", description = "The web app's backend-for-frontend: sign-in with a \
             provider, the session cookie, sign-out. Browsers only."),
     ),
@@ -205,12 +273,29 @@ fn api(composition: &Composition) -> OpenApiRouter<AppState> {
     doc.components
         .get_or_insert_with(Default::default)
         .add_security_scheme(bff::SESSION_SCHEME, bff::security_scheme());
+    doc.components
+        .get_or_insert_with(Default::default)
+        .add_security_scheme(applicamp_runs::RUN_TOKEN_SCHEME, run_token_scheme());
     modules_with(composition)
         .into_iter()
         .fold(OpenApiRouter::with_openapi(doc), |api, module| {
             api.merge(module.router)
         })
         .routes(routes!(health))
+}
+
+/// The `run_token` security scheme of the agent API.
+fn run_token_scheme() -> utoipa::openapi::security::SecurityScheme {
+    use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
+    SecurityScheme::Http(
+        HttpBuilder::new()
+            .scheme(HttpAuthScheme::Bearer)
+            .description(Some(
+                "A run's token, sent once into its sandbox: it names the run and the tools its \
+                 kind may call, and works only while the run goes. Never with a cookie.",
+            ))
+            .build(),
+    )
 }
 
 /// The OpenAPI document: every route the server answers.

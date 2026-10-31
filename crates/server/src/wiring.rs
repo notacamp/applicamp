@@ -637,6 +637,49 @@ fn cv_profile_of(profile: applicamp_profile::schema::Profile) -> CvProfile {
     }
 }
 
+/// Starting runs for any module (the kernel's `RunStarter` port), over the
+/// runs module: a run of a kind this instance executes, queued in the
+/// caller's transaction.
+#[derive(Debug, Clone)]
+pub struct RunsWiring {
+    kinds: std::sync::Arc<applicamp_runs::Kinds>,
+}
+
+impl RunsWiring {
+    /// Starting runs of the kinds `runs` executes.
+    pub fn new(runs: &applicamp_runs::RunsDeps) -> Self {
+        Self {
+            kinds: std::sync::Arc::clone(&runs.kinds),
+        }
+    }
+}
+
+impl applicamp_kernel::agent::RunStarter for RunsWiring {
+    fn start_run<'a>(
+        &'a self,
+        conn: &'a mut sqlx::PgConnection,
+        run: applicamp_kernel::agent::StartRun,
+    ) -> BoxFuture<'a, Result<Uuid>> {
+        Box::pin(async move {
+            if self.kinds.get(&run.kind).is_none() {
+                return Err(applicamp_kernel::Error::BadRequest(
+                    "unknown_kind",
+                    format!("No run kind `{}` here.", run.kind),
+                ));
+            }
+            Ok(applicamp_runs::store::queue(
+                conn,
+                run.account,
+                &run.kind,
+                run.subject,
+                &run.inputs,
+                Utc::now(),
+            )
+            .await?)
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use applicamp_profile::{

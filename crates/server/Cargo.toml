@@ -18,6 +18,7 @@ applicamp-identity.workspace = true
 applicamp-kernel.workspace = true
 applicamp-pipeline.workspace = true
 applicamp-profile.workspace = true
+applicamp-runs.workspace = true
 applicamp-sources.workspace = true
 axum.workspace = true
 base64.workspace = true

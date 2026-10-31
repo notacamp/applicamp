@@ -106,6 +106,7 @@ pub fn module(deps: PipelineDeps) -> Module {
         background: Background::new()
             .job::<cv::ExpireCvDrafts>()
             .publishes::<events::OpportunityAdded>(),
+        kinds: Vec::new(),
     }
 }
 

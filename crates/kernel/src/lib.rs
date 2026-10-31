@@ -1,12 +1,14 @@
 //! `applicamp-kernel`: the domain-agnostic core every crate builds on.
 //!
 //! It depends on no other Applicamp crate and knows nothing about jobs to
-//! hunt, CVs or approvals (enforced by `cargo xtask arch`). A trimmed copy of
+//! hunt, CVs or approvals (enforced by `cargo xtask arch`); [`agent`] holds
+//! only the shape of a run kind, which modules fill in. A trimmed copy of
 //! Campbooks Next's kernel: no workspaces, no row-level security, no token
 //! issuer.
 
 #![forbid(unsafe_code)]
 
+pub mod agent;
 pub mod auth;
 pub mod claims;
 pub mod clock;

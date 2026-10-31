@@ -9,7 +9,7 @@ use std::{future::Future, pin::Pin};
 
 use utoipa_axum::router::OpenApiRouter;
 
-use crate::{jobs::Background, state::AppState};
+use crate::{agent::RunKind, jobs::Background, state::AppState};
 
 /// A domain module, as handed to the server.
 pub struct Module {
@@ -19,6 +19,9 @@ pub struct Module {
     pub router: OpenApiRouter<AppState>,
     /// The module's jobs and event handlers, each named `<name>.<…>`.
     pub background: Background,
+    /// The kinds of agent run it owns (`<name>.<kind>`), which the `runs`
+    /// module executes.
+    pub kinds: Vec<RunKind>,
 }
 
 impl std::fmt::Debug for Module {
@@ -26,6 +29,10 @@ impl std::fmt::Debug for Module {
         f.debug_struct("Module")
             .field("name", &self.name)
             .field("background", &self.background)
+            .field(
+                "kinds",
+                &self.kinds.iter().map(|kind| kind.name).collect::<Vec<_>>(),
+            )
             .finish_non_exhaustive()
     }
 }

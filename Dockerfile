@@ -1,5 +1,10 @@
-# Applicamp image: the `applicamp` server binary and the built web client on
-# distroless.
+# Applicamp images, on distroless:
+#
+# - `runtime` (the default target, ghcr.io/notacamp/applicamp): the `applicamp`
+#   server binary and the built web client, with the agent runner beside it for
+#   the fake sandbox runtime (local development and e2e only).
+# - `agent` (`--target agent`, ghcr.io/notacamp/applicamp-agent): the agent
+#   runner alone, the image OpenShell sandboxes run.
 #
 #   NODE_AUTH_TOKEN=$(gh auth token) docker build \
 #     --secret id=node_auth_token,env=NODE_AUTH_TOKEN \
@@ -48,12 +53,28 @@ RUN cargo chef prepare --recipe-path recipe.json
 # --- builder: build deps (cached), then the server -----------------------------
 FROM chef AS builder
 COPY --from=planner /src/recipe.json recipe.json
-RUN cargo chef cook --release --locked --package applicamp-server --recipe-path recipe.json
+RUN cargo chef cook --release --locked --package applicamp-server --package applicamp-agent \
+    --recipe-path recipe.json
 COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
 COPY .cargo .cargo
 COPY migrations migrations
+COPY policies policies
 COPY crates crates
-RUN cargo build --release --locked --package applicamp-server --bin applicamp
+RUN cargo build --release --locked --package applicamp-server --bin applicamp \
+    --package applicamp-agent --bin applicamp-agent
+
+# --- agent: the runner inside every sandbox; distroless, non-root, no shell ----
+FROM gcr.io/distroless/cc-debian12:nonroot AS agent
+ARG GIT_SHA=""
+LABEL org.opencontainers.image.title="applicamp-agent" \
+      org.opencontainers.image.description="Applicamp agent runner (inside OpenShell sandboxes)" \
+      org.opencontainers.image.source="https://github.com/notacamp/applicamp" \
+      org.opencontainers.image.licenses="LicenseRef-Sustainable-Use" \
+      org.opencontainers.image.revision="${GIT_SHA}"
+COPY --from=builder /src/target/release/applicamp-agent /app/applicamp-agent
+WORKDIR /sandbox
+USER nonroot:nonroot
+ENTRYPOINT ["/app/applicamp-agent"]
 
 # --- runtime: distroless, non-root, no shell ----------------------------------
 FROM gcr.io/distroless/cc-debian12:nonroot AS runtime
@@ -66,8 +87,10 @@ LABEL org.opencontainers.image.title="applicamp" \
 ENV GIT_SHA=${GIT_SHA} \
     APPLICAMP_BIND_ADDR=0.0.0.0:8080 \
     APPLICAMP_LOG_FORMAT=json \
-    APPLICAMP_WEB_DIR=/app/web
+    APPLICAMP_WEB_DIR=/app/web \
+    APPLICAMP_SANDBOX__FAKE_AGENT=/app/applicamp-agent
 COPY --from=builder /src/target/release/applicamp /app/applicamp
+COPY --from=builder /src/target/release/applicamp-agent /app/applicamp-agent
 COPY --from=web /src/clients/app/dist /app/web
 USER nonroot:nonroot
 EXPOSE 8080

@@ -45,7 +45,7 @@ caps and the run's token budget.
 
 #### Scenario: The cap is reached
 - **WHEN** an account has used its daily tokens and a run asks for a completion
-- **THEN** the call is refused with `ai_cap_reached` and the run records it
+- **THEN** the call is refused with `ai_daily_limit_reached` and the run records it
 
 ### Requirement: An agent calls only its kind's tools, within their caps
 The run token SHALL name the tools of the run's kind, each with a call cap and

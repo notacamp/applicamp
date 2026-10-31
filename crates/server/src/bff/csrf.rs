@@ -13,6 +13,10 @@
 //!
 //! Anything else is refused with 403 problem+json (`csrf_check_failed`)
 //! before any handler runs, so nothing changes.
+//!
+//! The agent API (`/api/agent/…`) is the one exception: no browser calls
+//! it, it takes a run's bearer token and refuses any request with a cookie,
+//! so a forged cross-site request has nothing to ride on.
 
 use std::sync::Arc;
 
@@ -33,7 +37,10 @@ pub const CSRF_FAILED: &str = "csrf_check_failed";
 /// Middleware: refuse unsafe requests that fail the check. Its state is the
 /// public origin (`https://applicamp.example.com`).
 pub async fn check(State(origin): State<Arc<str>>, request: Request, next: Next) -> Response {
-    if request.method().is_safe() || passes(request.headers(), &origin) {
+    if request.method().is_safe()
+        || is_agent_api(request.uri().path())
+        || passes(request.headers(), &origin)
+    {
         next.run(request).await
     } else {
         tracing::info!(method = %request.method(), "refused a request failing the CSRF check");
@@ -44,6 +51,11 @@ pub async fn check(State(origin): State<Arc<str>>, request: Request, next: Next)
         )
         .into_response()
     }
+}
+
+/// Whether `path` is the agent API's (bearer run tokens, no cookies).
+fn is_agent_api(path: &str) -> bool {
+    path.starts_with(applicamp_runs::AGENT_API_PREFIX)
 }
 
 fn passes(headers: &HeaderMap, origin: &str) -> bool {
@@ -91,6 +103,19 @@ mod tests {
             ]),
             ORIGIN
         ));
+    }
+
+    #[test]
+    fn only_the_agent_api_is_exempt() {
+        assert!(is_agent_api("/api/agent/v1/finish"));
+        for path in [
+            "/api/v1/runs",
+            "/api/agentx/v1",
+            "/bff/sign-out",
+            "/api/agent",
+        ] {
+            assert!(!is_agent_api(path), "{path}");
+        }
     }
 
     #[test]

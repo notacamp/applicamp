@@ -173,7 +173,28 @@ describe("Review the CV", () => {
   it("approves once nothing is flagged, then reads as a version that can't change", async () => {
     const approved = cv({
       draft: { ...fixedDraft(), status: "approved", version: 1, can_approve: false },
-      versions: [{ n: 1, version: 1, language: "en", approved_at: "2026-10-31T11:00:00Z" }],
+      versions: [
+        {
+          n: 1,
+          version: 1,
+          language: "en",
+          approved_at: "2026-10-31T11:00:00Z",
+          created_at: "2026-10-31T11:00:00Z",
+          template: "clean",
+          length: 1,
+          pages: 1,
+          size_bytes: 30_000,
+          current: true,
+          checks: {
+            sections: { expected: ["Summary"], missing: [] },
+            keywords: { total: 1, found: 1, missing: [] },
+            lines: { total: 3, missing: [] },
+            text_layer: true,
+            contact: { name: true, email: true, links: true },
+            size: { pages: 1, length: 1, bytes: 30_000 },
+          },
+        },
+      ],
     });
     renderReview({
       [CV]: { body: fixed() },

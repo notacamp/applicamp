@@ -26,9 +26,11 @@
 pub mod check;
 pub mod judge;
 pub mod model;
+pub mod pdf;
 pub mod prompt;
 #[cfg(test)]
 mod tests;
+pub mod versions;
 pub mod view;
 
 use applicamp_ai::Role;
@@ -49,6 +51,8 @@ use self::{
     check::Checks,
     judge::{MAX_BULLET, MAX_HEADLINE, MAX_SKILL, MAX_SUMMARY, RawCv},
     model::{CompanyFact, Content, Frame, Line, Role as CvRole, Source, SourceKind, short},
+    pdf::{Length, Template},
+    versions::LayoutRequest,
     view::{CvDraftView, CvVersion, DraftParts, DraftStatus},
 };
 use crate::{
@@ -123,7 +127,7 @@ pub struct Cv {
     /// The latest draft that was not discarded (approved or not); none before
     /// the first.
     pub draft: Option<CvDraftView>,
-    /// The approved versions, newest first (no PDF yet).
+    /// The PDF versions, newest first.
     pub versions: Vec<CvVersion>,
     pub can_draft: CanDraft,
     pub caps: CvCaps,
@@ -332,6 +336,54 @@ fn draft_view(row: &Row, wants: &[BriefWant], opp: &Opp) -> CvDraftView {
     )
 }
 
+#[derive(sqlx::FromRow)]
+struct VersionRow {
+    n: i32,
+    version: i32,
+    language: String,
+    approved_at: Option<DateTime<Utc>>,
+    template: String,
+    length: i16,
+    pages: i16,
+    size_bytes: i32,
+    created_at: DateTime<Utc>,
+    downloaded_at: Option<DateTime<Utc>>,
+    checks: sqlx::types::Json<pdf::readback::PdfChecks>,
+}
+
+/// The PDF versions of `opp`, newest first (the PDF itself is not read).
+async fn versions_of(db: &PgPool, account: Uuid, opp: Uuid) -> Result<Vec<CvVersion>> {
+    let rows: Vec<VersionRow> = sqlx::query_as(
+        "SELECT d.n, v.version, v.language, d.approved_at, v.template, v.length, v.pages,
+                v.size_bytes, v.created_at, v.downloaded_at, v.checks
+           FROM pipeline.cv_versions v JOIN pipeline.cv_drafts d ON d.id = v.draft_id
+          WHERE v.opportunity_id = $1 AND v.account_id = $2
+          ORDER BY v.version DESC",
+    )
+    .bind(opp)
+    .bind(account)
+    .fetch_all(db)
+    .await?;
+    let newest = rows.first().map(|r| r.version);
+    Ok(rows
+        .into_iter()
+        .map(|r| CvVersion {
+            n: counted(i64::from(r.n)),
+            version: counted(i64::from(r.version)),
+            language: r.language,
+            approved_at: r.approved_at.unwrap_or(r.created_at),
+            template: Template::parse(&r.template).unwrap_or_default(),
+            length: u8::try_from(r.length).unwrap_or(1),
+            pages: counted(i64::from(r.pages)),
+            size_bytes: u64::try_from(r.size_bytes).unwrap_or(0),
+            created_at: r.created_at,
+            downloaded_at: r.downloaded_at,
+            current: Some(r.version) == newest,
+            checks: r.checks.0,
+        })
+        .collect())
+}
+
 /// The tailored CV of `opp`, as it is now. Never calls the model.
 async fn build(
     deps: &PipelineDeps,
@@ -344,16 +396,16 @@ async fn build(
     let draft = latest(db, account, opp.id, now)
         .await?
         .map(|row| draft_view(&row, &wants, opp));
-    let versions: Vec<(i32, i32, String, DateTime<Utc>)> = sqlx::query_as(
-        "SELECT n, version, language, approved_at FROM pipeline.cv_drafts
-          WHERE opportunity_id = $1 AND account_id = $2 AND status = 'approved'
-            AND version IS NOT NULL AND approved_at IS NOT NULL
-          ORDER BY version DESC",
-    )
-    .bind(opp.id)
-    .bind(account)
-    .fetch_all(db)
-    .await?;
+    let versions = versions_of(db, account, opp.id).await?;
+    // An approved draft is shown as its newest PDF's version.
+    let draft = draft.map(|mut draft| {
+        if draft.status == DraftStatus::Approved
+            && let Some(newest) = versions.iter().find(|v| v.n == draft.n)
+        {
+            draft.version = Some(newest.version);
+        }
+        draft
+    });
     let here = drafts_here(db, opp.id).await?;
     let today = drafts_today(db, account, now).await?;
     let spend = match &deps.ai {
@@ -363,15 +415,7 @@ async fn build(
     Ok(Cv {
         opportunity_id: opp.id,
         draft,
-        versions: versions
-            .into_iter()
-            .map(|(n, version, language, approved_at)| CvVersion {
-                n: counted(i64::from(n)),
-                version: counted(i64::from(version)),
-                language,
-                approved_at,
-            })
-            .collect(),
+        versions,
         can_draft: can_draft(&opp.stage, here, today, gateway_ready(deps)),
         caps: CvCaps {
             drafts_here: counted(here),
@@ -1119,8 +1163,13 @@ pub async fn put_back(
 /// Approve the draft.
 ///
 /// Refused (409 `lines_flagged`) while any line or skill cannot be traced to
-/// the profile. The draft is frozen as the next version (contact details are
-/// read from the profile again); part B renders it as a PDF. No model call.
+/// the profile. The draft is frozen, its text rendered as a PDF with the
+/// `template` and `length` asked for (Clean, 1 page by default), the PDF read
+/// back out and compared with the CV, and the PDF kept as the next version:
+/// all or nothing. If it does not fit the length (`cv_doesnt_fit`) or the
+/// read-back finds it lacking (`cv_pdf_check_failed`, with the reasons, one
+/// per line), nothing is approved. Contact details are read from the profile
+/// again. No model call.
 #[utoipa::path(
     post,
     path = "/api/v1/opportunities/{id}/cv/drafts/{n}/approve",
@@ -1129,13 +1178,18 @@ pub async fn put_back(
     security(("session" = [])),
     params(("id" = Uuid, Path, description = "The opportunity."),
         ("n" = u32, Path, description = "The draft.")),
+    request_body(content = LayoutRequest, description = "The look of the PDF; optional."),
     responses(
         (status = 200, description = "The CV, with the version.", body = Cv),
+        (status = 400, description = "`invalid_layout`; `invalid_length`", body = Problem,
+            content_type = "application/problem+json"),
         (status = 401, description = "`session_required`", body = Problem,
             content_type = "application/problem+json"),
         (status = 404, description = "`not_found`", body = Problem,
             content_type = "application/problem+json"),
-        (status = 409, description = "`lines_flagged`; `draft_frozen`", body = Problem,
+        (status = 409, description = "`lines_flagged`; `draft_frozen`; `cv_doesnt_fit`; \
+            `cv_pdf_check_failed`", body = Problem, content_type = "application/problem+json"),
+        (status = 503, description = "`cv_pdf_unavailable`", body = Problem,
             content_type = "application/problem+json"),
     ),
 )]
@@ -1144,7 +1198,10 @@ pub async fn approve(
     SignedIn(principal): SignedIn,
     Extension(deps): Extension<PipelineDeps>,
     Path((id, n)): Path<(Uuid, u32)>,
+    body: Option<Json<LayoutRequest>>,
 ) -> Result<Json<Cv>> {
+    let request = body.map(|Json(b)| b).unwrap_or_default();
+    let (template, length) = versions::layout(&request, (Template::Clean, Length::One))?;
     let account = principal.account_id;
     let now = state.clock.now();
     let (opp, row) = open_draft(&state, account, id, n, now).await?;
@@ -1161,15 +1218,21 @@ pub async fn approve(
     {
         content.contact = profile.contact.into();
     }
-    let mut tx = state.db.begin().await?;
-    let version: i32 = sqlx::query_scalar(
-        "SELECT coalesce(max(version), 0) + 1 FROM pipeline.cv_drafts
-          WHERE opportunity_id = $1 AND status = 'approved'",
+    // The PDF first (it takes a moment and needs no lock); then, in one
+    // transaction, the approval and the version.
+    let made = versions::render(
+        &state.db,
+        &opp,
+        &content,
+        &row.frame.0,
+        &row.language,
+        template,
+        length,
     )
-    .bind(opp.id)
-    .fetch_one(&mut *tx)
     .await?;
-    sqlx::query(
+    let mut tx = state.db.begin().await?;
+    let version = versions::next_version(&mut tx, opp.id).await?;
+    let approved = sqlx::query(
         "UPDATE pipeline.cv_drafts
             SET status = 'approved', version = $2, approved_at = $3, updated_at = $3,
                 expires_at = NULL, content = $4, checks = '{}'::jsonb
@@ -1180,9 +1243,30 @@ pub async fn approve(
     .bind(now)
     .bind(sqlx::types::Json(&content))
     .execute(&mut *tx)
+    .await?
+    .rows_affected();
+    if approved == 0 {
+        return Err(Error::Conflict(
+            "draft_frozen",
+            "This draft was approved or put away, so it cannot change. Make the CV again."
+                .to_owned(),
+        ));
+    }
+    versions::insert(
+        &mut tx,
+        account,
+        opp.id,
+        row.id,
+        version,
+        &row.language,
+        template,
+        length,
+        &made,
+        now,
+    )
     .await?;
     tx.commit().await?;
-    tracing::info!(version, "a CV approved");
+    tracing::info!(version, pages = made.pages, "a CV approved");
     Ok(Json(build(&deps, &state.db, account, &opp, now).await?))
 }
 

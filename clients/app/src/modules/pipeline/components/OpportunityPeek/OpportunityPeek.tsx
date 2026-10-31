@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -12,6 +12,7 @@ import {
   Label,
   MatchBar,
   Property,
+  PdfViewer,
   PropertyList,
   Section,
   Select,
@@ -22,7 +23,7 @@ import {
 } from "~/lib/ui";
 
 import { canPrepare, PREPARE_ESTIMATE_EUR } from "../../api/brief";
-import { useCv } from "../../api/cv";
+import { cvPdfUrl, useCv } from "../../api/cv";
 import {
   factsText,
   formatCost,
@@ -109,6 +110,7 @@ function TailoredCv({
   const cv = useCv(opportunity.id);
   const draft = cv.data?.draft ?? undefined;
   const approved = cv.data?.versions[0];
+  const [viewing, setViewing] = useState(false);
   const state =
     draft === undefined
       ? t("peek.tailored.none")
@@ -127,6 +129,27 @@ function TailoredCv({
         <Tagged testId="peek-cv-state">
           <Text>{state}</Text>
         </Tagged>
+      )}
+      {approved === undefined ? null : (
+        <Cluster>
+          <Button
+            variant="secondary"
+            data-testid="peek-view-pdf"
+            onClick={() => {
+              setViewing(true);
+            }}
+          >
+            {t("peek.tailored.viewPdf")}
+          </Button>
+          <ButtonLink
+            variant="secondary"
+            icon="download"
+            href={cvPdfUrl(opportunity.id, approved.version, true)}
+            data-testid="peek-download-pdf"
+          >
+            {t("peek.tailored.download")}
+          </ButtonLink>
+        </Cluster>
       )}
       {approved === undefined || draft === undefined || draft.status === "approved" ? null : (
         <Tagged testId="peek-cv-approved">
@@ -165,6 +188,25 @@ function TailoredCv({
           </Text>
         ) : null}
       </Cluster>
+      <PdfViewer
+        open={viewing && approved !== undefined}
+        onClose={() => {
+          setViewing(false);
+        }}
+        url={cvPdfUrl(opportunity.id, approved?.version ?? 0)}
+        downloadUrl={cvPdfUrl(opportunity.id, approved?.version ?? 0, true)}
+        title={t("cvs.viewer.title", {
+          company: opportunity.company,
+          version: approved?.version ?? 0,
+        })}
+        labels={{
+          close: t("cv.viewer.close"),
+          download: t("cv.pdf.download"),
+          loading: t("cv.viewer.loading"),
+          failed: t("cv.viewer.failed"),
+          page: (page, pages) => t("cv.viewer.page", { page, pages }),
+        }}
+      />
     </Section>
   );
 }

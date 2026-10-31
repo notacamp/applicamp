@@ -14,6 +14,7 @@ import { QUESTIONS, type Question } from "~/modules/profile";
 
 import { Agents } from "./routes/agents";
 import { Boards } from "./routes/boards";
+import { Cvs } from "./routes/cvs";
 import { SignedInFrame } from "./routes/frame";
 import { GoalsInterview } from "./routes/goals-interview";
 import { NotFound } from "./routes/not-found";
@@ -148,6 +149,28 @@ const cvRoute = createRoute({
         id={id}
         onBack={() => {
           void navigate({ to: "/pipeline/$id/prepare", params: { id } });
+        }}
+        onPipeline={() => {
+          void navigate({ to: "/pipeline" });
+        }}
+      />
+    );
+  },
+});
+
+/** Every CV: the PDFs made and the drafts being reviewed. */
+const cvsRoute = createRoute({
+  getParentRoute: () => frameRoute,
+  path: "/cvs",
+  component: function CvsRoute() {
+    const navigate = cvsRoute.useNavigate();
+    return (
+      <Cvs
+        onReview={(id) => {
+          void navigate({ to: "/pipeline/$id/cv", params: { id } });
+        }}
+        onOpportunity={() => {
+          void navigate({ to: "/pipeline" });
         }}
         onPipeline={() => {
           void navigate({ to: "/pipeline" });
@@ -374,6 +397,7 @@ const routeTree = rootRoute.addChildren([
     pipelineRoute,
     prepareRoute,
     cvRoute,
+    cvsRoute,
     boardsRoute,
     agentsRoute,
     profileRoute,

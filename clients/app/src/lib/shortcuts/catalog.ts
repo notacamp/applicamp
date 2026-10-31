@@ -37,6 +37,13 @@ export const APP_SHORTCUTS = [
     label: "shortcuts:nav.agents",
   },
   {
+    id: "nav.cvs",
+    keys: "g c",
+    scope: "global",
+    group: "navigation",
+    label: "shortcuts:nav.cvs",
+  },
+  {
     id: "nav.profile",
     keys: "g y",
     scope: "global",

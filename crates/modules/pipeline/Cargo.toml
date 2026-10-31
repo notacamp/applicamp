@@ -13,10 +13,16 @@ applicamp-ai.workspace = true
 applicamp-kernel.workspace = true
 axum.workspace = true
 chrono.workspace = true
+pdf-extract.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sqlx.workspace = true
+tokio.workspace = true
 tracing.workspace = true
+typst.workspace = true
+typst-assets.workspace = true
+typst-layout.workspace = true
+typst-pdf.workspace = true
 url.workspace = true
 utoipa.workspace = true
 utoipa-axum.workspace = true
@@ -24,7 +30,6 @@ uuid.workspace = true
 
 [dev-dependencies]
 http-body-util.workspace = true
-tokio.workspace = true
 tower.workspace = true
 wiremock.workspace = true
 

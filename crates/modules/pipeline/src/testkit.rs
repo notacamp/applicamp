@@ -263,6 +263,20 @@ impl Harness {
             .await
     }
 
+    /// A GET whose answer is not JSON: the status, headers and body bytes.
+    pub(crate) async fn get_raw(&self, uri: &str) -> (StatusCode, axum::http::HeaderMap, Vec<u8>) {
+        let response = self
+            .app
+            .clone()
+            .oneshot(Request::get(uri).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        let status = response.status();
+        let headers = response.headers().clone();
+        let bytes = response.into_body().collect().await.unwrap().to_bytes();
+        (status, headers, bytes.to_vec())
+    }
+
     pub(crate) async fn send_delete(&self, uri: &str) -> (StatusCode, Value) {
         self.send(Request::delete(uri).body(Body::empty()).unwrap())
             .await

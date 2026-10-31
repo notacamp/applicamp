@@ -1,26 +1,48 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { problemCode } from "~/lib/api";
-import { Banner, Button, Cluster, Label, Page, ReviewLayout, Stack, Tagged, Text } from "~/lib/ui";
+import {
+  Banner,
+  Bullets,
+  Button,
+  Cluster,
+  Dialog,
+  formatSize,
+  Label,
+  Page,
+  PdfViewer,
+  ReviewLayout,
+  Stack,
+  Tagged,
+  Text,
+} from "~/lib/ui";
 
 import {
   cvErrorCode,
+  cvPdfUrl,
+  DEFAULT_LAYOUT,
+  layoutOf,
+  pdfFailureReasons,
   useApprove,
   useChangeLine,
   useConfirmLine,
   useCv,
   useMakeDraft,
+  useMakeVersion,
   usePutBack,
   type Cv,
   type CvDraft,
+  type CvLayout,
 } from "../../api/cv";
-import { formatCost } from "../../api/labels";
+import { formatCost, formatShortDate } from "../../api/labels";
 import { useOpportunity } from "../../api/opportunities";
 import { titleOf } from "../PipelinePage/OpportunityViews";
 import { CvSheet } from "./CvSheet";
 import { DraftSlot } from "./DraftSlot";
+import { cvLanguage, LayoutControls } from "./LayoutControls";
 import type { LineActions } from "./LineRow";
+import { VersionsSection } from "./PdfPanel";
 import { ReviewAside } from "./ReviewAside";
 
 export interface ReviewPageProps {
@@ -147,23 +169,35 @@ function Review({
   const confirm = useConfirmLine(id, draft.n);
   const putBack = usePutBack(id, draft.n);
   const approve = useApprove(id, draft.n);
-  const again = useMakeDraft(id);
+  const makeVersion = useMakeVersion(id);
+  const [language, setLanguage] = useState(() => cvLanguage(draft.language));
+  const again = useMakeDraft(id, language);
   const editable = draft.status === "draft";
+  const newest = cv.versions[0];
+  // What the PDF is made with: the person's choice before Approve, the newest version's after.
+  const [chosen, setChosen] = useState<CvLayout>(DEFAULT_LAYOUT);
+  const layout = editable ? chosen : newest === undefined ? DEFAULT_LAYOUT : layoutOf(newest);
+  // A layout asked for on an approved CV, waiting for the person to confirm.
+  const [asked, setAsked] = useState<CvLayout | null>(null);
+  const [viewing, setViewing] = useState<number | null>(null);
   const busy =
     change.isPending ||
     confirm.isPending ||
     putBack.isPending ||
     approve.isPending ||
+    makeVersion.isPending ||
     again.isPending;
-  const failure = [change, confirm, putBack, approve, again].find(
+  const failure = [change, confirm, putBack, approve, makeVersion, again].find(
     (action) => action.isError,
   )?.error;
+  const failedLength = approve.isError ? layout.length : (asked ?? layout).length;
 
   const resetErrors = () => {
-    for (const action of [change, confirm, putBack, approve, again]) {
+    for (const action of [change, confirm, putBack, approve, makeVersion, again]) {
       action.reset();
     }
   };
+  const viewed = cv.versions.find((version) => version.version === viewing);
   const actions: LineActions = {
     editable,
     busy,
@@ -180,7 +214,7 @@ function Review({
       confirm.mutate(text === undefined ? { line } : { line, text });
     },
   };
-  const version = draft.version ?? (cv.versions[0]?.version ?? 0) + 1;
+  const version = draft.version ?? (newest?.version ?? 0) + 1;
   const goFirst = () => {
     if (draft.first_flagged === undefined || draft.first_flagged === null) {
       return;
@@ -231,7 +265,7 @@ function Review({
               data-testid="cv-approve"
               onClick={() => {
                 resetErrors();
-                approve.mutate();
+                approve.mutate(chosen);
               }}
             >
               {approve.isPending ? t("cv.toolbar.approving") : t("cv.toolbar.approve", { version })}
@@ -261,25 +295,132 @@ function Review({
             tone="danger"
             icon="warning"
             role="alert"
-            title={t(`cv.errors.${cvErrorCode(failure)}`)}
-          />
+            title={t(`cv.errors.${cvErrorCode(failure)}`, { count: failedLength })}
+          >
+            {pdfFailureReasons(failure).length === 0 ? null : (
+              <Tagged testId="cv-error-reasons">
+                <Bullets items={pdfFailureReasons(failure)} />
+              </Tagged>
+            )}
+          </Banner>
         </Tagged>
       )}
+      <LayoutControls
+        layout={layout}
+        onLayout={(next) => {
+          resetErrors();
+          if (editable) {
+            setChosen(next);
+          } else {
+            setAsked(next);
+          }
+        }}
+        language={language}
+        onLanguage={(next) => {
+          setLanguage(cvLanguage(next));
+        }}
+        disabled={busy}
+      />
       <ReviewLayout
         testId="cv-layout"
         aside={
-          <ReviewAside cv={cv} draft={draft} spend={spend} onFirst={goFirst} onBack={onPipeline} />
+          <ReviewAside
+            cv={cv}
+            draft={draft}
+            spend={spend}
+            onFirst={goFirst}
+            onBack={onPipeline}
+            onOpenPdf={setViewing}
+          />
         }
       >
-        <CvSheet
-          draft={draft}
-          actions={actions}
-          onPutBack={(what) => {
-            resetErrors();
-            putBack.mutate(what);
-          }}
-        />
+        <Stack>
+          <CvSheet
+            draft={draft}
+            actions={actions}
+            onPutBack={(what) => {
+              resetErrors();
+              putBack.mutate(what);
+            }}
+          />
+          <VersionsSection opportunity={id} versions={cv.versions} onOpen={setViewing} />
+        </Stack>
       </ReviewLayout>
+      <Dialog
+        open={asked !== null}
+        onClose={() => {
+          setAsked(null);
+        }}
+        visor={null}
+        title={t("cv.layout.confirmTitle")}
+        description={
+          asked === null
+            ? undefined
+            : t("cv.layout.confirmBody", {
+                version: newest?.version ?? 0,
+                next: (newest?.version ?? 0) + 1,
+                template: t(`cv.layout.templates.${asked.template}`),
+                pages: t("cv.layout.pages", { count: asked.length }),
+              })
+        }
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              data-testid="cv-layout-cancel"
+              onClick={() => {
+                setAsked(null);
+              }}
+            >
+              {t("cv.layout.cancel")}
+            </Button>
+            <Button
+              variant="primary"
+              disabled={makeVersion.isPending}
+              data-testid="cv-layout-confirm"
+              onClick={() => {
+                if (asked !== null) {
+                  makeVersion.mutate(asked, {
+                    onSettled: () => {
+                      setAsked(null);
+                    },
+                  });
+                }
+              }}
+            >
+              {makeVersion.isPending
+                ? t("cv.layout.making")
+                : t("cv.layout.confirm", { next: (newest?.version ?? 0) + 1 })}
+            </Button>
+          </>
+        }
+      />
+      <PdfViewer
+        open={viewed !== undefined}
+        onClose={() => {
+          setViewing(null);
+        }}
+        url={cvPdfUrl(id, viewed?.version ?? 0)}
+        downloadUrl={cvPdfUrl(id, viewed?.version ?? 0, true)}
+        title={t("cv.viewer.title", { version: viewed?.version ?? 0 })}
+        subtitle={
+          viewed === undefined
+            ? undefined
+            : t("cv.viewer.subtitle", {
+                date: formatShortDate(viewed.created_at, i18n.language),
+                template: t(`cv.layout.templates.${viewed.template}`),
+                pages: t("cv.layout.pages", { count: viewed.pages }),
+                size: formatSize(viewed.size_bytes, i18n.language),
+              })
+        }
+        labels={{
+          close: t("cv.viewer.close"),
+          download: t("cv.pdf.download"),
+          loading: t("cv.viewer.loading"),
+          failed: t("cv.viewer.failed"),
+          page: (page, pages) => t("cv.viewer.page", { page, pages }),
+        }}
+      />
     </Stack>
   );
 }

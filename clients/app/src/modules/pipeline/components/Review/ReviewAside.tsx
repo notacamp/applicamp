@@ -15,6 +15,7 @@ import {
 } from "~/lib/ui";
 
 import type { Cv, CvDraft, CvKeyword } from "../../api/cv";
+import { PdfPanel } from "./PdfPanel";
 import { formatCost, formatLimit } from "../../api/labels";
 
 const STATE_HUES: Record<CvKeyword["state"], LabelHue> = {
@@ -62,6 +63,7 @@ export function ReviewAside({
   spend,
   onFirst,
   onBack,
+  onOpenPdf,
 }: {
   cv: Cv;
   draft: CvDraft;
@@ -71,10 +73,13 @@ export function ReviewAside({
   onFirst: () => void;
   /** Back to the pipeline, once approved. */
   onBack: () => void;
+  /** Open a version's PDF. */
+  onOpenPdf: (version: number) => void;
 }) {
   const { t, i18n } = useTranslation("pipeline");
   const { changes, keywords } = draft;
   const nextVersion = (cv.versions[0]?.version ?? 0) + 1;
+  const newest = cv.versions[0];
   const lines: string[] = [
     t("cv.changes.reworded", { count: changes.reworded }),
     t("cv.changes.movedUp", { count: changes.moved_up }),
@@ -104,7 +109,11 @@ export function ReviewAside({
             </Stack>
           </Banner>
         </Tagged>
-      ) : draft.flagged > 0 ? (
+      ) : null}
+      {draft.status === "approved" && newest !== undefined ? (
+        <PdfPanel opportunity={cv.opportunity_id} version={newest} onOpen={onOpenPdf} />
+      ) : null}
+      {draft.status === "approved" ? null : draft.flagged > 0 ? (
         <Tagged testId="cv-banner-flagged">
           <Banner
             tone="danger"

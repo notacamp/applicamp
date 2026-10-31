@@ -16,6 +16,20 @@ ignore = [
     # fonts it embeds when *writing* PDFs, which Applicamp never does. Drop
     # this once lopdf moves off it.
     { id = "RUSTSEC-2026-0192", reason = "ttf-parser is unmaintained; only lopdf's PDF writer uses it" },
+    # Typst (compiled inside the server to render the tailored CV, #38) pulls in
+    # parsers for things the CV never uses: bibliographies (hayagriva, citationberg,
+    # biblatex, serde_yaml), syntax-highlighting definitions (syntect, two-face) and
+    # SVG text shaping (rustybuzz). Our World hands the compiler one fixed embedded
+    # template and no files, so nothing a person writes is ever parsed by any of
+    # them: the person's text is data in `sys.inputs`, never markup (see
+    # openspec/specs/pipeline/spec.md, "The CV as a PDF").
+    { id = "RUSTSEC-2026-0194", reason = "quick-xml (citationberg, plist): no XML is ever parsed; the World serves no files" },
+    { id = "RUSTSEC-2026-0195", reason = "quick-xml (citationberg, plist): no XML is ever parsed; the World serves no files" },
+    { id = "RUSTSEC-2026-0206", reason = "rustybuzz is unmaintained; typst's own shaper, no input of ours reaches it beyond the CV's text" },
+    { id = "RUSTSEC-2025-0141", reason = "bincode 1 is unmaintained; syntect loads its own embedded dumps, never ours" },
+    { id = "RUSTSEC-2024-0436", reason = "paste is an unmaintained proc-macro (hayagriva), compile time only" },
+    { id = "RUSTSEC-2024-0449", reason = "unsafe-libyaml (serde_yaml, hayagriva) is unmaintained; no YAML is ever parsed" },
+    { id = "RUSTSEC-2024-0320", reason = "yaml-rust (syntect) is unmaintained; no YAML is ever parsed" },
 ]
 
 [licenses]
@@ -29,6 +43,10 @@ allow = [
     "Unicode-3.0",         # ICU data/normalisation crates (via url -> idna)
     "Zlib",                # foldhash (via hashbrown <- sqlx-core)
     "CDLA-Permissive-2.0", # Mozilla CA root data: webpki-roots (sqlx), webpki-root-certs (reqwest)
+    # Typst, compiled inside the server to render the tailored CV as a PDF (#38):
+    "BSD-2-Clause",                  # arrayref, kamadak-exif, mutate_once (typst-pdf's image and PDF stack)
+    "Apache-2.0 WITH LLVM-exception", # ar_archive_writer (via stacker, typst-eval)
+    "0BSD",                          # roman-numerals-rs (typst-library), offered as 0BSD OR CC0-1.0
 ]
 
 [licenses.private]

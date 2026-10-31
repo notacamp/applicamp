@@ -87,6 +87,13 @@ wiremock = "0.6.5"
 # Writes the invented PDFs the profile import reads (pdf-extract's own).
 lopdf = { version = "0.42.0", default-features = false }
 
+# The tailored CV as a PDF (#38): Typst compiled inside the server (no CLI, no
+# browser), with the fonts of typst-assets embedded in the binary.
+typst = "0.15.1"
+typst-layout = "0.15.1"
+typst-pdf = "0.15.1"
+typst-assets = { version = "0.15.1", features = ["fonts"] }
+
 [workspace.lints.rust]
 unsafe_code = "forbid"
 unused_must_use = "deny"

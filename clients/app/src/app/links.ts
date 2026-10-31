@@ -1,13 +1,17 @@
 import { useNavigate } from "@tanstack/react-router";
 import type { MouseEvent } from "react";
 
-/** The places of the signed-in app, in the sidebar's order. */
+/**
+ * The places of the signed-in app, in the sidebar's order. `phone: false` keeps one off
+ * the tab bar, which has room for five (it is still in the sidebar and ⌘K).
+ */
 export const PLACES = [
-  { id: "today", path: "/", icon: "home", shortcut: "nav.today" },
-  { id: "pipeline", path: "/pipeline", icon: "tasks", shortcut: "nav.pipeline" },
-  { id: "boards", path: "/boards", icon: "bullets", shortcut: "nav.boards" },
-  { id: "agents", path: "/agents", icon: "hourglass", shortcut: "nav.agents" },
-  { id: "profile", path: "/profile", icon: "people", shortcut: "nav.profile" },
+  { id: "today", path: "/", icon: "home", shortcut: "nav.today", phone: true },
+  { id: "pipeline", path: "/pipeline", icon: "tasks", shortcut: "nav.pipeline", phone: true },
+  { id: "boards", path: "/boards", icon: "bullets", shortcut: "nav.boards", phone: true },
+  { id: "cvs", path: "/cvs", icon: "document", shortcut: "nav.cvs", phone: false },
+  { id: "agents", path: "/agents", icon: "hourglass", shortcut: "nav.agents", phone: true },
+  { id: "profile", path: "/profile", icon: "people", shortcut: "nav.profile", phone: true },
 ] as const;
 
 export type Place = (typeof PLACES)[number];

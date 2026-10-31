@@ -5,9 +5,11 @@
 //! (one per account, three on the instance) and keeps its claim while the
 //! run goes, renewing it every second. For each run it
 //!
-//! 1. mints the run's token (kept as its hash, with the kind's tools),
+//! 1. mints the run's token (kept as its hash, with the kind's tools), only
+//!    while its claim is still this server's,
 //! 2. creates the sandbox with the kind's image and policy, the run id, the
-//!    token and the agent API's address,
+//!    token and the agent API's address, within 20 s (well inside the
+//!    lease, which is renewed from the claim on),
 //! 3. follows the sandbox's log into the run's events,
 //! 4. waits for the agent to exit, the deadline, or Stop,
 //! 5. **always** deletes the sandbox,
@@ -47,6 +49,8 @@ pub const SWEEP_EVERY: Duration = Duration::from_secs(5 * 60);
 pub const TOKEN_GRACE: TimeDelta = TimeDelta::minutes(5);
 /// How long the log is still read once the agent exited.
 const DRAIN: Duration = Duration::from_secs(2);
+/// How long making a sandbox may take: well within a claim's lease.
+pub const CREATE_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// Sees runs through. Cheap to clone.
 #[derive(Clone)]
@@ -56,6 +60,7 @@ pub struct Orchestrator {
     deps: RunsDeps,
     runtime: Arc<dyn SandboxRuntime>,
     api: url::Url,
+    create_timeout: Duration,
 }
 
 impl std::fmt::Debug for Orchestrator {
@@ -87,7 +92,15 @@ impl Orchestrator {
             deps,
             runtime,
             api,
+            create_timeout: CREATE_TIMEOUT,
         })
+    }
+
+    /// The same, giving up on making a sandbox after `timeout` (tests).
+    #[must_use]
+    pub fn with_create_timeout(mut self, timeout: Duration) -> Self {
+        self.create_timeout = timeout;
+        self
     }
 
     /// Its runtime.
@@ -198,8 +211,17 @@ impl Orchestrator {
         }
     }
 
-    /// See claimed run `run` through.
+    /// See claimed run `run` through. Its claim is renewed from the start,
+    /// while its sandbox is made too.
     pub async fn execute(&self, run: RunRow) {
+        let (hold_tx, mut hold) = watch::channel(Hold::Going);
+        let keeper = tokio::spawn(keep(
+            self.db.clone(),
+            run.id,
+            Arc::clone(&self.deps.instance),
+            hold_tx,
+        ));
+        let _keeper = AbortOnDrop(keeper.abort_handle());
         let Some(kind) = self.deps.kinds.get(&run.kind).cloned() else {
             tracing::warn!(run = %run.id, kind = %run.kind, "a run of a kind this server does not know");
             self.end(run.id, Outcome::Failed, Some("unknown_kind"))
@@ -221,9 +243,10 @@ impl Orchestrator {
             "policies/{}.yaml",
             kind.name.split_once('.').map_or(kind.name, |(_, k)| k)
         );
-        if let Err(e) = store::start(
+        match store::start(
             &self.db,
             run.id,
+            &self.deps.instance,
             deadline,
             &image,
             &policy,
@@ -233,10 +256,18 @@ impl Orchestrator {
         )
         .await
         {
-            tracing::error!(run = %run.id, error = %e, "could not start a run");
-            self.end(run.id, Outcome::Failed, Some("start_failed"))
-                .await;
-            return;
+            Ok(true) => {}
+            Ok(false) => {
+                // Ended elsewhere meanwhile (its claim lapsed): no token.
+                tracing::warn!(run = %run.id, "a run was ended before it could start");
+                return;
+            }
+            Err(e) => {
+                tracing::error!(run = %run.id, error = %e, "could not start a run");
+                self.end(run.id, Outcome::Failed, Some("start_failed"))
+                    .await;
+                return;
+            }
         }
         let spec = SandboxSpec {
             run: run.id,
@@ -246,16 +277,25 @@ impl Orchestrator {
             api: self.api.clone(),
             token,
         };
-        let handle = match self.runtime.create(spec).await {
-            Ok(handle) => handle,
-            Err(e) => {
+        let handle = match tokio::time::timeout(self.create_timeout, self.runtime.create(spec))
+            .await
+        {
+            Ok(Ok(handle)) => handle,
+            Ok(Err(e)) => {
                 tracing::warn!(run = %run.id, kind = kind.name, error = %e, "could not create a sandbox");
                 self.end(run.id, Outcome::Failed, Some("sandbox_create_failed"))
                     .await;
                 return;
             }
+            Err(_) => {
+                // A sandbox made after all is removed by the sweep.
+                tracing::warn!(run = %run.id, kind = kind.name, "creating a sandbox took too long");
+                self.end(run.id, Outcome::Failed, Some("sandbox_create_timeout"))
+                    .await;
+                return;
+            }
         };
-        let end = self.watch(&run, &handle, until).await;
+        let end = self.watch(&run, &handle, until, &mut hold).await;
         // Always, whatever happened.
         if let Err(e) = self.runtime.delete(&handle).await {
             tracing::error!(run = %run.id, error = %e, "could not delete a sandbox; the sweep will");
@@ -283,12 +323,13 @@ impl Orchestrator {
     }
 
     /// Follow the run while its sandbox exists: its log into its events,
-    /// its claim renewed, until the agent exits, the deadline, or Stop.
+    /// until the agent exits, the deadline, Stop, or its claim is gone.
     async fn watch(
         &self,
         run: &RunRow,
         handle: &SandboxHandle,
         until: tokio::time::Instant,
+        hold: &mut watch::Receiver<Hold>,
     ) -> End {
         if let Err(e) = store::running(&self.db, run.id, &handle.name).await {
             tracing::warn!(run = %run.id, error = %e, "could not mark a run running");
@@ -301,7 +342,10 @@ impl Orchestrator {
                 Ok(Exit::Deadline) => End::Deadline,
                 Err(e) => End::Failed(e.to_string()),
             },
-            end = self.keep(run.id) => end,
+            held = hold.wait_for(|hold| *hold != Hold::Going) => match held.map(|hold| *hold) {
+                Ok(Hold::Cancelled) => End::Cancelled,
+                _ => End::Lost,
+            },
         };
         if matches!(end, End::Exited(_)) {
             // What it wrote last.
@@ -310,19 +354,45 @@ impl Orchestrator {
         stop.abort();
         end
     }
+}
 
-    /// Renew run `run`'s claim every tick until someone asks it to stop or
-    /// the claim is gone.
-    async fn keep(&self, run: Uuid) -> End {
-        let mut tick = tokio::time::interval(TICK);
-        loop {
-            tick.tick().await;
-            match store::renew(&self.db, run, &self.deps.instance, self.now() + LEASE).await {
-                Ok(Some(true)) => return End::Cancelled,
-                Ok(Some(false)) => {}
-                Ok(None) => return End::Lost,
-                Err(e) => tracing::warn!(run = %run, error = %e, "could not renew a run's claim"),
+/// Where a run's claim stands, as its keeper sees it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Hold {
+    /// Held: the run goes on.
+    Going,
+    /// Someone asked it to stop.
+    Cancelled,
+    /// The claim is gone: the run was ended elsewhere.
+    Lost,
+}
+
+/// Aborts its task when dropped, whatever path the run took.
+struct AbortOnDrop(tokio::task::AbortHandle);
+
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+
+/// Renew run `run`'s claim every tick until someone asks it to stop or the
+/// claim is gone, and say so on `hold`.
+async fn keep(db: PgPool, run: Uuid, instance: Arc<str>, hold: watch::Sender<Hold>) {
+    let mut tick = tokio::time::interval(TICK);
+    loop {
+        tick.tick().await;
+        match store::renew(&db, run, &instance, Utc::now() + LEASE).await {
+            Ok(Some(true)) => {
+                let _ = hold.send(Hold::Cancelled);
+                return;
             }
+            Ok(Some(false)) => {}
+            Ok(None) => {
+                let _ = hold.send(Hold::Lost);
+                return;
+            }
+            Err(e) => tracing::warn!(run = %run, error = %e, "could not renew a run's claim"),
         }
     }
 }
@@ -361,6 +431,15 @@ pub fn event(line: &LogLine) -> Option<NewEvent> {
                     .filter(|data| data.to_string().len() <= crate::features::agent_api::MAX_DATA),
             })
         }
+        LogLine::Dropped(count) => Some(NewEvent {
+            layer: Layer::Sandbox,
+            level: Level::Error,
+            agent_seq: None,
+            operation: Some("log".to_owned()),
+            tool_name: None,
+            message: format!("{count} log line(s) came too fast and were not kept."),
+            data: None,
+        }),
         LogLine::Sandbox(message) => {
             let denied = message.split_whitespace().any(|word| word == "DENIED");
             let operation = message
@@ -449,5 +528,11 @@ mod tests {
         .unwrap();
         assert_eq!(allowed.level, Level::Info);
         assert_eq!(allowed.operation.as_deref(), Some("HTTP:POST"));
+        let dropped = event(&LogLine::Dropped(12)).unwrap();
+        assert_eq!(
+            (dropped.layer, dropped.level),
+            (Layer::Sandbox, Level::Error)
+        );
+        assert!(dropped.message.starts_with("12 log line(s)"));
     }
 }

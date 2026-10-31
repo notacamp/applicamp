@@ -392,3 +392,132 @@ async fn the_probe_has_no_token_budget(db: PgPool) {
     assert_eq!(status.as_u16(), 400, "max_tokens is at most 16 000");
     assert!(server.received_requests().await.unwrap().is_empty());
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn completes_made_at_once_stay_within_the_runs_budget(db: PgPool) {
+    let server = model().await;
+    let thinker = kind("runs.thinker", Duration::from_secs(60), 3_000);
+    let deps = RunsDeps::new(
+        crate::RunsConfig::default(),
+        Some(gateway(&server, 1_000_000)),
+    )
+    .with_kinds([thinker.clone()])
+    .with_runtime(
+        scripted("true"),
+        url::Url::parse("http://127.0.0.1:9").unwrap(),
+    );
+    let harness = Harness::with_deps(db, deps);
+    let (run, token) = harness.going(harness.account, &thinker).await;
+
+    // Each reserves its prompt and its whole answer (about 1 005 tokens):
+    // two fit in 3 000, whatever the order they arrive in.
+    let body = ask(1_000);
+    let calls = (0..10).map(|_| harness.agent("POST", "complete", &token, Some(&body)));
+    let answers = futures::future::join_all(calls).await;
+    let answered = answers
+        .iter()
+        .filter(|(status, _)| status.as_u16() == 200)
+        .count();
+    assert_eq!(answered, 2, "{answers:?}");
+    assert!(
+        answers
+            .iter()
+            .filter(|(status, _)| status.as_u16() != 200)
+            .all(|(status, body)| status.as_u16() == 429 && body["code"] == "run_budget_reached"),
+        "{answers:?}"
+    );
+    let row = harness.run(run).await;
+    assert_eq!(row.tokens_in + row.tokens_out, 2_400);
+    let reserved: i32 = sqlx::query_scalar("SELECT tokens_reserved FROM runs.runs WHERE id = $1")
+        .bind(run)
+        .fetch_one(&harness.db)
+        .await
+        .unwrap();
+    assert_eq!(reserved, 0, "every reservation is settled");
+    assert_eq!(server.received_requests().await.unwrap().len(), 2);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_failed_completion_releases_its_reservation(db: PgPool) {
+    let server = model().await;
+    let thinker = kind("runs.thinker", Duration::from_secs(60), 3_000);
+    // A daily cap of one token: the first call goes, the second is refused.
+    let deps = RunsDeps::new(crate::RunsConfig::default(), Some(gateway(&server, 1)))
+        .with_kinds([thinker.clone()])
+        .with_runtime(
+            scripted("true"),
+            url::Url::parse("http://127.0.0.1:9").unwrap(),
+        );
+    let harness = Harness::with_deps(db, deps);
+    let (run, token) = harness.going(harness.account, &thinker).await;
+    let (status, _) = harness
+        .agent("POST", "complete", &token, Some(&ask(500)))
+        .await;
+    assert_eq!(status.as_u16(), 200);
+    let (status, _) = harness
+        .agent("POST", "complete", &token, Some(&ask(500)))
+        .await;
+    assert_eq!(status.as_u16(), 503);
+    let reserved: i32 = sqlx::query_scalar("SELECT tokens_reserved FROM runs.runs WHERE id = $1")
+        .bind(run)
+        .fetch_one(&harness.db)
+        .await
+        .unwrap();
+    assert_eq!(reserved, 0);
+}
+
+#[test]
+fn the_worst_case_counts_the_prompt_and_the_whole_answer() {
+    let completion: super::Completion = serde_json::from_value(json!({
+        "messages": [{ "role": "user", "content": "12345678" }, { "role": "system", "content": "x" }],
+        "max_tokens": 100,
+    }))
+    .unwrap();
+    // Nine characters are three tokens at most four characters each.
+    assert_eq!(super::worst_case(&completion), 103);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_nul_character_is_refused_before_anything_is_recorded(db: PgPool) {
+    let harness = harness(db);
+    let (run, token) = harness.going(harness.account, &probe::kind()).await;
+    for bad in [
+        json!([{ "seq": 1, "level": "info", "message": "fine" },
+               { "seq": 2, "level": "info", "message": "nul \u{0000} here" }]),
+        json!([{ "seq": 3, "level": "info", "message": "fine", "data": { "x": "a\u{0000}b" } }]),
+        json!([{ "seq": 4, "level": "info", "message": "fine", "tool_name": "a\u{0000}" }]),
+    ] {
+        let (status, body) = harness.agent("POST", "events", &token, Some(&bad)).await;
+        assert_eq!(
+            (status.as_u16(), body["code"].as_str()),
+            (400, Some("invalid_event")),
+            "{bad}"
+        );
+    }
+    assert!(harness.events(run).await.is_empty(), "nothing was written");
+    let (status, body) = harness
+        .agent(
+            "POST",
+            "finish",
+            &token,
+            Some(&json!({ "outcome": "succeeded", "summary": { "checks": ["a\u{0000}"] } })),
+        )
+        .await;
+    assert_eq!(
+        (status.as_u16(), body["code"].as_str()),
+        (400, Some("invalid_summary"))
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_token_works_while_its_sandbox_is_being_made(db: PgPool) {
+    let harness = harness(db);
+    let (run, token) = harness.going(harness.account, &probe::kind()).await;
+    sqlx::query("UPDATE runs.runs SET status = 'starting' WHERE id = $1")
+        .bind(run)
+        .execute(&harness.db)
+        .await
+        .unwrap();
+    let (status, body) = harness.agent("GET", "context", &token, None).await;
+    assert_eq!(status.as_u16(), 200, "{body}");
+}

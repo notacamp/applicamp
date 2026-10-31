@@ -228,9 +228,10 @@ impl Harness {
             .map(|tool| (tool.name.to_owned(), json!(tool.cap)))
             .collect();
         let deadline = now + chrono::TimeDelta::from_std(kind.limits.wall_clock).unwrap();
-        store::start(
+        let started = store::start(
             &self.db,
             id,
+            "test",
             deadline,
             "agent",
             "policies/probe.yaml",
@@ -240,6 +241,7 @@ impl Harness {
         )
         .await
         .unwrap();
+        assert!(started);
         store::running(&self.db, id, "sandbox-test").await.unwrap();
         (id, token)
     }

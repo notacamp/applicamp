@@ -37,7 +37,8 @@ three; other runs SHALL wait queued.
 ### Requirement: Sandboxes hold no secrets
 A sandbox SHALL receive only its run id, a single-run token and the agent API
 address. Model calls SHALL go through the server, which applies the account's
-caps and the run's token budget.
+caps and the run's token budget, reserving each call's worst case (its prompt
+and its whole answer) before forwarding it.
 
 #### Scenario: A token used for another run
 - **WHEN** an agent calls the agent API with its token for a different run, or after its run has finished
@@ -46,6 +47,10 @@ caps and the run's token budget.
 #### Scenario: The cap is reached
 - **WHEN** an account has used its daily tokens and a run asks for a completion
 - **THEN** the call is refused with `ai_daily_limit_reached` and the run records it
+
+#### Scenario: Completions asked at once
+- **WHEN** an agent asks for several completions at the same time whose worst cases together pass its run's token budget
+- **THEN** only those that fit are forwarded, the others are refused with `run_budget_reached`, and the run's tokens never pass its budget
 
 ### Requirement: An agent calls only its kind's tools, within their caps
 The run token SHALL name the tools of the run's kind, each with a call cap and
@@ -60,7 +65,10 @@ match the schema SHALL be refused with `invalid_arguments`.
 ### Requirement: Policies enforce
 Every committed policy SHALL deny by default, enforce every rule it inspects,
 require its filesystem rules to apply, and never allow LinkedIn, Indeed,
-wildcard hosts or private, loopback or link-local ranges.
+wildcard hosts, IPv4 hosts written other than `a.b.c.d`, private, shared,
+loopback, link-local, reserved or NAT64 addresses, or `allowed_ips` ranges wider
+than /24 (IPv4) or /48 (IPv6); and every kind's policy SHALL stay within the
+committed boundary (`policies/boundary.yaml`), as `openshell-prover` checks.
 
 #### Scenario: A policy that only audits
 - **WHEN** a policy file has an endpoint without `enforcement: enforce`
@@ -69,7 +77,12 @@ wildcard hosts or private, loopback or link-local ranges.
 ### Requirement: You can watch what agents do
 The Agents page SHALL list runs and show, live, the agent's own events and
 the sandbox's allow/deny log for the selected run, with its sandbox, image,
-policy, model, tokens, cost, duration and end state.
+policy, model, tokens, cost, duration and end state. A run SHALL keep at most
+5 000 events; past them, one event says the rest were not kept.
+
+#### Scenario: A run that writes too much
+- **WHEN** a run's agent writes more than 5 000 lines
+- **THEN** the first 5 000 are kept and shown, then one line says the rest were not kept, and the server's memory does not grow with them
 
 #### Scenario: Watching a check
 - **WHEN** someone starts a check from the Agents page

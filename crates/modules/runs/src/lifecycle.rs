@@ -323,3 +323,267 @@ async fn a_sandbox_that_cannot_be_created_fails_the_run(db: PgPool) {
     assert_eq!(run.error_kind.as_deref(), Some("sandbox_create_failed"));
     assert!(!harness.has_token(id).await);
 }
+
+/// The fake runtime, taking `delay` to make each sandbox, and noting the
+/// run's claim once it has (so a test sees it was renewed meanwhile).
+struct Slow {
+    inner: Arc<FakeRuntime>,
+    delay: Duration,
+    db: PgPool,
+    claimed_until: std::sync::Mutex<Option<chrono::DateTime<Utc>>>,
+}
+
+#[async_trait::async_trait]
+impl SandboxRuntime for Slow {
+    fn name(&self) -> &'static str {
+        "slow"
+    }
+    async fn prepare(&self, kinds: &crate::kinds::Kinds) -> crate::runtime::Result<()> {
+        self.inner.prepare(kinds).await
+    }
+    async fn create(
+        &self,
+        spec: SandboxSpec,
+    ) -> crate::runtime::Result<crate::runtime::SandboxHandle> {
+        tokio::time::sleep(self.delay).await;
+        let until: Option<chrono::DateTime<Utc>> =
+            sqlx::query_scalar("SELECT claimed_until FROM runs.runs WHERE id = $1")
+                .bind(spec.run)
+                .fetch_one(&self.db)
+                .await
+                .unwrap();
+        *self.claimed_until.lock().unwrap() = until;
+        self.inner.create(spec).await
+    }
+    fn logs(
+        &self,
+        handle: &crate::runtime::SandboxHandle,
+    ) -> futures::stream::BoxStream<'static, crate::runtime::Result<crate::runtime::LogLine>> {
+        self.inner.logs(handle)
+    }
+    async fn wait(
+        &self,
+        handle: &crate::runtime::SandboxHandle,
+        until: tokio::time::Instant,
+    ) -> crate::runtime::Result<crate::runtime::Exit> {
+        self.inner.wait(handle, until).await
+    }
+    async fn delete(&self, handle: &crate::runtime::SandboxHandle) -> crate::runtime::Result<()> {
+        self.inner.delete(handle).await
+    }
+    async fn sweep(&self, keep: &std::collections::HashSet<Uuid>) -> crate::runtime::Result<usize> {
+        self.inner.sweep(keep).await
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_claim_is_renewed_while_the_sandbox_is_made(db: PgPool) {
+    let inner = scripted("exit 0");
+    let slow = Arc::new(Slow {
+        inner: inner.clone(),
+        delay: Duration::from_millis(2_500),
+        db: db.clone(),
+        claimed_until: std::sync::Mutex::new(None),
+    });
+    let harness = Harness::new(db, slow.clone());
+    let api = serve(harness.agent_router()).await;
+    let orchestrator = orchestrator(&harness, slow.clone(), api, vec![], 3);
+    let id = queue(&harness, harness.account, probe::KIND).await;
+
+    let claimed_at = Utc::now();
+    orchestrator.tick().await.unwrap().unwrap().await.unwrap();
+
+    let renewed = slow
+        .claimed_until
+        .lock()
+        .unwrap()
+        .expect("a claim while making it");
+    assert!(
+        renewed > claimed_at + crate::orchestrator::LEASE + TimeDelta::seconds(1),
+        "renewed while the sandbox was made: {renewed} vs {claimed_at}"
+    );
+    assert_eq!(
+        harness.run(id).await.error_kind.as_deref(),
+        Some("agent_exited")
+    );
+    assert!(inner.is_empty());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_sandbox_that_takes_too_long_to_make_fails_the_run(db: PgPool) {
+    let inner = scripted("exit 0");
+    let slow = Arc::new(Slow {
+        inner: inner.clone(),
+        delay: Duration::from_secs(30),
+        db: db.clone(),
+        claimed_until: std::sync::Mutex::new(None),
+    });
+    let harness = Harness::new(db, slow.clone());
+    let orchestrator = orchestrator(
+        &harness,
+        slow,
+        url::Url::parse("http://127.0.0.1:9").unwrap(),
+        vec![],
+        3,
+    )
+    .with_create_timeout(Duration::from_millis(300));
+    let id = queue(&harness, harness.account, probe::KIND).await;
+
+    tokio::time::timeout(
+        Duration::from_secs(10),
+        orchestrator.tick().await.unwrap().unwrap(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+
+    let run = harness.run(id).await;
+    assert_eq!(run.outcome.as_deref(), Some("failed"));
+    assert_eq!(run.error_kind.as_deref(), Some("sandbox_create_timeout"));
+    assert!(!harness.has_token(id).await);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_run_ended_elsewhere_gets_no_token(db: PgPool) {
+    let harness = Harness::new(db, scripted("true"));
+    let id = queue(&harness, harness.account, probe::KIND).await;
+    let now = Utc::now();
+    store::claim(&harness.db, "s1", 3, now, now + TimeDelta::seconds(30))
+        .await
+        .unwrap()
+        .unwrap();
+    let start = |instance: &'static str| {
+        let db = harness.db.clone();
+        async move {
+            store::start(
+                &db,
+                id,
+                instance,
+                now,
+                "agent",
+                "policies/probe.yaml",
+                b"hash",
+                &json!({}),
+                now,
+            )
+            .await
+            .unwrap()
+        }
+    };
+    assert!(!start("s2").await, "not claimed by s2");
+    assert!(!harness.has_token(id).await);
+    // Reaped meanwhile: its claimer cannot start it either.
+    store::finish(
+        &harness.db,
+        &harness.state.events,
+        id,
+        applicamp_kernel::agent::Outcome::Failed,
+        Some("server_restarted"),
+        now,
+    )
+    .await
+    .unwrap();
+    assert!(!start("s1").await, "already ended");
+    assert!(!harness.has_token(id).await);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_run_asked_to_stop_is_never_claimed(db: PgPool) {
+    let harness = Harness::new(db, scripted("true"));
+    let id = queue(&harness, harness.account, probe::KIND).await;
+    sqlx::query("UPDATE runs.runs SET cancel_requested = true WHERE id = $1")
+        .bind(id)
+        .execute(&harness.db)
+        .await
+        .unwrap();
+    let now = Utc::now();
+    assert!(
+        store::claim(&harness.db, "s1", 3, now, now + TimeDelta::seconds(30))
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        store::cancel_queued(&harness.db, &harness.state.events, id, now)
+            .await
+            .unwrap()
+    );
+    assert!(
+        !store::cancel_queued(&harness.db, &harness.state.events, id, now)
+            .await
+            .unwrap(),
+        "once"
+    );
+    assert_eq!(harness.run(id).await.outcome.as_deref(), Some("cancelled"));
+    assert_eq!(harness.finished().await, [(id, "cancelled".to_owned())]);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_run_keeps_at_most_its_cap_of_events(db: PgPool) {
+    let harness = Harness::new(db, scripted("true"));
+    let (run, _) = harness.going(harness.account, &probe::kind()).await;
+    // As if it had written all but one of its lines already.
+    sqlx::query("UPDATE runs.runs SET last_seq = $2 WHERE id = $1")
+        .bind(run)
+        .bind(store::MAX_EVENTS_PER_RUN - 1)
+        .execute(&harness.db)
+        .await
+        .unwrap();
+    let line = |seq: i64| store::NewEvent {
+        layer: Layer::Agent,
+        level: Level::Info,
+        agent_seq: Some(seq),
+        operation: None,
+        tool_name: None,
+        message: format!("line {seq}"),
+        data: None,
+    };
+    let now = Utc::now();
+    assert!(
+        store::insert_event(&harness.db, run, now, &line(1))
+            .await
+            .unwrap(),
+        "the last one kept"
+    );
+    assert!(
+        !store::insert_event(&harness.db, run, now, &line(2))
+            .await
+            .unwrap()
+    );
+    assert!(
+        !store::insert_event(&harness.db, run, now, &line(3))
+            .await
+            .unwrap()
+    );
+    let events = harness.events(run).await;
+    assert_eq!(events.len(), 2, "{events:?}");
+    assert_eq!(events[0].seq, store::MAX_EVENTS_PER_RUN);
+    assert_eq!(events[1].seq, store::MAX_EVENTS_PER_RUN + 1);
+    assert_eq!(events[1].operation.as_deref(), Some("truncated"));
+    assert_eq!(events[1].message, store::TRUNCATED);
+    assert_eq!(events[1].level, Level::Error);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn nul_characters_from_a_runners_output_are_dropped(db: PgPool) {
+    let harness = Harness::new(db, scripted("true"));
+    let (run, _) = harness.going(harness.account, &probe::kind()).await;
+    let event = store::NewEvent {
+        layer: Layer::Agent,
+        level: Level::Info,
+        agent_seq: Some(1),
+        operation: Some("op\u{0000}".to_owned()),
+        tool_name: None,
+        message: "a\u{0000}b".to_owned(),
+        data: Some(json!({ "x": "\u{0000}" })),
+    };
+    assert!(
+        store::insert_event(&harness.db, run, Utc::now(), &event)
+            .await
+            .unwrap()
+    );
+    let events = harness.events(run).await;
+    assert_eq!(events[0].message, "ab");
+    assert_eq!(events[0].operation.as_deref(), Some("op"));
+    assert!(events[0].data.is_none());
+}

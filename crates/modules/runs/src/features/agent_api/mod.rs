@@ -3,7 +3,9 @@
 //!
 //! Every call carries its run's token as a bearer (`run_token`) and no
 //! cookie. The token names its run (so its account and subject) and the
-//! kind's tools with their caps; it works only while its run is going and
+//! kind's tools with their caps; it works only while its run is going (from
+//! the moment its sandbox is being made: a runner may call before the
+//! runtime has said the sandbox exists) and
 //! the agent has not finished, and never past the deadline plus five
 //! minutes. Anything else is not found. A run may make ten calls a second.
 //! The door is outside the CSRF check (no browser sends a run token).
@@ -107,7 +109,7 @@ impl FromRequestParts<AppState> for RunCaller {
             "SELECT t.run_id, r.account_id, r.kind, r.subject_id, r.inputs, r.deadline, t.tools
                FROM runs.tokens t JOIN runs.runs r ON r.id = t.run_id
               WHERE t.hash = $1 AND t.expires_at > $2
-                AND r.status = 'running' AND r.outcome IS NULL",
+                AND r.status IN ('starting', 'running') AND r.outcome IS NULL",
         )
         .bind(crypto::hash(token))
         .bind(state.clock.now())
@@ -259,7 +261,8 @@ fn invalid_event(detail: impl Into<String>) -> Error {
 /// Record the agent's events.
 ///
 /// At most 50 a call, each numbered by the agent, its message at most
-/// 2 000 characters, its data at most 8 KB.
+/// 2 000 characters, its data at most 8 KB, none with a NUL character; all
+/// or none are recorded. A run keeps at most 5 000 events.
 #[utoipa::path(
     post,
     path = "/api/agent/v1/events",
@@ -315,6 +318,18 @@ pub async fn events(
             .is_some_and(|data| data.to_string().len() > MAX_DATA)
         {
             return Err(invalid_event("`data` is at most 8 KB."));
+        }
+        if [
+            Some(&event.message),
+            event.operation.as_ref(),
+            event.tool_name.as_ref(),
+        ]
+        .into_iter()
+        .flatten()
+        .any(|text| text.contains('\0'))
+            || event.data.as_ref().is_some_and(store::has_nul)
+        {
+            return Err(invalid_event("An event holds no NUL character."));
         }
     }
     let now = state.clock.now();
@@ -475,6 +490,45 @@ pub struct CompletionAnswer {
     pub tokens_out: u32,
 }
 
+/// A completion's worst case in tokens: its prompt (about four characters a
+/// token, rounded up) and its whole answer.
+pub fn worst_case(completion: &Completion) -> u32 {
+    let chars: usize = completion
+        .messages
+        .iter()
+        .map(|message| message.content.chars().count())
+        .sum();
+    let prompt = u32::try_from(chars.div_ceil(4)).unwrap_or(u32::MAX);
+    prompt.saturating_add(completion.max_tokens)
+}
+
+/// Settle a completion's reservation of `reserved` tokens: to what it used
+/// (tokens in and out, cost, model) when it answered, released when not.
+async fn settle(
+    state: &AppState,
+    run: Uuid,
+    reserved: u32,
+    used: Option<(u32, u32, f64, &str)>,
+) -> Result<()> {
+    let (tokens_in, tokens_out, cost_eur, model) = used.unwrap_or((0, 0, 0.0, ""));
+    sqlx::query(
+        "UPDATE runs.runs
+            SET tokens_reserved = greatest(tokens_reserved - $2, 0),
+                tokens_in = tokens_in + $3, tokens_out = tokens_out + $4,
+                cost_eur = cost_eur + $5, model = coalesce(nullif($6, ''), model)
+          WHERE id = $1",
+    )
+    .bind(run)
+    .bind(i32::try_from(reserved).unwrap_or(i32::MAX))
+    .bind(i32::try_from(tokens_in).unwrap_or(i32::MAX))
+    .bind(i32::try_from(tokens_out).unwrap_or(i32::MAX))
+    .bind(cost_eur)
+    .bind(model)
+    .execute(&state.db)
+    .await?;
+    Ok(())
+}
+
 async fn record(state: &AppState, run: Uuid, level: Level, message: String) {
     let event = NewEvent {
         layer: Layer::Agent,
@@ -495,8 +549,11 @@ async fn record(state: &AppState, run: Uuid, level: Level, message: String) {
 /// One completion of the `complete` role through the AI gateway, for the
 /// run's account: refused when the account reached its daily tokens or a
 /// spending limit (`ai_daily_limit_reached`, `ai_budget_reached`), and
-/// when the run's tokens with this answer's worst case would pass its
-/// kind's budget (`run_budget_reached`). The run's tokens and cost grow by
+/// when the run's tokens, with what its calls in flight reserved and this
+/// call's worst case (its prompt at about four characters a token, and its
+/// whole `max_tokens` answer), would pass its kind's budget
+/// (`run_budget_reached`). The worst case is reserved before the call is
+/// forwarded and settled to what it used. The run's tokens and cost grow by
 /// what it used.
 #[utoipa::path(
     post,
@@ -541,13 +598,25 @@ pub async fn complete(
             ),
         ));
     }
-    let used: i64 = sqlx::query_scalar(
-        "SELECT tokens_in::bigint + tokens_out::bigint FROM runs.runs WHERE id = $1",
+    let Some(ai) = &deps.ai else {
+        return Err(Error::Unavailable(applicamp_ai::AI_UNAVAILABLE));
+    };
+    // The call's worst case is reserved before it is forwarded, in one
+    // statement, so calls made at once cannot together pass the budget.
+    let reserved = worst_case(&completion);
+    let fits: Option<Uuid> = sqlx::query_scalar(
+        "UPDATE runs.runs SET tokens_reserved = tokens_reserved + $2
+          WHERE id = $1
+            AND tokens_in::bigint + tokens_out::bigint + tokens_reserved::bigint + $2::bigint
+                <= $3::bigint
+      RETURNING id",
     )
     .bind(caller.run)
-    .fetch_one(&state.db)
+    .bind(i32::try_from(reserved).unwrap_or(i32::MAX))
+    .bind(i64::from(kind.limits.max_tokens))
+    .fetch_optional(&state.db)
     .await?;
-    if used + i64::from(completion.max_tokens) > i64::from(kind.limits.max_tokens) {
+    if fits.is_none() {
         record(
             &state,
             caller.run,
@@ -560,9 +629,6 @@ pub async fn complete(
             format!("This run may use {} model tokens.", kind.limits.max_tokens),
         ));
     }
-    let Some(ai) = &deps.ai else {
-        return Err(Error::Unavailable(applicamp_ai::AI_UNAVAILABLE));
-    };
     let mut request = ChatRequest::new(
         completion
             .messages
@@ -590,6 +656,7 @@ pub async fn complete(
     let answer = match ai.complete(caller_ai, request).await {
         Ok(answer) => answer,
         Err(err) => {
+            settle(&state, caller.run, reserved, None).await?;
             let err = Error::from(err);
             record(
                 &state,
@@ -603,18 +670,17 @@ pub async fn complete(
     };
     let usage = answer.usage.unwrap_or_default();
     let cost_eur = answer.cost_usd.unwrap_or_default() * ai.usd_to_eur();
-    sqlx::query(
-        "UPDATE runs.runs
-            SET tokens_in = tokens_in + $2, tokens_out = tokens_out + $3,
-                cost_eur = cost_eur + $4, model = $5
-          WHERE id = $1",
+    settle(
+        &state,
+        caller.run,
+        reserved,
+        Some((
+            usage.prompt_tokens,
+            usage.completion_tokens,
+            cost_eur,
+            &answer.model,
+        )),
     )
-    .bind(caller.run)
-    .bind(i32::try_from(usage.prompt_tokens).unwrap_or(i32::MAX))
-    .bind(i32::try_from(usage.completion_tokens).unwrap_or(i32::MAX))
-    .bind(cost_eur)
-    .bind(&answer.model)
-    .execute(&state.db)
     .await?;
     Ok(Json(CompletionAnswer {
         content: answer.content,
@@ -690,11 +756,17 @@ pub async fn finish(
         body.map_err(|rejection| Error::BadRequest("invalid_request", rejection.body_text()))?;
     schema::check(&kind.output, &finish.summary)
         .map_err(|why| Error::BadRequest("invalid_summary", why))?;
+    if store::has_nul(&finish.summary) {
+        return Err(Error::BadRequest(
+            "invalid_summary",
+            "A summary holds no NUL character.".to_owned(),
+        ));
+    }
     let outcome = Outcome::from(finish.outcome);
     debug_assert!(crate::agent_outcomes().contains(&outcome));
     let done = sqlx::query(
         "UPDATE runs.runs SET outcome = $2, summary = $3
-          WHERE id = $1 AND status = 'running' AND outcome IS NULL",
+          WHERE id = $1 AND status IN ('starting', 'running') AND outcome IS NULL",
     )
     .bind(caller.run)
     .bind(outcome.as_str())

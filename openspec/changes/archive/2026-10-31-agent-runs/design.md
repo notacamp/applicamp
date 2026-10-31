@@ -32,7 +32,7 @@ the caller's transaction) and hears the end by consuming `runs.finished`.
 ## Data (schema `runs`)
 - `runs(id uuid pk, account_id, kind, subject_id uuid null, status text, outcome text null, inputs jsonb, deadline timestamptz, created_at, started_at, finished_at, sandbox text, image text, policy text, model text, tokens_in int default 0, tokens_out int default 0, cost_eur double precision default 0 (as `ai.usage.cost_usd`), error_kind text, summary jsonb, cancel_requested bool default false, claimed_by text, claimed_until timestamptz, last_seq bigint default 0)`.
   `status`: `queued | starting | running | finished`. `outcome` (when finished): `succeeded | nothing_new | needs_you | ended_max_steps | ended_budget | ended_timeout | ended_loop | failed | cancelled`.
-- `events(run_id, seq bigint, agent_seq bigint null unique per run, at, layer text check in ('agent','sandbox'), level text check in ('info','tool','model','deny','ask','error'), operation text null, tool_name text null, message text check (length(message) <= 2000), data jsonb, primary key (run_id, seq))`. `seq` is the SSE `Last-Event-ID`, given out from `runs.last_seq`; agent events carry their own number (`agent_seq`) so a line seen on stdout and through `POST events` is stored once. Retention: 30 days (a daily job deletes older runs' events; runs keep their summary).
+- `events(run_id, seq bigint, agent_seq bigint null unique per run, at, layer text check in ('agent','sandbox'), level text check in ('info','tool','model','deny','ask','error'), operation text null, tool_name text null, message text check (length(message) <= 2000), data jsonb, primary key (run_id, seq))`. `seq` is the SSE `Last-Event-ID`, given out from `runs.last_seq`; agent events carry their own number (`agent_seq`) so a line seen on stdout and through `POST events` is stored once. A run keeps at most 5 000 events (the next becomes one `truncated` event, later ones are not kept); a sandbox's log is a bounded channel (1 024 lines) that drops what overflows and records how many. Messages and data lose NUL characters from the runner's output and refuse them through the API (`invalid_event`). Retention: 30 days (a daily job deletes older runs' events; runs keep their summary).
 - `tokens(run_id pk, hash bytea, tools jsonb, calls jsonb, expires_at)`: 32 random bytes sent once to the sandbox, stored as SHA-256, with the kind's tools and their caps and a count of calls made; expires at the deadline + 5 minutes; deleted on finish.
 - Events published: `runs.finished` v1 `{ run, account, kind, subject, outcome }`.
 
@@ -40,9 +40,11 @@ the caller's transaction) and hears the end by consuming `runs.finished`.
 A run outlives the kernel job lease (60 s), so the queue is `runs.runs` itself:
 the server starts an **orchestrator loop** that claims queued runs with
 `FOR UPDATE SKIP LOCKED` (and a renewed claim), within concurrency (1 per
-account, 3 per instance). For each claimed run it:
-1. mints the run token,
-2. `SandboxRuntime::create(spec)`: image and template for the kind, the
+account, 3 per instance). For each claimed run it renews its claim from the start (while the sandbox is
+made too), and:
+1. mints the run token, only while the run is `starting` and claimed by this
+   server (a run reaped meanwhile gets none),
+2. `SandboxRuntime::create(spec)` within 20 s (inside the 30 s lease): image and template for the kind, the
    kind's policy, the run id, token and agent API address as command
    arguments (a gateway template cannot carry per-run environment), labels
    `applicamp-run=<id>`,
@@ -104,7 +106,7 @@ environment otherwise. The server image carries the runner at
 - `GET /api/agent/v1/context` → `{ run, kind, inputs, subject, limits, tools: [{ name, class, schema, cap }] }`.
 - `POST /api/agent/v1/events` `[{ seq, level, message, operation?, tool_name?, data? }]` (≤ 50 per call, message ≤ 2000 chars, data ≤ 8 KB).
 - `POST /api/agent/v1/tools/{name}` `{ args }` → the handler's result. Refused (404) when the tool is not the kind's; `tool_cap_reached` past its cap; `invalid_arguments` (with the schema error) when `args` does not match.
-- `POST /api/agent/v1/complete` `{ messages, response_format?, max_tokens ≤ 16000 }` → the `complete` role through `applicamp-ai` with the run's account and caps (refusals keep the gateway's codes: `ai_daily_limit_reached`, `ai_budget_reached`, recorded as an event); the run's tokens and cost grow; when its tokens plus this call's `max_tokens` would pass the kind's `max_tokens` the answer is `429 run_budget_reached`.
+- `POST /api/agent/v1/complete` `{ messages, response_format?, max_tokens ≤ 16000 }` → the `complete` role through `applicamp-ai` with the run's account and caps (refusals keep the gateway's codes: `ai_daily_limit_reached`, `ai_budget_reached`, recorded as an event); the call's worst case (its prompt at about four characters a token, plus its whole `max_tokens` answer) is reserved first in one guarded update (`runs.tokens_reserved`), so calls made at once cannot together pass the kind's `max_tokens` (`429 run_budget_reached`); the reservation is settled to what the call used, or released when it fails.
 - `POST /api/agent/v1/finish` `{ outcome: succeeded | nothing_new | needs_you | failed, summary }` (summary checked against the kind's output schema).
 - Every call checks the token's hash and expiry and that the run is `running` and not yet finished by its agent; 404 otherwise (401 `run_token_required` without a bearer, 400 `cookies_refused` with a cookie). 10 requests a second per run (`429 rate_limited`). `tool_cap_reached` is 409; bad arguments do not count against the cap.
 - The door is exempt from the CSRF middleware and refuses `Cookie`; `cargo xtask arch` knows a `run_token` security scheme allowed only under `/api/agent/`.

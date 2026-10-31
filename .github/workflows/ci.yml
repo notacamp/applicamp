@@ -46,6 +46,27 @@ jobs:
       - name: Sandbox policies (enforced endpoints, Landlock required, no forbidden or internal host)
         if: always()
         run: cargo xtask policies
+      - name: Sandbox policies within their boundary (openshell-prover)
+        # NVIDIA's prover, pinned to the OpenShell tag the runtime uses and
+        # checked against its published SHA-256 before it runs.
+        if: always()
+        env:
+          PROVER_VERSION: v0.1.6
+          PROVER_SHA256: 791528b070b5241f025f3f7a310850d12e7cda46ea65cc825133fbf21a8b2fc8
+        run: |
+          dir="$RUNNER_TEMP/openshell-prover"
+          mkdir -p "$dir"
+          curl -sSfL -o "$dir/prover.tar.gz" \
+            "https://github.com/NVIDIA/OpenShell/releases/download/${PROVER_VERSION}/openshell-prover-x86_64-unknown-linux-musl.tar.gz"
+          echo "${PROVER_SHA256}  $dir/prover.tar.gz" | sha256sum -c -
+          tar -xzf "$dir/prover.tar.gz" -C "$dir" openshell-prover
+          status=0
+          for policy in policies/*.yaml; do
+            [ "$policy" = policies/boundary.yaml ] && continue
+            echo "== $policy"
+            "$dir/openshell-prover" check "$policy" --boundary policies/boundary.yaml || status=1
+          done
+          exit $status
       - name: OpenAPI drift
         id: openapi
         if: always()

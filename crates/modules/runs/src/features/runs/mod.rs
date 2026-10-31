@@ -326,16 +326,7 @@ pub async fn cancel(
         }
         RunStatus::Queued => {
             // Unless it was claimed meanwhile; then it is asked to stop.
-            let ended: Option<Uuid> = sqlx::query_scalar(
-                "UPDATE runs.runs SET cancel_requested = true WHERE id = $1 AND status = 'queued'
-              RETURNING id",
-            )
-            .bind(id)
-            .fetch_optional(&state.db)
-            .await?;
-            if ended.is_some() {
-                store::finish(&state.db, &state.events, id, Outcome::Cancelled, None, now).await?;
-            } else {
+            if !store::cancel_queued(&state.db, &state.events, id, now).await? {
                 request_stop(&state, id).await?;
             }
         }

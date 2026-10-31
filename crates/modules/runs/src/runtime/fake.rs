@@ -23,15 +23,15 @@ use tokio::{
     io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _, BufReader},
     net::{TcpListener, TcpStream},
     process::Command,
-    sync::{Notify, mpsc, watch},
+    sync::{Notify, watch},
     task::JoinHandle,
     time::Instant,
 };
 use uuid::Uuid;
 
 use super::{
-    Exit, LogLine, Result, RuntimeError, SandboxHandle, SandboxRuntime, SandboxSpec, TokenArg,
-    agent_args, policy,
+    Exit, LOG_BUFFER, LogLine, LogSender, Result, RuntimeError, SandboxHandle, SandboxRuntime,
+    SandboxSpec, TokenArg, agent_args, policy,
 };
 use crate::kinds::Kinds;
 
@@ -43,7 +43,7 @@ struct Sandbox {
     run: Uuid,
     exit: watch::Receiver<Option<Option<i32>>>,
     kill: Arc<Notify>,
-    lines: Option<mpsc::UnboundedReceiver<LogLine>>,
+    lines: Option<BoxStream<'static, Result<LogLine>>>,
     proxy: JoinHandle<()>,
 }
 
@@ -108,7 +108,7 @@ impl SandboxRuntime for FakeRuntime {
     async fn create(&self, spec: SandboxSpec) -> Result<SandboxHandle> {
         let policy = policy::for_run(spec.policy, &spec.api).map_err(RuntimeError)?;
         let allowed: HashSet<(String, u16)> = policy::hosts(&policy).into_iter().collect();
-        let (lines, rx) = mpsc::unbounded_channel();
+        let (lines, rx) = LogSender::new(LOG_BUFFER);
         let listener = TcpListener::bind("127.0.0.1:0")
             .await
             .map_err(|e| RuntimeError(format!("the fake proxy could not listen: {e}")))?;
@@ -153,7 +153,7 @@ impl SandboxRuntime for FakeRuntime {
             tokio::spawn(async move {
                 let mut reader = BufReader::new(stdout).lines();
                 while let Ok(Some(line)) = reader.next_line().await {
-                    if lines.send(LogLine::Agent(line)).is_err() {
+                    if !lines.send(Ok(LogLine::Agent(line))) {
                         break;
                     }
                 }
@@ -191,13 +191,7 @@ impl SandboxRuntime for FakeRuntime {
             .sandboxes()
             .get_mut(&handle.name)
             .and_then(|sandbox| sandbox.lines.take());
-        match rx {
-            Some(rx) => futures::stream::unfold(rx, |mut rx| async move {
-                rx.recv().await.map(|line| (Ok(line), rx))
-            })
-            .boxed(),
-            None => futures::stream::empty().boxed(),
-        }
+        rx.unwrap_or_else(|| futures::stream::empty().boxed())
     }
 
     async fn wait(&self, handle: &SandboxHandle, until: Instant) -> Result<Exit> {
@@ -243,7 +237,7 @@ async fn serve_proxy(
     listener: TcpListener,
     allowed: Arc<HashSet<(String, u16)>>,
     kind: &'static str,
-    lines: mpsc::UnboundedSender<LogLine>,
+    lines: LogSender,
 ) {
     while let Ok((stream, _)) = listener.accept().await {
         tokio::spawn(proxy_one(stream, Arc::clone(&allowed), kind, lines.clone()));
@@ -301,7 +295,7 @@ async fn proxy_one(
     mut stream: TcpStream,
     allowed: Arc<HashSet<(String, u16)>>,
     kind: &'static str,
-    lines: mpsc::UnboundedSender<LogLine>,
+    lines: LogSender,
 ) {
     let mut head = Vec::new();
     let mut buf = [0_u8; 1024];
@@ -321,7 +315,7 @@ async fn proxy_one(
         return;
     };
     let ok = allowed.contains(&(asked.host.clone(), asked.port));
-    let _ = lines.send(LogLine::Sandbox(line(&asked, ok, kind)));
+    lines.send(Ok(LogLine::Sandbox(line(&asked, ok, kind))));
     if !ok {
         let _ = stream
             .write_all(b"HTTP/1.1 403 Forbidden\r\ncontent-length: 0\r\nconnection: close\r\n\r\n")
@@ -352,6 +346,8 @@ async fn proxy_one(
 
 #[cfg(test)]
 mod tests {
+    use futures::StreamExt as _;
+
     use super::*;
 
     #[test]
@@ -393,7 +389,7 @@ mod tests {
     async fn the_proxy_refuses_hosts_outside_the_policy() {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
-        let (lines, mut rx) = mpsc::unbounded_channel();
+        let (lines, mut rx) = LogSender::new(8);
         let proxy = tokio::spawn(serve_proxy(
             listener,
             Arc::new(HashSet::new()),
@@ -408,7 +404,7 @@ mod tests {
         let mut answer = String::new();
         client.read_to_string(&mut answer).await.unwrap();
         assert!(answer.starts_with("HTTP/1.1 403"), "{answer}");
-        let Some(LogLine::Sandbox(line)) = rx.recv().await else {
+        let Some(Ok(LogLine::Sandbox(line))) = rx.next().await else {
             panic!("no sandbox line");
         };
         assert!(line.contains("DENIED"), "{line}");

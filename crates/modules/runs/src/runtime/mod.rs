@@ -13,10 +13,17 @@ pub mod fake;
 pub mod openshell;
 pub mod policy;
 
-use std::collections::HashSet;
+use std::{
+    collections::HashSet,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
+};
 
 use async_trait::async_trait;
-use futures::stream::BoxStream;
+use futures::{StreamExt as _, stream::BoxStream};
+use tokio::sync::mpsc;
 use tokio::time::Instant;
 use url::Url;
 use uuid::Uuid;
@@ -84,6 +91,59 @@ pub enum LogLine {
     /// An allow or deny line of the sandbox's network proxy (OpenShell's
     /// OCSF shorthand: `NET:OPEN [MED] DENIED … -> example.com:443`).
     Sandbox(String),
+    /// This many lines came faster than they could be recorded and were
+    /// dropped.
+    Dropped(u64),
+}
+
+/// Lines a sandbox's log holds before it drops them.
+pub const LOG_BUFFER: usize = 1024;
+
+/// The sending side of a sandbox's log: bounded, so a runner writing faster
+/// than lines are recorded loses lines (counted, and said so with a
+/// [`LogLine::Dropped`]) instead of growing the server's memory. Cheap to
+/// clone; clones share the count.
+#[derive(Debug, Clone)]
+pub struct LogSender {
+    tx: mpsc::Sender<Result<LogLine>>,
+    dropped: Arc<AtomicU64>,
+}
+
+impl LogSender {
+    /// A log of at most `capacity` waiting lines, and its stream.
+    pub fn new(capacity: usize) -> (Self, BoxStream<'static, Result<LogLine>>) {
+        let (tx, rx) = mpsc::channel(capacity.max(2));
+        let stream = futures::stream::unfold(rx, |mut rx| async move {
+            rx.recv().await.map(|line| (line, rx))
+        })
+        .boxed();
+        (
+            Self {
+                tx,
+                dropped: Arc::new(AtomicU64::new(0)),
+            },
+            stream,
+        )
+    }
+
+    /// Send `line` unless the log is full (then it is counted as dropped).
+    /// Whether anyone still reads the log.
+    pub fn send(&self, line: Result<LogLine>) -> bool {
+        match self.tx.try_send(line) {
+            Ok(()) => {
+                let dropped = self.dropped.swap(0, Ordering::SeqCst);
+                if dropped > 0 && self.tx.try_send(Ok(LogLine::Dropped(dropped))).is_err() {
+                    self.dropped.fetch_add(dropped, Ordering::SeqCst);
+                }
+                true
+            }
+            Err(mpsc::error::TrySendError::Full(_)) => {
+                self.dropped.fetch_add(1, Ordering::SeqCst);
+                true
+            }
+            Err(mpsc::error::TrySendError::Closed(_)) => false,
+        }
+    }
 }
 
 /// How waiting for a sandbox ended.
@@ -149,6 +209,22 @@ pub enum TokenArg<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn a_full_log_drops_lines_and_says_how_many() {
+        let (log, mut lines) = LogSender::new(2);
+        for n in 0..5 {
+            assert!(log.send(Ok(LogLine::Agent(n.to_string()))));
+        }
+        assert_eq!(lines.next().await, Some(Ok(LogLine::Agent("0".into()))));
+        assert_eq!(lines.next().await, Some(Ok(LogLine::Agent("1".into()))));
+        // Room again: the next line goes, then how many were lost.
+        assert!(log.send(Ok(LogLine::Agent("5".into()))));
+        assert_eq!(lines.next().await, Some(Ok(LogLine::Agent("5".into()))));
+        assert_eq!(lines.next().await, Some(Ok(LogLine::Dropped(3))));
+        drop(lines);
+        assert!(!log.send(Ok(LogLine::Agent("6".into()))), "nobody reads it");
+    }
 
     #[test]
     fn the_runner_gets_its_run_api_and_token_and_nothing_prints_the_token() {

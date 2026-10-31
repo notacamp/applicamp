@@ -10,9 +10,11 @@
 //! - require its filesystem rules (`landlock.compatibility:
 //!   hard_requirement`; the default runs without them),
 //! - name no wildcard host, nothing under `linkedin.com` or `indeed.com`
-//!   (their terms forbid automation, ADR 0006), and no private, shared
-//!   (tailnet), loopback, link-local or unspecified address, as a host or in
-//!   `allowed_ips`.
+//!   (their terms forbid automation, ADR 0006), no IPv4 host written other
+//!   than `a.b.c.d` (`127.1`, `2130706433`, `0177.0.0.1`), no private,
+//!   shared (tailnet), loopback, link-local, reserved, multicast or NAT64
+//!   address as a host or in `allowed_ips`, and no `allowed_ips` range wider
+//!   than /24 (IPv4) or /48 (IPv6).
 //!
 //! [`lint`] is a pure function over a file's name and text, so the rules
 //! are unit tested with fixtures.
@@ -22,37 +24,79 @@ use std::net::IpAddr;
 /// Hosts no policy may name, with every host under them.
 pub const FORBIDDEN_DOMAINS: [&str; 2] = ["linkedin.com", "indeed.com"];
 
-/// Whether `ip` is an address a sandbox must never reach.
+/// The widest IPv4 range `allowed_ips` may name.
+pub const MIN_V4_PREFIX: u8 = 24;
+/// The widest IPv6 range `allowed_ips` may name.
+pub const MIN_V6_PREFIX: u8 = 48;
+
+/// Whether `ip` is an address a sandbox must never reach: private, shared,
+/// loopback, link-local, unspecified, reserved, documentation, benchmark,
+/// multicast or NAT64.
 fn is_internal(ip: IpAddr) -> bool {
     match ip {
         IpAddr::V4(v4) => {
-            let [a, b, ..] = v4.octets();
+            let [a, b, c, _] = v4.octets();
             v4.is_private()
                 || v4.is_loopback()
                 || v4.is_link_local()
                 || v4.is_unspecified()
                 || v4.is_broadcast()
+                // 0.0.0.0/8: "this network".
+                || a == 0
                 // 100.64.0.0/10: shared address space (carrier NAT, tailnets).
                 || (a == 100 && (64..=127).contains(&b))
+                // 192.0.0.0/24 (protocol assignments) and the documentation
+                // ranges 192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24.
+                || (a == 192 && b == 0 && (c == 0 || c == 2))
+                || (a == 198 && b == 51 && c == 100)
+                || (a == 203 && b == 0 && c == 113)
+                // 198.18.0.0/15: benchmarking.
+                || (a == 198 && (b & 0xfe) == 18)
+                // 224.0.0.0/4 multicast and 240.0.0.0/4 reserved.
+                || a >= 224
         }
         IpAddr::V6(v6) => {
-            let first = v6.segments()[0];
+            let segments = v6.segments();
+            let first = segments[0];
             v6.is_loopback()
                 || v6.is_unspecified()
+                || v6.is_multicast()
                 || (first & 0xfe00) == 0xfc00
                 || (first & 0xffc0) == 0xfe80
-                || v6
-                    .to_ipv4_mapped()
-                    .is_some_and(|v4| is_internal(IpAddr::V4(v4)))
+                // 2001:db8::/32: documentation.
+                || (first == 0x2001 && segments[1] == 0x0db8)
+                // 64:ff9b::/96 and 64:ff9b:1::/48: NAT64, an IPv4 address in
+                // disguise.
+                || (first == 0x0064 && segments[1] == 0xff9b)
+                || v6.to_ipv4_mapped().is_some_and(|v4| is_internal(IpAddr::V4(v4)))
+                // ::/96, IPv4-compatible.
+                || segments[..6].iter().all(|s| *s == 0)
         }
     }
 }
 
-/// The address in `raw` (`10.0.0.1`, `10.0.0.0/8`, `[::1]`), if it is one.
-fn address(raw: &str) -> Option<IpAddr> {
+/// The address and prefix length in `raw` (`10.0.0.1`, `10.0.0.0/8`,
+/// `[::1]`), if it is one.
+fn address(raw: &str) -> Option<(IpAddr, Option<u8>)> {
     let raw = raw.trim();
-    let raw = raw.split_once('/').map_or(raw, |(ip, _)| ip);
-    raw.trim_matches(['[', ']']).parse().ok()
+    let (ip, prefix) = match raw.split_once('/') {
+        Some((ip, prefix)) => (ip, Some(prefix.trim().parse().ok()?)),
+        None => (raw, None),
+    };
+    Some((ip.trim_matches(['[', ']']).parse().ok()?, prefix))
+}
+
+/// Whether `host` is written like an IPv4 address (only decimal, octal or
+/// hex numbers between dots: `127.1`, `2130706433`, `0x7f.0.0.1`), which
+/// resolvers read in more ways than one.
+fn numeric(host: &str) -> bool {
+    !host.is_empty()
+        && host.split('.').all(|label| {
+            let digits = label.strip_prefix("0x").unwrap_or(label);
+            !digits.is_empty()
+                && digits.chars().all(|c| c.is_ascii_hexdigit())
+                && (label.starts_with("0x") || label.chars().all(|c| c.is_ascii_digit()))
+        })
 }
 
 /// Why `host` may not be in a policy, if it may not.
@@ -70,10 +114,32 @@ fn host_problem(host: &str) -> Option<&'static str> {
     {
         return Some("is a site whose terms forbid automation");
     }
-    if address(&host).is_some_and(is_internal) {
-        return Some("is a private, loopback or link-local address");
+    if numeric(&host) && host.parse::<std::net::Ipv4Addr>().is_err() {
+        return Some("is not an IPv4 address written the one canonical way (a.b.c.d)");
+    }
+    if address(&host).is_some_and(|(ip, _)| is_internal(ip)) {
+        return Some("is a private, loopback, link-local or reserved address");
     }
     None
+}
+
+/// Why `range` may not be in `allowed_ips`, if it may not.
+fn range_problem(range: &str) -> Option<String> {
+    let Some((ip, prefix)) = address(range) else {
+        return Some("is not an address or a range".to_owned());
+    };
+    if is_internal(ip) {
+        return Some("is not a public address or range".to_owned());
+    }
+    let (widest, max) = match ip {
+        IpAddr::V4(_) => (MIN_V4_PREFIX, 32),
+        IpAddr::V6(_) => (MIN_V6_PREFIX, 128),
+    };
+    match prefix {
+        Some(prefix) if prefix > max => Some(format!("has a prefix longer than /{max}")),
+        Some(prefix) if prefix < widest => Some(format!("is wider than /{widest}")),
+        _ => None,
+    }
 }
 
 /// The lint's findings for the policy file `name` holding `yaml`.
@@ -115,11 +181,9 @@ pub fn lint(name: &str, yaml: &str) -> Vec<String> {
             if let Some(why) = host_problem(&endpoint.host) {
                 problems.push(format!("{at}: {} {why}", endpoint.host));
             }
-            for ip in &endpoint.allowed_ips {
-                if address(ip).is_none_or(is_internal) {
-                    problems.push(format!(
-                        "{at}: allowed_ips `{ip}` is not a public address or range"
-                    ));
+            for range in &endpoint.allowed_ips {
+                if let Some(why) = range_problem(range) {
+                    problems.push(format!("{at}: allowed_ips `{range}` {why}"));
                 }
             }
         }
@@ -214,13 +278,81 @@ network_policies:
     }
 
     #[test]
-    fn internal_ranges_fail() {
-        for range in ["10.0.0.0/8", "fd00::/8", "fe80::1"] {
-            assert!(address(range).is_some_and(is_internal), "{range}");
+    fn internal_and_reserved_addresses_fail() {
+        for internal in [
+            "10.0.0.1",
+            "fd00::1",
+            "fe80::1",
+            "0.1.2.3",
+            "198.18.0.1",
+            "198.19.255.1",
+            "224.0.0.1",
+            "240.0.0.1",
+            "192.0.2.10",
+            "64:ff9b::a00:1",
+            "::ffff:127.0.0.1",
+            "::127.0.0.1",
+            "2001:db8::1",
+        ] {
+            assert!(
+                address(internal).is_some_and(|(ip, _)| is_internal(ip)),
+                "{internal}"
+            );
         }
-        for public in ["93.184.215.14", "2606:2800::1"] {
-            assert!(!address(public).is_some_and(is_internal), "{public}");
+        for public in ["93.184.215.14", "2606:2800::1", "198.20.0.1"] {
+            assert!(
+                !address(public).is_some_and(|(ip, _)| is_internal(ip)),
+                "{public}"
+            );
         }
+    }
+
+    #[test]
+    fn non_canonical_ipv4_hosts_fail() {
+        for host in [
+            "127.1",
+            "2130706433",
+            "0177.0.0.1",
+            "0x7f.0.0.1",
+            "0x7f000001",
+            "1.2.3.04",
+        ] {
+            assert!(host_problem(host).is_some(), "{host}");
+        }
+        for host in [
+            "93.184.215.14",
+            "api.example.com",
+            "deadbeef.example.com",
+            "1password.com",
+        ] {
+            assert_eq!(host_problem(host), None, "{host}");
+        }
+    }
+
+    #[test]
+    fn wide_or_internal_ranges_fail() {
+        for range in [
+            "1.0.0.0/1",
+            "8.8.0.0/16",
+            "2606:2800::/32",
+            "10.0.0.0/24",
+            "nonsense",
+            "1.2.3.4/33",
+        ] {
+            assert!(range_problem(range).is_some(), "{range}");
+        }
+        for range in ["93.184.215.0/24", "93.184.215.14", "2606:2800:220::/48"] {
+            assert_eq!(range_problem(range), None, "{range}");
+        }
+        let policy = with_endpoint(
+            "      - { host: jobs.example.com, port: 443, protocol: rest, enforcement: enforce, \
+             access: read-only, allowed_ips: [\"1.0.0.0/1\"] }\n",
+        );
+        let problems = lint("wide.yaml", &policy);
+        assert!(
+            problems.iter().any(|p| p.contains("1.0.0.0/1")),
+            "{problems:?}"
+        );
     }
 
     #[test]

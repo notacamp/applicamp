@@ -30,8 +30,8 @@ use tokio::{sync::OnceCell, time::Instant};
 use uuid::Uuid;
 
 use super::{
-    AGENT_BINARY, Exit, LABEL, LABEL_VALUE, LogLine, RUN_LABEL, Result, RuntimeError,
-    SandboxHandle, SandboxRuntime, SandboxSpec, TokenArg, agent_args, policy,
+    AGENT_BINARY, Exit, LABEL, LABEL_VALUE, LOG_BUFFER, LogLine, LogSender, RUN_LABEL, Result,
+    RuntimeError, SandboxHandle, SandboxRuntime, SandboxSpec, TokenArg, agent_args, policy,
 };
 use crate::{issuer::Issuer, kinds::Kinds};
 
@@ -114,20 +114,22 @@ impl OpenShellRuntime {
     }
 }
 
-/// A gateway error, without anything it echoes of the request.
+/// A gateway error as its kind (and gRPC code) only: never its message,
+/// which may echo the request, and a sandbox's request carries its run's
+/// token in its command.
 fn failed(what: &str, err: &SdkError) -> RuntimeError {
     let kind = match err {
-        SdkError::InvalidConfig { .. } => "invalid configuration",
-        SdkError::Tls { .. } => "TLS",
-        SdkError::Connect { .. } => "unreachable",
-        SdkError::Auth { .. } => "not authenticated",
-        SdkError::Io { .. } => "I/O",
-        SdkError::NotFound { .. } => "not found",
-        SdkError::AlreadyExists { .. } => "already exists",
-        SdkError::OutOfRange { .. } => "log out of range",
-        SdkError::Rpc { .. } => "gateway error",
+        SdkError::InvalidConfig { .. } => "invalid configuration".to_owned(),
+        SdkError::Tls { .. } => "TLS".to_owned(),
+        SdkError::Connect { .. } => "unreachable".to_owned(),
+        SdkError::Auth { .. } => "not authenticated".to_owned(),
+        SdkError::Io { .. } => "I/O".to_owned(),
+        SdkError::NotFound { .. } => "not found".to_owned(),
+        SdkError::AlreadyExists { .. } => "already exists".to_owned(),
+        SdkError::OutOfRange { .. } => "log out of range".to_owned(),
+        SdkError::Rpc { code, .. } => format!("gateway error, gRPC code {code}"),
     };
-    RuntimeError(format!("could not {what}: {kind} ({err})"))
+    RuntimeError(format!("could not {what}: {kind}"))
 }
 
 /// A kind's template name: `runs.probe` is `applicamp-runs-probe`.
@@ -225,6 +227,13 @@ impl SandboxRuntime for OpenShellRuntime {
     async fn create(&self, spec: SandboxSpec) -> Result<SandboxHandle> {
         let client = self.client().await?;
         let policy = policy::for_run(spec.policy, &spec.api).map_err(RuntimeError)?;
+        // The token goes in the command: a template-made sandbox takes no
+        // per-run environment (the gateway refuses `spec.environment` with a
+        // template), OpenShell v0.1.6 has no way to put a file into it at
+        // creation, and the canonical command gets no standard input. The
+        // gateway keeps the command with the sandbox, which is deleted when
+        // the run ends; the token dies with the run (deadline + 5 min at
+        // most), and errors are logged by kind only ([`failed`]).
         let mut command = vec![AGENT_BINARY.to_owned()];
         command.extend(agent_args(&spec, TokenArg::Inline(&spec.token)));
         let labels = HashMap::from([
@@ -252,7 +261,7 @@ impl SandboxRuntime for OpenShellRuntime {
             .boxed();
         };
         let name = handle.name.clone();
-        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, lines) = LogSender::new(LOG_BUFFER);
         tokio::spawn(async move {
             let options = WatchOptions {
                 follow_logs: true,
@@ -272,15 +281,12 @@ impl SandboxRuntime for OpenShellRuntime {
                     Err(e) => Err(failed("follow the sandbox log", &e)),
                 };
                 let end = line.is_err();
-                if tx.send(line).is_err() || end {
+                if !tx.send(line) || end {
                     break;
                 }
             }
         });
-        futures::stream::unfold(rx, |mut rx| async move {
-            rx.recv().await.map(|line| (line, rx))
-        })
-        .boxed()
+        lines
     }
 
     async fn wait(&self, handle: &SandboxHandle, until: Instant) -> Result<Exit> {
@@ -356,6 +362,20 @@ impl SandboxRuntime for OpenShellRuntime {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn gateway_errors_never_carry_their_message() {
+        for err in [
+            SdkError::invalid_config("spec.command: --token s3cret is too long"),
+            SdkError::Connect {
+                message: "reset while sending --token s3cret".to_owned(),
+            },
+        ] {
+            let said = failed("create a sandbox", &err).to_string();
+            assert!(said.starts_with("could not create a sandbox: "), "{said}");
+            assert!(!said.contains("s3cret"), "{said}");
+        }
+    }
 
     #[test]
     fn templates_are_named_after_their_kind() {

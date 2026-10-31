@@ -15,6 +15,10 @@ use url::Url;
 
 /// How long one call may take.
 const TIMEOUT: Duration = Duration::from_secs(30);
+/// Times the context is asked again while the run is not found.
+const CONTEXT_RETRIES: u32 = 5;
+/// The wait before asking again.
+const CONTEXT_RETRY_AFTER: Duration = Duration::from_millis(500);
 
 /// A call failed.
 #[derive(Debug, thiserror::Error)]
@@ -134,9 +138,22 @@ impl Api {
         }
     }
 
-    /// `GET context`.
+    /// `GET context`, asked again a few times while the run is not found
+    /// yet (the server may not have recorded its sandbox when the runner
+    /// starts).
     pub async fn context(&self) -> Result<Value, ApiError> {
-        self.send(self.http.get(self.url("context")?)).await
+        let mut attempt = 0;
+        loop {
+            match self.send(self.http.get(self.url("context")?)).await {
+                Err(ApiError::Refused { status, .. })
+                    if status == StatusCode::NOT_FOUND && attempt < CONTEXT_RETRIES =>
+                {
+                    attempt += 1;
+                    tokio::time::sleep(CONTEXT_RETRY_AFTER).await;
+                }
+                other => return other,
+            }
+        }
     }
 
     /// `POST tools/{name}`: the tool's result.

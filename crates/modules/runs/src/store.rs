@@ -17,6 +17,11 @@ use uuid::Uuid;
 pub const MAX_MESSAGE: usize = 2000;
 /// Longest operation or tool name on an event, in characters.
 pub const MAX_NAME: usize = 100;
+/// Events one run keeps; past them one `truncated` event says so, and the
+/// rest are not kept.
+pub const MAX_EVENTS_PER_RUN: i64 = 5_000;
+/// What the `truncated` event says.
+pub const TRUNCATED: &str = "This run wrote more than 5 000 lines; the rest are not kept.";
 
 /// Where a run is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -129,11 +134,6 @@ impl Level {
             .find(|level| level.as_str() == raw)
             .unwrap_or(Self::Info)
     }
-}
-
-/// `text` cut to `max` characters.
-pub fn clip(text: &str, max: usize) -> String {
-    text.chars().take(max).collect()
 }
 
 /// A run, as stored.
@@ -252,7 +252,7 @@ pub async fn claim(
         "UPDATE runs.runs
             SET status = 'starting', claimed_by = $1, claimed_until = $2, started_at = $3
           WHERE id = (SELECT r.id FROM runs.runs r
-                       WHERE r.status = 'queued'
+                       WHERE r.status = 'queued' AND NOT r.cancel_requested
                          AND NOT EXISTS (SELECT 1 FROM runs.runs o
                                           WHERE o.account_id = r.account_id
                                             AND o.status IN ('starting', 'running'))
@@ -294,27 +294,39 @@ pub async fn renew(
     .await
 }
 
-/// Run `id` starts: its deadline, image and policy, and its token (stored
-/// as `hash`, with its kind's tools and their caps).
+/// Run `id` starts on `instance`: its deadline, image and policy, and its
+/// token (stored as `hash`, with its kind's tools and their caps). Only
+/// while it is `starting` and claimed by `instance`; whether it was (when
+/// not, nothing is written: no token for a run that ended meanwhile).
 #[allow(clippy::too_many_arguments)]
 pub async fn start(
     db: &PgPool,
     id: Uuid,
+    instance: &str,
     deadline: DateTime<Utc>,
     image: &str,
     policy: &str,
     hash: &[u8],
     tools: &Value,
     expires_at: DateTime<Utc>,
-) -> Result<(), sqlx::Error> {
+) -> Result<bool, sqlx::Error> {
     let mut tx = db.begin().await?;
-    sqlx::query("UPDATE runs.runs SET deadline = $2, image = $3, policy = $4 WHERE id = $1")
-        .bind(id)
-        .bind(deadline)
-        .bind(image)
-        .bind(policy)
-        .execute(&mut *tx)
-        .await?;
+    let started: Option<Uuid> = sqlx::query_scalar(
+        "UPDATE runs.runs SET deadline = $2, image = $3, policy = $4
+          WHERE id = $1 AND status = 'starting' AND claimed_by = $5
+      RETURNING id",
+    )
+    .bind(id)
+    .bind(deadline)
+    .bind(image)
+    .bind(policy)
+    .bind(instance)
+    .fetch_optional(&mut *tx)
+    .await?;
+    if started.is_none() {
+        tx.rollback().await?;
+        return Ok(false);
+    }
     sqlx::query(
         "INSERT INTO runs.tokens (run_id, hash, tools, expires_at) VALUES ($1, $2, $3, $4)
          ON CONFLICT (run_id) DO UPDATE SET hash = $2, tools = $3, calls = '{}'::jsonb,
@@ -326,7 +338,8 @@ pub async fn start(
     .bind(expires_at)
     .execute(&mut *tx)
     .await?;
-    tx.commit().await
+    tx.commit().await?;
+    Ok(true)
 }
 
 /// Run `id`'s sandbox `sandbox` exists and its agent works.
@@ -408,6 +421,45 @@ async fn ended_run(
     Ok(())
 }
 
+/// End queued run `id` as cancelled, in one guarded step: unless it was
+/// claimed meanwhile (then it is going, and is asked to stop instead).
+/// Whether it ended now.
+pub async fn cancel_queued(
+    db: &PgPool,
+    events: &EventBus,
+    id: Uuid,
+    now: DateTime<Utc>,
+) -> Result<bool, sqlx::Error> {
+    let mut tx = db.begin().await?;
+    let ended: Option<(Uuid, String, Option<Uuid>)> = sqlx::query_as(
+        "UPDATE runs.runs
+            SET status = 'finished', outcome = 'cancelled', cancel_requested = true,
+                finished_at = $2
+          WHERE id = $1 AND status = 'queued'
+      RETURNING account_id, kind, subject_id",
+    )
+    .bind(id)
+    .bind(now)
+    .fetch_optional(&mut *tx)
+    .await?;
+    let Some((account, kind, subject)) = ended else {
+        return Ok(false);
+    };
+    ended_run(
+        &mut tx,
+        events,
+        id,
+        account,
+        kind.clone(),
+        subject,
+        Outcome::Cancelled,
+    )
+    .await?;
+    tx.commit().await?;
+    tracing::info!(run = %id, kind, outcome = "cancelled", "run finished");
+    Ok(true)
+}
+
 /// End every run whose server's claim lapsed (it died mid-run) as failed,
 /// `server_restarted`. How many.
 pub async fn reap(
@@ -465,33 +517,61 @@ pub struct NewEvent {
     pub data: Option<Value>,
 }
 
+/// `text` without NUL characters (Postgres text cannot hold them), cut to
+/// `max` characters.
+fn clean(text: &str, max: usize) -> String {
+    text.chars().filter(|c| *c != '\0').take(max).collect()
+}
+
+/// Whether `data` holds a NUL character (`jsonb` cannot hold one).
+pub fn has_nul(data: &Value) -> bool {
+    data.to_string().contains("\\u0000")
+}
+
 /// Record `event` for run `run` at `at`, under the next number. Whether it
-/// was new (an agent event with a number already recorded is not).
+/// was kept: not an agent event with a number already recorded, and not
+/// past the run's [`MAX_EVENTS_PER_RUN`] (the first event past them becomes
+/// one `truncated` event; later ones are not kept).
 pub async fn insert_event(
     db: &PgPool,
     run: Uuid,
     at: DateTime<Utc>,
     event: &NewEvent,
 ) -> Result<bool, sqlx::Error> {
-    let done = sqlx::query(
-        "WITH s AS (UPDATE runs.runs SET last_seq = last_seq + 1 WHERE id = $1 RETURNING last_seq)
+    let kept: Option<bool> = sqlx::query_scalar(
+        "WITH s AS (UPDATE runs.runs SET last_seq = last_seq + 1
+                     WHERE id = $1 AND last_seq <= $10 RETURNING last_seq)
          INSERT INTO runs.events
                 (run_id, seq, agent_seq, at, layer, level, operation, tool_name, message, data)
-         SELECT $1, s.last_seq, $2, $3, $4, $5, $6, $7, $8, $9 FROM s
-         ON CONFLICT (run_id, agent_seq) DO NOTHING",
+         SELECT $1, s.last_seq,
+                CASE WHEN s.last_seq > $10 THEN NULL ELSE $2 END,
+                $3, $4,
+                CASE WHEN s.last_seq > $10 THEN 'error' ELSE $5 END,
+                CASE WHEN s.last_seq > $10 THEN 'truncated' ELSE $6 END,
+                CASE WHEN s.last_seq > $10 THEN NULL ELSE $7 END,
+                CASE WHEN s.last_seq > $10 THEN $11 ELSE $8 END,
+                CASE WHEN s.last_seq > $10 THEN NULL ELSE $9 END
+           FROM s
+         ON CONFLICT (run_id, agent_seq) DO NOTHING
+      RETURNING seq <= $10",
     )
     .bind(run)
     .bind(event.agent_seq)
     .bind(at)
     .bind(event.layer.as_str())
     .bind(event.level.as_str())
-    .bind(event.operation.as_deref().map(|s| clip(s, MAX_NAME)))
-    .bind(event.tool_name.as_deref().map(|s| clip(s, MAX_NAME)))
-    .bind(clip(&event.message, MAX_MESSAGE))
-    .bind(&event.data)
-    .execute(db)
+    .bind(event.operation.as_deref().map(|s| clean(s, MAX_NAME)))
+    .bind(event.tool_name.as_deref().map(|s| clean(s, MAX_NAME)))
+    .bind(clean(&event.message, MAX_MESSAGE))
+    .bind(event.data.as_ref().filter(|data| !has_nul(data)))
+    .bind(MAX_EVENTS_PER_RUN)
+    .bind(TRUNCATED)
+    .fetch_optional(db)
     .await?;
-    Ok(done.rows_affected() > 0)
+    if kept == Some(false) {
+        tracing::warn!(run = %run, cap = MAX_EVENTS_PER_RUN, "a run's events were cut short");
+    }
+    Ok(kept == Some(true))
 }
 
 /// A recorded event.

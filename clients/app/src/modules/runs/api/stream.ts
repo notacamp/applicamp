@@ -25,6 +25,24 @@ export interface RunEvents {
   retry: () => void;
 }
 
+/**
+ * Lines one run keeps in memory: the server keeps 5 000 and one line saying
+ * the rest were cut.
+ */
+export const MAX_KEPT_EVENTS = 5_001;
+
+/**
+ * Add `event` to `kept` in place, unless `kept` is full: constant time, so
+ * a long run is not copied on every line. Whether it was added.
+ */
+export function keepEvent(kept: RunEvent[], event: RunEvent): boolean {
+  if (kept.length >= MAX_KEPT_EVENTS) {
+    return false;
+  }
+  kept.push(event);
+  return true;
+}
+
 /** The live stream of run `id`, after line `after`. */
 export function streamUrl(id: string, after: number): string {
   const path = `/api/v1/runs/${encodeURIComponent(id)}/events/stream`;
@@ -40,7 +58,11 @@ export function streamUrl(id: string, after: number): string {
  */
 export function useRunEvents(id: string): RunEvents {
   const queryClient = useQueryClient();
-  const [events, setEvents] = useState<RunEvent[]>([]);
+  // Lines are kept in one array that grows in place (copying it on every
+  // line would cost the square of a long run); `lines` counts them, so a
+  // new line renders.
+  const [kept] = useState<RunEvent[]>(() => []);
+  const [, setLines] = useState(0);
   const [state, setState] = useState<StreamState>("connecting");
   const [attempt, setAttempt] = useState(0);
   // The last line seen, so a retry resumes after it.
@@ -57,7 +79,9 @@ export function useRunEvents(id: string): RunEvents {
         return;
       }
       last.current = event.seq;
-      setEvents((seen) => [...seen, event]);
+      if (keepEvent(kept, event)) {
+        setLines(kept.length);
+      }
     };
     const onEnd = (message: MessageEvent<string>) => {
       source.close();
@@ -79,10 +103,10 @@ export function useRunEvents(id: string): RunEvents {
       source.removeEventListener("error", onError);
       source.close();
     };
-  }, [id, attempt, queryClient]);
+  }, [id, attempt, queryClient, kept]);
 
   return {
-    events,
+    events: kept,
     state,
     retry: () => {
       setState("connecting");

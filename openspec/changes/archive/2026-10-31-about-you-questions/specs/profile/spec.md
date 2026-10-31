@@ -66,7 +66,7 @@ An answer, in the person's words and the choices they picked (which SHALL be amo
 - **THEN** it is refused and nothing is read
 
 ### Requirement: Improve my profile, Skills and Grill me are retired into Tell me about you
-The routes `/profile/improve`, `/profile/skills` and `/profile/grill` (and `/profile/grill/{position}`) SHALL lead to Tell me about you. Every entry point to them SHALL lead there instead: the Grill me button, the per-role "Grill me about this role" links, Today's nudge and the strength checklist's Add and Improve buttons. The facts the person kept SHALL stay on the profile under "What you told Applicamp about each role", and the skills SHALL be reordered from the profile's own skills list. Skills the roles name that the skills lack SHALL be a question, not a page.
+The routes `/profile/improve`, `/profile/skills` and `/profile/grill` (and `/profile/grill/{position}`) SHALL lead to Tell me about you. Every entry point to them SHALL lead there instead: the Grill me button, the per-role "Grill me about this role" links, Today's nudge and the strength checklist's Add and Improve buttons for results, skills and questions (a part with a place on the profile, such as the headline or a link, is still added in place). The facts the person kept SHALL stay on the profile under "What you told Applicamp about each role", and the skills SHALL be reordered from the profile's own skills list. Skills the roles name that the skills lack SHALL be a question, not a page.
 
 #### Scenario: An old address
 - **WHEN** someone opens `/profile/grill` or `/profile/improve`

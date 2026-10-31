@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseAction, yearOf } from "./completion";
+import { parseAction } from "./completion";
 
 describe("a strength item's action", () => {
   it("names where to go", () => {
@@ -17,14 +17,5 @@ describe("a strength item's action", () => {
 
     expect(parseAction("edit:pets")).toBeNull();
     expect(parseAction("dance")).toBeNull();
-  });
-});
-
-describe("years", () => {
-  it("are the first four characters of a date", () => {
-    expect(yearOf("2021-03")).toBe("2021");
-    expect(yearOf("2014")).toBe("2014");
-    expect(yearOf(null)).toBeUndefined();
-    expect(yearOf("")).toBeUndefined();
   });
 });

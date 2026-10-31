@@ -9,7 +9,7 @@ import { AboutLegend, PortraitText } from "./PortraitText";
 export interface AddedStepProps {
   view: AboutView;
   onBack: () => void;
-  onReview: () => void;
+  onQuestions: () => void;
 }
 
 /**
@@ -17,7 +17,7 @@ export interface AddedStepProps {
  * you wrote", each change with their own words and its flags), and the
  * portrait with the new sentences highlighted. Nothing is saved yet.
  */
-export function AddedStep({ view, onBack, onReview }: AddedStepProps) {
+export function AddedStep({ view, onBack, onQuestions }: AddedStepProps) {
   const { t } = useTranslation("profile");
   const open = view.changes.filter(
     (change) => change.flags.length > 0 && (change.resolution ?? null) === null,
@@ -68,10 +68,10 @@ export function AddedStep({ view, onBack, onReview }: AddedStepProps) {
         <Button
           variant="primary"
           icon="arrow-right"
-          data-testid="about-to-review"
-          onClick={onReview}
+          data-testid="about-to-questions"
+          onClick={onQuestions}
         >
-          {t("about.added.review")}
+          {t("about.added.questions")}
         </Button>
         <Button variant="ghost" data-testid="about-back-to-portrait" onClick={onBack}>
           {t("about.added.back")}

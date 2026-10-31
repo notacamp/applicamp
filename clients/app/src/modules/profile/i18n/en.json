@@ -359,11 +359,7 @@
     "scoreLabel": "Profile strength: {{score}} percent",
     "strong": "Strong. Keep it up to date.",
     "growing": "{{left}} points to a strong profile.",
-    "reading": "The AI is reading your profile for what is missing…",
     "checklist": "What your profile strength is made of",
-    "improve": "Improve my profile",
-    "improveCount_one": "Improve my profile · {{count}} question",
-    "improveCount_other": "Improve my profile · {{count}} questions",
     "add": "Add",
     "improveItem": "Improve",
     "skillsFound_one": "{{count}} found in your roles",
@@ -427,95 +423,13 @@
         "missing": "Tell agents what you want next"
       }
     },
-    "grill": "Grill me",
     "about": "Tell me about you"
   },
-  "improve": {
-    "eyebrow": "Question {{n}} of {{total}}",
-    "readingTitle": "Reading your profile…",
-    "readingLead": "The AI is looking for what is missing or thin. This takes a few seconds.",
-    "loadFailed": "The questions couldn’t be loaded.",
-    "later": "Finish later",
-    "skip": "Skip",
-    "draft": "Draft from my answer",
-    "drafting": "Drafting…",
-    "answerLabel": "Your answer",
-    "answerHint": "Enter drafts it from your answer; Shift and Enter start a new line.",
-    "answerPlaceholder": "Answer in your own words. Rough is fine.",
-    "strengthNow": "Strength {{from}}% → {{to}}% if you answer",
-    "contextRole": "From your role · {{role}}",
-    "years": "{{from}}–{{to}}",
-    "yearsNow": "{{from}}–now",
-    "context": {
-      "label": "Your headline",
-      "summary": "Your summary",
-      "education": "Your education",
-      "links": "Your links"
-    },
-    "draftTitle": "Draft from your answer",
-    "draftSource": "Uses only what you wrote and what your profile says. Nothing is saved until you keep it.",
-    "nothingDrafted": "Nothing in your answer could be drafted without adding something you didn’t write. Add detail and draft again.",
-    "dropped_one": "{{count}} line left out: it mentioned something you didn’t write.",
-    "dropped_other": "{{count}} lines left out: they mentioned something you didn’t write.",
-    "keep": "Keep",
-    "edit": "Edit",
-    "discard": "Discard",
-    "editLabel": "Edit the draft, one line each",
-    "kept": "Kept. Your profile is now {{score}}% strong.",
-    "doneTitle": "That’s everything for now",
-    "doneLead": "You have answered or skipped every question. Your profile is {{score}}% strong.",
-    "backToProfile": "Back to your profile",
-    "unavailableTitle": "The questions need an AI model",
-    "unavailableLead": "This Applicamp has no AI model set up, so it can’t read your profile for gaps. The checklist on your profile still shows what to add.",
-    "noProfile": "There is nothing to read yet. Import or write your profile first.",
-    "failedTitle": "The questions couldn’t be made",
-    "reasons": {
-      "ai_unavailable": "This Applicamp has no AI model set up, so it can’t read your profile for gaps.",
-      "ai_daily_limit_reached": "You’ve reached today’s AI limit. Try again tomorrow.",
-      "ai_budget_reached": "You’ve reached the AI spending limit, so nothing was sent. It resets with the day or the month; the checklist on your profile still shows what to add.",
-      "ai_failed": "The AI model couldn’t read your profile just now. Try again in a minute."
-    },
-    "errors": {
-      "generic": "That didn’t work. Try again.",
-      "ai_unavailable": "This Applicamp has no AI model set up, so it can’t draft from your answer.",
-      "ai_daily_limit_reached": "You’ve reached today’s AI limit. Try again tomorrow.",
-      "ai_budget_reached": "You’ve reached the AI spending limit, so nothing was sent. You can write this in your profile yourself.",
-      "ai_failed": "The AI model couldn’t draft this just now. Try again in a minute.",
-      "profile_changed": "Your profile changed since this draft was made. Discard it and draft again.",
-      "draft_not_ready": "This draft was already kept or discarded.",
-      "invalid_answer": "Write between 1 and 2,000 characters.",
-      "invalid_items": "Check the lines: none can be empty or too long.",
-      "not_found": "This question isn’t there any more. Finish later and come back."
-    }
-  },
   "skills": {
-    "yours": "Your skills",
     "order": "The first three drive the job board searches, so put the ones you most want to be hired for first.",
     "top": "Used for searches",
-    "empty": "No skills yet. Add the ones found in your roles below, or on your profile.",
     "moveUp": "Move {{name}} up",
-    "moveDown": "Move {{name}} down",
-    "foundTitle": "Skills found in your roles",
-    "foundLead": "These appear in the descriptions of your positions but aren’t listed as skills yet. Add the ones you’d be happy to be asked about in an interview.",
-    "found": "Skills found in your roles",
-    "inRoles_one": "in {{count}} role",
-    "inRoles_other": "in {{count}} roles",
-    "add": "Add",
-    "addLabel": "Add {{name}}",
-    "notMine": "Not mine",
-    "notMineLabel": "{{name}} is not mine",
-    "foundNote": "Found by reading your own positions, with the number of roles that mention each. Nothing is added without your click.",
-    "noneFound": "Nothing left to suggest: every skill your positions mention is listed or put aside.",
-    "reading": "Reading your positions for skills…",
-    "unavailable": "Finding skills in your roles needs an AI model, which isn’t set up here. You can still add skills by hand on your profile.",
-    "loadFailed": "The skills found in your roles couldn’t be loaded.",
-    "back": "Back to your profile",
-    "reasons": {
-      "ai_unavailable": "Finding skills in your roles needs an AI model, which isn’t set up here.",
-      "ai_daily_limit_reached": "You’ve reached today’s AI limit. Try again tomorrow.",
-      "ai_budget_reached": "You’ve reached the AI spending limit, so nothing was sent. You can still add skills by hand on your profile.",
-      "ai_failed": "The AI model couldn’t read your positions just now. Try again in a minute."
-    }
+    "moveDown": "Move {{name}} down"
   },
   "nudge": {
     "title": "Your profile is {{score}}% strong.",
@@ -531,50 +445,9 @@
     }
   },
   "grill": {
-    "title": "Grill me",
-    "lead": "A CV can only say what Applicamp knows. Pick a role and answer one question at a time. Vague answers get pushed back on and numbers get asked about. Every fact taken from your answers is shown to you first; nothing is saved until you keep it.",
-    "open": "Grill me",
-    "aboutRole": "Grill me about this role",
-    "rolesLabel": "Your roles",
     "loading": "Loading your roles…",
-    "loadFailed": "Your roles couldn’t be loaded.",
-    "roleLoadFailed": "This role’s interview couldn’t be loaded.",
-    "back": "Back to your profile",
-    "noRolesTitle": "No roles to talk about yet",
-    "noRolesLead": "Import or write your profile first. Grill me goes through one role at a time.",
-    "pickTitle": "Pick a role",
-    "pickLead": "A role takes about a dozen questions. Each one is a single small AI call, about €0.001, and nothing runs until you click.",
     "years": "{{from}}–{{to}}",
     "yearsNow": "{{from}}–now",
-    "status": {
-      "not_started": "not started",
-      "in_progress": "in progress",
-      "covered": "covered"
-    },
-    "startTitle": "Ready when you are",
-    "startLead": "It starts with one question about this role. Answer in your own words; it asks again if it needs more.",
-    "start": "Start",
-    "starting": "Asking…",
-    "continue": "Ask me a question",
-    "coveredBanner": "All seven areas are covered for this role.",
-    "coveredLead": "Your kept facts are under this role on your profile. Come back to add more.",
-    "stoppedBanner": "Nothing left to ask for now.",
-    "labels": {
-      "question": "Question",
-      "push": "Pushing back",
-      "answer": "You"
-    },
-    "skippedNote": "You skipped this one.",
-    "doneNote": "Left for now. Start again any time and it carries on from here.",
-    "logLabel": "The interview so far",
-    "answerLabel": "Your answer",
-    "answerHint": "Enter sends it; Shift and Enter start a new line.",
-    "answerPlaceholder": "Answer in your own words. Rough is fine; it asks again if it needs more.",
-    "answer": "Answer",
-    "answering": "Reading your answer…",
-    "skip": "Skip this one",
-    "done": "Done with this role for now",
-    "costLine": "Each question is one small AI call, about €0.001. Questions today: {{n}} of {{cap}}.",
     "facts": {
       "title": "Facts taken from your answer",
       "yourWords": "Your words:",
@@ -595,47 +468,6 @@
       "leftOut_one": "{{count}} line left out: it said something you didn’t write.",
       "leftOut_other": "{{count}} lines left out: they said something you didn’t write."
     },
-    "coverage": {
-      "title": "Coverage",
-      "count": "{{n}}/7",
-      "label": "{{n}} of 7 areas covered",
-      "note": "It also checks your answers against each other and against your profile. If two say different things, it asks which is right.",
-      "state": {
-        "ok": "Covered",
-        "part": "Partly covered",
-        "none": "Not covered yet"
-      },
-      "areas": {
-        "context": {
-          "name": "Context",
-          "hint": "what the company sold, to whom, team size"
-        },
-        "your_part": {
-          "name": "Your part",
-          "hint": "what you did yourself, not the team"
-        },
-        "stack_scale": {
-          "name": "Stack and scale",
-          "hint": "tools, data size, traffic"
-        },
-        "results": {
-          "name": "Results with proof",
-          "hint": "numbers, and how you know them"
-        },
-        "hard_problems": {
-          "name": "Hard problems",
-          "hint": "what went wrong and what you did"
-        },
-        "people": {
-          "name": "People",
-          "hint": "leading, mentoring, hiring"
-        },
-        "stories": {
-          "name": "Interview stories",
-          "hint": "stories you would tell in an interview"
-        }
-      }
-    },
     "errors": {
       "generic": "That didn’t work. Try again.",
       "ai_unavailable": "This Applicamp has no AI model set up, so it can’t ask questions.",
@@ -653,8 +485,8 @@
       "not_found": "That isn’t there any more. Go back to your roles."
     },
     "roleFacts": {
-      "title": "What you told us about each role",
-      "lead": "Facts you kept in Grill me, with your own words. A CV can use only these and what you wrote above.",
+      "title": "What you told Applicamp about each role",
+      "lead": "Facts you kept, with your own words. A CV can use only these and what your profile says.",
       "none": "No facts kept yet",
       "count_one": "{{count}} fact",
       "count_other": "{{count}} facts",
@@ -663,7 +495,8 @@
       "removeLabel": "Remove this fact: {{text}}",
       "removed": "Fact removed.",
       "listLabel": "Facts kept for {{role}}",
-      "confirmed": "You confirmed this assumption."
+      "confirmed": "You confirmed this assumption.",
+      "tellMore": "Tell me more"
     }
   },
   "about": {
@@ -747,8 +580,8 @@
       "questionsNext": "Questions about the gaps come next.",
       "open_one": "{{count}} claim needs your answer before you can save.",
       "open_other": "{{count}} claims need your answer before you can save.",
-      "review": "Review and save",
-      "back": "Back"
+      "back": "Back",
+      "questions": "Continue to the questions"
     },
     "flag": {
       "claim": "“{{claim}}” isn’t in your words.",
@@ -800,7 +633,7 @@
       "ai_daily_limit_reached": "You’ve reached today’s AI limit. Try again tomorrow.",
       "ai_budget_reached": "You’ve reached the AI spending limit, so nothing was sent. What you wrote is still in the box.",
       "ai_failed": "The AI model couldn’t answer just now. What you wrote is still in the box; try again in a minute.",
-      "about_daily_cap": "This is limited to 30 AI steps a day. It continues tomorrow.",
+      "about_daily_cap": "This is limited to 60 AI steps a day. It continues tomorrow.",
       "profile_needed": "Add your profile first, then tell me about you.",
       "changes_flagged": "Something you wrote has a claim I can’t find in your words. Settle it first.",
       "invalid_text": "Write between 1 and 4,000 characters.",
@@ -808,7 +641,34 @@
       "site_not_allowed": "That address can’t be read. Use the company’s public website.",
       "invalid_change": "Write what it should say.",
       "research_unavailable": "Reading websites isn’t set up here.",
-      "not_found": "That isn’t here any more. Go back and look again."
+      "not_found": "That isn’t here any more. Go back and look again.",
+      "portrait_needed": "Start with the portrait: the questions come after it.",
+      "invalid_choice": "Pick one of the choices shown."
+    },
+    "questions": {
+      "title": "A few questions",
+      "progress": "Question {{n}} of about {{total}}",
+      "strength": "Profile strength {{score}}%",
+      "strengthAfter": "Profile strength {{score}}% → {{after}}% if you answer",
+      "tag": {
+        "assumed": "I assumed",
+        "unknown": "I don’t know",
+        "told": "You told me"
+      },
+      "updated": "Updated from your answer",
+      "savedLater": "It goes into your profile when you save.",
+      "goesTo": "Goes to: {{where}}.",
+      "role": "{{company}} · role",
+      "answerLabel": "Your answer",
+      "answerPlaceholder": "Say it in your own words. Rough is fine.",
+      "answer": "Answer",
+      "skip": "Skip",
+      "enough": "That’s enough for now",
+      "cost": "1 small AI call · about €0.001",
+      "asking": "Thinking of the next question…",
+      "reading": "Reading your answer…",
+      "peek": "See what I know about you now",
+      "toReview": "Go to the review"
     }
   }
 }

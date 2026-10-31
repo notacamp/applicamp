@@ -29,8 +29,8 @@ export interface ProfileViewProps {
   onImportAgain: () => void;
   /** Goals, between the about-you properties and the lists. */
   goals?: ReactNode;
-  /** Open Grill me on a position (a role's "Grill me about this role"). */
-  onGrill?: ((position: number) => void) | undefined;
+  /** Open "Tell me about you" (a role's kept facts, and what else to tell). */
+  onAbout?: (() => void) | undefined;
 }
 
 /**
@@ -38,7 +38,7 @@ export interface ProfileViewProps {
  * you) and its lists, every value edited in place; each change saves the
  * whole profile.
  */
-export function ProfileView({ view, onImportAgain, goals, onGrill }: ProfileViewProps) {
+export function ProfileView({ view, onImportAgain, goals, onAbout }: ProfileViewProps) {
   const { t, i18n } = useTranslation("profile");
   const save = useSaveProfile();
   const { profile } = view;
@@ -112,8 +112,8 @@ export function ProfileView({ view, onImportAgain, goals, onGrill }: ProfileView
             busy={save.isPending}
             onChange={saveList(list)}
           />
-          {list === "work" && onGrill !== undefined && profile.work.length > 0 ? (
-            <RoleFacts profile={profile} onGrill={onGrill} />
+          {list === "work" && onAbout !== undefined && profile.work.length > 0 ? (
+            <RoleFacts profile={profile} onAbout={onAbout} />
           ) : null}
         </Fragment>
       ))}

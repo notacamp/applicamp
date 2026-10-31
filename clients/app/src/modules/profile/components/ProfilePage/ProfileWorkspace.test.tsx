@@ -73,7 +73,7 @@ function Workspace({ startImporting = false }: { startImporting?: boolean }) {
         onImporting={setImporting}
         onStartGoals={vi.fn()}
         onAction={vi.fn()}
-        onGrill={vi.fn()}
+        onAbout={vi.fn()}
       />
     </UndoProvider>
   );

@@ -17,15 +17,9 @@ export { QUESTIONS, type Question } from "./api/questions";
 export { GoalInterview, type GoalInterviewProps } from "./components/GoalInterview/GoalInterview";
 export { parseAction, type Action, type StrengthItem, type StrengthView } from "./api/completion";
 export {
-  ImproveProfile,
-  type ImproveProfileProps,
-} from "./components/ImproveProfile/ImproveProfile";
-export { SkillsPanel, type SkillsPanelProps } from "./components/SkillsPanel/SkillsPanel";
-export {
   StrengthNudge,
   type NudgeAction,
   type StrengthNudgeProps,
 } from "./components/StrengthNudge/StrengthNudge";
-export { GrillPage, type GrillPageProps } from "./components/Grill/GrillPage";
 export { JobAnswerFacts, type JobAnswerFactsProps } from "./components/Grill/JobAnswerFacts";
 export { AboutYouPage, type AboutYouPageProps } from "./components/AboutYou/AboutYouPage";

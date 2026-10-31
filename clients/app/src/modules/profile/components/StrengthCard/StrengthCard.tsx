@@ -14,21 +14,13 @@ import {
   type IconName,
 } from "~/lib/ui";
 
-import {
-  parseAction,
-  useQuestions,
-  useStrength,
-  type Action,
-  type StrengthItem,
-} from "../../api/completion";
+import { parseAction, useStrength, type Action, type StrengthItem } from "../../api/completion";
 
 export interface StrengthCardProps {
-  /** The person chose what to do about a part, or to improve the profile. */
+  /** The person chose what to do about a part. */
   onAction: (action: Action) => void;
-  /** Open Grill me, the deep interview about each role; none hides the button. */
-  onGrill?: (() => void) | undefined;
-  /** Open "Tell me about you"; it takes the place of "Improve my profile". */
-  onAbout?: (() => void) | undefined;
+  /** Open "Tell me about you": the way to make the profile stronger. */
+  onAbout: () => void;
 }
 
 const ICONS: Record<StrengthItem["state"], IconName> = {
@@ -47,13 +39,12 @@ function hintOf(t: TFunction<"profile">, item: StrengthItem, suggested: number):
 
 /**
  * How strong the profile is: the score and a bar, what each part is worth and
- * what to do about it, and the way into "Improve my profile". Reading the
- * profile for questions starts when this shows (once per profile version).
+ * what to do about it, and the way into "Tell me about you", which asks about
+ * the gaps. Showing it asks nothing of the model.
  */
-export function StrengthCard({ onAction, onGrill, onAbout }: StrengthCardProps) {
+export function StrengthCard({ onAction, onAbout }: StrengthCardProps) {
   const { t } = useTranslation("profile");
   const strength = useStrength();
-  const questions = useQuestions();
   if (strength.isPending) {
     return (
       <Tagged testId="strength-loading">
@@ -66,42 +57,15 @@ export function StrengthCard({ onAction, onGrill, onAbout }: StrengthCardProps) 
   }
   const { score, strong, items } = strength.data;
   const suggested = strength.data.suggested_skills ?? 0;
-  const open = questions.data?.status === "ready" ? questions.data.questions.length : 0;
-  const reading = questions.data?.status === "running";
-
-  const improve = (
-    <Button
-      variant="primary"
-      icon="arrow-right"
-      data-testid="strength-improve"
-      onClick={() => {
-        onAction({ kind: "improve" });
-      }}
-    >
-      {open > 0 ? t("strength.improveCount", { count: open }) : t("strength.improve")}
-    </Button>
-  );
-
-  const about =
-    onAbout === undefined ? null : (
-      <Button variant="primary" icon="arrow-right" data-testid="strength-about" onClick={onAbout}>
-        {t("strength.about")}
-      </Button>
-    );
 
   return (
     <Section
       title={t("strength.title")}
       description={t("strength.description")}
       action={
-        <>
-          {about ?? (strong && open === 0 ? null : improve)}
-          {onGrill === undefined ? null : (
-            <Button variant="secondary" data-testid="strength-grill" onClick={onGrill}>
-              {t("strength.grill")}
-            </Button>
-          )}
-        </>
+        <Button variant="primary" icon="arrow-right" data-testid="strength-about" onClick={onAbout}>
+          {t("strength.about")}
+        </Button>
       }
       testId="strength-card"
       anchor="strength"
@@ -117,13 +81,6 @@ export function StrengthCard({ onAction, onGrill, onAbout }: StrengthCardProps) 
             </Progress>
           </Stack>
         </Tagged>
-        {reading ? (
-          <Tagged testId="strength-reading">
-            <Text tone="secondary" size="sm">
-              {t("strength.reading")}
-            </Text>
-          </Tagged>
-        ) : null}
         <List label={t("strength.checklist")}>
           {items.map((item) => {
             const action = parseAction(item.action);

@@ -8,11 +8,13 @@ const ERROR_CODES = [
   "ai_failed",
   "about_daily_cap",
   "profile_needed",
+  "portrait_needed",
   "changes_flagged",
   "invalid_text",
   "invalid_site",
   "site_not_allowed",
   "invalid_change",
+  "invalid_choice",
   "research_unavailable",
   "not_found",
 ] as const;

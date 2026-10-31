@@ -10,7 +10,11 @@
 use serde::Serialize;
 use utoipa::ToSchema;
 
-use crate::{goals::Goals, matching, schema::Profile};
+use crate::{
+    goals::Goals,
+    matching,
+    schema::{Area, Profile, Work},
+};
 
 /// A profile this strong or more is strong.
 pub const STRONG: u8 = 80;
@@ -120,10 +124,31 @@ fn has_number(text: &str) -> bool {
     text.chars().any(|c| c.is_ascii_digit())
 }
 
-/// Points of one recent role, out of 8: a highlight is 6, one with a number
+/// What a position states as results: its highlights, and the facts the
+/// person kept about its results ("Tell me about you", #44).
+fn results_of(work: &Work) -> Vec<&str> {
+    work.highlights
+        .iter()
+        .map(String::as_str)
+        .chain(
+            work.facts
+                .iter()
+                .filter(|f| f.area == Area::Results)
+                .map(|f| f.text.as_str()),
+        )
+        .filter(|h| !h.trim().is_empty())
+        .collect()
+}
+
+/// Whether a position states a result with a number or a percentage.
+pub fn has_numbered_result(work: &Work) -> bool {
+    results_of(work).iter().any(|h| has_number(h))
+}
+
+/// Points of one recent role, out of 8: a result is 6, one with a number
 /// or a percentage another 2.
-fn role_points(highlights: &[String]) -> u32 {
-    let real: Vec<&String> = highlights.iter().filter(|h| !h.trim().is_empty()).collect();
+fn role_points(work: &Work) -> u32 {
+    let real = results_of(work);
     if real.is_empty() {
         0
     } else if real.iter().any(|h| has_number(h)) {
@@ -171,15 +196,10 @@ pub fn compute(profile: &Profile, goals: &Goals) -> Strength {
     let achievements = if recent.is_empty() {
         0
     } else {
-        let points: u32 = recent.iter().map(|w| role_points(&w.highlights)).sum();
+        let points: u32 = recent.iter().map(role_points).sum();
         (points * StrengthKey::Achievements.weight()).div_ceil(8 * count(recent.len()))
     };
-    let with_results = count(
-        recent
-            .iter()
-            .filter(|w| w.highlights.iter().any(|h| !h.trim().is_empty()))
-            .count(),
-    );
+    let with_results = count(recent.iter().filter(|w| !results_of(w).is_empty()).count());
     let skills = count(profile.skills.len());
     let dated = profile
         .work
@@ -356,6 +376,42 @@ mod tests {
         }
         let full = of(&profile);
         assert_eq!((full.earned, full.state), (24, StrengthState::Ok));
+    }
+
+    #[test]
+    fn a_kept_fact_about_results_counts_like_a_highlight() {
+        use crate::schema::{FactStatus, ProfileFact};
+        let fact = |text: &str, area: Area| ProfileFact {
+            id: "f".into(),
+            text: text.into(),
+            quote: text.into(),
+            area,
+            kept_at: chrono::Utc::now(),
+            status: FactStatus::Told,
+            basis: None,
+        };
+        let mut work = role(&[]);
+        let of = |work: &Work| {
+            compute(
+                &Profile {
+                    work: vec![work.clone()],
+                    ..Profile::default()
+                },
+                &Goals::default(),
+            )
+            .item(StrengthKey::Achievements)
+            .copied()
+            .unwrap()
+            .earned
+        };
+        assert_eq!(of(&work), 0);
+        work.facts.push(fact("Led a small team", Area::People));
+        assert_eq!(of(&work), 0, "only results count");
+        work.facts.push(fact("Rebuilt billing", Area::Results));
+        assert_eq!(of(&work), 18, "a result is 6 of 8");
+        work.facts.push(fact("Cut runs by 40%", Area::Results));
+        assert_eq!(of(&work), 24, "a number is worth 2 more");
+        assert!(has_numbered_result(&work));
     }
 
     #[test]

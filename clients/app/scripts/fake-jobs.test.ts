@@ -93,6 +93,33 @@ async function model<T>(system: string, user: string): Promise<T> {
 
 const PORTRAIT_SYSTEM = "You write what a job-hunting app knows about one person, as a portrait.";
 const EXTRA_SYSTEM = "You read what a person wrote about themselves, to fit it into a profile.";
+const QUESTION_SYSTEM = "You word one question that a job-hunting app asks a person.";
+const ANSWER_SYSTEM = "You read a person's answer to one question about their own profile.";
+
+interface Asked {
+  question: string;
+  why: string;
+  tag: string;
+  choices: string[];
+}
+
+interface Answered {
+  changes: {
+    field: string;
+    value: string;
+    position: number | null;
+    area: string;
+    quote: string;
+  }[];
+}
+
+/** The prompt of a question about `gap`, with the role it is about. */
+const questionPrompt = (gap: Record<string, unknown>, assumption: unknown = null) =>
+  `<language>en</language>\n<today>2026-10-31</today>\n<gap>\n${JSON.stringify(gap)}\n</gap>\n<role>\n${JSON.stringify({ index: 0, title: "Lead Engineer", company: "Example Co" })}\n</role>\n<positions>\nnull\n</positions>\n<assumption>\n${JSON.stringify(assumption)}\n</assumption>`;
+
+/** The prompt of an answer about position 0 in `area`. */
+const answerPrompt = (area: string, words: string) =>
+  `<language>en</language>\n<profile>\n${JSON.stringify({ positions: [{ index: 0, title: "Lead Engineer", company: "Example Co" }] })}\n</profile>\n<about>\n${JSON.stringify({ index: 0, area })}\n</about>\n<question>\nQ?\n</question>\n<text>\n${words}\n</text>`;
 
 describe("the fake CV writer", () => {
   let child: ChildProcess | undefined;
@@ -213,5 +240,56 @@ Company: Example Co
     for (const change of read.changes) {
       expect(text).toContain(change.quote);
     }
+  });
+
+  it("words a question for each kind of gap, always saying what was assumed or what is missing", async () => {
+    const ask = (gap: Record<string, unknown>, assumption: unknown = null) =>
+      model<Asked>(QUESTION_SYSTEM, questionPrompt(gap, assumption));
+    const assumed = await ask(
+      { kind: "assumed", area: "your_part", basis: "ask me later" },
+      { text: "I assume you built bookings.", why: "Platforms like this are made of bookings." },
+    );
+    expect(assumed.tag).toBe("assumed");
+    expect(assumed.why).toContain("I assumed this: I assume you built bookings.");
+    expect(assumed.choices).toContain("None of these");
+    const results = await ask({
+      kind: "results",
+      area: "results",
+      basis: "Lead Engineer at Example Co states no results.",
+    });
+    expect(results.tag).toBe("unknown");
+    expect(results.why).toContain("states no results");
+    expect(results.choices).toEqual([]);
+    const team = await ask({ kind: "team_size", area: "people", basis: "x" });
+    expect(team.why).toContain("Your title was Lead Engineer");
+    expect(team.choices).toHaveLength(4);
+    const found = await ask({ kind: "skills_found", names: ["Kafka"], basis: "x" });
+    expect(found.why).toBe("Your roles mention Kafka, but they aren’t in your skills.");
+    expect(found.choices).toEqual(["Kafka", "None of these"]);
+    const claim = await ask({ kind: "claim", names: ["Elixir"], basis: "x" });
+    expect(claim.tag).toBe("told");
+    expect(claim.why).toBe("You mentioned Elixir, but none of your roles do.");
+  });
+
+  it("reads an answer into changes quoting it, one of them naming a company the answer never wrote", async () => {
+    const answer = (area: string, words: string) =>
+      model<Answered>(ANSWER_SYSTEM, answerPrompt(area, words));
+    const result = await answer("results", "Invoice runs went from 6 hours to 40 minutes.");
+    expect(result.changes).toEqual([
+      {
+        field: "role_fact",
+        value: "Invoice runs went from 6 hours to 40 minutes",
+        position: 0,
+        area: "results",
+        quote: "Invoice runs went from 6 hours to 40 minutes.",
+        sentence: "You told me: Invoice runs went from 6 hours to 40 minutes.",
+      },
+    ]);
+    const team = await answer("people", "about 4 people\n3 to 6");
+    expect(team.changes[0]?.value).toBe("Led about 4 people at Example Co");
+    expect(team.changes[0]?.quote).toBe("about 4 people");
+    const built = await answer("your_part", "Bookings\nPayments");
+    expect(built.changes[0]?.value).toBe("Worked on bookings, payments");
+    expect((await answer("your_part", "None of these")).changes).toEqual([]);
   });
 });

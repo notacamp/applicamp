@@ -22,13 +22,23 @@
 //! profile version, so the strength and the gap review refresh. Assumptions
 //! the person never confirmed are not saved. Pending state lives seven days.
 //!
+//! **The questions** (#44) come after "Anything else": [`gaps`] decides, in
+//! plain code, what Applicamp does not know or only assumes, ranked; and
+//! [`questions`] asks about the top gap, one question at a time, each with
+//! its reason. The model only words the question (1 small call) and reads
+//! the answer into proposed changes with the same checks as "Anything else"
+//! (1 small call); a question can be skipped, and the person can stop at any
+//! point. Nothing is saved until Save.
+//!
 //! Employers are read through the [`crate::ports::EmployerResearch`] port: the
 //! latest five, only where a site is known, cached 30 days, no loop and no
 //! open-web search. Every call counts toward [`DAILY_CAP`] and the AI budget;
 //! nothing runs in the background.
 
+pub mod gaps;
 pub mod judge;
 pub mod prompt;
+pub mod questions;
 #[cfg(test)]
 mod tests;
 
@@ -63,8 +73,11 @@ use crate::{
     strength,
 };
 
-/// Hard cap on the wizard's model calls per account per UTC day.
-pub const DAILY_CAP: i64 = 30;
+/// Hard cap on the wizard's model calls per account per UTC day. A full run is
+/// a portrait, up to five employer reads, "Anything else", and up to 16
+/// questions with an answer each: 39 calls, so the cap leaves room for a
+/// second try (it was 30 before the questions, #44).
+pub const DAILY_CAP: i64 = 60;
 /// Longest "Anything else", in characters.
 pub const MAX_EXTRA: usize = 4_000;
 /// Most past employers researched (the latest).
@@ -231,8 +244,10 @@ pub struct AboutView {
     pub accuracy: Option<Accuracy>,
     /// What the person wrote under "Anything else".
     pub extra: Option<String>,
-    /// The changes proposed from it.
+    /// The changes proposed from it and from the answers to the questions.
     pub changes: Vec<ChangeView>,
+    /// The questions about the gaps (#44).
+    pub questions: questions::AboutQuestions,
     /// Model calls made today by this account, of `daily_cap`.
     pub calls_today: u32,
     /// The most model calls a wizard can make for an account in a UTC day.
@@ -252,6 +267,7 @@ struct Row {
     accuracy: Option<String>,
     extra: Option<String>,
     changes: sqlx::types::Json<Vec<Change>>,
+    questions: sqlx::types::Json<questions::Progress>,
 }
 
 impl Row {
@@ -264,13 +280,14 @@ impl Row {
             accuracy: None,
             extra: None,
             changes: sqlx::types::Json(Vec::new()),
+            questions: sqlx::types::Json(questions::Progress::default()),
         }
     }
 }
 
 async fn row_of(db: &PgPool, account: Uuid, now: DateTime<Utc>) -> Result<Option<Row>> {
     Ok(sqlx::query_as(
-        "SELECT profile_version, portrait, employers, choices, accuracy, extra, changes
+        "SELECT profile_version, portrait, employers, choices, accuracy, extra, changes, questions
            FROM profile.about_you WHERE account_id = $1 AND expires_at > $2",
     )
     .bind(account)
@@ -283,7 +300,7 @@ async fn row_of(db: &PgPool, account: Uuid, now: DateTime<Utc>) -> Result<Option
 /// expired).
 async fn lock(tx: &mut PgConnection, account: Uuid, now: DateTime<Utc>) -> Result<Option<Row>> {
     Ok(sqlx::query_as(
-        "SELECT profile_version, portrait, employers, choices, accuracy, extra, changes
+        "SELECT profile_version, portrait, employers, choices, accuracy, extra, changes, questions
            FROM profile.about_you WHERE account_id = $1 AND expires_at > $2 FOR UPDATE",
     )
     .bind(account)
@@ -297,13 +314,13 @@ async fn put(tx: &mut PgConnection, account: Uuid, row: &Row, now: DateTime<Utc>
     sqlx::query(
         "INSERT INTO profile.about_you
             (account_id, profile_version, portrait, employers, choices, accuracy, extra, changes,
-             created_at, updated_at, expires_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9, $10)
+             questions, created_at, updated_at, expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10, $11)
          ON CONFLICT (account_id) DO UPDATE SET
             profile_version = excluded.profile_version, portrait = excluded.portrait,
             employers = excluded.employers, choices = excluded.choices,
             accuracy = excluded.accuracy, extra = excluded.extra, changes = excluded.changes,
-            updated_at = excluded.updated_at, expires_at = excluded.expires_at",
+            questions = excluded.questions, updated_at = excluded.updated_at, expires_at = excluded.expires_at",
     )
     .bind(account)
     .bind(row.profile_version)
@@ -313,6 +330,7 @@ async fn put(tx: &mut PgConnection, account: Uuid, row: &Row, now: DateTime<Utc>
     .bind(&row.accuracy)
     .bind(&row.extra)
     .bind(&row.changes)
+    .bind(&row.questions)
     .bind(now)
     .bind(expires_at)
     .execute(&mut *tx)
@@ -530,6 +548,7 @@ async fn view_of(
         );
     }
     sentences.extend(told_sentences(&row.changes.0));
+    let questions = questions::state(state, account, profile, row, built).await?;
     Ok(AboutView {
         has_profile: profile.is_some(),
         profile_version: version,
@@ -539,6 +558,7 @@ async fn view_of(
         accuracy: row.accuracy.as_deref().and_then(Accuracy::parse),
         extra: row.extra.clone(),
         changes: row.changes.0.iter().map(ChangeView::from).collect(),
+        questions,
         calls_today: counted(calls_today(&state.db, account, now).await?),
         daily_cap: counted(DAILY_CAP),
         extra_max: u32::try_from(MAX_EXTRA).unwrap_or(u32::MAX),
@@ -800,8 +820,10 @@ pub async fn portrait(
     row.profile_version = Some(seen.version);
     row.portrait = sqlx::types::Json(judged.sentences);
     row.employers = sqlx::types::Json(employers);
-    // Choices belong to the portrait they were made on.
+    // Choices belong to the portrait they were made on, and so do the
+    // questions asked and skipped for this profile version.
     row.choices = sqlx::types::Json(BTreeMap::new());
+    row.questions = sqlx::types::Json(questions::Progress::default());
     put(&mut tx, account, &row, now).await?;
     tx.commit().await?;
     respond(&state, &research, account).await
@@ -1035,7 +1057,16 @@ pub async fn extra(
         .await?
         .unwrap_or_else(Row::empty);
     row.extra = Some(text);
-    row.changes = sqlx::types::Json(changes);
+    // This text replaces the changes the last one made, not those the answers
+    // to the questions made.
+    let answered: Vec<Change> = row
+        .changes
+        .0
+        .iter()
+        .filter(|c| c.origin.is_some())
+        .cloned()
+        .collect();
+    row.changes = sqlx::types::Json(changes.into_iter().chain(answered).collect());
     put(&mut tx, account, &row, now).await?;
     tx.commit().await?;
     respond(&state, &research, account).await

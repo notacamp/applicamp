@@ -1,13 +1,10 @@
-import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api, CSRF_HEADERS, unwrap, type Schema } from "~/lib/api";
 
 import { PROFILE_QUERY_KEY } from "./profile";
 
-/** Every role with how far its interview is (`GET /api/v1/profile/grill`). */
-export type GrillList = Schema<"GrillList">;
-export type GrillRoleItem = Schema<"GrillRoleItem">;
-/** One role's interview (`GET /api/v1/profile/grill/{position}`). */
+/** One role's facts waiting to be kept (`GET /api/v1/profile/grill/{position}`). */
 export type GrillView = Schema<"GrillView">;
 export type GrillTurn = Schema<"GrillTurn">;
 export type GrillRole = Schema<"GrillRole">;
@@ -20,37 +17,11 @@ export type CoverageLevel = Schema<"CoverageLevel">;
 /** A fact the person kept, on a position of the profile. */
 export type ProfileFact = Schema<"ProfileFact">;
 
-/** The areas, in the order they are covered. */
-export const AREAS = [
-  "context",
-  "your_part",
-  "stack_scale",
-  "results",
-  "hard_problems",
-  "people",
-  "stories",
-] as const satisfies readonly Area[];
-
-/** Longest answer the server takes. */
-export const MAX_ANSWER = 2000;
-
 export const GRILL_QUERY_KEY = ["profile", "grill"] as const;
 const roleKey = (position: number) => [...GRILL_QUERY_KEY, position] as const;
 const STRENGTH_QUERY_KEY = ["profile", "strength"] as const;
-const QUESTIONS_QUERY_KEY = ["profile", "questions"] as const;
 
-/** Every role with its coverage (`GET /api/v1/profile/grill`). Never calls the model. */
-export const grillRolesQuery = queryOptions({
-  queryKey: GRILL_QUERY_KEY,
-  queryFn: async ({ signal }): Promise<GrillList> =>
-    unwrap(await api.GET("/api/v1/profile/grill", { signal })),
-});
-
-export function useGrillRoles() {
-  return useQuery(grillRolesQuery);
-}
-
-/** One role's interview. Nothing is asked of the model by reading it. */
+/** One role's facts waiting to be kept. Nothing is asked of the model by reading it. */
 export function useGrillRole(position: number | undefined) {
   return useQuery({
     queryKey: roleKey(position ?? -1),
@@ -65,12 +36,11 @@ export function useGrillRole(position: number | undefined) {
   });
 }
 
-/** What every change to an interview refreshes: the role itself, and the list's counts. */
+/** What every change to a role's facts refreshes: the role itself. */
 function useStore() {
   const queryClient = useQueryClient();
   return (view: GrillView) => {
     queryClient.setQueryData(roleKey(view.position), view);
-    void queryClient.invalidateQueries({ queryKey: GRILL_QUERY_KEY, exact: true });
   };
 }
 
@@ -82,69 +52,7 @@ function useStoreKept() {
     store(view);
     void queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY, exact: true });
     void queryClient.invalidateQueries({ queryKey: STRENGTH_QUERY_KEY });
-    void queryClient.invalidateQueries({ queryKey: QUESTIONS_QUERY_KEY });
   };
-}
-
-/** Starts (or takes up) a role: one model call, none when a question waits. */
-export function useStartGrill(language: string) {
-  const store = useStore();
-  return useMutation({
-    mutationFn: async (position: number): Promise<GrillView> =>
-      unwrap(
-        await api.POST("/api/v1/profile/grill/{position}/start", {
-          params: { path: { position }, query: { locale: language } },
-          headers: CSRF_HEADERS,
-        }),
-      ),
-    onSuccess: store,
-  });
-}
-
-/** Answers the question waiting: one model call. */
-export function useAnswerGrill(language: string) {
-  const store = useStore();
-  return useMutation({
-    mutationFn: async ({ position, text }: { position: number; text: string }) =>
-      unwrap(
-        await api.POST("/api/v1/profile/grill/{position}/answer", {
-          params: { path: { position }, query: { locale: language } },
-          headers: CSRF_HEADERS,
-          body: { text },
-        }),
-      ),
-    onSuccess: store,
-  });
-}
-
-/** Skips the question waiting: one model call, or none when nothing is left to ask. */
-export function useSkipGrill(language: string) {
-  const store = useStore();
-  return useMutation({
-    mutationFn: async (position: number): Promise<GrillView> =>
-      unwrap(
-        await api.POST("/api/v1/profile/grill/{position}/skip", {
-          params: { path: { position }, query: { locale: language } },
-          headers: CSRF_HEADERS,
-        }),
-      ),
-    onSuccess: store,
-  });
-}
-
-/** Leaves the role for now. No model. */
-export function useDoneGrill() {
-  const store = useStore();
-  return useMutation({
-    mutationFn: async (position: number): Promise<GrillView> =>
-      unwrap(
-        await api.POST("/api/v1/profile/grill/{position}/done", {
-          params: { path: { position } },
-          headers: CSRF_HEADERS,
-        }),
-      ),
-    onSuccess: store,
-  });
 }
 
 /** Keeps a fact as it is, or fixed (`text`). The quote never changes. */

@@ -35,6 +35,34 @@ const EMPLOYERS = [
   { position: 0, company: "Example Org", site: null, state: "no_site", facts: 0, error: null },
 ];
 
+const NO_QUESTIONS = {
+  current: null,
+  answered: 0,
+  skipped: 0,
+  total: 3,
+  left: 3,
+  done: false,
+  strength: 45,
+  updated: [],
+};
+
+const questionsOf = (overrides: Record<string, unknown> = {}) => ({
+  ...NO_QUESTIONS,
+  ...overrides,
+});
+
+const ASKED = {
+  id: "assumed:s3",
+  kind: "assumed",
+  position: 0,
+  area: "people",
+  question: "How many people did you lead at Example Org?",
+  why: "Your title was Senior Engineer, which often means leading people. Your profile doesn’t say how many.",
+  tag: "assumed",
+  choices: ["1 to 2", "3 to 6", "More than 6"],
+  strength_after: 45,
+};
+
 const view = (overrides: Record<string, unknown> = {}) => ({
   has_profile: true,
   profile_version: 3,
@@ -44,8 +72,9 @@ const view = (overrides: Record<string, unknown> = {}) => ({
   accuracy: null,
   extra: null,
   changes: [],
+  questions: NO_QUESTIONS,
   calls_today: 1,
-  daily_cap: 30,
+  daily_cap: 60,
   extra_max: 4000,
   ...overrides,
 });
@@ -273,6 +302,7 @@ describe("Tell me about you", () => {
           body: view({
             extra: "x",
             changes: [{ ...FLAGGED, flags: flagged ? FLAGGED.flags : [] }],
+            questions: questionsOf({ done: true, left: 0, total: 0 }),
           }),
         }),
         "GET /api/v1/profile/about/review": () => ({ body: review() }),
@@ -290,7 +320,8 @@ describe("Tell me about you", () => {
     // A text was written before: Continue goes on without another call.
     expect(await screen.findByTestId("about-extra")).toHaveValue("x");
     await user.click(screen.getByTestId("about-continue"));
-    await user.click(await screen.findByTestId("about-to-review"));
+    await user.click(await screen.findByTestId("about-to-questions"));
+    // No gap is left to ask about: on to the review.
     const group = await screen.findByTestId("about-group-summary");
     expect(group).toHaveTextContent("You told me");
     expect(screen.getByTestId("about-group-position-0")).toHaveTextContent("Confirmed");
@@ -333,5 +364,171 @@ describe("Tell me about you", () => {
     expect(await screen.findByTestId("about-no-profile")).toHaveTextContent(
       "Add your profile first",
     );
+  });
+
+  describe("the questions about the gaps", () => {
+    /** The wizard's state, which the stubbed questions change. */
+    function questionsState(first: Record<string, unknown> = ASKED) {
+      let state = view();
+      const set = (overrides: Record<string, unknown>) => {
+        state = view(overrides);
+        return { body: state };
+      };
+      return { get: () => ({ body: state }), set, first };
+    }
+
+    it("goes from the portrait into the questions: question n of about m, the strength it would add, and why it asks", async () => {
+      const user = userEvent.setup();
+      const wizard = questionsState();
+      const calls = renderPage({
+        "GET /api/v1/profile/about": wizard.get,
+        "POST /api/v1/profile/about/questions/next": () =>
+          wizard.set({ questions: questionsOf({ current: { ...ASKED, strength_after: 53 } }) }),
+      });
+      await user.click(await screen.findByTestId("about-continue"));
+      expect(await screen.findByTestId("about-q")).toBeVisible();
+      expect(screen.getByTestId("about-q-progress")).toHaveTextContent("Question 1 of about 3");
+      expect(screen.getByTestId("about-q-strength")).toHaveTextContent(
+        "Profile strength 45% → 53% if you answer",
+      );
+      expect(screen.getByTestId("about-q-question")).toHaveTextContent(
+        "How many people did you lead at Example Org?",
+      );
+      expect(screen.getByTestId("about-q-tag")).toHaveTextContent("I assumed");
+      expect(screen.getByTestId("about-q-why-text")).toHaveTextContent(
+        "Your profile doesn’t say how many.",
+      );
+      expect(screen.getAllByTestId(/^about-q-choice-/)).toHaveLength(3);
+      expect(screen.getByTestId("about-q-cost")).toHaveTextContent("1 small AI call");
+      expect(screen.getByTestId("about-q-peek")).toHaveTextContent("See what I know about you now");
+      expect(screen.getByTestId("about-q-portrait")).toBeInTheDocument();
+      // One call worded it, and only one.
+      expect(
+        calls.filter((c) => c.route === "POST /api/v1/profile/about/questions/next"),
+      ).toHaveLength(1);
+    });
+
+    it("answers with a choice and words, shows the update with where it goes and its flag, and asks the next", async () => {
+      const user = userEvent.setup();
+      const wizard = questionsState();
+      let sent: unknown;
+      const update = {
+        id: "q1",
+        field: "role_fact",
+        value: "Led about 4 people at Example Org",
+        position: 0,
+        quote: "about 4 people",
+        flags: [{ kind: "claim", claim: "Example Org" }],
+        resolution: null,
+      };
+      const second = {
+        ...ASKED,
+        id: "results:0",
+        kind: "results",
+        area: "results",
+        question: "What changed because of the billing platform?",
+        why: "Your profile states no results for Senior Engineer at Example Org.",
+        tag: "unknown",
+        choices: [],
+      };
+      let asked = 0;
+      renderPage({
+        "GET /api/v1/profile/about": wizard.get,
+        "POST /api/v1/profile/about/questions/next": () => {
+          asked += 1;
+          return wizard.set({
+            questions: questionsOf({
+              current: asked === 1 ? { ...ASKED, kind: "team_size" } : second,
+              answered: asked - 1,
+              updated: asked === 1 ? [] : ["q1"],
+            }),
+            changes: asked === 1 ? [] : [update],
+          });
+        },
+        "POST /api/v1/profile/about/questions/assumed%3As3/answer": async (request) => {
+          sent = await bodyOf(request);
+          return wizard.set({
+            questions: questionsOf({ answered: 1, updated: ["q1"] }),
+            changes: [update],
+          });
+        },
+      });
+      await user.click(await screen.findByTestId("about-continue"));
+      await user.click(await screen.findByTestId("about-q-choice-1"));
+      expect(screen.getByTestId("about-q-choice-1")).toHaveAttribute("aria-pressed", "true");
+      // A closed question with one answer: another choice replaces it.
+      await user.click(screen.getByTestId("about-q-choice-0"));
+      expect(screen.getByTestId("about-q-choice-1")).toHaveAttribute("aria-pressed", "false");
+      await user.type(screen.getByTestId("about-q-answer"), "about 4 people");
+      await user.click(screen.getByTestId("about-q-send"));
+      expect(await screen.findByTestId("about-q-updated")).toHaveTextContent(
+        "Updated from your answer",
+      );
+      expect(sent).toEqual({ text: "about 4 people", choices: ["1 to 2"] });
+      expect(screen.getByTestId("about-q-updated-q1")).toHaveTextContent(
+        "Goes to: Example Org · role.",
+      );
+      expect(screen.getByTestId("about-flags-q1")).toHaveTextContent(
+        "“Example Org” isn’t in your words.",
+      );
+      // The next question is for another gap, and says it does not know.
+      expect(await screen.findByTestId("about-q-question")).toHaveTextContent(
+        "What changed because of the billing platform?",
+      );
+      expect(screen.getByTestId("about-q-tag")).toHaveTextContent("I don’t know");
+      expect(screen.getByTestId("about-q-progress")).toHaveTextContent("Question 2 of about 3");
+      expect(screen.queryByTestId("about-q-choice-0")).toBeNull();
+    });
+
+    it("skips without a call of its own, and ends with “That’s enough for now” on the review", async () => {
+      const user = userEvent.setup();
+      const wizard = questionsState();
+      const calls = renderPage({
+        "GET /api/v1/profile/about": wizard.get,
+        "POST /api/v1/profile/about/questions/next": () =>
+          wizard.set({ questions: questionsOf({ current: ASKED }) }),
+        "POST /api/v1/profile/about/questions/assumed%3As3/skip": () =>
+          wizard.set({ questions: questionsOf({ skipped: 1, left: 2, total: 3 }) }),
+        "POST /api/v1/profile/about/questions/enough": () =>
+          wizard.set({ questions: questionsOf({ skipped: 1, done: true, left: 0, total: 1 }) }),
+        "GET /api/v1/profile/about/review": {
+          body: { sentences: [], groups: [], open_flags: 0, left_out: 0 },
+        },
+      });
+      await user.click(await screen.findByTestId("about-continue"));
+      await user.click(await screen.findByTestId("about-q-skip"));
+      await waitFor(() => {
+        expect(calls.map((c) => c.route)).toContain(
+          "POST /api/v1/profile/about/questions/assumed%3As3/skip",
+        );
+      });
+      // The next question is asked for after a skip (one more call to word it).
+      await waitFor(() => {
+        expect(
+          calls.filter((c) => c.route === "POST /api/v1/profile/about/questions/next"),
+        ).toHaveLength(2);
+      });
+      await user.click(await screen.findByTestId("about-q-enough"));
+      expect(await screen.findByTestId("about-review-step")).toBeVisible();
+    });
+
+    it("says plainly when the daily limit is reached, and offers the review", async () => {
+      const user = userEvent.setup();
+      renderPage({
+        "POST /api/v1/profile/about/questions/next": {
+          status: 429,
+          body: { code: "about_daily_cap", title: "x", status: 429, detail: "x" },
+        },
+        "GET /api/v1/profile/about/review": {
+          body: { sentences: [], groups: [], open_flags: 0, left_out: 0 },
+        },
+      });
+      await user.click(await screen.findByTestId("about-continue"));
+      expect(await screen.findByTestId("about-q-error")).toHaveTextContent(
+        "limited to 60 AI steps a day",
+      );
+      await user.click(screen.getByTestId("about-q-to-review"));
+      expect(await screen.findByTestId("about-review-step")).toBeVisible();
+    });
   });
 });

@@ -4,6 +4,139 @@
  */
 
 export interface paths {
+    "/.well-known/openid-configuration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The issuer's discovery document.
+         * @description The issuer (this instance's public origin) and where its keys are. Only
+         *     when sandboxes run on OpenShell; not found otherwise.
+         */
+        get: operations["runs.oidc_discovery"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agent/v1/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask the model.
+         * @description One completion of the `complete` role through the AI gateway, for the
+         *     run's account: refused when the account reached its daily tokens or a
+         *     spending limit (`ai_daily_limit_reached`, `ai_budget_reached`), and
+         *     when the run's tokens with this answer's worst case would pass its
+         *     kind's budget (`run_budget_reached`). The run's tokens and cost grow by
+         *     what it used.
+         */
+        post: operations["runs.agent_complete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agent/v1/context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The run's context.
+         * @description The run, its kind, inputs, subject, limits, and the tools the agent may
+         *     call with their schemas and caps.
+         */
+        get: operations["runs.agent_context"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agent/v1/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record the agent's events.
+         * @description At most 50 a call, each numbered by the agent, its message at most
+         *     2 000 characters, its data at most 8 KB.
+         */
+        post: operations["runs.agent_events"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agent/v1/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Finish.
+         * @description The agent's outcome and summary (checked against the kind's output
+         *     schema: `invalid_summary`). The token stops working; the server ends the
+         *     run once the sandbox is gone.
+         */
+        post: operations["runs.agent_finish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agent/v1/tools/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Call a tool.
+         * @description One call of one of the kind's tools. A tool the kind does not have is
+         *     not found; arguments that do not match its schema are refused
+         *     (`invalid_arguments`, saying where) and do not count; past its cap the
+         *     call is refused (`tool_cap_reached`).
+         */
+        post: operations["runs.agent_tool"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/boards": {
         parameters: {
             query?: never;
@@ -1298,6 +1431,121 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The signed-in person's runs.
+         * @description Newest first, at most 100, with whether runs can start here and which
+         *     kinds a person may start.
+         */
+        get: operations["runs.list"];
+        put?: never;
+        /**
+         * Start a run.
+         * @description Queues a run of a kind a person may start (`runs.probe`, "Run a
+         *     check"). It starts when it is its turn: one run at a time per account,
+         *     three on the instance. At most three may wait.
+         */
+        post: operations["runs.start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A run.
+         * @description One of the signed-in person's, with its facts. Anyone else's is not
+         *     found.
+         */
+        get: operations["runs.get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop a run.
+         * @description A waiting run ends `cancelled` at once; a going one is asked to stop:
+         *     its sandbox is removed and it ends `cancelled` with what it had used
+         *     (`stopping` until then).
+         */
+        post: operations["runs.cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What a run did.
+         * @description Its events, oldest first: the agent's own (`agent`: what it's doing) and
+         *     the sandbox's allow and deny lines (`sandbox`). Kept 30 days after the
+         *     run ends.
+         */
+        get: operations["runs.events"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{id}/events/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What a run does, live.
+         * @description Server-sent events: each event is `event: run_event`, `id: <seq>`,
+         *     `data:` a `RunEvent` as JSON. Once the run has ended and every event was
+         *     sent, one `event: end` with the `Run` as `data`, and the stream closes.
+         *     Resumes after `Last-Event-ID` (or `?after=`).
+         */
+        get: operations["runs.stream"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/searches": {
         parameters: {
             query?: never;
@@ -1496,10 +1744,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/oauth2/jwks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The issuer's keys.
+         * @description One Ed25519 key (JWK, `OKP`), derived from the instance secret for the
+         *     gateway only. Only when sandboxes run on OpenShell; not found otherwise.
+         */
+        get: operations["runs.oidc_jwks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description What the agent works on. */
+        AgentContext: {
+            /** @description Ids and settings, never personal data. */
+            inputs: unknown;
+            kind: string;
+            limits: components["schemas"]["RunLimits"];
+            /** Format: uuid */
+            run: string;
+            /** Format: uuid */
+            subject?: string | null;
+            tools: components["schemas"]["AgentTool"][];
+        };
+        /** @description One event line of the agent's. */
+        AgentEvent: {
+            /** @description At most 8 KB as JSON. */
+            data?: unknown;
+            level: components["schemas"]["Level"];
+            /** @description At most 2 000 characters. */
+            message: string;
+            operation?: string | null;
+            /**
+             * Format: int64
+             * @description The agent's own number for it, from 1; the same line sent twice is
+             *     kept once.
+             */
+            seq: number;
+            tool_name?: string | null;
+        };
+        /**
+         * @description How the agent says it ended.
+         * @enum {string}
+         */
+        AgentOutcome: "succeeded" | "nothing_new" | "needs_you" | "failed";
+        /** @description A tool the agent may call. */
+        AgentTool: {
+            /**
+             * Format: int32
+             * @description Calls the run may make.
+             */
+            cap: number;
+            class: components["schemas"]["ToolClass"];
+            name: string;
+            /** @description The JSON schema its arguments match. */
+            schema: unknown;
+        };
         /** @description A fact taken from an answer, waiting for Keep, Fix or Drop. */
         AnswerProposal: {
             /** @description What it is about (Grill me's areas). */
@@ -2013,6 +2327,47 @@ export interface components {
          * @enum {string}
          */
         CompanyStage: "early" | "growth" | "established" | "public" | "nonprofit";
+        /** @description One completion. */
+        Completion: {
+            /**
+             * Format: int32
+             * @description Longest answer, at most 16 000.
+             */
+            max_tokens: number;
+            /** @description At most 50. */
+            messages: components["schemas"]["CompletionMessage"][];
+            response_format?: components["schemas"]["CompletionFormat"] | null;
+        };
+        /** @description A model's answer. */
+        CompletionAnswer: {
+            content: string;
+            finish_reason?: string | null;
+            model: string;
+            /** Format: int32 */
+            tokens_in: number;
+            /** Format: int32 */
+            tokens_out: number;
+        };
+        /** @description The shape the answer must take. */
+        CompletionFormat: {
+            /** @enum {string} */
+            type: "json_object";
+        } | {
+            name: string;
+            schema: unknown;
+            /** @enum {string} */
+            type: "json_schema";
+        };
+        /** @description A message of a completion. */
+        CompletionMessage: {
+            content: string;
+            role: components["schemas"]["CompletionRole"];
+        };
+        /**
+         * @description Who said a message.
+         * @enum {string}
+         */
+        CompletionRole: "system" | "user" | "assistant";
         /** @description "It's true": the person's words. */
         ConfirmRequest: {
             /** @description What it is about (Grill me's areas); `results` when left out. */
@@ -2359,6 +2714,12 @@ export interface components {
          * @enum {string}
          */
         FactProposalStatus: "ready" | "kept" | "dropped";
+        /** @description The agent's end. */
+        Finish: {
+            outcome: components["schemas"]["AgentOutcome"];
+            /** @description Matching the kind's output schema. */
+            summary: unknown;
+        };
         /** @description The answers to the goals interview. Nothing is required. */
         Goals: {
             autonomy?: components["schemas"]["Autonomy"] | null;
@@ -2705,6 +3066,11 @@ export interface components {
         LatestSearch: {
             search?: components["schemas"]["Search"] | null;
         };
+        /**
+         * @description Who wrote an event.
+         * @enum {string}
+         */
+        Layer: "agent" | "sandbox";
         /** @description The look of a PDF. */
         LayoutRequest: {
             /**
@@ -2743,6 +3109,11 @@ export interface components {
             start_date?: string | null;
             title?: string | null;
         };
+        /**
+         * @description What kind of line an event is.
+         * @enum {string}
+         */
+        Level: "info" | "tool" | "model" | "deny" | "ask" | "error";
         /** @description A change to one line: its new text, or its removal. */
         LineChange: {
             /** @description Remove the line (or the skill). */
@@ -2815,6 +3186,11 @@ export interface components {
             title?: string | null;
             /** @description The posting's address (http or https, up to 2 000 characters). */
             url: string;
+        };
+        /** @description A run to start. */
+        NewRun: {
+            /** @description A kind a person may start (`runs.probe`: "Run a check"). */
+            kind: string;
         };
         /**
          * @description What to do next.
@@ -2985,6 +3361,11 @@ export interface components {
             url: string;
             work_mode?: components["schemas"]["JobWorkMode"] | null;
         };
+        /**
+         * @description How a run ended.
+         * @enum {string}
+         */
+        Outcome: "succeeded" | "nothing_new" | "needs_you" | "ended_max_steps" | "ended_budget" | "ended_timeout" | "ended_loop" | "failed" | "cancelled";
         /** @description What was checked on a PDF, kept with its version. */
         PdfChecks: {
             contact: components["schemas"]["ContactCheck"];
@@ -3211,6 +3592,11 @@ export interface components {
             kind: "skill_not_on_profile";
             skill: string;
         };
+        /** @description What was recorded. */
+        Recorded: {
+            /** @description New lines (a line already recorded is not counted). */
+            recorded: number;
+        };
         /**
          * @description Whether they would move for the right job.
          * @enum {string}
@@ -3280,6 +3666,119 @@ export interface components {
             start_date?: string | null;
             title?: string | null;
         };
+        /** @description A run, with its facts. */
+        Run: {
+            /**
+             * Format: double
+             * @description What its model calls cost, in euros.
+             */
+            cost_eur: number;
+            /** Format: date-time */
+            created_at: string;
+            /**
+             * Format: date-time
+             * @description When it is ended if still going.
+             */
+            deadline?: string | null;
+            /**
+             * Format: int64
+             * @description From start to end (or to now, while it goes), in milliseconds.
+             */
+            duration_ms?: number | null;
+            /**
+             * @description Why it failed, as a code (`sandbox_create_failed`, `agent_exited`,
+             *     `server_restarted`).
+             */
+            error_kind?: string | null;
+            /** Format: date-time */
+            finished_at?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** @description The image its agent ran in. */
+            image?: string | null;
+            /** @description Its kind (`runs.probe`). */
+            kind: string;
+            /** @description The model that answered it, if it asked one. */
+            model?: string | null;
+            outcome?: components["schemas"]["Outcome"] | null;
+            /** @description Its network policy (`policies/probe.yaml`). */
+            policy?: string | null;
+            /** @description Its sandbox's name at the runtime. */
+            sandbox?: string | null;
+            /** Format: date-time */
+            started_at?: string | null;
+            status: components["schemas"]["RunStatus"];
+            /** @description Someone pressed Stop and it has not ended yet. */
+            stopping: boolean;
+            /** @description What its agent finished with. */
+            summary?: unknown;
+            /** Format: int32 */
+            tokens_in: number;
+            /** Format: int32 */
+            tokens_out: number;
+        };
+        /** @description A recorded event. */
+        RunEvent: {
+            /** Format: date-time */
+            at: string;
+            /** @description What the agent attached to it. */
+            data?: unknown;
+            layer: components["schemas"]["Layer"];
+            level: components["schemas"]["Level"];
+            /**
+             * @description The line, at most 2 000 characters. Written by the agent or the
+             *     sandbox: text to show, never markup.
+             */
+            message: string;
+            /** @description What it was (`NET:OPEN`, `context`), when it says. */
+            operation?: string | null;
+            /**
+             * Format: int64
+             * @description Its number in the run: the live stream's `Last-Event-ID`.
+             */
+            seq: number;
+            /** @description The tool it is about, if any. */
+            tool_name?: string | null;
+        };
+        /** @description A page of a run's events. */
+        RunEvents: {
+            /** @description Oldest first, at most 500; ask again with `after` the last `seq`. */
+            events: components["schemas"]["RunEvent"][];
+        };
+        /** @description The limits of the run. */
+        RunLimits: {
+            /** Format: date-time */
+            deadline?: string | null;
+            /** Format: int32 */
+            max_steps: number;
+            /**
+             * Format: int32
+             * @description Model tokens the run may use.
+             */
+            max_tokens: number;
+            /**
+             * Format: int64
+             * @description Seconds from start to the deadline.
+             */
+            wall_clock_secs: number;
+        };
+        /** @description A person's runs. */
+        RunList: {
+            /**
+             * @description Whether runs can start on this instance (a sandbox runtime is
+             *     configured).
+             */
+            available: boolean;
+            /** @description Newest first, at most 100. */
+            runs: components["schemas"]["Run"][];
+            /** @description The kinds a person may start here (`runs.probe`). */
+            startable: string[];
+        };
+        /**
+         * @description Where a run is.
+         * @enum {string}
+         */
+        RunStatus: "queued" | "starting" | "running" | "finished";
         /** @description A job a check read as a sample. */
         SampleJob: {
             company: string;
@@ -3697,6 +4196,20 @@ export interface components {
             stopped?: components["schemas"]["SearchStop"] | null;
             trigger: components["schemas"]["SearchTrigger"];
         };
+        /** @description One tool call. */
+        ToolCall: {
+            /** @description The arguments, matching the tool's schema. */
+            args?: unknown;
+        };
+        /**
+         * @description What a tool does to the world.
+         * @enum {string}
+         */
+        ToolClass: "read" | "draft" | "outward";
+        /** @description What a tool answered. */
+        ToolResult: {
+            result: unknown;
+        };
         /** @description A position. */
         Work: {
             /** @description As `startDate`; none while it is their current position. */
@@ -3734,6 +4247,350 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    "runs.oidc_discovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The discovery document. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "runs.agent_complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Completion"];
+            };
+        };
+        responses: {
+            /** @description The answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompletionAnswer"];
+                };
+            };
+            /** @description `invalid_request`, `invalid_completion` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `run_token_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `run_budget_reached`, `rate_limited` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `ai_unavailable`, `ai_daily_limit_reached`, `ai_budget_reached`, `ai_failed` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "runs.agent_context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The context. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentContext"];
+                };
+            };
+            /** @description `cookies_refused` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `run_token_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: no such run going */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `rate_limited` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "runs.agent_events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentEvent"][];
+            };
+        };
+        responses: {
+            /** @description Recorded. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Recorded"];
+                };
+            };
+            /** @description `invalid_request`, `invalid_event`, `cookies_refused` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `run_token_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `rate_limited` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "runs.agent_finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Finish"];
+            };
+        };
+        responses: {
+            /** @description Recorded. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `invalid_request`, `invalid_summary` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `run_token_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `rate_limited` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "runs.agent_tool": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The tool. */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ToolCall"];
+            };
+        };
+        responses: {
+            /** @description Its answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolResult"];
+                };
+            };
+            /** @description `invalid_request`, `invalid_arguments`, or the tool's own refusal */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `run_token_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `tool_cap_reached` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `rate_limited` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "sources.boards": {
         parameters: {
             query?: never;
@@ -6950,6 +7807,299 @@ export interface operations {
             };
         };
     };
+    "runs.list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The runs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunList"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "runs.start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewRun"];
+            };
+        };
+        responses: {
+            /** @description Queued. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Run"];
+                };
+            };
+            /** @description `invalid_request`, `unknown_kind` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `too_many_runs` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `sandboxes_unavailable` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "runs.get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The run. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The run. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Run"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "runs.cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The run. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stopping, or stopped. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Run"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `run_finished` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "runs.events": {
+        parameters: {
+            query?: {
+                /** @description Only those after this number. */
+                after?: number;
+                /** @description Only the agent's (`agent`) or the sandbox's (`sandbox`). */
+                layer?: components["schemas"]["Layer"];
+            };
+            header?: never;
+            path: {
+                /** @description The run. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The events. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunEvents"];
+                };
+            };
+            /** @description `invalid_query` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "runs.stream": {
+        parameters: {
+            query?: {
+                /** @description Only those after this number. */
+                after?: number;
+                /** @description Only the agent's (`agent`) or the sandbox's (`sandbox`). */
+                layer?: components["schemas"]["Layer"];
+            };
+            header?: {
+                /** @description The last event seen. */
+                "Last-Event-ID"?: number | null;
+            };
+            path: {
+                /** @description The run. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The live events. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            /** @description `invalid_query` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "sources.start": {
         parameters: {
             query?: never;
@@ -7232,6 +8382,35 @@ export interface operations {
             };
             /** @description `database_unavailable` */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "runs.oidc_jwks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The key set. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description `not_found` */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

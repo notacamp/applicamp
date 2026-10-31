@@ -1,15 +1,18 @@
 # Tasks
-## 1. Server
-- [ ] 1.1 `runs` module: schema, lifecycle, queue + concurrency, time limits, startup sweep, cancel
-- [ ] 1.2 SandboxRuntime trait + fake runtime; OpenShell runtime behind the trait (templates from policies, log stream, delete, sweep)
-- [ ] 1.3 Agent API with run tokens (context, events, complete via crates/ai, finish), rate limit, tool allow-list per kind
-- [ ] 1.4 OIDC issuer for the gateway (discovery, JWKS, self-minted tokens) — nothing else issued
-- [ ] 1.5 Event retention job, metrics
-## 2. Agent
-- [ ] 2.1 `crates/agent` runner + `probe` kind; agent image in publish.yml
-- [ ] 2.2 `policies/probe.yaml` + policy lint in CI
-## 3. Client
-- [ ] 3.1 Agents page: run list, live console (SSE), sandbox log, run facts, Run a check
-## 4. Finish
-- [ ] 4.1 Tests: lifecycle with the fake runtime (success, failure, timeout, cancel, sweep), token checks (wrong run, finished run, expired), cap enforcement; e2e: Run a check → succeeded with events visible (desktop + phone)
-- [ ] 4.2 OpenAPI + client types regenerated, changelog entry file, gates green in CI, recording at 375px and desktop
+## 1. Kernel and server
+- [ ] 1.1 `kernel::agent`: `RunKind`, `ToolSpec`, `ToolClass`, `ToolHandler`, `Limits`; `Module.kinds`; the `start_run` port shape
+- [ ] 1.2 Server: gather kinds, compose `runs`, `/api/agent` door (no CSRF, no cookies), `/.well-known` and `/oauth2` prefixes; `cargo xtask arch` knows the `run_token` scheme
+## 2. Runs module
+- [ ] 2.1 Schema, orchestrator loop (claims, concurrency, deadlines), cancel, startup sweep, `runs.finished`
+- [ ] 2.2 `SandboxRuntime` + the fake runtime (child process, policy proxy, OCSF-style deny lines)
+- [ ] 2.3 OpenShell runtime at v0.1.6 (templates per kind, policy per sandbox, `watch_logs`, delete, sweep) + the OIDC issuer for the gateway
+- [ ] 2.4 Agent API with run tokens (context, events, tools with caps and schemas, complete through `applicamp-ai`, finish), rate limit
+- [ ] 2.5 Run routes: start, list, get, cancel, events, live events (SSE); event retention job
+## 3. Agent
+- [ ] 3.1 `crates/agent` runner + the `runs.probe` kind and its `probe_echo` tool; agent image in `publish.yml`
+- [ ] 3.2 `policies/probe.yaml` + `cargo xtask policies` in CI
+## 4. Client
+- [ ] 4.1 Agents page: run list, live console (SSE), sandbox log, run facts, Run a check, Stop
+## 5. Finish
+- [ ] 5.1 Tests: lifecycle with the fake runtime (success, failure, timeout, cancel, sweep), token checks (wrong run, finished run, expired, tool not allowed, cap reached, bad arguments), cap enforcement on `complete`; e2e: Run a check → succeeded with its events and a blocked request visible (desktop + phone)
+- [ ] 5.2 OpenAPI + client types regenerated, changelog entry, gates green in CI, recording at 375px and desktop

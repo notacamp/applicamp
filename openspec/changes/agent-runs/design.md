@@ -1,51 +1,135 @@
 # Design
 
+## Run kinds (kernel)
+`applicamp_kernel::agent` holds the types a module uses to declare a kind, so
+no module depends on `runs`:
+
+```rust
+pub struct RunKind {
+    pub name: &'static str,          // "<module>.<kind>", e.g. "runs.probe"
+    pub image: Image,                // Agent | Browser
+    pub policy: &'static str,        // policies/<kind>.yaml, embedded
+    pub limits: Limits,              // max_steps, wall_clock, max_tokens
+    pub tools: Vec<ToolSpec>,
+    pub output: serde_json::Value,   // JSON schema of finish's summary
+}
+pub struct ToolSpec { pub name: &'static str, pub class: ToolClass, pub cap: u32,
+                      pub schema: serde_json::Value, pub handler: Arc<dyn ToolHandler> }
+pub enum ToolClass { Read, Draft, Outward }
+pub trait ToolHandler: Send + Sync {
+    fn call<'a>(&'a self, ctx: ToolContext<'a>, args: Value) -> BoxFuture<'a, Result<Value, ToolError>>;
+}
+```
+
+`Module` gains `kinds: Vec<RunKind>`; the server gathers every module's kinds
+and hands them to `runs`. An outward tool may only create an approval (once
+the approvals module exists); `runs` refuses to register one otherwise. A
+module starts a run through a port the server implements
+(`start_run(conn, StartRun { kind, account, subject, inputs }) -> RunId`, in
+the caller's transaction) and hears the end by consuming `runs.finished`.
+
 ## Data (schema `runs`)
-- `runs(id uuid pk, account_id, kind text, status text, inputs jsonb, created_at, started_at, finished_at, sandbox text, image text, policy text, model text, tokens_in int default 0, tokens_out int default 0, error_kind text, summary jsonb)`.
-- `events(id bigserial pk, run_id, at timestamptz, layer text check in ('agent','sandbox'), level text check in ('info','tool','model','deny','ask','error'), message text check (length(message) <= 2000), data jsonb)`; index `(run_id, id)`. Retention: 30 days (a daily job deletes older runs' events; runs keep their summary).
-- `tokens(run_id pk, hash bytea, expires_at)`: the run token is 32 random bytes, sent once to the sandbox, stored as SHA-256; expires at the run's time limit + 5 minutes and is deleted on finish.
-- Events published: `runs.finished` v1 `{ run, account, kind, status }`.
+- `runs(id uuid pk, account_id, kind, subject_id uuid null, status text, outcome text null, inputs jsonb, deadline timestamptz, created_at, started_at, finished_at, sandbox text, image text, policy text, model text, tokens_in int default 0, tokens_out int default 0, cost_eur numeric default 0, error_kind text, summary jsonb, cancel_requested bool default false, claimed_by text, claimed_until timestamptz)`.
+  `status`: `queued | starting | running | finished`. `outcome` (when finished): `succeeded | nothing_new | needs_you | ended_max_steps | ended_budget | ended_timeout | ended_loop | failed | cancelled`.
+- `events(run_id, seq bigint, at, layer text check in ('agent','sandbox'), level text check in ('info','tool','model','deny','ask','error'), operation text null, tool_name text null, message text check (length(message) <= 2000), data jsonb, primary key (run_id, seq))`. `seq` is the SSE `Last-Event-ID`; agent events carry their own `seq` so a line seen on stdout and through `POST events` is stored once. Retention: 30 days (a daily job deletes older runs' events; runs keep their summary).
+- `tokens(run_id pk, hash bytea, tools jsonb, calls jsonb, expires_at)`: 32 random bytes sent once to the sandbox, stored as SHA-256, with the kind's tools and their caps and a count of calls made; expires at the deadline + 5 minutes; deleted on finish.
+- Events published: `runs.finished` v1 `{ run, account, kind, subject, outcome }`.
 
 ## Lifecycle
-`POST /api/v1/runs { kind, inputs }` (session, CSRF) → queued job `runs.start`. The worker:
-1. checks concurrency (else stays queued),
-2. mints the run token,
-3. `SandboxRuntime::create(template_for(kind), env { APPLICAMP_RUN_ID, APPLICAMP_RUN_TOKEN, APPLICAMP_AGENT_API })`,
-4. streams the sandbox's log into `events` (layer `sandbox` for OpenShell's OCSF lines, `agent` for the runner's JSON lines on stdout),
-5. waits for exit or the time limit,
-6. **always** deletes the sandbox (also on error and on server restart: a startup sweep deletes sandboxes labelled `applicamp-run=*` whose run is finished or unknown),
-7. records status, tokens and summary, publishes `runs.finished`.
-`POST /api/v1/runs/{id}/cancel` stops it the same way.
+A run outlives the kernel job lease (60 s), so the queue is `runs.runs` itself:
+the server starts an **orchestrator loop** that claims queued runs with
+`FOR UPDATE SKIP LOCKED` (and a renewed claim), within concurrency (1 per
+account, 3 per instance). For each claimed run it:
+1. mints the run token,
+2. `SandboxRuntime::create(spec)`: image and template for the kind, the
+   kind's policy, the run id, token and agent API address as command
+   arguments (a gateway template cannot carry per-run environment), labels
+   `applicamp-run=<id>`,
+3. follows the sandbox's log into `events` (layer `sandbox` for OpenShell's
+   OCSF lines, `agent` for the runner's JSON lines),
+4. waits for exit, the deadline, or a cancel,
+5. **always** deletes the sandbox, also on error,
+6. records the outcome, tokens, cost and summary, deletes the token, and
+   publishes `runs.finished`.
+At startup a sweep deletes sandboxes labelled `applicamp-run=*` whose run is
+finished or unknown, and marks runs left `starting`/`running` by a dead
+server `failed` (`error_kind = server_restarted`).
+`POST /api/v1/runs { kind }` (session, CSRF) queues a run a person may start
+(`runs.probe` only, for now); `POST /api/v1/runs/{id}/cancel` asks it to stop.
 
 ## SandboxRuntime
 ```rust
+#[async_trait]
 trait SandboxRuntime: Send + Sync {
-    async fn create(&self, spec: SandboxSpec) -> Result<SandboxHandle>;   // template name, image, env, labels
+    async fn create(&self, spec: SandboxSpec) -> Result<SandboxHandle>;
     fn logs(&self, handle: &SandboxHandle) -> BoxStream<'static, Result<LogLine>>;
-    async fn wait(&self, handle: &SandboxHandle, limit: Duration) -> Result<ExitStatus>;
+    async fn wait(&self, handle: &SandboxHandle, until: Instant) -> Result<Exit>;
     async fn delete(&self, handle: &SandboxHandle) -> Result<()>;
     async fn sweep(&self, keep: &HashSet<Uuid>) -> Result<usize>;
 }
 ```
-- **OpenShell** (`openshell-sdk`, git tag `v0.1.4`, already allowed by cargo-deny): templates `applicamp-<kind>` created/updated at startup from `policies/<kind>.yaml` + per-kind limits (CPU 1, memory 1 GiB, pids 512, time limit per kind). Logs via `raw_grpc_fresh()` log stream. Config `APPLICAMP_SANDBOX__RUNTIME=openshell|fake`, `APPLICAMP_SANDBOX__GATEWAY_URL`, `APPLICAMP_SANDBOX__GATEWAY_CA_FILE` (TLS), auth = an OIDC bearer the server mints for itself (see below), `APPLICAMP_SANDBOX__AGENT_IMAGE`.
-- **Gateway auth**: the gateway trusts Applicamp as its OIDC issuer. The server publishes `GET /.well-known/openid-configuration` and `GET /oauth2/jwks` (EdDSA key derived from the instance secret with its own purpose, `kid` stable) and mints 5-minute JWTs (`iss` = public URL, `aud` = `openshell-gateway`, roles claim `openshell-admin`) for its own gRPC calls. Nothing else is issued.
-- **Fake**: runs `target/debug/applicamp-agent` (or the path in `APPLICAMP_SANDBOX__FAKE_AGENT`) as a child process with the same env; logs = its stdout. Used by tests and local runs; never in production (refuses to start when `APPLICAMP_PUBLIC_URL` is https unless `APPLICAMP_SANDBOX__ALLOW_FAKE=true`).
+- **OpenShell** (`openshell-sdk`, `openshell-policy`, git tag `v0.1.6`): one
+  template `applicamp-<kind>` per kind for the image and resources (CPU 1,
+  memory 1 GiB), created or replaced at startup (there is no update RPC: get,
+  compare, delete and create). The policy is parsed from the kind's file with
+  `openshell_policy::parse_sandbox_policy` and set on each sandbox at create,
+  so a later kind can narrow it to its subject's host. Logs through
+  `OpenShellClient::watch_logs` (resumable); OCSF lines arrive with
+  `source: "sandbox"`, `level: "OCSF"`. Config `APPLICAMP_SANDBOX__RUNTIME=openshell|fake`,
+  `APPLICAMP_SANDBOX__GATEWAY_URL`, `APPLICAMP_SANDBOX__GATEWAY_CA_FILE`,
+  `APPLICAMP_SANDBOX__AGENT_IMAGE`.
+- **Gateway auth**: the gateway trusts Applicamp as its OIDC issuer. The
+  server serves `GET /.well-known/openid-configuration` and `GET /oauth2/jwks`
+  (an Ed25519 key derived from the instance secret for this purpose only,
+  stable `kid`) and mints five-minute JWTs (`iss` = the public origin, `aud` =
+  `openshell-gateway`, `sub` = `applicamp-server`, `roles` =
+  `["openshell-admin"]`) for its own gRPC calls. Nothing else is issued.
+- **Fake**: runs the agent binary (`APPLICAMP_SANDBOX__FAKE_AGENT`, default
+  `target/debug/applicamp-agent`) as a child process with the same
+  arguments, behind a local CONNECT proxy that applies the kind's policy
+  hosts and writes OCSF-style `DENIED` lines into the sandbox log. Logs are its
+  stdout. Never in production: it refuses to start when `APPLICAMP_PUBLIC_URL`
+  is https unless `APPLICAMP_SANDBOX__ALLOW_FAKE=true`.
 
-## Agent API (bearer run token; never the session cookie)
-- `GET /api/agent/v1/context` → `{ run, kind, inputs, profile_version?, goals_version? }`.
-- `POST /api/agent/v1/events` `[{ level, message, data? }]` (≤ 50 per call, message ≤ 2000 chars, data ≤ 8 KB).
-- `POST /api/agent/v1/complete` `{ messages, response_format?, max_tokens ≤ 16000 }` → the `complete` role through `crates/ai` with the run's account cap; adds tokens to the run.
-- `POST /api/agent/v1/finish` `{ status: succeeded|failed, summary }`.
-- Every call checks the token, that the run is `running`, and the kind's tool allow-list. 404 for anything else. Rate limit 10 req/s per run.
+## Agent API (bearer run token; a request with a cookie is refused)
+- `GET /api/agent/v1/context` → `{ run, kind, inputs, subject, limits, tools: [{ name, class, schema, cap }] }`.
+- `POST /api/agent/v1/events` `[{ seq, level, message, operation?, tool_name?, data? }]` (≤ 50 per call, message ≤ 2000 chars, data ≤ 8 KB).
+- `POST /api/agent/v1/tools/{name}` `{ args }` → the handler's result. Refused (404) when the tool is not the kind's; `tool_cap_reached` past its cap; `invalid_arguments` (with the schema error) when `args` does not match.
+- `POST /api/agent/v1/complete` `{ messages, response_format?, max_tokens ≤ 16000 }` → the `complete` role through `applicamp-ai` with the run's account and caps; the run's tokens and cost grow; past the kind's `max_tokens` the answer is `run_budget_reached`.
+- `POST /api/agent/v1/finish` `{ outcome: succeeded | nothing_new | needs_you | failed, summary }` (summary checked against the kind's output schema).
+- Every call checks the token's hash and expiry and that the run is `running`; 404 otherwise. 10 requests a second per run.
+- The door is exempt from the CSRF middleware and refuses `Cookie`; `cargo xtask arch` knows a `run_token` security scheme allowed only under `/api/agent/`.
 
 ## Agent runner (`crates/agent`)
-One binary, `applicamp-agent`, reads the env, `GET context`, dispatches on `kind`, writes JSON lines to stdout (`{"level":"tool","message":"…"}`) and the same through `POST events`, calls `finish`. Kind `probe`: GET context → event; try `https://example.com` (must be refused by policy) → event `deny`; finish. Image: distroless, nonroot, `WORKDIR /sandbox`, built and published like the server (`publish.yml` builds both).
+One binary, `applicamp-agent --run <id> --token-file <path> --api <url>`
+(or the token on stdin), depending on no other Applicamp crate. It reads its
+context, dispatches on `kind`, writes JSON lines to stdout
+(`{"seq":1,"level":"tool","message":"…"}`) and the same through `POST events`,
+and calls `finish`. Kind `runs.probe`: `GET context` → event; call `probe_echo`
+→ event; call it again and expect `tool_cap_reached` → event; fetch
+`https://example.com/` and expect it blocked → event `deny`; finish
+`succeeded`. Image: distroless, nonroot, `WORKDIR /sandbox`, published next to
+the server image by `publish.yml`.
 
-## Policies
-`policies/probe.yaml` (OpenShell policy v1): allow `applicamp.not-a-camp.com:443` (from config: the public host) for `/app/applicamp-agent`, nothing else. A CI lint checks every policy is deny-by-default and never lists `linkedin.com`, `indeed.com` or private ranges.
+## Policies and the lint
+`policies/probe.yaml` (OpenShell policy v1): the public Applicamp host on 443
+for `/app/applicamp-agent`, with `enforcement: enforce`, and nothing else;
+`landlock.compatibility: hard_requirement`. `cargo xtask policies` parses each
+file with `openshell-policy` and fails on: an endpoint without `enforce`, a
+missing `hard_requirement`, a wildcard host, a host under `linkedin.com` or
+`indeed.com`, or a private, loopback or link-local range. It runs in CI next to
+`cargo xtask arch`.
 
 ## Client: Agents page
-Prototype layout: runs on the left (kind, title, status dot, started), the console on the right with tabs **What it's doing** (agent events, live via `GET /api/v1/runs/{id}/events/stream` SSE, resumable with `Last-Event-ID`) and **Sandbox log** (sandbox layer), and run facts (sandbox, image, policy, model, tokens, duration). A "Run a check" button starts a `probe` run. Empty state when there are no runs. 375px + desktop, 4 languages.
+The runs on the left (kind, status dot, started); the run on the right with
+tabs **What it's doing** (agent events, live over
+`GET /api/v1/runs/{id}/events/stream`, resumable with `Last-Event-ID`) and
+**Sandbox log** (sandbox events), and the run facts (sandbox, image, policy,
+model, tokens, cost, duration, end state). On phones the list and the run are
+one column with a back button (`SplitView`). "Run a check" starts a probe;
+"Stop" cancels a live run. An empty state when there are no runs. 375px and
+desktop, four languages.
 
 ## Telemetry
-Server logs: run id, kind, status, durations; never event messages. Prometheus: `applicamp_runs_total{kind,status}`, `applicamp_run_duration_seconds{kind}`, `applicamp_sandbox_denies_total{kind}`, `applicamp_ai_tokens_total{role}`.
+Server logs: run id, kind, status, outcome, durations, counts; never event
+messages, tool arguments or results.

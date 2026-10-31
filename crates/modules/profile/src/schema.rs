@@ -135,7 +135,7 @@ pub struct Work {
     /// import and the model never write these.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[schemars(skip)]
-    pub facts: Vec<Fact>,
+    pub facts: Vec<ProfileFact>,
 }
 
 /// What a fact about a position is about: the seven things "Grill me" goes
@@ -197,7 +197,7 @@ impl Area {
 /// One thing the person confirmed about a position, with their own words.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
-pub struct Fact {
+pub struct ProfileFact {
     /// Its id.
     pub id: String,
     /// The fact, one short sentence. It says only what the quote or the

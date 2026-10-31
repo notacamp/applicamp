@@ -41,6 +41,20 @@ export {
   type BoardProps,
 } from "./components/Board/Board";
 export { Bullets } from "./components/Bullets/Bullets";
+export { Chat, ChatBubble, type ChatBubbleProps } from "./components/Chat/Chat";
+export {
+  ChoiceNav,
+  type ChoiceNavItem,
+  type ChoiceNavProps,
+} from "./components/ChoiceNav/ChoiceNav";
+export {
+  FactBlock,
+  FactRow,
+  type FactBlockProps,
+  type FactRowProps,
+} from "./components/FactBlock/FactBlock";
+export { StatusMark, type StatusMarkProps } from "./components/StatusMark/StatusMark";
+export { Workbench, type WorkbenchProps } from "./components/Workbench/Workbench";
 export { CardList, type CardListProps } from "./components/CardList/CardList";
 export { DataTable, type DataColumn, type DataTableProps } from "./components/DataTable/DataTable";
 export { Label, LABEL_HUES, type LabelHue, type LabelProps } from "./components/Label/Label";

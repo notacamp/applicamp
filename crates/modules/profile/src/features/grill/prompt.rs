@@ -6,8 +6,8 @@
 
 use serde_json::{Value, json};
 
-use super::{Turn, TurnKind, judge::Coverage};
-use crate::schema::{Area, Fact, Work};
+use super::{GrillTurn, GrillTurnKind, judge::Coverage};
+use crate::schema::{Area, ProfileFact, Work};
 
 /// The version of [`INSTRUCTIONS`]. Raise it with every change to them, so a
 /// log line of ids and counts can be told apart across prompts.
@@ -153,19 +153,19 @@ fn role(work: &Work) -> Value {
 }
 
 /// The conversation's last [`MAX_TURNS`] turns.
-fn conversation(turns: &[Turn]) -> Vec<Value> {
+fn conversation(turns: &[GrillTurn]) -> Vec<Value> {
     let start = turns.len().saturating_sub(MAX_TURNS);
     turns[start..]
         .iter()
         .filter_map(|turn| match turn.kind {
-            TurnKind::Question => Some(json!({ "by": "interviewer", "text": turn.text })),
-            TurnKind::Answer => Some(json!({ "by": "person", "text": turn.text })),
+            GrillTurnKind::Question => Some(json!({ "by": "interviewer", "text": turn.text })),
+            GrillTurnKind::Answer => Some(json!({ "by": "person", "text": turn.text })),
             // A skipped question is said as the person's choice; "done" is
             // not part of the conversation.
-            TurnKind::Note if turn.text == "skipped" => {
+            GrillTurnKind::Note if turn.text == "skipped" => {
                 Some(json!({ "by": "person", "text": "(skipped this question)" }))
             }
-            TurnKind::Note => None,
+            GrillTurnKind::Note => None,
         })
         .collect()
 }
@@ -178,13 +178,13 @@ pub struct Context<'a> {
     pub waiting: &'a [(Area, String)],
     pub coverage: &'a Coverage,
     pub skipped: &'a [Area],
-    pub turns: &'a [Turn],
+    pub turns: &'a [GrillTurn],
     /// The latest answer, for an `answer` event.
     pub answer: Option<&'a str>,
     pub language: Option<&'a str>,
 }
 
-fn facts_of(kept: &[Fact], waiting: &[(Area, String)]) -> Vec<Value> {
+fn facts_of(kept: &[ProfileFact], waiting: &[(Area, String)]) -> Vec<Value> {
     kept.iter()
         .map(|f| (f.area, f.text.as_str()))
         .chain(waiting.iter().map(|(a, t)| (*a, t.as_str())))
@@ -235,7 +235,7 @@ mod tests {
             location: Some("Lisbon".to_owned()),
             start_date: Some("2021-03".to_owned()),
             summary: Some("Runs billing.".to_owned()),
-            facts: vec![Fact {
+            facts: vec![ProfileFact {
                 id: "f1".to_owned(),
                 text: "Took 7 months".to_owned(),
                 quote: "It took 7 months".to_owned(),
@@ -246,8 +246,8 @@ mod tests {
         }
     }
 
-    fn turn(seq: i32, kind: TurnKind, text: &str) -> Turn {
-        Turn {
+    fn turn(seq: i32, kind: GrillTurnKind, text: &str) -> GrillTurn {
+        GrillTurn {
             seq,
             kind,
             text: text.to_owned(),
@@ -259,12 +259,12 @@ mod tests {
 
     #[test]
     fn the_model_sees_the_position_its_facts_and_the_last_ten_turns_only() {
-        let turns: Vec<Turn> = (1..=14)
+        let turns: Vec<GrillTurn> = (1..=14)
             .map(|n| {
                 let kind = if n % 2 == 1 {
-                    TurnKind::Question
+                    GrillTurnKind::Question
                 } else {
-                    TurnKind::Answer
+                    GrillTurnKind::Answer
                 };
                 turn(n, kind, &format!("turn number {n}"))
             })
@@ -299,9 +299,9 @@ mod tests {
     #[test]
     fn a_skipped_question_is_told_and_done_is_not() {
         let turns = [
-            turn(1, TurnKind::Question, "What did it sell?"),
-            turn(2, TurnKind::Note, "skipped"),
-            turn(3, TurnKind::Note, "done"),
+            turn(1, GrillTurnKind::Question, "What did it sell?"),
+            turn(2, GrillTurnKind::Note, "skipped"),
+            turn(3, GrillTurnKind::Note, "done"),
         ];
         let seen = conversation(&turns);
         assert_eq!(seen.len(), 2);

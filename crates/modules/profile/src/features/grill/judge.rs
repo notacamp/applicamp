@@ -38,7 +38,7 @@ pub const MAX_QUESTION: usize = 600;
     Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ToSchema,
 )]
 #[serde(rename_all = "snake_case")]
-pub enum Level {
+pub enum CoverageLevel {
     /// Nothing yet.
     #[default]
     None,
@@ -48,7 +48,7 @@ pub enum Level {
     Ok,
 }
 
-impl Level {
+impl CoverageLevel {
     /// The level the model names; `none` and anything else is no news.
     fn parse(raw: &str) -> Option<Self> {
         match raw.trim() {
@@ -61,16 +61,16 @@ impl Level {
 
 /// What has been covered about a position.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Coverage(pub BTreeMap<Area, Level>);
+pub struct Coverage(pub BTreeMap<Area, CoverageLevel>);
 
 impl Coverage {
     /// How well `area` is covered.
-    pub fn level(&self, area: Area) -> Level {
+    pub fn level(&self, area: Area) -> CoverageLevel {
         self.0.get(&area).copied().unwrap_or_default()
     }
 
     /// Raise `area` to `level`; it never goes down. Whether it changed.
-    pub fn raise(&mut self, area: Area, level: Level) -> bool {
+    pub fn raise(&mut self, area: Area, level: CoverageLevel) -> bool {
         if level > self.level(area) {
             self.0.insert(area, level);
             true
@@ -83,7 +83,7 @@ impl Coverage {
     pub fn ok_count(&self) -> u8 {
         let ok = Area::ALL
             .into_iter()
-            .filter(|area| self.level(*area) == Level::Ok)
+            .filter(|area| self.level(*area) == CoverageLevel::Ok)
             .count();
         u8::try_from(ok).unwrap_or(u8::MAX)
     }
@@ -97,7 +97,7 @@ impl Coverage {
     pub fn first_open(&self, skipped: &[Area]) -> Option<Area> {
         Area::ALL
             .into_iter()
-            .find(|area| self.level(*area) != Level::Ok && !skipped.contains(area))
+            .find(|area| self.level(*area) != CoverageLevel::Ok && !skipped.contains(area))
     }
 }
 
@@ -232,7 +232,7 @@ pub fn judge(raw: Raw, input: &Input<'_>) -> Outcome {
 
         for entry in raw.coverage {
             if let (Some(area), Some(level)) =
-                (Area::parse(&entry.area), Level::parse(&entry.level))
+                (Area::parse(&entry.area), CoverageLevel::parse(&entry.level))
             {
                 coverage.raise(area, level);
             }
@@ -374,8 +374,8 @@ mod tests {
     fn coverage_only_ever_goes_up() {
         let profile = json!({});
         let mut before = Coverage::default();
-        before.raise(Area::Context, Level::Ok);
-        before.raise(Area::Results, Level::Part);
+        before.raise(Area::Context, CoverageLevel::Ok);
+        before.raise(Area::Results, CoverageLevel::Part);
         let outcome = judge(
             raw(&json!({
                 "coverage": [
@@ -390,16 +390,20 @@ mod tests {
             })),
             &input(Some(ANSWER), &profile, &before),
         );
-        assert_eq!(outcome.coverage.level(Area::Context), Level::Ok);
-        assert_eq!(outcome.coverage.level(Area::Results), Level::Ok);
-        assert_eq!(outcome.coverage.level(Area::People), Level::Part);
-        assert_eq!(outcome.coverage.level(Area::Stories), Level::None);
+        assert_eq!(outcome.coverage.level(Area::Context), CoverageLevel::Ok);
+        assert_eq!(outcome.coverage.level(Area::Results), CoverageLevel::Ok);
+        assert_eq!(outcome.coverage.level(Area::People), CoverageLevel::Part);
+        assert_eq!(outcome.coverage.level(Area::Stories), CoverageLevel::None);
         assert_eq!(outcome.coverage.0.len(), 3, "unknown areas are ignored");
-        assert!(!Coverage::default().clone().raise(Area::People, Level::None));
+        assert!(
+            !Coverage::default()
+                .clone()
+                .raise(Area::People, CoverageLevel::None)
+        );
         let mut c = Coverage::default();
-        assert!(c.raise(Area::People, Level::Ok));
-        assert!(!c.raise(Area::People, Level::Part), "never down");
-        assert_eq!(c.level(Area::People), Level::Ok);
+        assert!(c.raise(Area::People, CoverageLevel::Ok));
+        assert!(!c.raise(Area::People, CoverageLevel::Part), "never down");
+        assert_eq!(c.level(Area::People), CoverageLevel::Ok);
     }
 
     #[test]
@@ -432,7 +436,7 @@ mod tests {
         let profile = json!({});
         let mut full = Coverage::default();
         for area in Area::ALL {
-            full.raise(area, Level::Ok);
+            full.raise(area, CoverageLevel::Ok);
         }
         let ask =
             json!({ "next": { "question": "Anything else?", "area": "stories", "push": false } });
@@ -443,7 +447,7 @@ mod tests {
 
         let mut most = Coverage::default();
         for area in &Area::ALL[..6] {
-            most.raise(*area, Level::Ok);
+            most.raise(*area, CoverageLevel::Ok);
         }
         let skipped = [Area::Stories];
         let outcome = judge(
@@ -461,7 +465,7 @@ mod tests {
         let profile = json!({});
         let mut full = Coverage::default();
         for area in Area::ALL {
-            full.raise(area, Level::Ok);
+            full.raise(area, CoverageLevel::Ok);
         }
         let outcome = judge(
             raw(&json!({

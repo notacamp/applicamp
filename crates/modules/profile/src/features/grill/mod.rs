@@ -29,7 +29,7 @@ use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use self::{
-    judge::{Coverage, Input, Level, NewFact, Outcome, Raw},
+    judge::{Coverage, CoverageLevel, Input, NewFact, Outcome, Raw},
     prompt::{Context, Event, INSTRUCTIONS},
 };
 use crate::{
@@ -37,7 +37,7 @@ use crate::{
         completion::{Current, carry_forward, check::Evidence, current, write_profile},
         imports::{Ai, DRAFT_LIFETIME, ExpireImports, source_check::squash},
     },
-    schema::{Area, Fact, Profile, Work},
+    schema::{Area, Profile, ProfileFact, Work},
 };
 
 /// Hard cap on model calls per account per UTC day.
@@ -60,7 +60,7 @@ pub const fn over_cap(calls: i64) -> bool {
 /// What a turn is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum TurnKind {
+pub enum GrillTurnKind {
     /// The interviewer asks.
     Question,
     /// The person answers.
@@ -69,7 +69,7 @@ pub enum TurnKind {
     Note,
 }
 
-impl TurnKind {
+impl GrillTurnKind {
     const fn as_str(self) -> &'static str {
         match self {
             Self::Question => "question",
@@ -90,11 +90,11 @@ impl TurnKind {
 
 /// One turn of the interview.
 #[derive(Debug, Clone, Serialize, ToSchema)]
-pub struct Turn {
+pub struct GrillTurn {
     /// Its place in the interview, from 1.
     pub seq: i32,
     /// What it is.
-    pub kind: TurnKind,
+    pub kind: GrillTurnKind,
     /// The question, the answer, or `skipped` / `done` for a note.
     pub text: String,
     /// A question that pushes back on a vague answer or asks about a
@@ -131,16 +131,16 @@ fn status_of(started: bool, covered: u8) -> GrillStatus {
 
 /// How well one area is covered.
 #[derive(Debug, Clone, Copy, Serialize, ToSchema)]
-pub struct AreaCoverage {
+pub struct GrillAreaCoverage {
     /// The area.
     pub area: Area,
     /// How well.
-    pub level: Level,
+    pub level: CoverageLevel,
 }
 
 /// The question waiting for an answer.
 #[derive(Debug, Clone, Serialize, ToSchema)]
-pub struct OpenQuestion {
+pub struct GrillQuestion {
     /// The question.
     pub text: String,
     /// What it is about.
@@ -152,7 +152,7 @@ pub struct OpenQuestion {
 /// Where a fact taken from an answer is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum ProposalStatus {
+pub enum FactProposalStatus {
     /// Waiting for Keep, Fix or Drop.
     Ready,
     /// Kept: it is on the position in the profile.
@@ -161,7 +161,7 @@ pub enum ProposalStatus {
     Dropped,
 }
 
-impl ProposalStatus {
+impl FactProposalStatus {
     fn parse(raw: &str) -> Option<Self> {
         match raw {
             "ready" => Some(Self::Ready),
@@ -174,7 +174,7 @@ impl ProposalStatus {
 
 /// A fact taken from an answer.
 #[derive(Debug, Clone, Serialize, ToSchema)]
-pub struct ProposalView {
+pub struct FactProposal {
     /// Its id.
     pub id: Uuid,
     /// The fact (as the person fixed it, once kept).
@@ -186,14 +186,14 @@ pub struct ProposalView {
     /// The answer it was taken from.
     pub turn_seq: i32,
     /// Waiting, kept or dropped.
-    pub status: ProposalStatus,
+    pub status: FactProposalStatus,
     /// When it is deleted if nobody keeps it.
     pub expires_at: DateTime<Utc>,
 }
 
 /// The position an interview is about.
 #[derive(Debug, Clone, Serialize, ToSchema)]
-pub struct RoleSummary {
+pub struct GrillRole {
     /// Its title.
     pub position: Option<String>,
     /// Its company.
@@ -204,8 +204,8 @@ pub struct RoleSummary {
     pub end_date: Option<String>,
 }
 
-fn role_summary(work: &Work) -> RoleSummary {
-    RoleSummary {
+fn role_summary(work: &Work) -> GrillRole {
+    GrillRole {
         position: work.position.clone(),
         company: work.name.clone(),
         start_date: work.start_date.clone(),
@@ -219,21 +219,21 @@ pub struct GrillView {
     /// The position's place in the profile's `work` list.
     pub position: u32,
     /// The position.
-    pub role: RoleSummary,
+    pub role: GrillRole,
     /// Where the interview is.
     pub status: GrillStatus,
     /// The seven areas, in order.
-    pub coverage: Vec<AreaCoverage>,
+    pub coverage: Vec<GrillAreaCoverage>,
     /// Areas at `ok`, of 7.
     pub covered: u8,
     /// The conversation so far.
-    pub turns: Vec<Turn>,
+    pub turns: Vec<GrillTurn>,
     /// The question waiting for an answer; none when there is none (before
     /// the start, after "done", or when everything is covered).
-    pub question: Option<OpenQuestion>,
+    pub question: Option<GrillQuestion>,
     /// Facts taken from answers in the last 24 hours, whether they wait for
     /// Keep, Fix or Drop, were kept or were dropped.
-    pub proposals: Vec<ProposalView>,
+    pub proposals: Vec<FactProposal>,
     /// Facts the person has kept on this position, in all.
     pub kept: u32,
     /// Model calls made today by this account, of `daily_cap`.
@@ -244,11 +244,11 @@ pub struct GrillView {
 
 /// One position in the list.
 #[derive(Debug, Clone, Serialize, ToSchema)]
-pub struct RoleItem {
+pub struct GrillRoleItem {
     /// The position's place in the profile's `work` list.
     pub position: u32,
     /// The position.
-    pub role: RoleSummary,
+    pub role: GrillRole,
     /// Where its interview is.
     pub status: GrillStatus,
     /// Areas at `ok`, of 7.
@@ -261,7 +261,7 @@ pub struct RoleItem {
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct GrillList {
     /// The positions, in the profile's order.
-    pub roles: Vec<RoleItem>,
+    pub roles: Vec<GrillRoleItem>,
     /// Model calls made today by this account, of `daily_cap`.
     pub calls_today: u32,
     /// The most model calls an account can make for Grill me in a UTC day.
@@ -278,14 +278,14 @@ pub struct LanguageQuery {
 
 /// The person's answer.
 #[derive(Debug, Clone, Deserialize, ToSchema)]
-pub struct AnswerRequest {
+pub struct GrillAnswerRequest {
     /// In their own words, 1 to 2000 characters.
     pub text: String,
 }
 
 /// What the person keeps.
 #[derive(Debug, Clone, Default, Deserialize, ToSchema)]
-pub struct KeepRequest {
+pub struct KeepFactRequest {
     /// The fact, fixed. Left out, the fact is kept as it is. Whatever is
     /// written must still be said by the quote or the profile; the quote
     /// itself never changes.
@@ -347,7 +347,7 @@ async fn session_for(
         .filter(|s| s.role_key == role_key(work)))
 }
 
-async fn turns_of(db: &PgPool, session: Uuid) -> Result<Vec<Turn>> {
+async fn turns_of(db: &PgPool, session: Uuid) -> Result<Vec<GrillTurn>> {
     // The last turns, in order.
     let rows = sqlx::query(
         "SELECT seq, kind, text, push, area, dropped FROM (
@@ -363,9 +363,9 @@ async fn turns_of(db: &PgPool, session: Uuid) -> Result<Vec<Turn>> {
         .map(|row| {
             let kind: String = row.try_get("kind")?;
             let area: Option<String> = row.try_get("area")?;
-            Ok(Turn {
+            Ok(GrillTurn {
                 seq: row.try_get("seq")?,
-                kind: TurnKind::parse(&kind)
+                kind: GrillTurnKind::parse(&kind)
                     .ok_or_else(|| Error::internal("an unknown turn kind"))?,
                 text: row.try_get("text")?,
                 push: row.try_get("push")?,
@@ -376,7 +376,7 @@ async fn turns_of(db: &PgPool, session: Uuid) -> Result<Vec<Turn>> {
         .collect()
 }
 
-async fn proposals_of(db: &PgPool, session: Uuid, now: DateTime<Utc>) -> Result<Vec<ProposalView>> {
+async fn proposals_of(db: &PgPool, session: Uuid, now: DateTime<Utc>) -> Result<Vec<FactProposal>> {
     let rows = sqlx::query(
         "SELECT id, text, quote, area, turn_seq, status, expires_at FROM profile.grill_proposals
           WHERE session_id = $1 AND expires_at > $2
@@ -390,13 +390,13 @@ async fn proposals_of(db: &PgPool, session: Uuid, now: DateTime<Utc>) -> Result<
         .map(|row| {
             let area: String = row.try_get("area")?;
             let status: String = row.try_get("status")?;
-            Ok(ProposalView {
+            Ok(FactProposal {
                 id: row.try_get("id")?,
                 text: row.try_get("text")?,
                 quote: row.try_get("quote")?,
                 area: Area::parse(&area).ok_or_else(|| Error::internal("an unknown fact area"))?,
                 turn_seq: row.try_get("turn_seq")?,
-                status: ProposalStatus::parse(&status)
+                status: FactProposalStatus::parse(&status)
                     .ok_or_else(|| Error::internal("an unknown fact status"))?,
                 expires_at: row.try_get("expires_at")?,
             })
@@ -432,10 +432,10 @@ fn counted(n: i64) -> u32 {
     u32::try_from(n).unwrap_or(u32::MAX)
 }
 
-fn coverage_view(coverage: &Coverage) -> Vec<AreaCoverage> {
+fn coverage_view(coverage: &Coverage) -> Vec<GrillAreaCoverage> {
     Area::ALL
         .iter()
-        .map(|area| AreaCoverage {
+        .map(|area| GrillAreaCoverage {
             area: *area,
             level: coverage.level(*area),
         })
@@ -443,11 +443,11 @@ fn coverage_view(coverage: &Coverage) -> Vec<AreaCoverage> {
 }
 
 /// The open question: the last turn, when it is a question.
-fn open_question(turns: &[Turn]) -> Option<OpenQuestion> {
+fn open_question(turns: &[GrillTurn]) -> Option<GrillQuestion> {
     turns
         .last()
-        .filter(|t| t.kind == TurnKind::Question)
-        .map(|t| OpenQuestion {
+        .filter(|t| t.kind == GrillTurnKind::Question)
+        .map(|t| GrillQuestion {
             text: t.text.clone(),
             area: t.area,
             push: t.push,
@@ -548,16 +548,16 @@ async fn ask(
 }
 
 /// The facts still waiting for the person, as the model is shown them.
-fn ready_texts(proposals: &[ProposalView]) -> Vec<(Area, String)> {
+fn ready_texts(proposals: &[FactProposal]) -> Vec<(Area, String)> {
     proposals
         .iter()
-        .filter(|p| p.status == ProposalStatus::Ready)
+        .filter(|p| p.status == FactProposalStatus::Ready)
         .map(|p| (p.area, p.text.clone()))
         .collect()
 }
 
 /// Facts kept, waiting or dropped, squashed: not proposed again.
-fn known_facts(work: &Work, waiting: &[ProposalView]) -> Vec<String> {
+fn known_facts(work: &Work, waiting: &[FactProposal]) -> Vec<String> {
     work.facts
         .iter()
         .map(|f| squash(&f.text))
@@ -566,7 +566,7 @@ fn known_facts(work: &Work, waiting: &[ProposalView]) -> Vec<String> {
 }
 
 /// What `turns` last said: its last sequence number.
-fn last_seq(turns: &[Turn]) -> i32 {
+fn last_seq(turns: &[GrillTurn]) -> i32 {
     turns.last().map_or(0, |t| t.seq)
 }
 
@@ -576,7 +576,7 @@ async fn insert_turn(
     account: Uuid,
     session: Uuid,
     seq: i32,
-    kind: TurnKind,
+    kind: GrillTurnKind,
     text: &str,
     push: bool,
     area: Option<Area>,
@@ -727,7 +727,7 @@ pub async fn list(
             let (covered, started) = session.map_or((0, false), |(_, coverage, turns)| {
                 (coverage.ok_count(), turns > 0)
             });
-            Ok(RoleItem {
+            Ok(GrillRoleItem {
                 position: u32::try_from(index).map_err(Error::internal)?,
                 role: role_summary(work),
                 status: status_of(started, covered),
@@ -914,7 +914,7 @@ pub async fn start(
         account,
         session_id,
         seq + 1,
-        TurnKind::Question,
+        GrillTurnKind::Question,
         &next.question,
         next.push,
         Some(next.area),
@@ -944,7 +944,7 @@ pub async fn start(
     security(("session" = [])),
     params(("position" = u32, Path, description = "The position's place in the profile's `work` list."),
         LanguageQuery),
-    request_body = AnswerRequest,
+    request_body = GrillAnswerRequest,
     responses(
         (status = 200, description = "The interview, after the answer.", body = GrillView),
         (status = 400, description = "`invalid_answer`", body = Problem,
@@ -968,9 +968,9 @@ pub async fn answer(
     Extension(ai): Extension<Ai>,
     Path(position): Path<u32>,
     Query(query): Query<LanguageQuery>,
-    body: std::result::Result<Json<AnswerRequest>, JsonRejection>,
+    body: std::result::Result<Json<GrillAnswerRequest>, JsonRejection>,
 ) -> Result<Json<GrillView>> {
-    let Json(AnswerRequest { text }) =
+    let Json(GrillAnswerRequest { text }) =
         body.map_err(|rejection| Error::BadRequest("invalid_answer", rejection.body_text()))?;
     let text = text.trim().to_owned();
     if text.is_empty() || text.chars().count() > MAX_ANSWER {
@@ -1038,7 +1038,7 @@ pub async fn answer(
         account,
         session.id,
         seq + 1,
-        TurnKind::Answer,
+        GrillTurnKind::Answer,
         &text,
         false,
         asked.area,
@@ -1069,7 +1069,7 @@ pub async fn answer(
             account,
             session.id,
             seq + 2,
-            TurnKind::Question,
+            GrillTurnKind::Question,
             &next.question,
             next.push,
             Some(next.area),
@@ -1199,7 +1199,7 @@ pub async fn skip(
         account,
         session.id,
         seq + 1,
-        TurnKind::Note,
+        GrillTurnKind::Note,
         "skipped",
         false,
         asked.area,
@@ -1220,7 +1220,7 @@ pub async fn skip(
             account,
             session.id,
             seq + 2,
-            TurnKind::Question,
+            GrillTurnKind::Question,
             &next.question,
             next.push,
             Some(next.area),
@@ -1278,7 +1278,7 @@ pub async fn done(
             account,
             session.id,
             seq + 1,
-            TurnKind::Note,
+            GrillTurnKind::Note,
             "done",
             false,
             None,
@@ -1401,7 +1401,7 @@ async fn keep_proposals(
             None => proposal.text.clone(),
         };
         if !work.facts.iter().any(|f| squash(&f.text) == squash(&text)) {
-            work.facts.push(Fact {
+            work.facts.push(ProfileFact {
                 id: proposal.id.to_string(),
                 text,
                 quote: proposal.quote.clone(),
@@ -1442,7 +1442,7 @@ async fn keep_proposals(
     operation_id = "profile.grill_keep",
     security(("session" = [])),
     params(("id" = Uuid, Path, description = "The fact waiting.")),
-    request_body = KeepRequest,
+    request_body = KeepFactRequest,
     responses(
         (status = 200, description = "The interview, after the fact was kept.", body = GrillView),
         (status = 400, description = "`invalid_fact`; `fact_not_supported`", body = Problem,
@@ -1459,7 +1459,7 @@ pub async fn keep_proposal(
     State(state): State<AppState>,
     SignedIn(principal): SignedIn,
     Path(id): Path<Uuid>,
-    body: std::result::Result<Json<KeepRequest>, JsonRejection>,
+    body: std::result::Result<Json<KeepFactRequest>, JsonRejection>,
 ) -> Result<Json<GrillView>> {
     let Json(keep) =
         body.map_err(|rejection| Error::BadRequest("invalid_fact", rejection.body_text()))?;

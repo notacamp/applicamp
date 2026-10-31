@@ -517,8 +517,8 @@ async fn facts_the_person_waited_too_long_to_keep_are_gone_and_cannot_be_kept(db
 #[test]
 fn coverage_is_stored_as_a_plain_object_of_areas() {
     let mut coverage = Coverage::default();
-    coverage.raise(Area::YourPart, super::judge::Level::Ok);
-    coverage.raise(Area::Results, super::judge::Level::Part);
+    coverage.raise(Area::YourPart, super::judge::CoverageLevel::Ok);
+    coverage.raise(Area::Results, super::judge::CoverageLevel::Part);
     let json = serde_json::to_value(&coverage).unwrap();
     assert_eq!(json, json!({ "your_part": "ok", "results": "part" }));
     let back: Coverage = serde_json::from_value(json).unwrap();

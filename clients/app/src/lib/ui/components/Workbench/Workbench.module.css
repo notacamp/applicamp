@@ -1,0 +1,45 @@
+.workbench {
+  display: grid;
+  grid-template-columns: 13.75rem minmax(0, 1fr) 16.25rem;
+  grid-template-areas: "nav main aside";
+  gap: var(--space-6);
+  align-items: start;
+  min-width: 0;
+}
+
+.workbench[data-aside="none"] {
+  grid-template-columns: 13.75rem minmax(0, 1fr);
+  grid-template-areas: "nav main";
+}
+
+.nav {
+  grid-area: nav;
+  min-width: 0;
+}
+
+.main {
+  grid-area: main;
+  min-width: 0;
+}
+
+.aside {
+  grid-area: aside;
+  min-width: 0;
+}
+
+@media (width <= 980px) {
+  .workbench,
+  .workbench[data-aside="none"] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "nav"
+      "aside"
+      "main";
+  }
+
+  .workbench[data-aside="none"] {
+    grid-template-areas:
+      "nav"
+      "main";
+  }
+}

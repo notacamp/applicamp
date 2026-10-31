@@ -5,7 +5,7 @@ import { problemCode } from "~/lib/api";
 import { Banner, Button, Cluster, Label, Page, Section, Stack, Tagged, Text } from "~/lib/ui";
 
 import { useBrief, type AnswerResult, type Brief } from "../../api/brief";
-import { formatCost, formatLimit } from "../../api/labels";
+import { formatCost } from "../../api/labels";
 import { useOpportunity } from "../../api/opportunities";
 import { titleOf } from "../PipelinePage/OpportunityViews";
 import { CompanyFacts } from "./CompanyFacts";
@@ -191,7 +191,7 @@ function PrepareBody({
         </Tagged>
         <Tagged testId="prepare-spend">
           <Text tone="secondary" size="sm">
-            {spendLine(brief, language, t)}
+            {spendLine(brief, t)}
           </Text>
         </Tagged>
         {spend}
@@ -200,16 +200,7 @@ function PrepareBody({
   );
 }
 
-function spendLine(
-  brief: Brief,
-  language: string,
-  t: ReturnType<typeof useTranslation<"pipeline">>["t"],
-): string {
-  const { spend } = brief;
-  const spent = formatCost(spend.month_eur, language);
-  const month =
-    spend.month_limit_eur === undefined || spend.month_limit_eur === null
-      ? t("prepare.spend.monthNoLimit", { spent })
-      : t("prepare.spend.month", { spent, limit: formatLimit(spend.month_limit_eur, language) });
-  return `${month} ${t("prepare.spend.reads", { n: spend.reads_today, cap: spend.reads_cap })}`;
+function spendLine(brief: Brief, t: ReturnType<typeof useTranslation<"pipeline">>["t"]): string {
+  // The month's spend is the shared spend line beside it; this says only the reads.
+  return t("prepare.spend.reads", { n: brief.spend.reads_today, cap: brief.spend.reads_cap });
 }

@@ -101,9 +101,7 @@ describe("Prepare: company and job", () => {
     expect(screen.getByTestId("prepare-site")).toHaveTextContent("example.com");
     expect(screen.getByTestId("prepare-wants-pending")).toBeVisible();
     expect(screen.getByTestId("prepare-draft-slot")).toBeVisible();
-    expect(screen.getByTestId("prepare-spend")).toHaveTextContent(
-      "AI this month: €0.42 of €5. Company reads today: 1 of 20.",
-    );
+    expect(screen.getByTestId("prepare-spend")).toHaveTextContent("Company reads today: 1 of 20.");
     expect(requests.map((r) => r.route)).not.toContain(
       `POST /api/v1/opportunities/${ID}/brief/read`,
     );

@@ -210,8 +210,6 @@
     },
     "costLine": "Reading a company: one AI call, about {{read}}, reused for 30 days. Comparing the job: one call, about {{analysis}}. Each answer: one small call, about {{answer}}. Nothing runs in the background.",
     "spend": {
-      "month": "AI this month: {{spent}} of {{limit}}.",
-      "monthNoLimit": "AI this month: {{spent}}.",
       "reads": "Company reads today: {{n}} of {{cap}}."
     },
     "errors": {

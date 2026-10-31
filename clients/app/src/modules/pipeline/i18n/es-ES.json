@@ -210,8 +210,6 @@
     },
     "costLine": "Leer una empresa: una llamada a la IA, unos {{read}}, reutilizada durante 30 días. Comparar la oferta: una llamada, unos {{analysis}}. Cada respuesta: una llamada pequeña, unos {{answer}}. Nada se ejecuta en segundo plano.",
     "spend": {
-      "month": "IA este mes: {{spent}} de {{limit}}.",
-      "monthNoLimit": "IA este mes: {{spent}}.",
       "reads": "Empresas leídas hoy: {{n}} de {{cap}}."
     },
     "errors": {

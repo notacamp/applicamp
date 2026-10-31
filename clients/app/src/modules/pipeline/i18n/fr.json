@@ -210,8 +210,6 @@
     },
     "costLine": "Lire une entreprise : un appel à l’IA, environ {{read}}, réutilisé pendant 30 jours. Comparer le poste : un appel, environ {{analysis}}. Chaque réponse : un petit appel, environ {{answer}}. Rien ne tourne en arrière-plan.",
     "spend": {
-      "month": "IA ce mois-ci : {{spent}} sur {{limit}}.",
-      "monthNoLimit": "IA ce mois-ci : {{spent}}.",
       "reads": "Entreprises lues aujourd’hui : {{n}} sur {{cap}}."
     },
     "errors": {

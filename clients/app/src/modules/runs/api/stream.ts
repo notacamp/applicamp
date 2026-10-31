@@ -62,7 +62,7 @@ export function useRunEvents(id: string): RunEvents {
     const onEnd = (message: MessageEvent<string>) => {
       source.close();
       setState("ended");
-      settleRun(queryClient, JSON.parse(message.data) as Run);
+      void settleRun(queryClient, JSON.parse(message.data) as Run);
     };
     const onError = () => {
       // CLOSED: the server answered with an error, and the browser gave up.

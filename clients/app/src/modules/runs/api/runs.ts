@@ -56,7 +56,7 @@ export function runQuery(id: string) {
 
 /** The run `id`, starting from what the list already says about it. */
 export function useRun(id: string, initial: Run | undefined) {
-  return useQuery({ ...runQuery(id), placeholderData: initial });
+  return useQuery({ ...runQuery(id), placeholderData: () => initial });
 }
 
 /** Starts a check (`POST /api/v1/runs` with `runs.probe`); the list then holds it. */
@@ -97,10 +97,14 @@ export function useStopRun() {
   });
 }
 
-/** A run has ended: what the live view ended with is the run as it is now. */
-export function settleRun(queryClient: QueryClient, run: Run) {
+/**
+ * A run has ended: what the live view ended with is the run as it is now
+ * (an older answer still on its way is dropped).
+ */
+export async function settleRun(queryClient: QueryClient, run: Run): Promise<void> {
+  await queryClient.cancelQueries({ queryKey: runKey(run.id) });
   queryClient.setQueryData(runKey(run.id), run);
-  void queryClient.invalidateQueries({ queryKey: LIST_KEY });
+  await queryClient.invalidateQueries({ queryKey: LIST_KEY });
 }
 
 /** The problems starting a check can answer with, each with its own message. */

@@ -83,13 +83,14 @@ impl Composition {
             .then(|| gateway.clone());
         let sources = applicamp_sources::SourcesDeps::new(
             sources,
-            Some(gateway),
+            Some(gateway.clone()),
             std::sync::Arc::new(wiring::SourcesWiring),
         )?;
         let pipeline = applicamp_pipeline::PipelineDeps {
             neighbours: Some(std::sync::Arc::new(wiring::PipelineWiring {
                 sources: sources.clone(),
             })),
+            ai: Some(gateway),
         };
         Ok(Self {
             profile: applicamp_profile::ProfileDeps { ai: profile_ai },
@@ -107,6 +108,7 @@ impl Composition {
             neighbours: Some(std::sync::Arc::new(wiring::PipelineWiring {
                 sources: self.sources.clone(),
             })),
+            ai: self.pipeline.ai.clone(),
         };
         self
     }

@@ -20,13 +20,15 @@ export interface PipelineProps {
   run: "search" | "add" | undefined;
   /** Change the address's search (replacing the entry). */
   onSearch: (next: PipelineSearchParams) => void;
+  /** Open the Prepare page of an opportunity (its peek's Tailored CV block). */
+  onPrepare: (id: string) => void;
 }
 
 /**
  * `/pipeline`: every opportunity, from first match to offer, with Search now
  * and its progress (the sources module) beside them.
  */
-export function Pipeline({ newOnly, run, onSearch }: PipelineProps) {
+export function Pipeline({ newOnly, run, onSearch, onPrepare }: PipelineProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const keep = newOnly ? { new: true } : {};
@@ -37,6 +39,7 @@ export function Pipeline({ newOnly, run, onSearch }: PipelineProps) {
         onNewOnly={(only) => {
           onSearch(only ? { new: true } : {});
         }}
+        onPrepare={onPrepare}
         adding={run === "add"}
         onAdding={(open) => {
           onSearch(open ? { ...keep, run: "add" } : keep);

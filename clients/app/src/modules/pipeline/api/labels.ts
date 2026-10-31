@@ -97,3 +97,28 @@ export function factsText(facts: JobFacts, locale: string, t: TFunction<"pipelin
   }
   return parts.join(" · ");
 }
+
+/**
+ * What an AI step costs, about, in euros: "€0.004" (a tenth of a cent is
+ * shown; a few cents are shown as cents).
+ */
+export function formatCost(value: number, locale: string): string {
+  const small = value > 0 && value < 0.01;
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: small ? 3 : 2,
+    maximumFractionDigits: small ? 4 : 2,
+  }).format(value);
+}
+
+/** A limit in euros: whole euros without cents ("€3"), else with them ("€0.30"). */
+export function formatLimit(value: number, locale: string): string {
+  const whole = Number.isInteger(value);
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: whole ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}

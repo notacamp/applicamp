@@ -49,6 +49,9 @@ services:
           - keyed-board.test
           - feed-site-desktop.test
           - feed-site-phone.test
+          # A company's own site (#34): a posting pasted at
+          # http://example-co.test:9020/jobs/staff-engineer.
+          - example-co.test
     environment:
       FAKE_JOBS_HOST: 0.0.0.0
       FAKE_JOBS_PORT: "9020"

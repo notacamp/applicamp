@@ -30,6 +30,15 @@
 //                         feed: the check proposes a config (one per
 //                         Playwright project, desktop and phone).
 //
+// The company and job facts of a tailored CV (#34): example-co.test is a
+// company's own site (an alias of this fake on the e2e network, so a pasted
+// posting at http://example-co.test:9020/jobs/staff-engineer is a link to a
+// site that is not a job board). Its robots.txt forbids /private, which the
+// home page links to anyway and which must never be read; the model reads the
+// pages it is shown and answers with facts quoting them (plus one whose quote
+// is on no page, which the server drops), then with what the posting wants
+// and up to three questions; an answer about a job becomes facts quoting it.
+//
 // Every list answers with four new jobs (new ids each time); a board keeps to
 // its polling interval, so a search within it reads the last answer. The
 // fourth is remote only from Germany or Austria, in the words of the posting
@@ -373,6 +382,18 @@ async function complete(request: IncomingMessage, response: ServerResponse) {
       json(response, 200, completion(interview(user?.content ?? "")));
       return;
     }
+    if (system.startsWith("You read pages from a company")) {
+      json(response, 200, completion(companyFacts(user?.content ?? "")));
+      return;
+    }
+    if (system.startsWith("You compare a job posting")) {
+      json(response, 200, completion(jobAnalysis(user?.content ?? "")));
+      return;
+    }
+    if (system.startsWith("You read a person's answer to one question about a job")) {
+      json(response, 200, completion(jobAnswer(user?.content ?? "")));
+      return;
+    }
     if (system.startsWith("You turn a person's answer")) {
       json(response, 200, completion(draftOf(system, user?.content ?? "")));
       return;
@@ -490,10 +511,172 @@ function waitingBoard(site: string, url: URL, response: ServerResponse): boolean
   return false;
 }
 
+/** The company's own site (#34): invented, at its own host name. */
+const COMPANY_HOST = "example-co.test";
+
+const COMPANY_PAGES: Record<string, string> = {
+  "/": `<html><head><title>Example Co</title></head><body><h1>Example Co</h1>
+    <p>Example Co builds invented ledgers for small shops.</p>
+    <nav><a href="/about">About us</a> <a href="/customers">Customers</a>
+    <a href="/blog/hotwire">Engineering blog</a> <a href="/contact">Contact</a>
+    <a href="/private/roadmap">Customers roadmap</a>
+    <a href="http://elsewhere.test/about">About them</a></nav></body></html>`,
+  "/about": `<html><body><h1>About us</h1><p>Founded in an invented year. We are 40 people in Porto.</p></body></html>`,
+  "/customers": `<html><body><h1>Customers</h1><p>Our customers are small shops and cafés in Portugal and Spain.</p></body></html>`,
+  "/blog/hotwire": `<html><body><h1>Why we left React</h1><p>In March 2026 we started moving our dashboard from React to Hotwire.</p></body></html>`,
+  "/contact": `<html><body><p>Write to hello at example-co dot test.</p></body></html>`,
+  // Forbidden by robots.txt: the server must never ask for it.
+  "/private/roadmap": `<html><body><p>SECRET ROADMAP: never read.</p></body></html>`,
+};
+
+/**
+ * The posting (`/jobs/staff-engineer`): it asks for a skill in production,
+ * Hotwire unless `?skill=` names another (a test that puts a skill away asks
+ * for one of its own, so the next run still has its question).
+ */
+function posting(skill: string): string {
+  return `<html><body><h1>Staff Engineer</h1>
+    <p>You will own billing at Example Co.</p>
+    <ul><li>5+ years of Rails required</li><li>${skill} in production</li><li>Kafka is a plus</li></ul></body></html>`;
+}
+
+/** The company's site, by its host name; whether it answered. */
+function companySite(url: URL, response: ServerResponse): boolean {
+  if (url.pathname === "/jobs/staff-engineer") {
+    const skill = (url.searchParams.get("skill") ?? "Hotwire").replaceAll(/[^\w-]/g, "");
+    text(response, "text/html", posting(skill === "" ? "Hotwire" : skill));
+    return true;
+  }
+  if (url.pathname === "/robots.txt") {
+    text(response, "text/plain", "User-agent: *\nDisallow: /private\n");
+    return true;
+  }
+  const page = COMPANY_PAGES[url.pathname];
+  if (page === undefined) {
+    return false;
+  }
+  if (url.pathname.startsWith("/private")) {
+    console.log("fake-jobs: a page robots.txt forbids was asked for!");
+  }
+  text(response, "text/html", page);
+  return true;
+}
+
+/** The `<page url="…">` blocks of the company prompt's user message. */
+function pagesOf(content: string): { url: string; text: string }[] {
+  return [...content.matchAll(/<page url="([^"]*)">\n([\s\S]*?)\n<\/page>/g)].map((match) => ({
+    url: match[1] ?? "",
+    text: match[2] ?? "",
+  }));
+}
+
+/** What the fake company reader finds on a page, as `[fact, words on the page]`. */
+const COMPANY_FACTS: readonly [string, string][] = [
+  ["Builds ledgers for small shops", "builds invented ledgers for small shops"],
+  ["Has about 40 people, in Porto", "We are 40 people in Porto"],
+  [
+    "Sells to small shops and cafés in Portugal and Spain",
+    "small shops and cafés in Portugal and Spain",
+  ],
+  ["Is moving its dashboard from React to Hotwire", "moving our dashboard from React to Hotwire"],
+];
+
+/**
+ * The company reader (system prompt "You read pages from a company's own
+ * website…"): a fact for each known sentence the pages hold, quoted from the
+ * page it is on, plus one whose quote is on no page, which the server drops.
+ */
+function companyFacts(userContent: string) {
+  const pages = pagesOf(userContent);
+  const facts = COMPANY_FACTS.flatMap(([fact, quote]) => {
+    const page = pages.find((candidate) => candidate.text.includes(quote));
+    return page === undefined ? [] : [{ text: fact, quote, url: page.url }];
+  });
+  const about = pages.find((page) => page.url.endsWith("/about"));
+  return {
+    facts:
+      about === undefined
+        ? facts
+        : [...facts, { text: "Has 900 employees", quote: "We are 900 people", url: about.url }],
+  };
+}
+
+/**
+ * The job reader (system prompt "You compare a job posting…"): what the
+ * posting asks for, quoting it, and up to three questions: the Hotwire one
+ * (a skill, on the first position), one about owning billing (no position
+ * named) and a Kafka one (no skill, no position).
+ */
+function jobAnalysis(userContent: string) {
+  const posting = between(userContent, "posting");
+  const profile = parsedBetween<{ positions?: { index: number }[] }>(userContent, "profile", {});
+  const first = profile.positions?.[0]?.index ?? null;
+  const skill = /([\w-]+) in production/.exec(posting)?.[1] ?? "Hotwire";
+  const dismissed = parsedBetween<string[]>(userContent, "dismissed", []);
+  const wants = (
+    [
+      ["Rails", "5+ years of Rails required", "must"],
+      [`${skill} in production`, `${skill} in production`, "must"],
+      ["Kafka", "Kafka is a plus", "nice"],
+    ] as const
+  )
+    .filter(([, quote]) => posting.includes(quote))
+    .map(([label, quote, level]) => ({ label, quote, level }));
+  const questions = [
+    {
+      question: `They are moving from React to Hotwire (their blog). Have you worked with ${skill}?`,
+      about: first,
+      skill,
+    },
+    {
+      question: "The posting says you will own billing. What did you own at your last job?",
+      about: null,
+      skill: null,
+    },
+    {
+      question: "Kafka is a plus for this job. Have you run it in production?",
+      about: null,
+      skill: null,
+    },
+  ].filter(
+    (question) =>
+      (question.skill === null || !dismissed.includes(question.skill.toLowerCase())) &&
+      (wants.length > 0 || question.skill === null),
+  );
+  return { wants, questions };
+}
+
+/**
+ * An answer about a job (system prompt "You read a person's answer to one
+ * question about a job opening…"): up to three facts quoted from the answer,
+ * plus one whose quote the answer never says, which the server drops.
+ */
+function jobAnswer(userContent: string) {
+  const answer = between(userContent, "answer");
+  const quotes = answer
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.replace(/[.!?]+$/, "").trim())
+    .filter((sentence) => sentence !== "")
+    .slice(0, 3);
+  return {
+    facts: [
+      ...quotes.map((quote) => ({ text: quote, quote, area: "your_part" })),
+      {
+        text: "Saved the company 30% of its costs",
+        quote: "we saved 30% of costs",
+        area: "results",
+      },
+    ],
+  };
+}
+
 const server = createServer((request, response) => {
   const url = new URL(request.url ?? "/", `http://${host}:${String(port)}`);
   const method = request.method ?? "GET";
   const site = (request.headers.host ?? "").split(":", 1)[0] ?? "";
+  if (method === "GET" && site === COMPANY_HOST && companySite(url, response)) {
+    return;
+  }
   if (method === "GET" && site.endsWith(".test") && waitingBoard(site, url, response)) {
     return;
   }

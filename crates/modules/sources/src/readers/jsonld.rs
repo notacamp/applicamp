@@ -35,6 +35,7 @@ pub fn fields() -> Fields {
         company: Some("/hiringOrganization/name".into()),
         url: Some("/url".into()),
         apply_url: Some("/url".into()),
+        company_url: Some("/hiringOrganization/sameAs".into()),
         location: Some("/jobLocation/address/addressLocality".into()),
         regions: Some("/applicantLocationRequirements".into()),
         description: Some("/description".into()),

@@ -172,6 +172,7 @@ dependencies = [
 name = "applicamp-pipeline"
 version = "0.0.0"
 dependencies = [
+ "applicamp-ai",
  "applicamp-kernel",
  "axum",
  "chrono",
@@ -186,6 +187,7 @@ dependencies = [
  "utoipa",
  "utoipa-axum",
  "uuid",
+ "wiremock",
 ]
 
 [[package]]

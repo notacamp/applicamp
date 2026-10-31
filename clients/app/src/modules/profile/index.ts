@@ -27,3 +27,4 @@ export {
   type StrengthNudgeProps,
 } from "./components/StrengthNudge/StrengthNudge";
 export { GrillPage, type GrillPageProps } from "./components/Grill/GrillPage";
+export { JobAnswerFacts, type JobAnswerFactsProps } from "./components/Grill/JobAnswerFacts";

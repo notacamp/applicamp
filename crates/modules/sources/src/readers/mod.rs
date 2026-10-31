@@ -60,6 +60,8 @@ pub const MAX_BOARD_BODY: usize = 4 * 1024 * 1024;
 pub const MAX_PAGE: usize = 1024 * 1024;
 /// How long one request may take.
 pub const TIMEOUT: Duration = Duration::from_secs(10);
+/// Most redirects [`Reader::page`] follows.
+const MAX_HOPS: usize = 3;
 /// How Applicamp introduces itself to every board.
 pub const USER_AGENT: &str = concat!(
     "applicamp/",
@@ -231,6 +233,46 @@ impl Fetched {
         self.read += other.read;
         self.failed += other.failed;
     }
+}
+
+/// A page read by [`Reader::page`].
+#[derive(Debug, Clone)]
+pub struct Page {
+    /// Where it was read, after any redirect inside the site.
+    pub url: Url,
+    /// Its bytes, at most the cap asked.
+    pub body: Vec<u8>,
+    /// Its media type, when it said.
+    pub content_type: Option<String>,
+}
+
+/// A site's host without a leading `www.`, lower case.
+pub fn site_host(url: &Url) -> Option<String> {
+    let host = url.host_str()?.trim_end_matches('.').to_ascii_lowercase();
+    Some(host.strip_prefix("www.").map(str::to_owned).unwrap_or(host))
+}
+
+/// Whether `a` and `b` are on one site: the same host (`www.` aside) and
+/// port.
+pub fn same_site(a: &Url, b: &Url) -> bool {
+    site_host(a).is_some() && site_host(a) == site_host(b) && a.port() == b.port()
+}
+
+/// The first `max` bytes of `response`'s body: a longer page is cut, not
+/// refused.
+async fn read_truncated(
+    response: &mut reqwest::Response,
+    max: usize,
+) -> Result<Vec<u8>, FetchError> {
+    let mut body = Vec::new();
+    while body.len() < max {
+        let Some(chunk) = response.chunk().await.map_err(|_| FetchError::Transport)? else {
+            break;
+        };
+        let room = max - body.len();
+        body.extend_from_slice(&chunk[..chunk.len().min(room)]);
+    }
+    Ok(body)
 }
 
 /// Reads the boards. Cheap to clone.
@@ -498,6 +540,88 @@ impl Reader {
             )
             .await?
             .map(|got| got.body))
+    }
+
+    /// One web page of a company's own site (or the posting), for the facts
+    /// a tailored CV is built on: a public https address only (unless
+    /// allowed), never from the cache, at most `max` bytes, [`TIMEOUT`] per
+    /// request, a second apart on one host. A redirect is followed (three
+    /// hops at most) only inside the same site (`www.` or not), and every
+    /// hop goes through the same address check. `Ok(None)` on a 404; a
+    /// page that is not text or HTML is [`FetchError::Unexpected`].
+    pub async fn page(&self, url: &Url, max: usize) -> Result<Option<Page>, FetchError> {
+        let allow_private = self.inner.config.allow_private_hosts();
+        let spacing = if allow_private {
+            Duration::ZERO
+        } else {
+            Duration::from_secs(1)
+        };
+        let mut at = url.clone();
+        for _ in 0..=MAX_HOPS {
+            net::check(&at, allow_private).map_err(|_| FetchError::Refused)?;
+            self.wait_turn(at.host_str().unwrap_or_default(), spacing)
+                .await;
+            let mut response = self
+                .inner
+                .boards_http
+                .get(at.clone())
+                .header(
+                    reqwest::header::ACCEPT,
+                    "text/html, application/xhtml+xml, text/plain;q=0.9",
+                )
+                .send()
+                .await
+                .map_err(|_| FetchError::Transport)?;
+            let status = response.status();
+            if status.is_redirection() {
+                let next = response
+                    .headers()
+                    .get(reqwest::header::LOCATION)
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(|v| at.join(v).ok())
+                    .ok_or_else(|| FetchError::Status(status.as_u16()))?;
+                if !same_site(&at, &next) {
+                    return Err(FetchError::Refused);
+                }
+                at = next;
+                continue;
+            }
+            if status == reqwest::StatusCode::NOT_FOUND {
+                return Ok(None);
+            }
+            if status == reqwest::StatusCode::TOO_MANY_REQUESTS
+                || status == reqwest::StatusCode::SERVICE_UNAVAILABLE
+            {
+                return Err(FetchError::RateLimited(None));
+            }
+            if !status.is_success() {
+                return Err(FetchError::Status(status.as_u16()));
+            }
+            let content_type = response
+                .headers()
+                .get(reqwest::header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok())
+                .map(|v| {
+                    v.split(';')
+                        .next()
+                        .unwrap_or("")
+                        .trim()
+                        .to_ascii_lowercase()
+                });
+            if content_type
+                .as_deref()
+                .is_some_and(|t| !(t.starts_with("text/") || t == "application/xhtml+xml"))
+            {
+                return Err(FetchError::Unexpected);
+            }
+            let body = read_truncated(&mut response, max).await?;
+            return Ok(Some(Page {
+                url: at,
+                body,
+                content_type,
+            }));
+        }
+        Err(FetchError::Status(310))
     }
 
     /// A job board's answer at `url`: a public https address only (unless

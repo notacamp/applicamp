@@ -128,6 +128,9 @@ pub struct BoardJob {
     pub links: Vec<SourceLink>,
     /// The apply link exactly as the board gives it (never rewritten).
     pub apply_url: Option<String>,
+    /// The company's own website, when the board gives it (the tailored CV
+    /// reads the company's pages from there).
+    pub company_url: Option<String>,
     /// Who may apply, as the board's structured field says ("United
     /// States", "Europe", "Anywhere"); empty when the board does not say.
     pub regions: Vec<String>,

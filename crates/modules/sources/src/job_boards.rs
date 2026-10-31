@@ -259,6 +259,9 @@ pub struct Fields {
     /// The apply link, used unchanged.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub apply_url: Option<String>,
+    /// The company's own website, when the board gives it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub company_url: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub location: Option<String>,
     /// Who may apply: a list, or text separated by commas.

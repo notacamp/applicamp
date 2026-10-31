@@ -7,7 +7,10 @@ use std::collections::HashSet;
 
 use applicamp_kernel::{BoxFuture, EventBus, Result};
 use applicamp_pipeline::{
-    ports::{Posting, ProfileStatus, SearchLine},
+    ports::{
+        AnswerFacts, Posting, ProfileDigest, ProfileStatus, ProposedFact, RoleDigest, SearchLine,
+        SiteFailure, SitePage, SiteReading,
+    },
     store::{self as pipeline_store, Eligibility, Found, UncheckedRow},
 };
 use applicamp_profile::{
@@ -167,6 +170,7 @@ fn found(scored: Scored) -> Found {
         expires_at: board.as_ref().and_then(|b| b.expires_at),
         canonical_url,
         dedupe_key,
+        company_site: board.as_ref().and_then(|b| b.company_url.clone()),
         sources: board
             .map(|b| b.links.into_iter().map(link).collect())
             .unwrap_or_default(),
@@ -397,6 +401,129 @@ impl applicamp_pipeline::Neighbours for PipelineWiring {
                 stopped: row.error_kind,
             }))
         })
+    }
+
+    fn site_allowed(&self, site: &Url) -> bool {
+        applicamp_sources::net::check(site, self.sources.config.allow_private_hosts()).is_ok()
+    }
+
+    fn read_site<'a>(
+        &'a self,
+        site: &'a Url,
+        posting: Option<&'a Url>,
+        now: DateTime<Utc>,
+    ) -> BoxFuture<'a, Result<SiteReading, SiteFailure>> {
+        Box::pin(async move {
+            let Some(reader) = &self.sources.reader else {
+                return Err(SiteFailure::Unreachable);
+            };
+            match applicamp_sources::pages::read_site(reader, site, posting, now).await {
+                Ok(read) => Ok(SiteReading {
+                    pages: read
+                        .pages
+                        .into_iter()
+                        .map(|page| SitePage {
+                            url: page.url.to_string(),
+                            fetched_at: page.fetched_at,
+                            kind: page.kind.as_str().to_owned(),
+                            text: page.text,
+                        })
+                        .collect(),
+                    blocked: read.blocked,
+                }),
+                Err(applicamp_sources::pages::Failure::Unreachable) => {
+                    Err(SiteFailure::Unreachable)
+                }
+                Err(applicamp_sources::pages::Failure::RobotsDisallows) => {
+                    Err(SiteFailure::RobotsDisallows)
+                }
+                Err(applicamp_sources::pages::Failure::NothingReadable) => {
+                    Err(SiteFailure::NothingReadable)
+                }
+            }
+        })
+    }
+
+    fn profile_digest<'a>(
+        &'a self,
+        db: &'a PgPool,
+        account: Uuid,
+    ) -> BoxFuture<'a, Result<Option<ProfileDigest>>> {
+        Box::pin(async move {
+            Ok(matching::digest(db, account)
+                .await?
+                .map(|digest| ProfileDigest {
+                    roles: digest
+                        .roles
+                        .into_iter()
+                        .map(|role| RoleDigest {
+                            index: role.index,
+                            position: role.position,
+                            company: role.company,
+                            start_date: role.start_date,
+                            end_date: role.end_date,
+                            facts: role.facts,
+                        })
+                        .collect(),
+                    skills: digest.skills,
+                    latest: digest.latest,
+                    dismissed_skills: digest.dismissed_skills,
+                }))
+        })
+    }
+
+    fn answer_about<'a>(
+        &'a self,
+        db: &'a PgPool,
+        account: Uuid,
+        now: DateTime<Utc>,
+        position: usize,
+        question: &'a str,
+        answer: &'a str,
+        locale: Option<&'a str>,
+    ) -> BoxFuture<'a, Result<AnswerFacts>> {
+        Box::pin(async move {
+            let gateway = self
+                .sources
+                .ai
+                .as_ref()
+                .filter(|ai| ai.is_configured(applicamp_ai::Role::Complete))
+                .ok_or(applicamp_kernel::Error::Unavailable(
+                    applicamp_ai::AI_UNAVAILABLE,
+                ))?;
+            let answered = applicamp_profile::features::grill::about::propose(
+                db, gateway, account, now, position, question, answer, locale,
+            )
+            .await?;
+            Ok(AnswerFacts {
+                position: usize::try_from(answered.position)
+                    .map_err(applicamp_kernel::Error::internal)?,
+                title: answered.role.position,
+                company: answered.role.company,
+                facts: answered
+                    .proposals
+                    .into_iter()
+                    .map(|proposal| ProposedFact {
+                        id: proposal.id,
+                        text: proposal.text,
+                        quote: proposal.quote,
+                        area: proposal.area.as_str().to_owned(),
+                        expires_at: proposal.expires_at,
+                    })
+                    .collect(),
+                dropped: answered.dropped,
+            })
+        })
+    }
+
+    fn dismiss_skill<'a>(
+        &'a self,
+        db: &'a PgPool,
+        account: Uuid,
+        skill: &'a str,
+        now: DateTime<Utc>,
+    ) -> BoxFuture<'a, Result<()>> {
+        Box::pin(matching::dismiss_skill(db, account, skill, now))
     }
 }
 

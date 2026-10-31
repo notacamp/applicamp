@@ -54,6 +54,7 @@ function Frame() {
   useShortcut("nav.today", go("/"));
   useShortcut("nav.pipeline", go("/pipeline"));
   useShortcut("nav.boards", go("/boards"));
+  useShortcut("nav.cvs", go("/cvs"));
   useShortcut("nav.agents", go("/agents"));
   useShortcut("nav.profile", go("/profile"));
   // ⌘K's "Search now" and "New opportunity" (and their keys) from any page:
@@ -140,13 +141,15 @@ function Frame() {
         <TabBar
           phoneOnly
           label={t("frame.places")}
-          items={places.map((place) => ({
-            id: place.id,
-            label: place.label,
-            icon: place.icon,
-            current: place.current,
-            ...link(place.path),
-          }))}
+          items={places
+            .filter((place) => place.phone)
+            .map((place) => ({
+              id: place.id,
+              label: place.label,
+              icon: place.icon,
+              current: place.current,
+              ...link(place.path),
+            }))}
         />
       </Tagged>
       <ShortcutSheet
@@ -161,6 +164,13 @@ function Frame() {
           setMenuOpen(false);
         }}
         commands={[
+          {
+            id: "go.cvs",
+            label: tNav("nav.cvs"),
+            group: t("commands.go"),
+            shortcut: "nav.cvs",
+            onSelect: go("/cvs"),
+          },
           {
             id: "account.sign-out",
             label: t("commands.signOut"),

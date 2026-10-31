@@ -117,7 +117,9 @@
       "needsYou_other": "Brouillon {{n}} : {{count}} lignes ont besoin de vous.",
       "clean": "Brouillon {{n}} : chaque ligne s’appuie sur votre profil.",
       "approvedBefore": "La v{{version}} est approuvée ; ce brouillon plus récent ne l’est pas encore.",
-      "review": "Relire le CV"
+      "review": "Relire le CV",
+      "viewPdf": "Voir le PDF",
+      "download": "Télécharger"
     }
   },
   "hidden": {
@@ -332,7 +334,7 @@
       "clean": "Chaque ligne s’appuie sur votre profil",
       "cleanBody": "Approuvez pour garder ce brouillon comme v{{version}}.",
       "approvedTitle": "Approuvé · v{{version}}",
-      "approvedBody": "Cette version ne peut plus changer. Refaites le CV pour en avoir une autre. Le PDF vient ensuite.",
+      "approvedBody": "Ce texte ne peut plus changer, et le PDF en est tiré. Refaites le CV pour un autre brouillon.",
       "toPipeline": "Retour au pipeline"
     },
     "keywords": {
@@ -381,7 +383,106 @@
       "lines_flagged": "Certaines lignes ne peuvent pas encore être rattachées à votre profil. Corrigez-les ou supprimez-les d’abord.",
       "already_on_cv": "C’est déjà dans le CV.",
       "not_found": "Ce CV est introuvable.",
-      "generic": "Un problème est survenu. Réessayez."
+      "generic": "Un problème est survenu. Réessayez.",
+      "cv_doesnt_fit_one": "Ne tient pas sur 1 page : passez à 2 pages ou retirez quelques lignes",
+      "cv_doesnt_fit_other": "Ne tient pas sur {{count}} pages : retirez quelques lignes",
+      "cv_pdf_check_failed": "Le PDF n’a pas réussi sa vérification, donc rien n’a été approuvé. Ce qui a échoué :",
+      "cv_pdf_unavailable": "Le PDF n’a pas pu être fait pour le moment. Rien n’a été approuvé ; réessayez.",
+      "cv_versions_cap": "Vous avez gardé 20 versions PDF de ce CV. C’est le maximum.",
+      "not_approved": "Approuvez d’abord le CV : le PDF est fait à partir du texte approuvé.",
+      "same_layout": "C’est déjà la mise en page de la version la plus récente.",
+      "invalid_length": "Choisissez 1 ou 2 pages.",
+      "invalid_layout": "Choisissez un modèle et 1 ou 2 pages."
+    },
+    "layout": {
+      "template": "Modèle",
+      "templates": {
+        "clean": "Épuré",
+        "compact": "Compact"
+      },
+      "length": "Longueur",
+      "pages_one": "{{count}} page",
+      "pages_other": "{{count}} pages",
+      "language": "Langue",
+      "note": "Le modèle et la longueur font un PDF à partir du même texte approuvé, sans IA. Une autre langue est un nouveau brouillon : un appel à l’IA et une relecture. Utilisez « Refaire ».",
+      "confirmTitle": "Faire une nouvelle version ?",
+      "confirmBody": "Cela garde la v{{version}} telle quelle et fait la v{{next}} à partir du même texte approuvé, avec le modèle {{template}} sur {{pages}}. Aucune IA n’est utilisée.",
+      "confirm": "Faire la v{{next}}",
+      "cancel": "Annuler",
+      "making": "Création du PDF…"
+    },
+    "pdf": {
+      "open": "Ouvrir le PDF",
+      "download": "Télécharger",
+      "checksTitle": "Relu depuis le PDF",
+      "sections_one": "{{count}} section retrouvée sous son titre habituel",
+      "sections_other": "Les {{count}} sections retrouvées sous des titres habituels",
+      "keywords_one": "Le {{count}} mot-clé du poste présent dans le CV a survécu",
+      "keywords_other": "Les {{count}} mots-clés du poste présents dans le CV ont survécu",
+      "noKeywords": "Aucun mot-clé du poste n’était dans le CV à conserver",
+      "textLayer": "Une seule couche de texte, pas de texte dans des images",
+      "contact": "Nom, email et liens sont du vrai texte",
+      "size_one": "{{count}} page · {{size}}",
+      "size_other": "{{count}} pages · {{size}}"
+    },
+    "versions": {
+      "title": "Versions",
+      "lead": "Chaque PDF fait à partir de ce CV est conservé, pour que vous puissiez toujours voir exactement ce que vous avez envoyé. Stocké en privé avec votre compte.",
+      "name": "v{{version}} · {{template}}",
+      "current": "Actuelle",
+      "facts_one": "{{count}} page · {{size}} · fait le {{made}}",
+      "facts_other": "{{count}} pages · {{size}} · fait le {{made}}",
+      "neverDownloaded": "Pas encore téléchargé",
+      "downloaded": "Téléchargé le {{date}}",
+      "view": "Voir le PDF"
+    },
+    "viewer": {
+      "title": "CV · v{{version}}",
+      "subtitle": "{{date}} · {{template}} · {{pages}} · {{size}}",
+      "close": "Fermer",
+      "loading": "Chargement du PDF…",
+      "failed": "Le PDF n’a pas pu s’ouvrir. Vous pouvez encore le télécharger.",
+      "page": "Page {{page}} sur {{pages}}"
+    }
+  },
+  "cvs": {
+    "label": "Vos CV",
+    "filter": {
+      "label": "Afficher",
+      "all": "Tous",
+      "approved": "Approuvés",
+      "drafts": "Brouillons"
+    },
+    "title": "{{role}} · {{company}}",
+    "version": "v{{version}}",
+    "draftN": "Brouillon {{n}}",
+    "approved": "Approuvé",
+    "draft": "Brouillon",
+    "current": "Actuelle",
+    "noPdf": "Approuvé, pas encore de PDF",
+    "facts_one": "{{template}} · {{count}} page · {{size}}",
+    "facts_other": "{{template}} · {{count}} pages · {{size}}",
+    "made": "Fait le {{date}}",
+    "started": "Commencé le {{date}}",
+    "neverDownloaded": "Pas encore téléchargé",
+    "downloaded": "Téléchargé le {{date}}",
+    "viewPdf": "Voir le PDF",
+    "download": "Télécharger",
+    "review": "Relire",
+    "opportunity": "Ouvrir l’offre",
+    "empty": {
+      "title": "Pas encore de CV",
+      "body": "Présélectionnez une offre, ouvrez « Préparer » et faites le brouillon du CV. Une fois approuvé, son PDF est conservé ici.",
+      "action": "Aller au pipeline"
+    },
+    "emptyFiltered": {
+      "title": "Rien ici",
+      "body": "Aucun CV ne correspond à ce filtre."
+    },
+    "loading": "Chargement de vos CV…",
+    "loadFailed": "Vos CV n’ont pas pu être chargés.",
+    "viewer": {
+      "title": "{{company}} · v{{version}}"
     }
   }
 }

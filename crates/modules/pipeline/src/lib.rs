@@ -25,6 +25,12 @@
 //!   line says what its sources do not, review (edit, remove, "it's true",
 //!   put back) and approval as a version.
 //!
+//! - **The tailored CV as a PDF** (#38): approving renders the approved text
+//!   with Typst inside the server (Clean or Compact, 1 or 2 pages), reads the
+//!   PDF's text back and compares it with the CV, and keeps the PDF as a
+//!   version (`/api/v1/opportunities/{id}/cv/versions/{n}/pdf`); a new template
+//!   or length is a new version, with no AI call; `/api/v1/cvs` lists them all.
+//!
 //! Publishes `pipeline.opportunity_added` (ids only).
 
 #![forbid(unsafe_code)]
@@ -88,6 +94,9 @@ pub fn module(deps: PipelineDeps) -> Module {
         .routes(routes!(cv::confirm_line))
         .routes(routes!(cv::put_back))
         .routes(routes!(cv::approve))
+        .routes(routes!(cv::versions::create))
+        .routes(routes!(cv::versions::pdf_file))
+        .routes(routes!(cv::versions::list_all))
         .routes(routes!(cv::discard))
         .routes(routes!(today::get))
         .layer(Extension(deps));

@@ -235,6 +235,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cvs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every CV the person has.
+         * @description The PDF versions and the drafts still being reviewed, across all the
+         *     opportunities of the account (the ones put away included: a PDF is what was
+         *     sent), newest first. Never calls a model.
+         */
+        get: operations["pipeline.cvs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/goals": {
         parameters: {
             query?: never;
@@ -578,8 +600,13 @@ export interface paths {
         /**
          * Approve the draft.
          * @description Refused (409 `lines_flagged`) while any line or skill cannot be traced to
-         *     the profile. The draft is frozen as the next version (contact details are
-         *     read from the profile again); part B renders it as a PDF. No model call.
+         *     the profile. The draft is frozen, its text rendered as a PDF with the
+         *     `template` and `length` asked for (Clean, 1 page by default), the PDF read
+         *     back out and compared with the CV, and the PDF kept as the next version:
+         *     all or nothing. If it does not fit the length (`cv_doesnt_fit`) or the
+         *     read-back finds it lacking (`cv_pdf_check_failed`, with the reasons, one
+         *     per line), nothing is approved. Contact details are read from the profile
+         *     again. No model call.
          */
         post: operations["pipeline.cv_approve"];
         delete?: never;
@@ -672,6 +699,54 @@ export interface paths {
          *     it passes the check. No model call.
          */
         post: operations["pipeline.cv_put_back"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/cv/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make another version of the approved CV.
+         * @description The latest approved draft's text, rendered with `template` and `length`
+         *     (what the newest version has when left out), read back, and kept as the
+         *     next version. **No model call.** The earlier versions are untouched. Refused
+         *     when the text does not fit the length (`cv_doesnt_fit`) or the read-back
+         *     finds the PDF lacking (`cv_pdf_check_failed`, with the reasons, one per
+         *     line). At most 20 versions per opportunity.
+         */
+        post: operations["pipeline.cv_version"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/cv/versions/{version}/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The PDF of a version.
+         * @description `Content-Type: application/pdf`, shown inline, named
+         *     `<Name> CV - <Company>.pdf`. `?download=1` serves it as an attachment and
+         *     sets the version's `downloaded_at`. Never cached, never sniffed. Another
+         *     account's version is not found.
+         */
+        get: operations["pipeline.cv_pdf"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1945,6 +2020,15 @@ export interface components {
             /** @description In their own words, up to 300 characters. Not needed for a skill. */
             text?: string | null;
         };
+        /** @description Name, email and links as text. */
+        ContactCheck: {
+            /** @description The email is text in the PDF (true when the CV has none). */
+            email: boolean;
+            /** @description Every link is text and a real link in the PDF. */
+            links: boolean;
+            /** @description The name is text in the PDF (true when the CV has none). */
+            name: boolean;
+        };
         /** @description How to reach the person, from the profile. */
         ContactView: {
             email?: string | null;
@@ -1982,7 +2066,7 @@ export interface components {
             draft_eur: number;
             /** Format: uuid */
             opportunity_id: string;
-            /** @description The approved versions, newest first (no PDF yet). */
+            /** @description The PDF versions, newest first. */
             versions: components["schemas"]["CvVersion"][];
         };
         /** @description The caps and the spend. */
@@ -2062,13 +2146,92 @@ export interface components {
              */
             version?: number | null;
         };
-        /** @description An approved version. */
-        CvVersion: {
+        /**
+         * @description What a row of the CVs page is.
+         * @enum {string}
+         */
+        CvKind: "version" | "draft";
+        /** @description Every CV of the account. */
+        CvList: {
+            /**
+             * @description Newest first: every PDF version and every draft being reviewed, across
+             *     the opportunities (at most 200).
+             */
+            items: components["schemas"]["CvListItem"][];
+        };
+        /** @description One row of the CVs page. */
+        CvListItem: {
+            company: string;
             /** Format: date-time */
-            approved_at: string;
+            created_at: string;
+            /** @description The newest version of its opportunity. */
+            current: boolean;
+            /** Format: date-time */
+            downloaded_at?: string | null;
+            /**
+             * Format: int32
+             * @description The draft it comes from.
+             */
+            draft: number;
+            kind: components["schemas"]["CvKind"];
             language: string;
+            /** Format: uuid */
+            opportunity_id: string;
             /** Format: int32 */
+            pages?: number | null;
+            /** Format: int64 */
+            size_bytes?: number | null;
+            /** @description `approved` for a version, `draft` for a draft being reviewed. */
+            status: components["schemas"]["DraftStatus"];
+            template?: components["schemas"]["Template"] | null;
+            /** @description The role. */
+            title: string;
+            /**
+             * Format: int32
+             * @description The version, for a PDF.
+             */
+            version?: number | null;
+        };
+        /** @description An approved version: the approved text as a PDF. */
+        CvVersion: {
+            /**
+             * Format: date-time
+             * @description When the draft was approved.
+             */
+            approved_at: string;
+            /** @description What the read-back found. */
+            checks: components["schemas"]["PdfChecks"];
+            /**
+             * Format: date-time
+             * @description When this PDF was made.
+             */
+            created_at: string;
+            /** @description The newest version of the opportunity. */
+            current: boolean;
+            /**
+             * Format: date-time
+             * @description The last time it was downloaded; none if it never was.
+             */
+            downloaded_at?: string | null;
+            language: string;
+            /**
+             * Format: int32
+             * @description The most pages it may take: 1 or 2.
+             */
+            length: number;
+            /**
+             * Format: int32
+             * @description The draft it renders.
+             */
             n: number;
+            /**
+             * Format: int32
+             * @description The pages it takes.
+             */
+            pages: number;
+            /** Format: int64 */
+            size_bytes: number;
+            template: components["schemas"]["Template"];
             /** Format: int32 */
             version: number;
         };
@@ -2512,6 +2675,20 @@ export interface components {
             /** Format: int32 */
             total: number;
         };
+        /** @description The job keywords the review showed as on the CV, against the PDF. */
+        KeywordsCheck: {
+            /**
+             * Format: int32
+             * @description How many the PDF's text has.
+             */
+            found: number;
+            missing: string[];
+            /**
+             * Format: int32
+             * @description How many were on the CV.
+             */
+            total: number;
+        };
         /** @description A language they speak. */
         Language: {
             /** @description How well ("Native or bilingual"). */
@@ -2527,6 +2704,15 @@ export interface components {
         /** @description The latest search. */
         LatestSearch: {
             search?: components["schemas"]["Search"] | null;
+        };
+        /** @description The look of a PDF. */
+        LayoutRequest: {
+            /**
+             * Format: int32
+             * @description The most pages: 1 (the default) or 2.
+             */
+            length?: number | null;
+            template?: components["schemas"]["Template"] | null;
         };
         /** @description What the CV leaves out of the profile. */
         LeftOut: {
@@ -2576,6 +2762,12 @@ export interface components {
             sources: components["schemas"]["SourceView"][];
             text: string;
         };
+        /** @description Every line of the CV against the PDF's text. */
+        LinesCheck: {
+            missing: components["schemas"]["MissingLine"][];
+            /** Format: int32 */
+            total: number;
+        };
         /** @description A profile elsewhere. */
         Link: {
             /** @description Where ("GitHub"). */
@@ -2608,6 +2800,12 @@ export interface components {
             picture_url?: string | null;
             /** @description The providers that sign them in. */
             ways_in: components["schemas"]["Provider"][];
+        };
+        /** @description A line the PDF did not give back. */
+        MissingLine: {
+            /** @description The line (its id on the CV), or the head of a role or school. */
+            id: string;
+            text: string;
         };
         /** @description A job to add by its link. */
         NewOpportunity: {
@@ -2787,6 +2985,21 @@ export interface components {
             url: string;
             work_mode?: components["schemas"]["JobWorkMode"] | null;
         };
+        /** @description What was checked on a PDF, kept with its version. */
+        PdfChecks: {
+            contact: components["schemas"]["ContactCheck"];
+            keywords: components["schemas"]["KeywordsCheck"];
+            lines: components["schemas"]["LinesCheck"];
+            sections: components["schemas"]["SectionsCheck"];
+            size: components["schemas"]["SizeCheck"];
+            /** @description There is text, and no picture: one text layer. */
+            text_layer: boolean;
+        };
+        /**
+         * Format: binary
+         * @description The bytes of a PDF (documentation only: the answer is the file itself).
+         */
+        PdfFile: string;
         /**
          * @description What a cash floor is counted over.
          * @enum {string}
@@ -3216,6 +3429,13 @@ export interface components {
          * @enum {string}
          */
         SearchTrigger: "manual" | "nightly";
+        /** @description The section headings of the CV against the PDF's text. */
+        SectionsCheck: {
+            /** @description The headings the CV has. */
+            expected: string[];
+            /** @description The ones the PDF's text does not have as whole words. */
+            missing: string[];
+        };
         /**
          * @description Which levels fit.
          * @enum {string}
@@ -3230,6 +3450,18 @@ export interface components {
         SiteRequest: {
             /** @description An http or https address; only its host (and port) is kept. */
             url: string;
+        };
+        /** @description The pages and the size. */
+        SizeCheck: {
+            /** Format: int64 */
+            bytes: number;
+            /**
+             * Format: int32
+             * @description The length the person chose, in pages.
+             */
+            length: number;
+            /** Format: int32 */
+            pages: number;
         };
         /** @description A skill. */
         Skill: {
@@ -3394,6 +3626,11 @@ export interface components {
             /** @description Where the review is (the same review as the questions'). */
             status: components["schemas"]["ReviewStatus"];
         };
+        /**
+         * @description How the CV looks.
+         * @enum {string}
+         */
+        Template: "clean" | "compact";
         /** @description Where the person is. */
         Today: {
             goals: components["schemas"]["TodayGoals"];
@@ -4088,6 +4325,35 @@ export interface operations {
             };
             /** @description `not_approved` */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.cvs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The CVs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CvList"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4989,7 +5255,12 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        /** @description The look of the PDF; optional. */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LayoutRequest"];
+            };
+        };
         responses: {
             /** @description The CV, with the version. */
             200: {
@@ -4998,6 +5269,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Cv"];
+                };
+            };
+            /** @description `invalid_layout`; `invalid_length` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
             /** @description `session_required` */
@@ -5018,8 +5298,17 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `lines_flagged`; `draft_frozen` */
+            /** @description `lines_flagged`; `draft_frozen`; `cv_doesnt_fit`; `cv_pdf_check_failed` */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `cv_pdf_unavailable` */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5271,6 +5560,133 @@ export interface operations {
             };
             /** @description `draft_frozen`; `already_on_cv` */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.cv_version": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LayoutRequest"];
+            };
+        };
+        responses: {
+            /** @description The CV, with the new version. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cv"];
+                };
+            };
+            /** @description `invalid_layout`; `invalid_length` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_approved`; `same_layout`; `cv_doesnt_fit`; `cv_pdf_check_failed` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `cv_versions_cap` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `cv_pdf_unavailable` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.cv_pdf": {
+        parameters: {
+            query?: {
+                /** @description `1` serves it as an attachment and records the download. */
+                download?: string;
+            };
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+                /** @description The version. */
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The PDF. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": components["schemas"]["PdfFile"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

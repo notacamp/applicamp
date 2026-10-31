@@ -204,7 +204,8 @@ test("someone reads what Applicamp knows and assumes about them, settles two ass
   await expect(page.getByTestId("basics-summary")).toContainText("I ran events");
   await expect(page.getByTestId("basics-background")).toContainText("6 years");
   await expect(page.getByTestId("role-facts-list-0")).toContainText(
-    "I assume you led a small team",
+    "Led a small team at Example Co (3 to 6 people)",
   );
+  await expect(page.getByTestId("role-facts-list-0")).not.toContainText("I assume you");
   await expectNoSidewaysScroll(page);
 });

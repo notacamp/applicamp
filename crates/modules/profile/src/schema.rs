@@ -13,6 +13,7 @@
 use std::sync::LazyLock;
 
 use applicamp_kernel::{Error, Result};
+use chrono::{DateTime, Utc};
 use regex::Regex;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -129,6 +130,85 @@ pub struct Work {
     #[serde(default)]
     #[schema(required = true)]
     pub highlights: Vec<String>,
+    /// What they told Applicamp about this position when it was grilled
+    /// ("Grill me"): facts they confirmed, each with their own words. The
+    /// import and the model never write these.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[schemars(skip)]
+    pub facts: Vec<Fact>,
+}
+
+/// What a fact about a position is about: the seven things "Grill me" goes
+/// through, in order.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, ToSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum Area {
+    /// What the company sold, to whom, how big the team was.
+    Context,
+    /// What they did themselves, as against the team.
+    YourPart,
+    /// Tools, data size, traffic.
+    StackScale,
+    /// Numbers, and how they know them.
+    Results,
+    /// What went wrong and what they did.
+    HardProblems,
+    /// Leading, mentoring, hiring.
+    People,
+    /// Stories they would tell in an interview.
+    Stories,
+}
+
+impl Area {
+    /// Every area, in the order they are covered.
+    pub const ALL: [Self; 7] = [
+        Self::Context,
+        Self::YourPart,
+        Self::StackScale,
+        Self::Results,
+        Self::HardProblems,
+        Self::People,
+        Self::Stories,
+    ];
+
+    /// The name stored and sent.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Context => "context",
+            Self::YourPart => "your_part",
+            Self::StackScale => "stack_scale",
+            Self::Results => "results",
+            Self::HardProblems => "hard_problems",
+            Self::People => "people",
+            Self::Stories => "stories",
+        }
+    }
+
+    /// The area named `raw`; none for anything else.
+    pub fn parse(raw: &str) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|area| area.as_str() == raw.trim())
+    }
+}
+
+/// One thing the person confirmed about a position, with their own words.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Fact {
+    /// Its id.
+    pub id: String,
+    /// The fact, one short sentence. It says only what the quote or the
+    /// profile says.
+    pub text: String,
+    /// The person's exact words it was taken from.
+    pub quote: String,
+    /// What it is about.
+    pub area: Area,
+    /// When the person kept it.
+    pub kept_at: DateTime<Utc>,
 }
 
 /// A school or degree.
@@ -286,6 +366,9 @@ impl Profile {
             visitor.value(Kind::Date, &mut work.start_date);
             visitor.value(Kind::Date, &mut work.end_date);
             visitor.value(Kind::Long, &mut work.summary);
+            work.facts.retain_mut(|fact| {
+                visitor.key(Kind::Long, &mut fact.text) && visitor.key(Kind::Long, &mut fact.quote)
+            });
             work.highlights.retain_mut(|highlight| {
                 let mut value = Some(std::mem::take(highlight));
                 visitor.value(Kind::Long, &mut value);
@@ -366,7 +449,7 @@ impl Profile {
             + self
                 .work
                 .iter_mut()
-                .map(|work| cap(&mut work.highlights))
+                .map(|work| cap(&mut work.highlights) + cap(&mut work.facts))
                 .sum::<usize>();
         u32::try_from(over).unwrap_or(u32::MAX)
     }
@@ -465,7 +548,10 @@ impl Profile {
             self.projects.len(),
         ];
         if lists.into_iter().any(|len| len > MAX_ITEMS)
-            || self.work.iter().any(|w| w.highlights.len() > MAX_ITEMS)
+            || self
+                .work
+                .iter()
+                .any(|w| w.highlights.len() > MAX_ITEMS || w.facts.len() > MAX_ITEMS)
         {
             return Err(invalid(format!(
                 "A list has more than {MAX_ITEMS} entries."

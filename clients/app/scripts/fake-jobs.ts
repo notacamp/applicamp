@@ -39,6 +39,13 @@
 // is on no page, which the server drops), then with what the posting wants
 // and up to three questions; an answer about a job becomes facts quoting it.
 //
+// The tailored CV (#37): the model answers the CV prompt ("You write a
+// one-page CV…") from the sources it is shown, by fixed rules: a bullet
+// reworded from a kept fact, a highlight word for word, a bullet with a number
+// no source says (it is flagged), a bullet that cites a company fact outside
+// the summary (flagged), a summary that cites a company fact, a skill that is
+// not on the profile (flagged), and every position after the second left out.
+//
 // Every list answers with four new jobs (new ids each time); a board keeps to
 // its polling interval, so a search within it reads the last answer. The
 // fourth is remote only from Germany or Austria, in the words of the posting
@@ -390,6 +397,10 @@ async function complete(request: IncomingMessage, response: ServerResponse) {
       json(response, 200, completion(jobAnalysis(user?.content ?? "")));
       return;
     }
+    if (system.startsWith("You write a one-page CV")) {
+      json(response, 200, completion(tailoredCv(user?.content ?? "")));
+      return;
+    }
     if (system.startsWith("You read a person's answer to one question about a job")) {
       json(response, 200, completion(jobAnswer(user?.content ?? "")));
       return;
@@ -667,6 +678,103 @@ function jobAnswer(userContent: string) {
         area: "results",
       },
     ],
+  };
+}
+
+/** A source of the CV prompt: `[w0.h1] text`. */
+interface CvSource {
+  id: string;
+  text: string;
+}
+
+/** The `[id] text` lines of the CV prompt's user message. */
+function cvSourcesOf(content: string): CvSource[] {
+  return [...content.matchAll(/^\[([^\]\s]+)\] (.+)$/gm)].map((match) => ({
+    id: match[1] ?? "",
+    text: match[2] ?? "",
+  }));
+}
+
+/** `text` with its first whole number changed to one no source has. */
+function wrongNumber(text: string): string {
+  const number = /\b(\d+)\b/.exec(text);
+  if (number === null) {
+    return `${text.replace(/[.!?]+$/, "")} by 37%`;
+  }
+  const wrong = String(Number(number[1]) + 17);
+  return text.replace(number[0], wrong);
+}
+
+/**
+ * The CV writer (system prompt "You write a one-page CV…"): the rules at the
+ * head of this script, deterministic from the sources it is shown.
+ */
+function tailoredCv(userContent: string) {
+  const sources = cvSourcesOf(userContent);
+  const company = /^Company: (.+)$/m.exec(userContent)?.[1]?.trim() ?? "";
+  const positions = [...userContent.matchAll(/<position id="w(\d+)"/g)].map((match) =>
+    Number(match[1]),
+  );
+  const of = (position: number, kind: string) =>
+    sources.filter((source) => source.id.startsWith(`w${String(position)}.${kind}`));
+  const companyFact = sources.find((source) => /^c[0-9a-z]+$/.test(source.id));
+  const headline = sources.find((source) => source.id === "hl");
+  const [first, second] = positions;
+  const highlights = first === undefined ? [] : of(first, "h");
+  const facts = first === undefined ? [] : of(first, "f");
+  const stripped = (text: string) => text.replace(/[.!?]+$/, "");
+
+  const bullets: { text: string; sources: string[] }[] = [];
+  const kept = facts[0];
+  if (kept !== undefined) {
+    bullets.push({ text: `Delivered: ${stripped(kept.text)}`, sources: [kept.id] });
+  }
+  const one = highlights[0];
+  if (one !== undefined) {
+    bullets.push({ text: one.text, sources: [one.id] });
+  }
+  const counted = highlights.find((source) => /\d/.test(source.text)) ?? one;
+  if (counted !== undefined) {
+    // A number no source says: the check flags it.
+    bullets.push({ text: wrongNumber(counted.text), sources: [counted.id] });
+  }
+  const two = highlights[1];
+  if (two !== undefined && companyFact !== undefined) {
+    // A company fact used as the person's own achievement: the check flags it.
+    bullets.push({
+      text: `${stripped(two.text)} for customers like those of ${company}`,
+      sources: [two.id, companyFact.id],
+    });
+  }
+  const experience: { position: number; bullets: { text: string; sources: string[] }[] }[] = [];
+  if (first !== undefined) {
+    experience.push({ position: first, bullets });
+  }
+  const older = second === undefined ? undefined : of(second, "h")[0];
+  if (second !== undefined && older !== undefined) {
+    experience.push({ position: second, bullets: [{ text: older.text, sources: [older.id] }] });
+  }
+  const skills = (sources.find((source) => source.id === "sk")?.text ?? "")
+    .split(",")
+    .map((skill) => skill.trim())
+    .filter((skill) => skill !== "");
+  return {
+    headline: {
+      text: headline?.text ?? "Software engineer",
+      sources: headline === undefined ? [] : ["hl"],
+    },
+    summary: {
+      text: [
+        one === undefined ? "" : `${stripped(one.text)}.`,
+        companyFact === undefined ? "" : `A fit for what ${company} builds.`,
+      ]
+        .filter((part) => part !== "")
+        .join(" "),
+      sources: [...(one === undefined ? [] : [one.id]), ...(companyFact ? [companyFact.id] : [])],
+    },
+    experience,
+    // One skill the profile does not list: the check flags it.
+    skills: [...skills, "Kubernetes"],
   };
 }
 

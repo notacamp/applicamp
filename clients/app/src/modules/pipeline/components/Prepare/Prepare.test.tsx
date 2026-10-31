@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Schema } from "~/lib/api";
 
-import { opportunity } from "../../../../../test/pipeline";
+import { cv, cvDraft, opportunity } from "../../../../../test/pipeline";
 import { renderWithProviders, stubApi, type Stub } from "../../../../../test/render";
 
 import { PreparePage } from "./PreparePage";
@@ -77,12 +77,14 @@ const question = (
 function renderPage(routes: Record<string, Stub>) {
   const requests = stubApi({
     [`GET /api/v1/opportunities/${ID}`]: { body: opportunity({ id: ID, stage: "shortlisted" }) },
+    [`GET /api/v1/opportunities/${ID}/cv`]: { body: cv({ opportunity_id: ID }) },
     ...routes,
   });
   const view = renderWithProviders(
     <PreparePage
       id={ID}
       onBack={vi.fn()}
+      onReview={vi.fn()}
       renderFacts={(answer) => <p data-testid="facts-slot">{answer.proposals.length} facts</p>}
       spend={<p data-testid="month-spend">AI this month</p>}
     />,
@@ -101,6 +103,9 @@ describe("Prepare: company and job", () => {
     expect(screen.getByTestId("prepare-site")).toHaveTextContent("example.com");
     expect(screen.getByTestId("prepare-wants-pending")).toBeVisible();
     expect(screen.getByTestId("prepare-draft-slot")).toBeVisible();
+    expect(await screen.findByTestId("prepare-draft")).toHaveTextContent(
+      "Draft the CV · about €0.002",
+    );
     expect(screen.getByTestId("prepare-spend")).toHaveTextContent("Company reads today: 1 of 20.");
     expect(requests.map((r) => r.route)).not.toContain(
       `POST /api/v1/opportunities/${ID}/brief/read`,
@@ -281,6 +286,40 @@ describe("Prepare: company and job", () => {
     await user.click(await screen.findByTestId("prepare-read"));
     expect(await screen.findByTestId("prepare-error")).toHaveTextContent(
       "The company’s website asks robots not to read it, so nothing was read.",
+    );
+  });
+
+  it("drafts the CV from a click and goes to the review; with a draft it says Review the CV", async () => {
+    const { requests } = renderPage({
+      [BRIEF]: { body: brief() },
+      [`POST /api/v1/opportunities/${ID}/cv/drafts`]: {
+        body: cv({ opportunity_id: ID, draft: cvDraft() }),
+      },
+    });
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("prepare-draft"));
+    await waitFor(() => {
+      expect(screen.getByTestId("prepare-review")).toHaveTextContent("Review the CV");
+    });
+    expect(screen.queryByTestId("prepare-draft")).toBeNull();
+    expect(
+      requests.filter((r) => r.route === `POST /api/v1/opportunities/${ID}/cv/drafts`),
+    ).toHaveLength(1);
+  });
+
+  it("turns Draft the CV off, with its reason, when the job is not shortlisted or a cap is hit", async () => {
+    renderPage({
+      [BRIEF]: { body: brief() },
+      [`GET /api/v1/opportunities/${ID}/cv`]: {
+        body: cv({
+          opportunity_id: ID,
+          can_draft: { allowed: false, reason: "daily_cap" },
+        }),
+      },
+    });
+    expect(await screen.findByTestId("prepare-draft")).toBeDisabled();
+    expect(screen.getByTestId("prepare-draft-reason")).toHaveTextContent(
+      "You’ve made 20 drafts today. Drafting continues tomorrow.",
     );
   });
 });

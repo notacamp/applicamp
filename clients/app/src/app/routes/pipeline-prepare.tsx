@@ -6,6 +6,8 @@ export interface PipelinePrepareProps {
   /** The opportunity (`/pipeline/$id/prepare`). */
   id: string;
   onBack: () => void;
+  /** Open the review of the CV (`/pipeline/$id/cv`). */
+  onReview: () => void;
 }
 
 /**
@@ -13,11 +15,12 @@ export interface PipelinePrepareProps {
  * CV is based on. An answer's facts are kept, fixed or dropped with Grill
  * me's own controls (the profile module's), on the position they are about.
  */
-export function PipelinePrepare({ id, onBack }: PipelinePrepareProps) {
+export function PipelinePrepare({ id, onBack, onReview }: PipelinePrepareProps) {
   return (
     <PreparePage
       id={id}
       onBack={onBack}
+      onReview={onReview}
       spend={<SpendLine testId="prepare-month-spend" />}
       renderFacts={(answer, role) => (
         <JobAnswerFacts

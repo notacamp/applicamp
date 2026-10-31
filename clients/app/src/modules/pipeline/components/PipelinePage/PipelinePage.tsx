@@ -44,6 +44,8 @@ export interface PipelinePageProps {
   progress?: ReactNode;
   /** Open the page that prepares a tailored CV for an opportunity (from its peek). */
   onPrepare?: ((id: string) => void) | undefined;
+  /** Open the review of an opportunity's tailored CV. */
+  onReview?: ((id: string) => void) | undefined;
 }
 
 /**
@@ -61,6 +63,7 @@ export function PipelinePage({
   search,
   progress,
   onPrepare,
+  onReview,
 }: PipelinePageProps) {
   const { t } = useTranslation("pipeline");
   const narrow = useNarrowScreen();
@@ -280,6 +283,7 @@ export function PipelinePage({
           setOpen(null);
         }}
         onPrepare={onPrepare}
+        onReview={onReview}
       />
       <NewOpportunityDialog
         open={adding}

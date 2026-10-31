@@ -9,6 +9,7 @@ import { formatCost } from "../../api/labels";
 import { useOpportunity } from "../../api/opportunities";
 import { titleOf } from "../PipelinePage/OpportunityViews";
 import { CompanyFacts } from "./CompanyFacts";
+import { DraftSlot } from "../Review/DraftSlot";
 import { Questions } from "./Questions";
 
 export interface PreparePageProps {
@@ -23,8 +24,8 @@ export interface PreparePageProps {
   renderFacts: (answer: AnswerResult, role: string) => ReactNode;
   /** The month's AI spend line. */
   spend?: ReactNode;
-  /** Where "Draft the CV" arrives (the next change). */
-  next?: ReactNode;
+  /** Open the review of the CV ("Draft the CV" arrives there, and "Review the CV" goes there). */
+  onReview: () => void;
 }
 
 /**
@@ -34,7 +35,7 @@ export interface PreparePageProps {
  * few questions where the profile is thin. Opening it asks nothing of the
  * model and fetches nothing; every step starts with a click.
  */
-export function PreparePage({ id, onBack, renderFacts, spend, next }: PreparePageProps) {
+export function PreparePage({ id, onBack, renderFacts, spend, onReview }: PreparePageProps) {
   const { t } = useTranslation("pipeline");
   const opportunity = useOpportunity(id);
   const brief = useBrief(id);
@@ -76,7 +77,13 @@ export function PreparePage({ id, onBack, renderFacts, spend, next }: PreparePag
     );
   } else {
     body = (
-      <PrepareBody id={id} brief={brief.data} renderFacts={renderFacts} spend={spend} next={next} />
+      <PrepareBody
+        id={id}
+        brief={brief.data}
+        renderFacts={renderFacts}
+        spend={spend}
+        onReview={onReview}
+      />
     );
   }
 
@@ -102,13 +109,13 @@ function PrepareBody({
   brief,
   renderFacts,
   spend,
-  next,
+  onReview,
 }: {
   id: string;
   brief: Brief;
   renderFacts: PreparePageProps["renderFacts"];
   spend: ReactNode;
-  next: ReactNode;
+  onReview: () => void;
 }) {
   const { t, i18n } = useTranslation("pipeline");
   const language = i18n.language;
@@ -176,7 +183,7 @@ function PrepareBody({
 
       <Section title={t("prepare.draft.title")} testId="prepare-draft-slot">
         <Text tone="secondary">{t("prepare.draft.lead")}</Text>
-        {next}
+        <DraftSlot id={id} onReview={onReview} />
       </Section>
 
       <Stack gap="sm">

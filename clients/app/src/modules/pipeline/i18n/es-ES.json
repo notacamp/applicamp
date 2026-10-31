@@ -110,7 +110,14 @@
       "title": "CV a medida",
       "lead": "Un CV para esta oferta, basado en datos reales sobre la empresa y la oferta.",
       "prepare": "Preparar: empresa y oferta",
-      "cost": "Unos {{cost}}. No se envía nada a ninguna parte."
+      "cost": "Unos {{cost}}. No se envía nada a ninguna parte.",
+      "none": "Todavía no hay borrador.",
+      "approved": "v{{version}} aprobada.",
+      "needsYou_one": "Borrador {{n}}: {{count}} línea te necesita.",
+      "needsYou_other": "Borrador {{n}}: {{count}} líneas te necesitan.",
+      "clean": "Borrador {{n}}: todas las líneas se apoyan en tu perfil.",
+      "approvedBefore": "La v{{version}} está aprobada; este borrador más reciente todavía no.",
+      "review": "Revisar el CV"
     }
   },
   "hidden": {
@@ -206,7 +213,7 @@
     },
     "draft": {
       "title": "Redactar el CV",
-      "lead": "Después: el CV se redacta a partir de estos datos, tu perfil y tus respuestas, y cada línea se comprueba contra ellos."
+      "lead": "El CV se redacta a partir de estos datos y tu perfil, y cada línea se comprueba contra lo que dice tu perfil."
     },
     "costLine": "Leer una empresa: una llamada a la IA, unos {{read}}, reutilizada durante 30 días. Comparar la oferta: una llamada, unos {{analysis}}. Cada respuesta: una llamada pequeña, unos {{answer}}. Nada se ejecuta en segundo plano.",
     "spend": {
@@ -231,6 +238,150 @@
       "no_skill": "Esta pregunta no es sobre una habilidad.",
       "not_found": "No se ha encontrado esta oportunidad.",
       "generic": "Algo ha salido mal. Inténtalo de nuevo."
+    }
+  },
+  "cv": {
+    "eyebrow": "CV a medida",
+    "title": "Revisar el CV",
+    "heading": "Revisa tu CV para {{company}}",
+    "lead": "Hecho a partir de tu perfil para esta oferta. Cada línea indica de dónde viene. Las líneas que no se pueden rastrear hasta tu perfil quedan bloqueadas hasta que las corrijas.",
+    "back": "Volver a Preparar",
+    "loading": "Cargando el CV…",
+    "loadFailed": "No se ha podido cargar el CV.",
+    "empty": {
+      "body": "Todavía no hay borrador. El CV se redacta a partir de tu perfil, los datos de la empresa y lo que pide la oferta: una llamada de IA. Después, cada línea se comprueba sin IA."
+    },
+    "toolbar": {
+      "draft": "Borrador {{n}}",
+      "draftPill": "Borrador",
+      "approvedPill": "Aprobado · v{{version}}",
+      "language": "Escrito en {{language}}",
+      "makeAgain": "Rehacer · unos {{cost}}",
+      "making": "Redactando…",
+      "approve": "Aprobar v{{version}}",
+      "approving": "Aprobando…",
+      "approveWhy": "Aprobar se activa cuando todas las líneas bloqueadas están corregidas o eliminadas."
+    },
+    "draft": {
+      "draft": "Redactar el CV · unos {{cost}}",
+      "drafting": "Redactando…",
+      "review": "Revisar el CV",
+      "hint": "Una llamada de IA. Después, cada línea se comprueba contra tu perfil, sin IA.",
+      "blocked": {
+        "stage_too_early": "Preselecciona antes esta oferta: el CV se hace para las ofertas que persigues.",
+        "per_opportunity_cap": "Ya has hecho 10 borradores para esta oferta. Revisa uno de ellos.",
+        "daily_cap": "Ya has hecho 20 borradores hoy. Puedes seguir mañana.",
+        "ai_unavailable": "La IA no está configurada en este servidor, así que no se puede redactar nada."
+      }
+    },
+    "sheet": {
+      "label": "Tu CV a medida",
+      "summary": "Resumen",
+      "experience": "Experiencia",
+      "skills": "Habilidades",
+      "education": "Formación",
+      "languages": "Idiomas",
+      "now": "actual"
+    },
+    "marks": {
+      "as_in_profile": "Como en el perfil",
+      "moved_up": "Subida",
+      "reworded": "Reformulada",
+      "edited": "Editada"
+    },
+    "from": {
+      "show": "De tu perfil",
+      "title": "De tu perfil:",
+      "companyPage": "(leído en {{page}})"
+    },
+    "flag": {
+      "label": "No está en tu perfil",
+      "claim": "«{{claim}}» no está en las fuentes que cita esta línea.",
+      "noSource": "Esta línea no cita nada de tu perfil.",
+      "company": "Los datos de la empresa no pueden ser logros tuyos. Solo pueden aparecer en el resumen.",
+      "skill": "{{skill}} no es una de tus habilidades."
+    },
+    "actions": {
+      "edit": "Editar",
+      "removeLine": "Quitar la línea",
+      "itsTrue": "Es verdad: añadirlo a mi perfil",
+      "editLabel": "Editar la línea",
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "confirmLabel": "Dilo con tus palabras",
+      "confirmHint": "Esto guarda tus palabras en {{role}} de tu perfil y luego vuelve a comprobar la línea.",
+      "confirmHintNoRole": "Esto guarda tus palabras en tu perfil y luego vuelve a comprobar la línea.",
+      "confirmSave": "Guardar en mi perfil y comprobar de nuevo",
+      "removeSkill": "Quitarla",
+      "addSkill": "La tengo: añadirla a mis habilidades"
+    },
+    "leftOut": {
+      "title_one": "Dejado fuera para esta oferta · {{count}} elemento",
+      "title_other": "Dejado fuera para esta oferta · {{count}} elementos",
+      "lead": "Esto está en tu perfil y no en este CV. Al volver a ponerlo se usan las palabras de tu perfil.",
+      "role_one": "{{role}} · {{count}} línea",
+      "role_other": "{{role}} · {{count}} líneas",
+      "line": "«{{text}}» · {{role}}",
+      "putBack": "Volver a poner"
+    },
+    "aside": {
+      "flagged_one": "{{count}} línea no se puede rastrear hasta tu perfil",
+      "flagged_other": "{{count}} líneas no se pueden rastrear hasta tu perfil",
+      "flaggedBody": "Aprobar se activa cuando cada una esté corregida, eliminada o añadida a tu perfil.",
+      "goFirst": "Ir a la primera",
+      "clean": "Todas las líneas se apoyan en tu perfil",
+      "cleanBody": "Aprueba para guardar este borrador como v{{version}}.",
+      "approvedTitle": "Aprobado · v{{version}}",
+      "approvedBody": "Esta versión no puede cambiar. Rehaz el CV para tener otra. El PDF viene después.",
+      "toPipeline": "Volver al pipeline"
+    },
+    "keywords": {
+      "title": "Palabras clave de la oferta en el CV",
+      "count": "{{on}}/{{total}}",
+      "on_cv": "En el CV",
+      "in_profile": "En tu perfil, pero no en este CV",
+      "not_in_profile": "No está en tu perfil",
+      "nice": "{{label}} · se valora",
+      "none": "La oferta no nombra nada que buscar.",
+      "note": "Las palabras clave que no tienes nunca se añaden por ti. Si tienes alguna, añádela a tu perfil y rehaz el CV."
+    },
+    "changes": {
+      "title": "Qué ha cambiado respecto a tu perfil",
+      "reworded_one": "{{count}} línea reformulada",
+      "reworded_other": "{{count}} líneas reformuladas",
+      "movedUp_one": "{{count}} línea subida",
+      "movedUp_other": "{{count}} líneas subidas",
+      "edited_one": "{{count}} línea editada por ti",
+      "edited_other": "{{count}} líneas editadas por ti",
+      "asIs_one": "{{count}} línea tal como estaba",
+      "asIs_other": "{{count}} líneas tal como estaban",
+      "leftOutRoles_one": "{{count}} puesto dejado fuera",
+      "leftOutRoles_other": "{{count}} puestos dejados fuera",
+      "leftOutLines_one": "{{count}} línea dejada fuera",
+      "leftOutLines_other": "{{count}} líneas dejadas fuera"
+    },
+    "spend": {
+      "drafts": "Borradores de hoy: {{n}} de {{cap}}",
+      "day": "IA de hoy: {{spent}} de {{limit}}",
+      "dayNoLimit": "IA de hoy: {{spent}}"
+    },
+    "errors": {
+      "stage_too_early": "Preselecciona antes esta oferta: el CV se hace para las ofertas que persigues.",
+      "profile_needed": "Añade primero un puesto a tu perfil: el CV se hace a partir de él.",
+      "cv_drafts_per_opportunity_cap": "Ya has hecho 10 borradores para esta oferta. Revisa uno de ellos.",
+      "cv_drafts_daily_cap": "Ya has hecho 20 borradores hoy. Puedes seguir mañana.",
+      "ai_unavailable": "La IA no está configurada en este servidor, así que no se puede redactar nada.",
+      "ai_daily_limit_reached": "Has alcanzado el límite diario de IA. Sigue mañana.",
+      "ai_budget_reached": "Has alcanzado tu límite de gasto de IA. Sigue cuando se reinicie el límite.",
+      "ai_failed": "La IA no ha podido responder esta vez. No se ha perdido nada; inténtalo de nuevo.",
+      "invalid_text": "Escribe entre 1 y 700 caracteres.",
+      "invalid_fact": "Escribe entre 1 y 300 caracteres.",
+      "profile_changed": "Ese puesto ha cambiado en tu perfil desde que se hizo este borrador. Rehaz el CV.",
+      "draft_frozen": "Este borrador se aprobó o se descartó, así que no puede cambiar. Rehaz el CV.",
+      "lines_flagged": "Algunas líneas todavía no se pueden rastrear hasta tu perfil. Corrígelas o elimínalas primero.",
+      "already_on_cv": "Eso ya está en el CV.",
+      "not_found": "No se ha encontrado este CV.",
+      "generic": "Algo ha ido mal. Inténtalo de nuevo."
     }
   }
 }

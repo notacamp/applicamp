@@ -109,3 +109,142 @@ export function todayAnswer(nextStep: Today["next_step"], overrides: Partial<Tod
     ...overrides,
   };
 }
+
+type Cv = Schema<"Cv">;
+type CvDraft = Schema<"CvDraftView">;
+type CvLine = Schema<"LineView">;
+
+/** A line of a tailored CV, traced to one source of the profile. */
+export function cvLine(id: string, text: string, overrides: Partial<CvLine> = {}): CvLine {
+  return {
+    id,
+    text,
+    mark: "as_in_profile",
+    sources: [
+      {
+        id: "w0.h1",
+        kind: "highlight",
+        text,
+        position: 0,
+        role: "Senior Engineer · Example Org",
+      },
+    ],
+    flags: [],
+    claims: [],
+    ...overrides,
+  };
+}
+
+/** A draft with a reworded line, a verbatim one, a number nobody wrote and a skill off the profile. */
+export function cvDraft(overrides: Partial<CvDraft> = {}): CvDraft {
+  const wrong = cvLine("l5", "Cut invoice runs to 20 minutes", {
+    mark: "reworded",
+    claims: ["20"],
+    flags: [{ kind: "claim_not_in_sources", claim: "20", cites: ["w0.h1"] }],
+  });
+  return {
+    n: 1,
+    status: "draft",
+    language: "en",
+    created_at: "2026-10-31T10:00:00Z",
+    expires_at: "2026-11-07T10:00:00Z",
+    contact: {
+      name: "Alex Demo",
+      email: "alex@example.com",
+      location: "Porto, Portugal",
+      links: [],
+    },
+    headline: cvLine("l1", "Backend engineer who ships billing systems"),
+    summary: cvLine("l2", "Rust engineer on billing."),
+    experience: [
+      {
+        position: 0,
+        title: "Senior Engineer",
+        company: "Example Org",
+        start_date: "2021-03",
+        bullets: [
+          cvLine("l3", "Moved invoicing over to PostgreSQL", {
+            mark: "reworded",
+            claims: ["PostgreSQL"],
+            sources: [
+              {
+                id: "w0.faaaa1111",
+                kind: "fact",
+                text: "Moved invoicing onto PostgreSQL",
+                position: 0,
+                role: "Senior Engineer · Example Org",
+              },
+            ],
+          }),
+          cvLine("l4", "Led a team of 4 engineers"),
+          wrong,
+        ],
+      },
+    ],
+    skills: [
+      { id: "l6", name: "Rust", flags: [] },
+      {
+        id: "l7",
+        name: "Kubernetes",
+        flags: [{ kind: "skill_not_on_profile", skill: "Kubernetes" }],
+      },
+    ],
+    education: [{ institution: "Example University", study_type: "BSc", area: "Computer science" }],
+    languages: [{ language: "English", fluency: "Fluent" }],
+    left_out: {
+      roles: [
+        {
+          position: 2,
+          title: "Junior Developer",
+          company: "Tiny Co",
+          start_date: "2015",
+          end_date: "2017",
+          lines: 1,
+        },
+      ],
+      lines: [],
+    },
+    flagged: 2,
+    first_flagged: "l5",
+    can_approve: false,
+    keywords: {
+      items: [
+        { label: "Rust", kind: "tech", state: "on_cv" },
+        { label: "Kafka", kind: "want", level: "nice", state: "not_in_profile" },
+      ],
+      on_cv: 1,
+      total: 2,
+    },
+    changes: {
+      reworded: 2,
+      as_in_profile: 3,
+      moved_up: 0,
+      edited: 0,
+      left_out_roles: 1,
+      left_out_lines: 0,
+    },
+    ...overrides,
+  };
+}
+
+/** The tailored CV of an opportunity, with no draft unless `draft` is given. */
+export function cv(overrides: Partial<Cv> = {}): Cv {
+  return {
+    opportunity_id: "0190a1b2-0000-7000-8000-000000000001",
+    draft: null,
+    versions: [],
+    can_draft: { allowed: true },
+    caps: {
+      drafts_here: 0,
+      drafts_here_cap: 10,
+      drafts_today: 0,
+      drafts_today_cap: 20,
+      today_eur: 0.01,
+      day_limit_eur: 0.3,
+      month_eur: 0.42,
+      month_limit_eur: 5,
+    },
+    draft_eur: 0.002,
+    ...overrides,
+  };
+}

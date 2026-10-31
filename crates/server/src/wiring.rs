@@ -5,11 +5,12 @@
 
 use std::collections::HashSet;
 
-use applicamp_kernel::{BoxFuture, EventBus, Result};
+use applicamp_kernel::{AppState, BoxFuture, EventBus, Result};
 use applicamp_pipeline::{
     ports::{
-        AnswerFacts, Posting, ProfileDigest, ProfileStatus, ProposedFact, RoleDigest, SearchLine,
-        SiteFailure, SitePage, SiteReading,
+        AnswerFacts, CvContact, CvEducation, CvFact, CvLanguage, CvPosition, CvProfile, Posting,
+        ProfileDigest, ProfileStatus, ProposedFact, RoleDigest, SearchLine, SiteFailure, SitePage,
+        SiteReading,
     },
     store::{self as pipeline_store, Eligibility, Found, UncheckedRow},
 };
@@ -524,6 +525,115 @@ impl applicamp_pipeline::Neighbours for PipelineWiring {
         now: DateTime<Utc>,
     ) -> BoxFuture<'a, Result<()>> {
         Box::pin(matching::dismiss_skill(db, account, skill, now))
+    }
+
+    fn cv_profile<'a>(
+        &'a self,
+        db: &'a PgPool,
+        account: Uuid,
+    ) -> BoxFuture<'a, Result<Option<CvProfile>>> {
+        Box::pin(async move {
+            let Some(profile) = matching::current_profile(db, account).await? else {
+                return Ok(None);
+            };
+            Ok(Some(cv_profile_of(profile)))
+        })
+    }
+
+    fn keep_fact<'a>(
+        &'a self,
+        state: &'a AppState,
+        account: Uuid,
+        position: usize,
+        title: Option<&'a str>,
+        company: Option<&'a str>,
+        text: &'a str,
+        area: &'a str,
+    ) -> BoxFuture<'a, Result<String>> {
+        Box::pin(async move {
+            let area = applicamp_profile::schema::Area::parse(area)
+                .unwrap_or(applicamp_profile::schema::Area::Results);
+            matching::keep_fact(state, account, position, title, company, text, area).await
+        })
+    }
+
+    fn add_skill<'a>(
+        &'a self,
+        state: &'a AppState,
+        account: Uuid,
+        skill: &'a str,
+    ) -> BoxFuture<'a, Result<()>> {
+        Box::pin(matching::add_skill(state, account, skill))
+    }
+}
+
+/// A profile as the CV is made from it: the contact apart from the rest.
+fn cv_profile_of(profile: applicamp_profile::schema::Profile) -> CvProfile {
+    let latest = matching::latest_position(&profile.work);
+    CvProfile {
+        contact: CvContact {
+            name: profile.basics.name,
+            email: profile.basics.email,
+            location: profile.basics.location,
+            url: profile.basics.url,
+            links: profile
+                .basics
+                .profiles
+                .into_iter()
+                .map(|link| (link.network, link.url))
+                .collect(),
+        },
+        headline: profile.basics.label,
+        summary: profile.basics.summary,
+        positions: profile
+            .work
+            .into_iter()
+            .enumerate()
+            .map(|(index, work)| CvPosition {
+                index,
+                title: work.position,
+                company: work.name,
+                location: work.location,
+                start_date: work.start_date,
+                end_date: work.end_date,
+                summary: work.summary,
+                highlights: work.highlights,
+                facts: work
+                    .facts
+                    .into_iter()
+                    .map(|fact| CvFact {
+                        id: fact.id,
+                        text: fact.text,
+                    })
+                    .collect(),
+            })
+            .collect(),
+        skills: profile
+            .skills
+            .into_iter()
+            .map(|skill| skill.name.trim().to_owned())
+            .filter(|name| !name.is_empty())
+            .collect(),
+        education: profile
+            .education
+            .into_iter()
+            .map(|e| CvEducation {
+                institution: e.institution,
+                area: e.area,
+                study_type: e.study_type,
+                start_date: e.start_date,
+                end_date: e.end_date,
+            })
+            .collect(),
+        languages: profile
+            .languages
+            .into_iter()
+            .map(|l| CvLanguage {
+                language: l.language,
+                fluency: l.fluency,
+            })
+            .collect(),
+        latest,
     }
 }
 

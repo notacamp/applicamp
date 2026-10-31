@@ -18,6 +18,7 @@ import { SignedInFrame } from "./routes/frame";
 import { GoalsInterview } from "./routes/goals-interview";
 import { NotFound } from "./routes/not-found";
 import { Pipeline } from "./routes/pipeline";
+import { PipelineCv } from "./routes/pipeline-cv";
 import { PipelinePrepare } from "./routes/pipeline-prepare";
 import { Profile } from "./routes/profile";
 import { ProfileGrill } from "./routes/profile-grill";
@@ -106,6 +107,9 @@ const pipelineRoute = createRoute({
         onPrepare={(id) => {
           void navigate({ to: "/pipeline/$id/prepare", params: { id } });
         }}
+        onReview={(id) => {
+          void navigate({ to: "/pipeline/$id/cv", params: { id } });
+        }}
       />
     );
   },
@@ -124,10 +128,35 @@ const prepareRoute = createRoute({
         onBack={() => {
           void navigate({ to: "/pipeline" });
         }}
+        onReview={() => {
+          void navigate({ to: "/pipeline/$id/cv", params: { id } });
+        }}
       />
     );
   },
 });
+
+/** Review the tailored CV: every line traced to the profile, approved when none is blocked. */
+const cvRoute = createRoute({
+  getParentRoute: () => frameRoute,
+  path: "/pipeline/$id/cv",
+  component: function CvRoute() {
+    const { id } = cvRoute.useParams();
+    const navigate = cvRoute.useNavigate();
+    return (
+      <PipelineCv
+        id={id}
+        onBack={() => {
+          void navigate({ to: "/pipeline/$id/prepare", params: { id } });
+        }}
+        onPipeline={() => {
+          void navigate({ to: "/pipeline" });
+        }}
+      />
+    );
+  },
+});
+
 /** `?tab=scanned` shows what each search scanned; anything else, the boards. */
 const boardsSearch = z.object({ tab: z.literal("scanned") });
 
@@ -344,6 +373,7 @@ const routeTree = rootRoute.addChildren([
     todayRoute,
     pipelineRoute,
     prepareRoute,
+    cvRoute,
     boardsRoute,
     agentsRoute,
     profileRoute,

@@ -517,6 +517,167 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/opportunities/{id}/cv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The tailored CV of an opportunity.
+         * @description The latest draft with each line's sources, marks and reasons, what was
+         *     left out, the job's keywords against it, the approved versions, the caps
+         *     and the spend. **Never calls the model.** Another account's opportunity is
+         *     not found.
+         */
+        get: operations["pipeline.cv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/cv/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Draft a CV for this job.
+         * @description **One model call.** From the posting, what the job wants, the company
+         *     facts not removed and the profile; each line cites the profile sources it
+         *     comes from, and the server then checks that it says nothing they do not.
+         *     The model never sees a name or contact details. Needs the opportunity at
+         *     Shortlisted or later. At most 10 drafts per opportunity and 20 per account
+         *     per UTC day; nothing retries past a limit. A new draft puts the earlier
+         *     unapproved one away.
+         */
+        post: operations["pipeline.cv_draft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/cv/drafts/{n}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve the draft.
+         * @description Refused (409 `lines_flagged`) while any line or skill cannot be traced to
+         *     the profile. The draft is frozen as the next version (contact details are
+         *     read from the profile again); part B renders it as a PDF. No model call.
+         */
+        post: operations["pipeline.cv_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/cv/drafts/{n}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Put a draft away.
+         * @description An approved version cannot be discarded. No model call.
+         */
+        post: operations["pipeline.cv_discard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/cv/drafts/{n}/lines/{line_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change one line of a draft.
+         * @description `{text}` edits it: the new text is checked against the **same sources**
+         *     (an edited line that is not a summary drops its company-fact citations).
+         *     `{remove: true}` removes the line (a position left with no line goes to
+         *     "left out"), or the skill. No model call. Only a draft can change.
+         */
+        patch: operations["pipeline.cv_line"];
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/cv/drafts/{n}/lines/{line_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * "It's true: add it to my profile."
+         * @description The person's own words become a fact kept on the line's position (its
+         *     `quote` is the text; `area` defaults to `results`), as Grill me's Keep
+         *     does, and the line is checked again with that fact as an extra source.
+         *     For a skill it adds the skill to the profile instead. A summary or
+         *     headline puts the fact on the most recent position. No model call.
+         */
+        post: operations["pipeline.cv_confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/cv/drafts/{n}/put-back": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Put back what the draft left out, as the profile has it.
+         * @description `{position}` puts a position left out back with up to three of its lines
+         *     (highlights, else kept facts, else its summary), word for word; `{source}`
+         *     puts one left-out line back on its position. Each cites its own source, so
+         *     it passes the check. No model call.
+         */
+        post: operations["pipeline.cv_put_back"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/profile": {
         parameters: {
             query?: never;
@@ -1338,6 +1499,11 @@ export interface components {
             /** @description Their own site. */
             url?: string | null;
         };
+        /**
+         * @description Why a draft cannot be made now.
+         * @enum {string}
+         */
+        Blocked: "stage_too_early" | "per_opportunity_cap" | "daily_cap" | "ai_unavailable";
         /** @description Why a board cannot be approved yet. */
         BoardBlocker: {
             /**
@@ -1699,6 +1865,11 @@ export interface components {
             /** @description The posting's exact words for it. */
             quote: string;
         };
+        /** @description Whether "Draft the CV" is on. */
+        CanDraft: {
+            allowed: boolean;
+            reason?: components["schemas"]["Blocked"] | null;
+        };
         /** @description The least they would take, before tax. */
         CashFloor: {
             /**
@@ -1721,6 +1892,21 @@ export interface components {
             name: string;
             /** @description Where it can be checked. */
             url?: string | null;
+        };
+        /** @description What changed from the profile. */
+        Changes: {
+            /** Format: int32 */
+            as_in_profile: number;
+            /** Format: int32 */
+            edited: number;
+            /** Format: int32 */
+            left_out_lines: number;
+            /** Format: int32 */
+            left_out_roles: number;
+            /** Format: int32 */
+            moved_up: number;
+            /** Format: int32 */
+            reworded: number;
         };
         /** @description The last read of the company's pages. */
         CompanyRead: {
@@ -1752,6 +1938,21 @@ export interface components {
          * @enum {string}
          */
         CompanyStage: "early" | "growth" | "established" | "public" | "nonprofit";
+        /** @description "It's true": the person's words. */
+        ConfirmRequest: {
+            /** @description What it is about (Grill me's areas); `results` when left out. */
+            area?: string | null;
+            /** @description In their own words, up to 300 characters. Not needed for a skill. */
+            text?: string | null;
+        };
+        /** @description How to reach the person, from the profile. */
+        ContactView: {
+            email?: string | null;
+            links: components["schemas"]["LinkView"][];
+            location?: string | null;
+            name?: string | null;
+            url?: string | null;
+        };
         /** @description A country's typical pay. */
         CountryBenchmark: {
             /** @description ISO 3166-1. */
@@ -1769,6 +1970,108 @@ export interface components {
          * @enum {string}
          */
         CoverageLevel: "none" | "part" | "ok";
+        /** @description The tailored CV of an opportunity. */
+        Cv: {
+            can_draft: components["schemas"]["CanDraft"];
+            caps: components["schemas"]["CvCaps"];
+            draft?: components["schemas"]["CvDraftView"] | null;
+            /**
+             * Format: double
+             * @description About what one draft costs, in euros.
+             */
+            draft_eur: number;
+            /** Format: uuid */
+            opportunity_id: string;
+            /** @description The approved versions, newest first (no PDF yet). */
+            versions: components["schemas"]["CvVersion"][];
+        };
+        /** @description The caps and the spend. */
+        CvCaps: {
+            /** Format: double */
+            day_limit_eur?: number | null;
+            /**
+             * Format: int32
+             * @description Drafts this opportunity has had.
+             */
+            drafts_here: number;
+            /** Format: int32 */
+            drafts_here_cap: number;
+            /**
+             * Format: int32
+             * @description Drafts the account started today (UTC).
+             */
+            drafts_today: number;
+            /** Format: int32 */
+            drafts_today_cap: number;
+            /** Format: double */
+            month_eur: number;
+            /** Format: double */
+            month_limit_eur?: number | null;
+            /** Format: double */
+            today_eur: number;
+        };
+        /** @description What to make a draft of. */
+        CvDraftRequest: {
+            /**
+             * @description A language tag such as `pt-PT`; the posting's when it says, else
+             *     English.
+             */
+            language?: string | null;
+        };
+        /** @description A draft, as the review page shows it. */
+        CvDraftView: {
+            /** Format: date-time */
+            approved_at?: string | null;
+            /** @description Approve is on: nothing is flagged and it is still a draft. */
+            can_approve: boolean;
+            changes: components["schemas"]["Changes"];
+            contact: components["schemas"]["ContactView"];
+            /** Format: date-time */
+            created_at: string;
+            education: components["schemas"]["EducationView"][];
+            experience: components["schemas"]["RoleView"][];
+            /**
+             * Format: date-time
+             * @description When it is deleted if nobody approves it.
+             */
+            expires_at?: string | null;
+            /** @description The first of them, as the page shows them. */
+            first_flagged?: string | null;
+            /**
+             * Format: int32
+             * @description How many lines (and skills) cannot be traced to the profile.
+             */
+            flagged: number;
+            headline?: components["schemas"]["LineView"] | null;
+            keywords: components["schemas"]["Keywords"];
+            /** @description The language it is written in. */
+            language: string;
+            languages: components["schemas"]["LanguageView"][];
+            left_out: components["schemas"]["LeftOut"];
+            /**
+             * Format: int32
+             * @description Its number for this opportunity, from 1.
+             */
+            n: number;
+            skills: components["schemas"]["SkillView"][];
+            status: components["schemas"]["DraftStatus"];
+            summary?: components["schemas"]["LineView"] | null;
+            /**
+             * Format: int32
+             * @description Once approved: the version, from 1.
+             */
+            version?: number | null;
+        };
+        /** @description An approved version. */
+        CvVersion: {
+            /** Format: date-time */
+            approved_at: string;
+            language: string;
+            /** Format: int32 */
+            n: number;
+            /** Format: int32 */
+            version: number;
+        };
         /** @description Why a board is declined. */
         DeclineBoard: {
             /** @description Up to 500 characters. */
@@ -1784,6 +2087,11 @@ export interface components {
             /** @description In the person's own words, 1 to 2000 characters. */
             answer: string;
         };
+        /**
+         * @description The status of a draft.
+         * @enum {string}
+         */
+        DraftStatus: "draft" | "approved" | "discarded";
         /** @description A draft, waiting to be kept, edited or discarded. */
         DraftView: {
             /**
@@ -1825,6 +2133,14 @@ export interface components {
             startDate?: string | null;
             /** @description The degree ("Master's"). */
             studyType?: string | null;
+        };
+        /** @description A school. */
+        EducationView: {
+            area?: string | null;
+            end_date?: string | null;
+            institution: string;
+            start_date?: string | null;
+            study_type?: string | null;
         };
         /** @description What each step costs, in euros, about. */
         Estimates: {
@@ -2167,6 +2483,35 @@ export interface components {
              */
             items?: string[] | null;
         };
+        /** @description A keyword of the job. */
+        Keyword: {
+            kind: components["schemas"]["KeywordKind"];
+            label: string;
+            /** @description `must` or `nice` for a want. */
+            level?: string | null;
+            state: components["schemas"]["KeywordState"];
+        };
+        /**
+         * @description Where a keyword comes from.
+         * @enum {string}
+         */
+        KeywordKind: "want" | "tech";
+        /**
+         * @description Where a job keyword is.
+         * @enum {string}
+         */
+        KeywordState: "on_cv" | "in_profile" | "not_in_profile";
+        /** @description The job's keywords against the CV and the profile. */
+        Keywords: {
+            items: components["schemas"]["Keyword"][];
+            /**
+             * Format: int32
+             * @description How many are on the CV.
+             */
+            on_cv: number;
+            /** Format: int32 */
+            total: number;
+        };
         /** @description A language they speak. */
         Language: {
             /** @description How well ("Native or bilingual"). */
@@ -2174,9 +2519,62 @@ export interface components {
             /** @description The language ("Portuguese"). */
             language: string;
         };
+        /** @description A language. */
+        LanguageView: {
+            fluency?: string | null;
+            language: string;
+        };
         /** @description The latest search. */
         LatestSearch: {
             search?: components["schemas"]["Search"] | null;
+        };
+        /** @description What the CV leaves out of the profile. */
+        LeftOut: {
+            lines: components["schemas"]["LeftOutLine"][];
+            roles: components["schemas"]["LeftOutRole"][];
+        };
+        /** @description A line of the profile, on a position that is on the CV, that is not. */
+        LeftOutLine: {
+            company?: string | null;
+            /** Format: int32 */
+            position: number;
+            /** @description The source id: what Put back is given. */
+            source: string;
+            text: string;
+            title?: string | null;
+        };
+        /** @description A position that is not on the CV. */
+        LeftOutRole: {
+            company?: string | null;
+            end_date?: string | null;
+            /**
+             * Format: int32
+             * @description How many lines of the profile it has.
+             */
+            lines: number;
+            /** Format: int32 */
+            position: number;
+            start_date?: string | null;
+            title?: string | null;
+        };
+        /** @description A change to one line: its new text, or its removal. */
+        LineChange: {
+            /** @description Remove the line (or the skill). */
+            remove?: boolean | null;
+            /** @description The new text. It is checked against the same sources. */
+            text?: string | null;
+        };
+        /** @description A line of the CV. */
+        LineView: {
+            /** @description The words of the line that the check looks for in its sources. */
+            claims: string[];
+            /** @description Why it cannot be traced to the profile; empty when it can. */
+            flags: components["schemas"]["Reason"][];
+            id: string;
+            mark: components["schemas"]["Mark"];
+            /** @description The sources it cites that the profile has. */
+            sources: components["schemas"]["SourceView"][];
+            text: string;
         };
         /** @description A profile elsewhere. */
         Link: {
@@ -2185,6 +2583,16 @@ export interface components {
             /** @description The address. */
             url: string;
         };
+        /** @description A link under the name. */
+        LinkView: {
+            network?: string | null;
+            url: string;
+        };
+        /**
+         * @description How a line relates to the profile.
+         * @enum {string}
+         */
+        Mark: "as_in_profile" | "moved_up" | "reworded" | "edited";
         /** @description The signed-in person. */
         Me: {
             /** @description The verified address the account was created with. */
@@ -2500,6 +2908,16 @@ export interface components {
             /** @description In the order the sign-in page shows them. */
             providers: components["schemas"]["Provider"][];
         };
+        /** @description What to put back: a position, or one of its lines. */
+        PutBackRequest: {
+            /**
+             * Format: int32
+             * @description A position left out (its place in the profile's `work`).
+             */
+            position?: number | null;
+            /** @description A line of the profile left out (its source id). */
+            source?: string | null;
+        };
         /** @description A question about a gap in the profile. */
         Question: {
             context?: components["schemas"]["RoleContext"] | null;
@@ -2560,6 +2978,26 @@ export interface components {
          * @enum {string}
          */
         RankingBasis: "own" | "few" | "benchmark" | "none";
+        /** @description Why a line cannot be traced to the profile. */
+        Reason: {
+            /** @description The sources it cites. */
+            cites: string[];
+            claim: string;
+            /** @enum {string} */
+            kind: "claim_not_in_sources";
+        } | {
+            /** @enum {string} */
+            kind: "no_source";
+        } | {
+            /** @description The company facts it cites. */
+            cites: string[];
+            /** @enum {string} */
+            kind: "company_fact_outside_summary";
+        } | {
+            /** @enum {string} */
+            kind: "skill_not_on_profile";
+            skill: string;
+        };
         /**
          * @description Whether they would move for the right job.
          * @enum {string}
@@ -2616,6 +3054,17 @@ export interface components {
              */
             position: number;
             /** @description Its title. */
+            title?: string | null;
+        };
+        /** @description A position on the CV. */
+        RoleView: {
+            bullets: components["schemas"]["LineView"][];
+            company?: string | null;
+            end_date?: string | null;
+            location?: string | null;
+            /** Format: int32 */
+            position: number;
+            start_date?: string | null;
             title?: string | null;
         };
         /** @description A job a check read as a sample. */
@@ -2794,6 +3243,12 @@ export interface components {
             /** @description Every skill name, once, in the new order. */
             names: string[];
         };
+        /** @description A skill on the CV. */
+        SkillView: {
+            flags: components["schemas"]["Reason"][];
+            id: string;
+            name: string;
+        };
         /** @description How well a board's listed engineering jobs fit someone's top skills. */
         SkillsFit: {
             /**
@@ -2806,6 +3261,27 @@ export interface components {
              * @description The share of those jobs that name one of their top skills, 0 to 1.
              */
             share: number;
+        };
+        /**
+         * @description What a source is.
+         * @enum {string}
+         */
+        SourceKind: "headline" | "summary" | "position_summary" | "highlight" | "fact" | "company" | "skills" | "education" | "languages";
+        /** @description A source a line cites. */
+        SourceView: {
+            id: string;
+            kind: components["schemas"]["SourceKind"];
+            /**
+             * Format: int32
+             * @description The position it belongs to.
+             */
+            position?: number | null;
+            /** @description "Title at Company" of that position. */
+            role?: string | null;
+            /** @description Its words, as the profile (or the company's page) has them. */
+            text: string;
+            /** @description For a company fact, the page it was read on. */
+            url?: string | null;
         };
         /** @description What was spent on AI, in euros, against the limits. */
         Spend: {
@@ -4370,6 +4846,431 @@ export interface operations {
             };
             /** @description `not_found` */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.cv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The CV. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cv"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.cv_draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CvDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description The CV, with the new draft. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cv"];
+                };
+            };
+            /** @description `invalid_request` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `stage_too_early`; `profile_needed` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `cv_drafts_per_opportunity_cap`; `cv_drafts_daily_cap` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.cv_approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+                /** @description The draft. */
+                n: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The CV, with the version. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cv"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `lines_flagged`; `draft_frozen` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.cv_discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+                /** @description The draft. */
+                n: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The CV. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cv"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `draft_frozen` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.cv_line": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+                /** @description The draft. */
+                n: number;
+                /** @description The line (or skill) id. */
+                line_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LineChange"];
+            };
+        };
+        responses: {
+            /** @description The CV, after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cv"];
+                };
+            };
+            /** @description `invalid_change`; `invalid_text` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: no such opportunity, draft or line */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `draft_frozen` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.cv_confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+                /** @description The draft. */
+                n: number;
+                /** @description The line (or skill) id. */
+                line_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description The CV, after the line was checked again. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cv"];
+                };
+            };
+            /** @description `invalid_fact`; `invalid_area`; `no_position` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `draft_frozen`; `profile_changed` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.cv_put_back": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+                /** @description The draft. */
+                n: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutBackRequest"];
+            };
+        };
+        responses: {
+            /** @description The CV, with it put back. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cv"];
+                };
+            };
+            /** @description `invalid_request` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: no such draft, position or line */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `draft_frozen`; `already_on_cv` */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

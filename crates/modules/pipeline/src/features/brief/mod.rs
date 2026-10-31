@@ -580,7 +580,7 @@ async fn build(
 /// a second only after a cut-off. A spending limit ends the attempt at once;
 /// nothing retries past it.
 #[allow(clippy::too_many_arguments)]
-async fn ask<T: DeserializeOwned>(
+pub(crate) async fn ask<T: DeserializeOwned>(
     gateway: &Gateway,
     db: &PgPool,
     account: Uuid,

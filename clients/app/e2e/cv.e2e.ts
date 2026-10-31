@@ -250,13 +250,13 @@ test("someone drafts a CV, sees the lines that can't be traced to their profile,
   await expectNoSidewaysScroll(page);
   await page.goBack();
 
-  // The peek says so.
+  // The peek shows the newest version: v2, the Compact one.
   await page.goto("/pipeline");
   await page.getByTestId("pipeline-search").fill(`Example Co ${tag}`);
   const row = page.getByTestId("pipeline-row").first();
   await expect(row).toBeVisible();
   await (phone ? row.click() : row.getByTestId("pipeline-row-open").click());
-  await expect(page.getByTestId("peek-cv-state")).toContainText("v1 approved");
+  await expect(page.getByTestId("peek-cv-state")).toContainText("v2 approved");
   await page.getByTestId("peek-review").click();
   await expect(page).toHaveURL(new RegExp(`/pipeline/${id}/cv$`));
 

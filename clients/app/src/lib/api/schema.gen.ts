@@ -39,8 +39,11 @@ export interface paths {
          * @description One completion of the `complete` role through the AI gateway, for the
          *     run's account: refused when the account reached its daily tokens or a
          *     spending limit (`ai_daily_limit_reached`, `ai_budget_reached`), and
-         *     when the run's tokens with this answer's worst case would pass its
-         *     kind's budget (`run_budget_reached`). The run's tokens and cost grow by
+         *     when the run's tokens, with what its calls in flight reserved and this
+         *     call's worst case (its prompt at about four characters a token, and its
+         *     whole `max_tokens` answer), would pass its kind's budget
+         *     (`run_budget_reached`). The worst case is reserved before the call is
+         *     forwarded and settled to what it used. The run's tokens and cost grow by
          *     what it used.
          */
         post: operations["runs.agent_complete"];
@@ -83,7 +86,8 @@ export interface paths {
         /**
          * Record the agent's events.
          * @description At most 50 a call, each numbered by the agent, its message at most
-         *     2 000 characters, its data at most 8 KB.
+         *     2 000 characters, its data at most 8 KB, none with a NUL character; all
+         *     or none are recorded. A run keeps at most 5 000 events.
          */
         post: operations["runs.agent_events"];
         delete?: never;
@@ -1044,6 +1048,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/profile/about/questions/enough": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * "That's enough for now": no more questions; on to the review. No model
+         *     call.
+         */
+        post: operations["profile.about_questions_enough"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/about/questions/next": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask the next question.
+         * @description The question for the top gap, or the one already on screen (no call).
+         *     **One small model call** words it: the model sees only that gap and its
+         *     context, and says why it asks. When there is nothing more to ask, no call
+         *     is made and the state says `done`.
+         */
+        post: operations["profile.about_question_next"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/about/questions/{id}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer the question on screen.
+         * @description **One small model call** reads the answer (and the choices picked) into
+         *     proposed changes, with the same structure and checks as "Anything else":
+         *     each quotes their words, and a claim their words do not say is a flag,
+         *     shown and never dropped. The changes join the pending ones, and the
+         *     portrait gains their sentences as new. Nothing is saved yet.
+         */
+        post: operations["profile.about_question_answer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/about/questions/{id}/skip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Skip the question on screen, for this profile version. No model call. */
+        post: operations["profile.about_question_skip"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/profile/about/review": {
         parameters: {
             query?: never;
@@ -1966,6 +2054,81 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description An answer to a question. */
+        AboutAnswerRequest: {
+            /** @description The choices picked, from the question's own. */
+            choices?: string[];
+            /**
+             * @description In their own words, up to 4000 characters; may be empty when a choice
+             *     is picked.
+             */
+            text?: string;
+        };
+        /** @description The question to answer now. */
+        AboutQuestion: {
+            area?: components["schemas"]["Area"] | null;
+            /** @description For a closed question, the answers to pick from. */
+            choices: string[];
+            /** @description The gap's id: what the answer and skip routes name. */
+            id: string;
+            kind: components["schemas"]["GapKind"];
+            /**
+             * Format: int32
+             * @description The position it is about (its place in `work`).
+             */
+            position?: number | null;
+            question: string;
+            /**
+             * Format: int32
+             * @description The profile's strength if this is answered, 0 to 100 (the same as
+             *     `strength` when the answer is not a part of the score).
+             */
+            strength_after: number;
+            tag: components["schemas"]["AboutQuestionTag"];
+            /** @description What was assumed, or what is not known: why it is asked. */
+            why: string;
+        };
+        /**
+         * @description What the question says it is.
+         * @enum {string}
+         */
+        AboutQuestionTag: "assumed" | "unknown" | "told";
+        /** @description The questions about the gaps. */
+        AboutQuestions: {
+            /**
+             * Format: int32
+             * @description Questions answered.
+             */
+            answered: number;
+            current?: components["schemas"]["AboutQuestion"] | null;
+            /**
+             * @description Nothing more to ask: the gaps ran out, the limit was reached or the
+             *     person said "That's enough for now".
+             */
+            done: boolean;
+            /**
+             * Format: int32
+             * @description Gaps left to ask about, the question on screen included.
+             */
+            left: number;
+            /**
+             * Format: int32
+             * @description Questions skipped.
+             */
+            skipped: number;
+            /**
+             * Format: int32
+             * @description The profile's strength with everything told so far, as if saved.
+             */
+            strength: number;
+            /**
+             * Format: int32
+             * @description About how many questions in all: the asked ones and those left.
+             */
+            total: number;
+            /** @description The changes (by id) the last answer proposed. */
+            updated: string[];
+        };
         /** @description What Save would do. */
         AboutReview: {
             groups: components["schemas"]["ReviewGroup"][];
@@ -1995,7 +2158,7 @@ export interface components {
              * @description Model calls made today by this account, of `daily_cap`.
              */
             calls_today: number;
-            /** @description The changes proposed from it. */
+            /** @description The changes proposed from it and from the answers to the questions. */
             changes: components["schemas"]["ChangeView"][];
             /**
              * Format: int32
@@ -2018,6 +2181,8 @@ export interface components {
              * @description The profile's version now.
              */
             profile_version: number;
+            /** @description The questions about the gaps (#44). */
+            questions: components["schemas"]["AboutQuestions"];
             /**
              * @description The portrait: sentences from the profile, what the person told, and
              *     the assumptions, in the order they read; then what they just added.
@@ -3081,6 +3246,11 @@ export interface components {
          * @enum {string}
          */
         FlagKind: "claim" | "quote";
+        /**
+         * @description What a gap is about.
+         * @enum {string}
+         */
+        GapKind: "assumed" | "results" | "team_size" | "area" | "skills" | "skills_found" | "claim" | "summary" | "headline" | "background" | "goals";
         /** @description The answers to the goals interview. Nothing is required. */
         Goals: {
             autonomy?: components["schemas"]["Autonomy"] | null;
@@ -7450,6 +7620,219 @@ export interface operations {
             };
             /** @description `ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed` */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.about_questions_enough": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The wizard's state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AboutView"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.about_question_next": {
+        parameters: {
+            query?: {
+                /** @description A language tag such as `pt-PT`; English when left out. */
+                locale?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The wizard's state, with the question. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AboutView"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `profile_needed`; `portrait_needed` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `about_daily_cap` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.about_question_answer": {
+        parameters: {
+            query?: {
+                /** @description A language tag such as `pt-PT`; English when left out. */
+                locale?: string;
+            };
+            header?: never;
+            path: {
+                /** @description The question on screen. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AboutAnswerRequest"];
+            };
+        };
+        responses: {
+            /** @description The wizard's state, with the changes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AboutView"];
+                };
+            };
+            /** @description `invalid_text`; `invalid_choice` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: that is not the question on screen */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `profile_needed`; `portrait_needed` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `about_daily_cap` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.about_question_skip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The question on screen. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The wizard's state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AboutView"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: that is not the question on screen */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

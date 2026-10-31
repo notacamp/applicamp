@@ -342,6 +342,9 @@ pub async fn running(db: &PgPool, id: Uuid, sandbox: &str) -> Result<(), sqlx::E
     Ok(())
 }
 
+/// What ending a run reads back: its account, kind, subject and start.
+type Ended = (Uuid, String, Option<Uuid>, Option<DateTime<Utc>>);
+
 /// End run `id` with `outcome` (and `error_kind`), unless it already ended:
 /// its token is deleted and `runs.finished` published in the same
 /// transaction. Whether it ended now.
@@ -354,7 +357,7 @@ pub async fn finish(
     now: DateTime<Utc>,
 ) -> Result<bool, sqlx::Error> {
     let mut tx = db.begin().await?;
-    let ended: Option<(Uuid, String, Option<Uuid>, Option<DateTime<Utc>>)> = sqlx::query_as(
+    let ended: Option<Ended> = sqlx::query_as(
         "UPDATE runs.runs
             SET status = 'finished', outcome = $2, error_kind = coalesce($3, error_kind),
                 finished_at = $4, claimed_until = NULL

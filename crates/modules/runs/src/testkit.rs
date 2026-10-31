@@ -82,7 +82,6 @@ pub(crate) struct Harness {
     pub(crate) db: PgPool,
     pub(crate) state: AppState,
     pub(crate) account: Uuid,
-    pub(crate) deps: RunsDeps,
 }
 
 impl Harness {
@@ -104,7 +103,7 @@ impl Harness {
             SecretKey::from_bytes([7; 32]),
         )
         .with_events(EventBus::new(Arc::new(registry)));
-        let (router, _) = module(deps.clone()).router.split_for_parts();
+        let (router, _) = module(deps).router.split_for_parts();
         let agent = router.clone().with_state(state.clone());
         let principal = Principal {
             account_id: account,
@@ -124,7 +123,6 @@ impl Harness {
             db,
             state,
             account,
-            deps,
         }
     }
 

@@ -49,7 +49,7 @@ use self::{
     check::Checks,
     judge::{MAX_BULLET, MAX_HEADLINE, MAX_SKILL, MAX_SUMMARY, RawCv},
     model::{CompanyFact, Content, Frame, Line, Role as CvRole, Source, SourceKind, short},
-    view::{CvVersion, DraftParts, DraftStatus, DraftView},
+    view::{CvDraftView, CvVersion, DraftParts, DraftStatus},
 };
 use crate::{
     PipelineDeps, companies,
@@ -122,7 +122,7 @@ pub struct Cv {
     pub opportunity_id: Uuid,
     /// The latest draft that was not discarded (approved or not); none before
     /// the first.
-    pub draft: Option<DraftView>,
+    pub draft: Option<CvDraftView>,
     /// The approved versions, newest first (no PDF yet).
     pub versions: Vec<CvVersion>,
     pub can_draft: CanDraft,
@@ -134,7 +134,7 @@ pub struct Cv {
 /// What to make a draft of.
 #[derive(Debug, Clone, Default, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
-pub struct DraftRequest {
+pub struct CvDraftRequest {
     /// A language tag such as `pt-PT`; the posting's when it says, else
     /// English.
     #[serde(default)]
@@ -311,7 +311,7 @@ fn can_draft(stage: &str, here: i64, today: i64, ai: bool) -> CanDraft {
     }
 }
 
-fn draft_view(row: &Row, wants: &[BriefWant], opp: &Opp) -> DraftView {
+fn draft_view(row: &Row, wants: &[BriefWant], opp: &Opp) -> CvDraftView {
     view::draft_view(
         &DraftParts {
             id: row.id,
@@ -603,7 +603,7 @@ pub async fn get(
     operation_id = "pipeline.cv_draft",
     security(("session" = [])),
     params(("id" = Uuid, Path, description = "The opportunity.")),
-    request_body = DraftRequest,
+    request_body = CvDraftRequest,
     responses(
         (status = 200, description = "The CV, with the new draft.", body = Cv),
         (status = 400, description = "`invalid_request`", body = Problem,
@@ -626,7 +626,7 @@ pub async fn create(
     SignedIn(principal): SignedIn,
     Extension(deps): Extension<PipelineDeps>,
     Path(id): Path<Uuid>,
-    body: Option<Json<DraftRequest>>,
+    body: Option<Json<CvDraftRequest>>,
 ) -> Result<Json<Cv>> {
     let request = body.map(|Json(b)| b).unwrap_or_default();
     let account = principal.account_id;

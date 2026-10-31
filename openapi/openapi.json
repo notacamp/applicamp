@@ -2028,7 +2028,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DraftRequest"
+                "$ref": "#/components/schemas/CvDraftRequest"
               }
             }
           },
@@ -6150,7 +6150,7 @@
           "draft": {
             "oneOf": [
               {
-                "$ref": "#/components/schemas/DraftView",
+                "$ref": "#/components/schemas/CvDraftView",
                 "description": "The latest draft that was not discarded (approved or not); none before\nthe first."
               },
               {
@@ -6231,6 +6231,156 @@
           "today_eur": {
             "type": "number",
             "format": "double"
+          }
+        }
+      },
+      "CvDraftRequest": {
+        "type": "object",
+        "description": "What to make a draft of.",
+        "properties": {
+          "language": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A language tag such as `pt-PT`; the posting's when it says, else\nEnglish."
+          }
+        },
+        "additionalProperties": false
+      },
+      "CvDraftView": {
+        "type": "object",
+        "description": "A draft, as the review page shows it.",
+        "required": [
+          "n",
+          "status",
+          "language",
+          "created_at",
+          "contact",
+          "experience",
+          "skills",
+          "education",
+          "languages",
+          "left_out",
+          "flagged",
+          "can_approve",
+          "keywords",
+          "changes"
+        ],
+        "properties": {
+          "approved_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "can_approve": {
+            "type": "boolean",
+            "description": "Approve is on: nothing is flagged and it is still a draft."
+          },
+          "changes": {
+            "$ref": "#/components/schemas/Changes"
+          },
+          "contact": {
+            "$ref": "#/components/schemas/ContactView"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "education": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EducationView"
+            }
+          },
+          "experience": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoleView"
+            }
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it is deleted if nobody approves it."
+          },
+          "first_flagged": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The first of them, as the page shows them."
+          },
+          "flagged": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many lines (and skills) cannot be traced to the profile.",
+            "minimum": 0
+          },
+          "headline": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LineView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "keywords": {
+            "$ref": "#/components/schemas/Keywords"
+          },
+          "language": {
+            "type": "string",
+            "description": "The language it is written in."
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LanguageView"
+            }
+          },
+          "left_out": {
+            "$ref": "#/components/schemas/LeftOut"
+          },
+          "n": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Its number for this opportunity, from 1.",
+            "minimum": 0
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkillView"
+            }
+          },
+          "status": {
+            "$ref": "#/components/schemas/DraftStatus"
+          },
+          "summary": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LineView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Once approved: the version, from 1.",
+            "minimum": 0
           }
         }
       },

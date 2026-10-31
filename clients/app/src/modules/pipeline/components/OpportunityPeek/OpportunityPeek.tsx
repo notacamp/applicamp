@@ -22,6 +22,7 @@ import {
 } from "~/lib/ui";
 
 import { canPrepare, PREPARE_ESTIMATE_EUR } from "../../api/brief";
+import { useCv } from "../../api/cv";
 import {
   factsText,
   formatCost,
@@ -48,6 +49,8 @@ export interface OpportunityPeekProps {
   onClose: () => void;
   /** Open the page that prepares a tailored CV for it; none hides the Tailored CV block. */
   onPrepare?: ((id: string) => void) | undefined;
+  /** Open the review of its tailored CV. */
+  onReview?: ((id: string) => void) | undefined;
 }
 
 /**
@@ -56,7 +59,7 @@ export interface OpportunityPeekProps {
  * gaps, the posting's text and link, notes, and Not for me. One that doesn't
  * meet the requirements says so. Opening it once marks a new match seen.
  */
-export function OpportunityPeek({ id, onClose, onPrepare }: OpportunityPeekProps) {
+export function OpportunityPeek({ id, onClose, onPrepare, onReview }: OpportunityPeekProps) {
   const { t } = useTranslation("pipeline");
   const opportunity = useOpportunity(id);
   const data = id === null ? undefined : opportunity.data;
@@ -80,9 +83,89 @@ export function OpportunityPeek({ id, onClose, onPrepare }: OpportunityPeekProps
         <Text tone="secondary">{t("loading")}</Text>
       ) : null}
       {data === undefined ? null : (
-        <PeekBody key={data.id} opportunity={data} onClose={onClose} onPrepare={onPrepare} />
+        <PeekBody
+          key={data.id}
+          opportunity={data}
+          onClose={onClose}
+          onPrepare={onPrepare}
+          onReview={onReview}
+        />
       )}
     </SidePeek>
+  );
+}
+
+/** The Tailored CV block: where the CV is (none yet, a draft, a version), and the way on. */
+function TailoredCv({
+  opportunity,
+  onPrepare,
+  onReview,
+}: {
+  opportunity: Opportunity;
+  onPrepare: (id: string) => void;
+  onReview: (id: string) => void;
+}) {
+  const { t, i18n } = useTranslation("pipeline");
+  const cv = useCv(opportunity.id);
+  const draft = cv.data?.draft ?? undefined;
+  const approved = cv.data?.versions[0];
+  const state =
+    draft === undefined
+      ? t("peek.tailored.none")
+      : draft.status === "approved"
+        ? t("peek.tailored.approved", { version: draft.version ?? 1 })
+        : draft.flagged > 0
+          ? t("peek.tailored.needsYou", { n: draft.n, count: draft.flagged })
+          : t("peek.tailored.clean", { n: draft.n });
+  return (
+    <Section
+      title={t("peek.tailored.title")}
+      description={t("peek.tailored.lead")}
+      testId="peek-tailored"
+    >
+      {cv.data === undefined ? null : (
+        <Tagged testId="peek-cv-state">
+          <Text>{state}</Text>
+        </Tagged>
+      )}
+      {approved === undefined || draft === undefined || draft.status === "approved" ? null : (
+        <Tagged testId="peek-cv-approved">
+          <Text tone="secondary" size="sm">
+            {t("peek.tailored.approvedBefore", { version: approved.version })}
+          </Text>
+        </Tagged>
+      )}
+      <Cluster>
+        {draft === undefined ? (
+          <Button
+            variant="primary"
+            icon="arrow-right"
+            data-testid="peek-prepare"
+            onClick={() => {
+              onPrepare(opportunity.id);
+            }}
+          >
+            {t("peek.tailored.prepare")}
+          </Button>
+        ) : (
+          <Button
+            variant="primary"
+            icon="arrow-right"
+            data-testid="peek-review"
+            onClick={() => {
+              onReview(opportunity.id);
+            }}
+          >
+            {t("peek.tailored.review")}
+          </Button>
+        )}
+        {draft === undefined ? (
+          <Text tone="secondary" size="sm">
+            {t("peek.tailored.cost", { cost: formatCost(PREPARE_ESTIMATE_EUR, i18n.language) })}
+          </Text>
+        ) : null}
+      </Cluster>
+    </Section>
   );
 }
 
@@ -90,10 +173,12 @@ function PeekBody({
   opportunity,
   onClose,
   onPrepare,
+  onReview,
 }: {
   opportunity: Opportunity;
   onClose: () => void;
   onPrepare: ((id: string) => void) | undefined;
+  onReview: ((id: string) => void) | undefined;
 }) {
   const { t, i18n } = useTranslation("pipeline");
   const update = useUpdateOpportunity();
@@ -275,27 +360,11 @@ function PeekBody({
         </Section>
       )}
       {onPrepare === undefined || !canPrepare(opportunity.stage) ? null : (
-        <Section
-          title={t("peek.tailored.title")}
-          description={t("peek.tailored.lead")}
-          testId="peek-tailored"
-        >
-          <Cluster>
-            <Button
-              variant="primary"
-              icon="arrow-right"
-              data-testid="peek-prepare"
-              onClick={() => {
-                onPrepare(opportunity.id);
-              }}
-            >
-              {t("peek.tailored.prepare")}
-            </Button>
-            <Text tone="secondary" size="sm">
-              {t("peek.tailored.cost", { cost: formatCost(PREPARE_ESTIMATE_EUR, i18n.language) })}
-            </Text>
-          </Cluster>
-        </Section>
+        <TailoredCv
+          opportunity={opportunity}
+          onPrepare={onPrepare}
+          onReview={onReview ?? onPrepare}
+        />
       )}
       <Section title={t("peek.notes")} testId="peek-notes">
         <InlineText

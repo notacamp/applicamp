@@ -224,7 +224,7 @@ impl DraftStatus {
 
 /// A draft, as the review page shows it.
 #[derive(Debug, Clone, Serialize, ToSchema)]
-pub struct DraftView {
+pub struct CvDraftView {
     /// Its number for this opportunity, from 1.
     pub n: u32,
     pub status: DraftStatus,
@@ -546,7 +546,7 @@ pub fn draft_view(
     wants: &[BriefWant],
     title: &str,
     posting: &str,
-) -> DraftView {
+) -> CvDraftView {
     let DraftParts {
         content,
         frame,
@@ -600,7 +600,7 @@ pub fn draft_view(
     changes.left_out_roles = to_u32(left_out.roles.len());
     changes.left_out_lines = to_u32(left_out.lines.len());
     let flagged_ids = flagged_in_order(content, checks);
-    DraftView {
+    CvDraftView {
         n: parts.n,
         status: parts.status,
         version: parts.version,
@@ -660,5 +660,104 @@ pub fn draft_view(
         can_approve: parts.status == DraftStatus::Draft && flagged_ids.is_empty(),
         keywords: keywords(wants, title, posting, content, frame),
         changes,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        features::cv::model::{Content, Role, SkillItem},
+        ports::{CvPosition, CvProfile},
+    };
+
+    fn frame() -> Frame {
+        Frame::build(
+            &CvProfile {
+                positions: vec![CvPosition {
+                    index: 0,
+                    title: Some("Senior Engineer".into()),
+                    highlights: vec!["Led a team of 4".into(), "Rebuilt billing in Rust".into()],
+                    ..CvPosition::default()
+                }],
+                skills: vec!["Rust".into(), "GraphQL".into()],
+                ..CvProfile::default()
+            },
+            "Example Co",
+            &[],
+        )
+    }
+
+    fn line(id: &str, text: &str, sources: &[&str]) -> Line {
+        Line {
+            id: id.into(),
+            text: text.into(),
+            sources: sources.iter().map(|s| (*s).to_owned()).collect(),
+            edited: false,
+        }
+    }
+
+    #[test]
+    fn a_line_word_for_word_is_as_in_profile_or_moved_up_and_a_rewording_is_neither() {
+        let f = frame();
+        // The second highlight, first on the CV: moved up.
+        let moved = line("l1", "Rebuilt billing in Rust", &["w0.h2"]);
+        assert_eq!(mark_of(&moved, 0, &f), Mark::MovedUp);
+        // The same one, where the profile has it.
+        assert_eq!(mark_of(&moved, 1, &f), Mark::AsInProfile);
+        let reworded = line("l2", "Rebuilt billing, in Rust", &["w0.h2"]);
+        assert_eq!(mark_of(&reworded, 0, &f), Mark::Reworded);
+        let two = line("l3", "Led a team of 4", &["w0.h1", "w0.h2"]);
+        assert_eq!(
+            mark_of(&two, 0, &f),
+            Mark::Reworded,
+            "two sources is no copy"
+        );
+        let mut mine = line("l4", "Led a team of 4", &["w0.h1"]);
+        mine.edited = true;
+        assert_eq!(mark_of(&mine, 0, &f), Mark::Edited);
+    }
+
+    #[test]
+    fn keywords_are_on_the_cv_in_the_profile_only_or_not_in_it_and_never_invented() {
+        let f = frame();
+        let content = Content {
+            experience: vec![Role {
+                position: 0,
+                bullets: vec![line("l1", "Rebuilt billing in Rust", &["w0.h2"])],
+            }],
+            skills: vec![SkillItem {
+                id: "k1".into(),
+                name: "Rust".into(),
+            }],
+            ..Content::default()
+        };
+        let wants = vec![
+            BriefWant {
+                label: "Billing experience".into(),
+                quote: "billing".into(),
+                level: "must".into(),
+            },
+            BriefWant {
+                label: "Terraform".into(),
+                quote: "Terraform".into(),
+                level: "nice".into(),
+            },
+        ];
+        let k = keywords(
+            &wants,
+            "Staff Engineer",
+            "You will use Rust, GraphQL and Kafka.",
+            &content,
+            &f,
+        );
+        let state = |label: &str| k.items.iter().find(|i| i.label == label).map(|i| i.state);
+        assert_eq!(state("Billing experience"), Some(KeywordState::OnCv));
+        assert_eq!(state("Terraform"), Some(KeywordState::NotInProfile));
+        assert_eq!(state("Rust"), Some(KeywordState::OnCv));
+        assert_eq!(state("GraphQL"), Some(KeywordState::InProfile));
+        assert_eq!(state("Kafka"), Some(KeywordState::NotInProfile));
+        assert_eq!(k.on_cv, 2);
+        assert_eq!(k.total, 5);
     }
 }

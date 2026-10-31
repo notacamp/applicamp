@@ -138,11 +138,11 @@ pub fn message(
         if sources.is_empty() {
             continue;
         }
-        let dates = format!(
-            "{} - {}",
-            position.start_date.as_deref().unwrap_or("?"),
-            position.end_date.as_deref().unwrap_or("now")
-        );
+        let dates = match (position.start_date.as_deref(), position.end_date.as_deref()) {
+            (Some(start), end) => format!("{start} - {}", end.unwrap_or("now")),
+            (None, Some(end)) => format!("? - {end}"),
+            (None, None) => String::new(),
+        };
         profile.push(format!(
             "<position id=\"w{}\" title=\"{}\" company=\"{}\" dates=\"{dates}\">\n{}\n</position>",
             position.index,

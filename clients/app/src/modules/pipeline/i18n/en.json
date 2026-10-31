@@ -110,7 +110,14 @@
       "title": "Tailored CV",
       "lead": "A CV for this job, based on real facts about the company and the job.",
       "prepare": "Prepare: company and job",
-      "cost": "About {{cost}}. Nothing is sent anywhere."
+      "cost": "About {{cost}}. Nothing is sent anywhere.",
+      "none": "No draft yet.",
+      "approved": "v{{version}} approved.",
+      "needsYou_one": "Draft {{n}}: {{count}} line needs you.",
+      "needsYou_other": "Draft {{n}}: {{count}} lines need you.",
+      "clean": "Draft {{n}}: every line traces to your profile.",
+      "approvedBefore": "v{{version}} is approved; this newer draft isn’t yet.",
+      "review": "Review the CV"
     }
   },
   "hidden": {
@@ -206,7 +213,7 @@
     },
     "draft": {
       "title": "Draft the CV",
-      "lead": "Next: the CV is drafted from these facts, your profile and your answers, and every line is checked against them."
+      "lead": "The CV is drafted from these facts and your profile, and every line is checked against what your profile says."
     },
     "costLine": "Reading a company: one AI call, about {{read}}, reused for 30 days. Comparing the job: one call, about {{analysis}}. Each answer: one small call, about {{answer}}. Nothing runs in the background.",
     "spend": {
@@ -230,6 +237,150 @@
       "profile_needed": "Add a position to your profile first: the answer needs one to go on.",
       "no_skill": "This question isn’t about a skill.",
       "not_found": "This opportunity wasn’t found.",
+      "generic": "Something went wrong. Try again."
+    }
+  },
+  "cv": {
+    "eyebrow": "Tailored CV",
+    "title": "Review the CV",
+    "heading": "Review your CV for {{company}}",
+    "lead": "Built from your profile for this job. Every line points back to where it came from. Lines that can’t be traced to your profile are blocked until you fix them.",
+    "back": "Back to Prepare",
+    "loading": "Loading the CV…",
+    "loadFailed": "The CV couldn’t be loaded.",
+    "empty": {
+      "body": "No draft yet. The CV is drafted from your profile, the company’s facts and what the job wants: one AI call. Every line is then checked without AI."
+    },
+    "toolbar": {
+      "draft": "Draft {{n}}",
+      "draftPill": "Draft",
+      "approvedPill": "Approved · v{{version}}",
+      "language": "Written in {{language}}",
+      "makeAgain": "Make again · about {{cost}}",
+      "making": "Drafting…",
+      "approve": "Approve v{{version}}",
+      "approving": "Approving…",
+      "approveWhy": "Approve turns on when every blocked line is fixed or removed."
+    },
+    "draft": {
+      "draft": "Draft the CV · about {{cost}}",
+      "drafting": "Drafting…",
+      "review": "Review the CV",
+      "hint": "One AI call. Then every line is checked against your profile, without AI.",
+      "blocked": {
+        "stage_too_early": "Shortlist this job first: a CV is made for the jobs you’re going after.",
+        "per_opportunity_cap": "You’ve made 10 drafts for this job. Review one of them.",
+        "daily_cap": "You’ve made 20 drafts today. Drafting continues tomorrow.",
+        "ai_unavailable": "The AI isn’t set up on this server, so nothing can be drafted."
+      }
+    },
+    "sheet": {
+      "label": "Your tailored CV",
+      "summary": "Summary",
+      "experience": "Experience",
+      "skills": "Skills",
+      "education": "Education",
+      "languages": "Languages",
+      "now": "now"
+    },
+    "marks": {
+      "as_in_profile": "As in profile",
+      "moved_up": "Moved up",
+      "reworded": "Reworded",
+      "edited": "Edited"
+    },
+    "from": {
+      "show": "From your profile",
+      "title": "From your profile:",
+      "companyPage": "(read on {{page}})"
+    },
+    "flag": {
+      "label": "Not in your profile",
+      "claim": "“{{claim}}” isn’t in the sources this line cites.",
+      "noSource": "This line cites nothing from your profile.",
+      "company": "Company facts can’t be your achievements. They can only appear in the summary.",
+      "skill": "{{skill}} isn’t one of your skills."
+    },
+    "actions": {
+      "edit": "Edit",
+      "removeLine": "Remove the line",
+      "itsTrue": "It’s true: add it to my profile",
+      "editLabel": "Edit the line",
+      "save": "Save",
+      "cancel": "Cancel",
+      "confirmLabel": "Say it in your words",
+      "confirmHint": "This saves your words to {{role}} in your profile, then checks the line again.",
+      "confirmHintNoRole": "This saves your words to your profile, then checks the line again.",
+      "confirmSave": "Save to my profile and check again",
+      "removeSkill": "Remove it",
+      "addSkill": "I have it: add to my skills"
+    },
+    "leftOut": {
+      "title_one": "Left out for this job · {{count}} item",
+      "title_other": "Left out for this job · {{count}} items",
+      "lead": "These are in your profile and not on this CV. Putting one back uses your profile’s own words.",
+      "role_one": "{{role}} · {{count}} line",
+      "role_other": "{{role}} · {{count}} lines",
+      "line": "“{{text}}” · {{role}}",
+      "putBack": "Put back"
+    },
+    "aside": {
+      "flagged_one": "{{count}} line can’t be traced to your profile",
+      "flagged_other": "{{count}} lines can’t be traced to your profile",
+      "flaggedBody": "Approve turns on when each one is fixed, removed or added to your profile.",
+      "goFirst": "Go to the first one",
+      "clean": "Every line traces to your profile",
+      "cleanBody": "Approve to keep this draft as v{{version}}.",
+      "approvedTitle": "Approved · v{{version}}",
+      "approvedBody": "This version can’t change. Make the CV again for another one. The PDF comes next.",
+      "toPipeline": "Back to the pipeline"
+    },
+    "keywords": {
+      "title": "Job keywords on the CV",
+      "count": "{{on}}/{{total}}",
+      "on_cv": "On the CV",
+      "in_profile": "In your profile, not on this CV",
+      "not_in_profile": "Not in your profile",
+      "nice": "{{label}} · nice to have",
+      "none": "The posting names nothing to look for.",
+      "note": "Keywords you don’t have are never added for you. If you do have one, add it to your profile and make the CV again."
+    },
+    "changes": {
+      "title": "What changed from your profile",
+      "reworded_one": "{{count}} line reworded",
+      "reworded_other": "{{count}} lines reworded",
+      "movedUp_one": "{{count}} line moved up",
+      "movedUp_other": "{{count}} lines moved up",
+      "edited_one": "{{count}} line edited by you",
+      "edited_other": "{{count}} lines edited by you",
+      "asIs_one": "{{count}} line as written",
+      "asIs_other": "{{count}} lines as written",
+      "leftOutRoles_one": "{{count}} position left out",
+      "leftOutRoles_other": "{{count}} positions left out",
+      "leftOutLines_one": "{{count}} line left out",
+      "leftOutLines_other": "{{count}} lines left out"
+    },
+    "spend": {
+      "drafts": "Drafts today: {{n}} of {{cap}}",
+      "day": "Today’s AI: {{spent}} of {{limit}}",
+      "dayNoLimit": "Today’s AI: {{spent}}"
+    },
+    "errors": {
+      "stage_too_early": "Shortlist this job first: a CV is made for the jobs you’re going after.",
+      "profile_needed": "Add a position to your profile first: the CV is made from it.",
+      "cv_drafts_per_opportunity_cap": "You’ve made 10 drafts for this job. Review one of them.",
+      "cv_drafts_daily_cap": "You’ve made 20 drafts today. Drafting continues tomorrow.",
+      "ai_unavailable": "The AI isn’t set up on this server, so nothing can be drafted.",
+      "ai_daily_limit_reached": "You’ve reached today’s AI limit. It continues tomorrow.",
+      "ai_budget_reached": "You’ve reached your AI spending limit. It continues when the limit resets.",
+      "ai_failed": "The AI couldn’t answer this time. Nothing was lost; try again.",
+      "invalid_text": "Write between 1 and 700 characters.",
+      "invalid_fact": "Write between 1 and 300 characters.",
+      "profile_changed": "That position changed in your profile since this draft was made. Make the CV again.",
+      "draft_frozen": "This draft was approved or put away, so it can’t change. Make the CV again.",
+      "lines_flagged": "Some lines can’t be traced to your profile yet. Fix or remove them first.",
+      "already_on_cv": "That is on the CV already.",
+      "not_found": "This CV wasn’t found.",
       "generic": "Something went wrong. Try again."
     }
   }

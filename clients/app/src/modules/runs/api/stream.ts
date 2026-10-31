@@ -29,7 +29,7 @@ export interface RunEvents {
  * Lines one run keeps in memory: the server keeps 5 000 and one line saying
  * the rest were cut.
  */
-export const MAX_KEPT_EVENTS = 5_001;
+export const MAX_KEPT_EVENTS = 5001;
 
 /**
  * Add `event` to `kept` in place, unless `kept` is full: constant time, so

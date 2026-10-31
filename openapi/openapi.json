@@ -49,7 +49,7 @@
           "runs"
         ],
         "summary": "Ask the model.",
-        "description": "One completion of the `complete` role through the AI gateway, for the\nrun's account: refused when the account reached its daily tokens or a\nspending limit (`ai_daily_limit_reached`, `ai_budget_reached`), and\nwhen the run's tokens with this answer's worst case would pass its\nkind's budget (`run_budget_reached`). The run's tokens and cost grow by\nwhat it used.",
+        "description": "One completion of the `complete` role through the AI gateway, for the\nrun's account: refused when the account reached its daily tokens or a\nspending limit (`ai_daily_limit_reached`, `ai_budget_reached`), and\nwhen the run's tokens, with what its calls in flight reserved and this\ncall's worst case (its prompt at about four characters a token, and its\nwhole `max_tokens` answer), would pass its kind's budget\n(`run_budget_reached`). The worst case is reserved before the call is\nforwarded and settled to what it used. The run's tokens and cost grow by\nwhat it used.",
         "operationId": "runs.agent_complete",
         "requestBody": {
           "content": {
@@ -203,7 +203,7 @@
           "runs"
         ],
         "summary": "Record the agent's events.",
-        "description": "At most 50 a call, each numbered by the agent, its message at most\n2 000 characters, its data at most 8 KB.",
+        "description": "At most 50 a call, each numbered by the agent, its message at most\n2 000 characters, its data at most 8 KB, none with a NUL character; all\nor none are recorded. A run keeps at most 5 000 events.",
         "operationId": "runs.agent_events",
         "requestBody": {
           "content": {

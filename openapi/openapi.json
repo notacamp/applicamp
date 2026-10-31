@@ -1945,6 +1945,652 @@
         ]
       }
     },
+    "/api/v1/opportunities/{id}/cv": {
+      "get": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "The tailored CV of an opportunity.",
+        "description": "The latest draft with each line's sources, marks and reasons, what was\nleft out, the job's keywords against it, the approved versions, the caps\nand the spend. **Never calls the model.** Another account's opportunity is\nnot found.",
+        "operationId": "pipeline.cv",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The CV.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cv"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/cv/drafts": {
+      "post": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Draft a CV for this job.",
+        "description": "**One model call.** From the posting, what the job wants, the company\nfacts not removed and the profile; each line cites the profile sources it\ncomes from, and the server then checks that it says nothing they do not.\nThe model never sees a name or contact details. Needs the opportunity at\nShortlisted or later. At most 10 drafts per opportunity and 20 per account\nper UTC day; nothing retries past a limit. A new draft puts the earlier\nunapproved one away.",
+        "operationId": "pipeline.cv_draft",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The CV, with the new draft.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cv"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_request`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`stage_too_early`; `profile_needed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`cv_drafts_per_opportunity_cap`; `cv_drafts_daily_cap`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/cv/drafts/{n}/approve": {
+      "post": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Approve the draft.",
+        "description": "Refused (409 `lines_flagged`) while any line or skill cannot be traced to\nthe profile. The draft is frozen as the next version (contact details are\nread from the profile again); part B renders it as a PDF. No model call.",
+        "operationId": "pipeline.cv_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "n",
+            "in": "path",
+            "description": "The draft.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The CV, with the version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cv"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`lines_flagged`; `draft_frozen`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/cv/drafts/{n}/discard": {
+      "post": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Put a draft away.",
+        "description": "An approved version cannot be discarded. No model call.",
+        "operationId": "pipeline.cv_discard",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "n",
+            "in": "path",
+            "description": "The draft.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The CV.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cv"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`draft_frozen`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/cv/drafts/{n}/lines/{line_id}": {
+      "patch": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Change one line of a draft.",
+        "description": "`{text}` edits it: the new text is checked against the **same sources**\n(an edited line that is not a summary drops its company-fact citations).\n`{remove: true}` removes the line (a position left with no line goes to\n\"left out\"), or the skill. No model call. Only a draft can change.",
+        "operationId": "pipeline.cv_line",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "n",
+            "in": "path",
+            "description": "The draft.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "line_id",
+            "in": "path",
+            "description": "The line (or skill) id.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LineChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The CV, after the change.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cv"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_change`; `invalid_text`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such opportunity, draft or line",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`draft_frozen`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/cv/drafts/{n}/lines/{line_id}/confirm": {
+      "post": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "\"It's true: add it to my profile.\"",
+        "description": "The person's own words become a fact kept on the line's position (its\n`quote` is the text; `area` defaults to `results`), as Grill me's Keep\ndoes, and the line is checked again with that fact as an extra source.\nFor a skill it adds the skill to the profile instead. A summary or\nheadline puts the fact on the most recent position. No model call.",
+        "operationId": "pipeline.cv_confirm",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "n",
+            "in": "path",
+            "description": "The draft.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "line_id",
+            "in": "path",
+            "description": "The line (or skill) id.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The CV, after the line was checked again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cv"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_fact`; `invalid_area`; `no_position`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`draft_frozen`; `profile_changed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/cv/drafts/{n}/put-back": {
+      "post": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Put back what the draft left out, as the profile has it.",
+        "description": "`{position}` puts a position left out back with up to three of its lines\n(highlights, else kept facts, else its summary), word for word; `{source}`\nputs one left-out line back on its position. Each cites its own source, so\nit passes the check. No model call.",
+        "operationId": "pipeline.cv_put_back",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "n",
+            "in": "path",
+            "description": "The draft.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutBackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The CV, with it put back.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cv"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_request`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such draft, position or line",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`draft_frozen`; `already_on_cv`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/v1/profile": {
       "get": {
         "tags": [
@@ -4256,6 +4902,16 @@
         },
         "additionalProperties": false
       },
+      "Blocked": {
+        "type": "string",
+        "description": "Why a draft cannot be made now.",
+        "enum": [
+          "stage_too_early",
+          "per_opportunity_cap",
+          "daily_cap",
+          "ai_unavailable"
+        ]
+      },
       "BoardBlocker": {
         "type": "object",
         "description": "Why a board cannot be approved yet.",
@@ -5191,6 +5847,28 @@
           }
         }
       },
+      "CanDraft": {
+        "type": "object",
+        "description": "Whether \"Draft the CV\" is on.",
+        "required": [
+          "allowed"
+        ],
+        "properties": {
+          "allowed": {
+            "type": "boolean"
+          },
+          "reason": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Blocked"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
       "CashFloor": {
         "type": "object",
         "description": "The least they would take, before tax.",
@@ -5252,6 +5930,50 @@
         },
         "additionalProperties": false
       },
+      "Changes": {
+        "type": "object",
+        "description": "What changed from the profile.",
+        "required": [
+          "reworded",
+          "as_in_profile",
+          "moved_up",
+          "edited",
+          "left_out_roles",
+          "left_out_lines"
+        ],
+        "properties": {
+          "as_in_profile": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "edited": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "left_out_lines": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "left_out_roles": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "moved_up": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "reworded": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
       "CompanyRead": {
         "type": "object",
         "description": "The last read of the company's pages.",
@@ -5305,6 +6027,66 @@
           "nonprofit"
         ]
       },
+      "ConfirmRequest": {
+        "type": "object",
+        "description": "\"It's true\": the person's words.",
+        "properties": {
+          "area": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What it is about (Grill me's areas); `results` when left out."
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "In their own words, up to 300 characters. Not needed for a skill."
+          }
+        },
+        "additionalProperties": false
+      },
+      "ContactView": {
+        "type": "object",
+        "description": "How to reach the person, from the profile.",
+        "required": [
+          "links"
+        ],
+        "properties": {
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LinkView"
+            }
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "CountryBenchmark": {
         "type": "object",
         "description": "A country's typical pay.",
@@ -5348,6 +6130,139 @@
           "ok"
         ]
       },
+      "Cv": {
+        "type": "object",
+        "description": "The tailored CV of an opportunity.",
+        "required": [
+          "opportunity_id",
+          "versions",
+          "can_draft",
+          "caps",
+          "draft_eur"
+        ],
+        "properties": {
+          "can_draft": {
+            "$ref": "#/components/schemas/CanDraft"
+          },
+          "caps": {
+            "$ref": "#/components/schemas/CvCaps"
+          },
+          "draft": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DraftView",
+                "description": "The latest draft that was not discarded (approved or not); none before\nthe first."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "draft_eur": {
+            "type": "number",
+            "format": "double",
+            "description": "About what one draft costs, in euros."
+          },
+          "opportunity_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CvVersion"
+            },
+            "description": "The approved versions, newest first (no PDF yet)."
+          }
+        }
+      },
+      "CvCaps": {
+        "type": "object",
+        "description": "The caps and the spend.",
+        "required": [
+          "drafts_here",
+          "drafts_here_cap",
+          "drafts_today",
+          "drafts_today_cap",
+          "today_eur",
+          "month_eur"
+        ],
+        "properties": {
+          "day_limit_eur": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "drafts_here": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Drafts this opportunity has had.",
+            "minimum": 0
+          },
+          "drafts_here_cap": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "drafts_today": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Drafts the account started today (UTC).",
+            "minimum": 0
+          },
+          "drafts_today_cap": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "month_eur": {
+            "type": "number",
+            "format": "double"
+          },
+          "month_limit_eur": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "today_eur": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "CvVersion": {
+        "type": "object",
+        "description": "An approved version.",
+        "required": [
+          "n",
+          "version",
+          "language",
+          "approved_at"
+        ],
+        "properties": {
+          "approved_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "language": {
+            "type": "string"
+          },
+          "n": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
       "DeclineBoard": {
         "type": "object",
         "description": "Why a board is declined.",
@@ -5385,6 +6300,15 @@
             "description": "In the person's own words, 1 to 2000 characters."
           }
         }
+      },
+      "DraftStatus": {
+        "type": "string",
+        "description": "The status of a draft.",
+        "enum": [
+          "draft",
+          "approved",
+          "discarded"
+        ]
       },
       "DraftView": {
         "type": "object",
@@ -5483,6 +6407,42 @@
           }
         },
         "additionalProperties": false
+      },
+      "EducationView": {
+        "type": "object",
+        "description": "A school.",
+        "required": [
+          "institution"
+        ],
+        "properties": {
+          "area": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "end_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "institution": {
+            "type": "string"
+          },
+          "start_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "study_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
       },
       "Estimates": {
         "type": "object",
@@ -6233,6 +7193,78 @@
           }
         }
       },
+      "Keyword": {
+        "type": "object",
+        "description": "A keyword of the job.",
+        "required": [
+          "label",
+          "kind",
+          "state"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/KeywordKind"
+          },
+          "label": {
+            "type": "string"
+          },
+          "level": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`must` or `nice` for a want."
+          },
+          "state": {
+            "$ref": "#/components/schemas/KeywordState"
+          }
+        }
+      },
+      "KeywordKind": {
+        "type": "string",
+        "description": "Where a keyword comes from.",
+        "enum": [
+          "want",
+          "tech"
+        ]
+      },
+      "KeywordState": {
+        "type": "string",
+        "description": "Where a job keyword is.",
+        "enum": [
+          "on_cv",
+          "in_profile",
+          "not_in_profile"
+        ]
+      },
+      "Keywords": {
+        "type": "object",
+        "description": "The job's keywords against the CV and the profile.",
+        "required": [
+          "items",
+          "on_cv",
+          "total"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Keyword"
+            }
+          },
+          "on_cv": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many are on the CV.",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
       "Language": {
         "type": "object",
         "description": "A language they speak.",
@@ -6254,6 +7286,24 @@
         },
         "additionalProperties": false
       },
+      "LanguageView": {
+        "type": "object",
+        "description": "A language.",
+        "required": [
+          "language"
+        ],
+        "properties": {
+          "fluency": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "language": {
+            "type": "string"
+          }
+        }
+      },
       "LatestSearch": {
         "type": "object",
         "description": "The latest search.",
@@ -6268,6 +7318,173 @@
                 "type": "null"
               }
             ]
+          }
+        }
+      },
+      "LeftOut": {
+        "type": "object",
+        "description": "What the CV leaves out of the profile.",
+        "required": [
+          "roles",
+          "lines"
+        ],
+        "properties": {
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeftOutLine"
+            }
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeftOutRole"
+            }
+          }
+        }
+      },
+      "LeftOutLine": {
+        "type": "object",
+        "description": "A line of the profile, on a position that is on the CV, that is not.",
+        "required": [
+          "source",
+          "position",
+          "text"
+        ],
+        "properties": {
+          "company": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "source": {
+            "type": "string",
+            "description": "The source id: what Put back is given."
+          },
+          "text": {
+            "type": "string"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "LeftOutRole": {
+        "type": "object",
+        "description": "A position that is not on the CV.",
+        "required": [
+          "position",
+          "lines"
+        ],
+        "properties": {
+          "company": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "end_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lines": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many lines of the profile it has.",
+            "minimum": 0
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "start_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "LineChange": {
+        "type": "object",
+        "description": "A change to one line: its new text, or its removal.",
+        "properties": {
+          "remove": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Remove the line (or the skill)."
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The new text. It is checked against the same sources."
+          }
+        },
+        "additionalProperties": false
+      },
+      "LineView": {
+        "type": "object",
+        "description": "A line of the CV.",
+        "required": [
+          "id",
+          "text",
+          "mark",
+          "sources",
+          "flags",
+          "claims"
+        ],
+        "properties": {
+          "claims": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The words of the line that the check looks for in its sources."
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Reason"
+            },
+            "description": "Why it cannot be traced to the profile; empty when it can."
+          },
+          "id": {
+            "type": "string"
+          },
+          "mark": {
+            "$ref": "#/components/schemas/Mark"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceView"
+            },
+            "description": "The sources it cites that the profile has."
+          },
+          "text": {
+            "type": "string"
           }
         }
       },
@@ -6291,6 +7508,34 @@
           }
         },
         "additionalProperties": false
+      },
+      "LinkView": {
+        "type": "object",
+        "description": "A link under the name.",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "network": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "Mark": {
+        "type": "string",
+        "description": "How a line relates to the profile.",
+        "enum": [
+          "as_in_profile",
+          "moved_up",
+          "reworded",
+          "edited"
+        ]
       },
       "Me": {
         "type": "object",
@@ -7081,6 +8326,29 @@
           }
         }
       },
+      "PutBackRequest": {
+        "type": "object",
+        "description": "What to put back: a position, or one of its lines.",
+        "properties": {
+          "position": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "A position left out (its place in the profile's `work`).",
+            "minimum": 0
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A line of the profile left out (its source id)."
+          }
+        },
+        "additionalProperties": false
+      },
       "Question": {
         "type": "object",
         "description": "A question about a gap in the profile.",
@@ -7206,6 +8474,95 @@
           "benchmark",
           "none"
         ]
+      },
+      "Reason": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "The line says something (`claim`: a number, a tool, a name) that the\nsources it cites do not.",
+            "required": [
+              "claim",
+              "cites",
+              "kind"
+            ],
+            "properties": {
+              "cites": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The sources it cites."
+              },
+              "claim": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "claim_not_in_sources"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The line cites no source the profile has.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "no_source"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A company fact is cited outside the summary: company facts can't be\nthe person's achievements.",
+            "required": [
+              "cites",
+              "kind"
+            ],
+            "properties": {
+              "cites": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The company facts it cites."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "company_fact_outside_summary"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The skill is not on the profile.",
+            "required": [
+              "skill",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "skill_not_on_profile"
+                ]
+              },
+              "skill": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "description": "Why a line cannot be traced to the profile."
       },
       "Relocate": {
         "type": "string",
@@ -7356,6 +8713,57 @@
               "null"
             ],
             "description": "Its title."
+          }
+        }
+      },
+      "RoleView": {
+        "type": "object",
+        "description": "A position on the CV.",
+        "required": [
+          "position",
+          "bullets"
+        ],
+        "properties": {
+          "bullets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LineView"
+            }
+          },
+          "company": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "end_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "start_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -7774,6 +9182,29 @@
           }
         }
       },
+      "SkillView": {
+        "type": "object",
+        "description": "A skill on the CV.",
+        "required": [
+          "id",
+          "name",
+          "flags"
+        ],
+        "properties": {
+          "flags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Reason"
+            }
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
       "SkillsFit": {
         "type": "object",
         "description": "How well a board's listed engineering jobs fit someone's top skills.",
@@ -7792,6 +9223,65 @@
             "type": "number",
             "format": "double",
             "description": "The share of those jobs that name one of their top skills, 0 to 1."
+          }
+        }
+      },
+      "SourceKind": {
+        "type": "string",
+        "description": "What a source is.",
+        "enum": [
+          "headline",
+          "summary",
+          "position_summary",
+          "highlight",
+          "fact",
+          "company",
+          "skills",
+          "education",
+          "languages"
+        ]
+      },
+      "SourceView": {
+        "type": "object",
+        "description": "A source a line cites.",
+        "required": [
+          "id",
+          "kind",
+          "text"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SourceKind"
+          },
+          "position": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The position it belongs to.",
+            "minimum": 0
+          },
+          "role": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "\"Title at Company\" of that position."
+          },
+          "text": {
+            "type": "string",
+            "description": "Its words, as the profile (or the company's page) has them."
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For a company fact, the page it was read on."
           }
         }
       },

@@ -59,20 +59,7 @@ const MONTHS: [&[&str]; 12] = [
     ],
 ];
 
-/// `text` as the check compares it: lower case, no whitespace, plain quotes
-/// and dashes.
-pub(crate) fn squash(text: &str) -> String {
-    text.chars()
-        .filter(|c| !c.is_whitespace() && !matches!(c, '\u{200b}' | '\u{00ad}' | '\u{feff}'))
-        .map(|c| match c {
-            '\u{2018}' | '\u{2019}' | '\u{201b}' | '\u{2032}' => '\'',
-            '\u{201c}' | '\u{201d}' | '\u{201f}' | '\u{2033}' => '"',
-            '\u{2010}'..='\u{2015}' | '\u{2212}' => '-',
-            other => other,
-        })
-        .flat_map(char::to_lowercase)
-        .collect()
-}
+pub(crate) use applicamp_kernel::claims::squash;
 
 /// The ways a source may write the date `value` (`YYYY`, `YYYY-MM` or
 /// `YYYY-MM-DD`), squashed.
@@ -254,10 +241,5 @@ mod tests {
         assert_eq!(kept.skills.len(), 1);
         // The headline, the invented position, Kubernetes.
         assert_eq!(dropped, 3);
-    }
-
-    #[test]
-    fn squashing_ignores_case_spacing_and_typography() {
-        assert_eq!(squash(" Rock’n  Roll\u{2013}Co \n"), "rock'nroll-co");
     }
 }

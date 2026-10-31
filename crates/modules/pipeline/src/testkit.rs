@@ -23,8 +23,8 @@ use uuid::Uuid;
 use crate::{
     PipelineDeps, module,
     ports::{
-        AnswerFacts, Neighbours, Posting, ProfileDigest, ProfileStatus, SearchLine, SiteFailure,
-        SiteReading,
+        AnswerFacts, CvProfile, Neighbours, Posting, ProfileDigest, ProfileStatus, SearchLine,
+        SiteFailure, SiteReading,
     },
 };
 
@@ -51,6 +51,12 @@ pub(crate) struct Fake {
     pub(crate) dismissed: Mutex<Vec<String>>,
     /// Hosts the guard refuses (as `localhost` is on a real instance).
     pub(crate) refused: Mutex<Vec<String>>,
+    /// The whole profile, as a tailored CV is made from it.
+    pub(crate) cv_profile: Mutex<Option<CvProfile>>,
+    /// The facts kept from a CV: `(position, text, area)`.
+    pub(crate) kept: Mutex<Vec<(usize, String, String)>>,
+    /// The skills added from a CV.
+    pub(crate) added_skills: Mutex<Vec<String>>,
 }
 
 fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
@@ -141,6 +147,39 @@ impl Neighbours for Fake {
         _now: DateTime<Utc>,
     ) -> BoxFuture<'a, Result<()>> {
         lock(&self.dismissed).push(skill.to_lowercase());
+        Box::pin(async move { Ok(()) })
+    }
+
+    fn cv_profile<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        _account: Uuid,
+    ) -> BoxFuture<'a, Result<Option<CvProfile>>> {
+        let profile = lock(&self.cv_profile).clone();
+        Box::pin(async move { Ok(profile) })
+    }
+
+    fn keep_fact<'a>(
+        &'a self,
+        _state: &'a AppState,
+        _account: Uuid,
+        position: usize,
+        _title: Option<&'a str>,
+        _company: Option<&'a str>,
+        text: &'a str,
+        area: &'a str,
+    ) -> BoxFuture<'a, Result<String>> {
+        lock(&self.kept).push((position, text.to_owned(), area.to_owned()));
+        Box::pin(async move { Ok(Uuid::now_v7().to_string()) })
+    }
+
+    fn add_skill<'a>(
+        &'a self,
+        _state: &'a AppState,
+        _account: Uuid,
+        skill: &'a str,
+    ) -> BoxFuture<'a, Result<()>> {
+        lock(&self.added_skills).push(skill.to_owned());
         Box::pin(async move { Ok(()) })
     }
 }
@@ -251,6 +290,7 @@ pub(crate) struct Model {
 struct Routed {
     facts: Mutex<Value>,
     analysis: Mutex<Value>,
+    cv: Mutex<Value>,
 }
 
 impl wiremock::Respond for Routed {
@@ -259,6 +299,8 @@ impl wiremock::Respond for Routed {
         let system = body["messages"][0]["content"].as_str().unwrap_or_default();
         let answer = if system.starts_with("You read pages from a company") {
             lock(&self.facts).clone()
+        } else if system.starts_with(crate::features::cv::prompt::PREFIX) {
+            lock(&self.cv).clone()
         } else {
             lock(&self.analysis).clone()
         };
@@ -277,6 +319,11 @@ impl Model {
     /// A model that says `facts` to the company prompt and `analysis` to the
     /// job prompt.
     pub(crate) async fn new(facts: Value, analysis: Value) -> Self {
+        Self::with_cv(facts, analysis, Value::Null).await
+    }
+
+    /// A model that also answers the CV prompt with `cv`.
+    pub(crate) async fn with_cv(facts: Value, analysis: Value, cv: Value) -> Self {
         // Its own server, not one from wiremock's pool, which is shared across the
         // tests' runtimes: the calls counted are this test's alone.
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -289,6 +336,7 @@ impl Model {
             .respond_with(Routed {
                 facts: Mutex::new(facts),
                 analysis: Mutex::new(analysis),
+                cv: Mutex::new(cv),
             })
             .mount(&server)
             .await;
@@ -314,6 +362,24 @@ impl Model {
             base_delay: std::time::Duration::from_millis(5),
             max_delay: std::time::Duration::from_millis(10),
         })
+    }
+
+    /// The user messages of the calls made so far whose system message
+    /// starts with `prefix`.
+    pub(crate) async fn user_messages(&self, prefix: &str) -> Vec<String> {
+        self.server
+            .received_requests()
+            .await
+            .unwrap()
+            .iter()
+            .filter_map(|request| serde_json::from_slice::<Value>(&request.body).ok())
+            .filter(|body| {
+                body["messages"][0]["content"]
+                    .as_str()
+                    .is_some_and(|system| system.starts_with(prefix))
+            })
+            .filter_map(|body| body["messages"][1]["content"].as_str().map(str::to_owned))
+            .collect()
     }
 
     /// The calls made so far whose system message starts with `prefix`.

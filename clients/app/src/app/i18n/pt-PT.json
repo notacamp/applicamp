@@ -64,11 +64,6 @@
     "lead": "A ligação pode ser antiga ou o endereço pode estar mal escrito.",
     "home": "Ir para Hoje"
   },
-  "profileSkills": {
-    "eyebrow": "Perfil e objetivos",
-    "title": "Competências",
-    "lead": "As competências com que os agentes comparam as ofertas, pela ordem em que contam, e as que as suas funções mencionam."
-  },
   "cvs": {
     "title": "CVs",
     "lead": "Todos os CVs que fez: os PDFs que pode abrir e enviar, e os rascunhos ainda em revisão."

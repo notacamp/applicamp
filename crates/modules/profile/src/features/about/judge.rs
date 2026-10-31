@@ -378,6 +378,10 @@ pub struct Change {
     pub sentence: String,
     pub flags: Vec<Flag>,
     pub resolution: Option<Resolution>,
+    /// The question (a gap's id) whose answer proposed it; none for a change
+    /// made from "Anything else". A new "Anything else" replaces only its own.
+    #[serde(default)]
+    pub origin: Option<String>,
 }
 
 impl Change {
@@ -459,6 +463,7 @@ pub fn judge_changes(raw: RawChanges, text: &str, role_keys: &[String]) -> Vec<C
             sentence,
             flags,
             resolution: None,
+            origin: None,
         });
     }
     changes

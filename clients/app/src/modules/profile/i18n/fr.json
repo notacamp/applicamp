@@ -359,11 +359,7 @@
     "scoreLabel": "Solidité du profil : {{score}} pour cent",
     "strong": "Solide. Gardez-le à jour.",
     "growing": "Encore {{left}} points pour un profil solide.",
-    "reading": "L’IA lit votre profil pour voir ce qui manque…",
     "checklist": "Ce dont se compose la solidité de votre profil",
-    "improve": "Améliorer mon profil",
-    "improveCount_one": "Améliorer mon profil · {{count}} question",
-    "improveCount_other": "Améliorer mon profil · {{count}} questions",
     "add": "Ajouter",
     "improveItem": "Améliorer",
     "skillsFound_one": "{{count}} trouvée dans vos postes",
@@ -427,95 +423,13 @@
         "missing": "Dites aux agents ce que vous voulez ensuite"
       }
     },
-    "grill": "Posez-moi des questions",
     "about": "Parlez-moi de vous"
   },
-  "improve": {
-    "eyebrow": "Question {{n}} sur {{total}}",
-    "readingTitle": "Lecture de votre profil…",
-    "readingLead": "L’IA cherche ce qui manque ou reste mince. Cela prend quelques secondes.",
-    "loadFailed": "Les questions n’ont pas pu être chargées.",
-    "later": "Terminer plus tard",
-    "skip": "Passer",
-    "draft": "Rédiger d’après ma réponse",
-    "drafting": "Rédaction…",
-    "answerLabel": "Votre réponse",
-    "answerHint": "Entrée rédige d’après votre réponse ; Maj et Entrée passent à la ligne.",
-    "answerPlaceholder": "Répondez avec vos mots. Peu importe si c’est brouillon.",
-    "strengthNow": "Solidité {{from}} % → {{to}} % si vous répondez",
-    "contextRole": "De votre poste · {{role}}",
-    "years": "{{from}}–{{to}}",
-    "yearsNow": "{{from}}–aujourd’hui",
-    "context": {
-      "label": "Votre titre",
-      "summary": "Votre résumé",
-      "education": "Votre formation",
-      "links": "Vos liens"
-    },
-    "draftTitle": "Brouillon d’après votre réponse",
-    "draftSource": "N’utilise que ce que vous avez écrit et ce que dit votre profil. Rien n’est enregistré tant que vous ne le gardez pas.",
-    "nothingDrafted": "Rien dans votre réponse n’a pu être rédigé sans ajouter quelque chose que vous n’avez pas écrit. Ajoutez des détails et rédigez à nouveau.",
-    "dropped_one": "{{count}} ligne écartée : elle mentionnait quelque chose que vous n’avez pas écrit.",
-    "dropped_other": "{{count}} lignes écartées : elles mentionnaient quelque chose que vous n’avez pas écrit.",
-    "keep": "Garder",
-    "edit": "Modifier",
-    "discard": "Écarter",
-    "editLabel": "Modifiez le brouillon, une ligne par élément",
-    "kept": "Gardé. Votre profil est maintenant solide à {{score}} %.",
-    "doneTitle": "C’est tout pour l’instant",
-    "doneLead": "Vous avez répondu à toutes les questions ou les avez passées. Votre profil est solide à {{score}} %.",
-    "backToProfile": "Retour à votre profil",
-    "unavailableTitle": "Les questions nécessitent un modèle d’IA",
-    "unavailableLead": "Cette installation d’Applicamp n’a pas de modèle d’IA configuré, elle ne peut donc pas lire votre profil pour y chercher des lacunes. La liste de votre profil montre toujours quoi ajouter.",
-    "noProfile": "Il n’y a rien à lire pour l’instant. Importez ou écrivez d’abord votre profil.",
-    "failedTitle": "Les questions n’ont pas pu être préparées",
-    "reasons": {
-      "ai_unavailable": "Cette installation d’Applicamp n’a pas de modèle d’IA configuré, elle ne peut donc pas lire votre profil pour y chercher des lacunes.",
-      "ai_daily_limit_reached": "Vous avez atteint la limite d’IA d’aujourd’hui. Réessayez demain.",
-      "ai_budget_reached": "Vous avez atteint la limite de dépenses d’IA, rien n’a donc été envoyé. Elle se renouvelle avec le jour ou le mois ; la liste de votre profil montre toujours quoi ajouter.",
-      "ai_failed": "Le modèle d’IA n’a pas pu lire votre profil à l’instant. Réessayez dans une minute."
-    },
-    "errors": {
-      "generic": "Cela n’a pas fonctionné. Réessayez.",
-      "ai_unavailable": "Cette installation d’Applicamp n’a pas de modèle d’IA configuré, elle ne peut donc pas rédiger d’après votre réponse.",
-      "ai_daily_limit_reached": "Vous avez atteint la limite d’IA d’aujourd’hui. Réessayez demain.",
-      "ai_budget_reached": "Vous avez atteint la limite de dépenses d’IA, rien n’a donc été envoyé. Vous pouvez l’écrire vous-même dans votre profil.",
-      "ai_failed": "Le modèle d’IA n’a pas pu rédiger ceci à l’instant. Réessayez dans une minute.",
-      "profile_changed": "Votre profil a changé depuis ce brouillon. Écartez-le et rédigez à nouveau.",
-      "draft_not_ready": "Ce brouillon a déjà été gardé ou écarté.",
-      "invalid_answer": "Écrivez entre 1 et 2 000 caractères.",
-      "invalid_items": "Vérifiez les lignes : aucune ne peut être vide ni trop longue.",
-      "not_found": "Cette question n’existe plus. Terminez plus tard et revenez."
-    }
-  },
   "skills": {
-    "yours": "Vos compétences",
     "order": "Les trois premières guident les recherches sur les sites d’emploi ; mettez en premier celles pour lesquelles vous voulez le plus être recruté.",
     "top": "Utilisée pour les recherches",
-    "empty": "Pas encore de compétences. Ajoutez celles trouvées dans vos postes ci-dessous, ou sur votre profil.",
     "moveUp": "Monter {{name}}",
-    "moveDown": "Descendre {{name}}",
-    "foundTitle": "Compétences trouvées dans vos postes",
-    "foundLead": "Elles apparaissent dans les descriptions de vos postes mais ne figurent pas encore dans vos compétences. Ajoutez celles dont vous seriez heureux de parler en entretien.",
-    "found": "Compétences trouvées dans vos postes",
-    "inRoles_one": "dans {{count}} poste",
-    "inRoles_other": "dans {{count}} postes",
-    "add": "Ajouter",
-    "addLabel": "Ajouter {{name}}",
-    "notMine": "Pas la mienne",
-    "notMineLabel": "{{name}} n’est pas la mienne",
-    "foundNote": "Trouvées en lisant vos propres postes, avec le nombre de postes qui mentionnent chacune. Rien n’est ajouté sans votre clic.",
-    "noneFound": "Plus rien à suggérer : toutes les compétences que mentionnent vos postes sont dans la liste ou mises de côté.",
-    "reading": "Lecture de vos postes à la recherche de compétences…",
-    "unavailable": "Trouver des compétences dans vos postes nécessite un modèle d’IA, qui n’est pas configuré ici. Vous pouvez toujours ajouter des compétences à la main sur votre profil.",
-    "loadFailed": "Les compétences trouvées dans vos postes n’ont pas pu être chargées.",
-    "back": "Retour à votre profil",
-    "reasons": {
-      "ai_unavailable": "Trouver des compétences dans vos postes nécessite un modèle d’IA, qui n’est pas configuré ici.",
-      "ai_daily_limit_reached": "Vous avez atteint la limite d’IA d’aujourd’hui. Réessayez demain.",
-      "ai_budget_reached": "Vous avez atteint la limite de dépenses d’IA, rien n’a donc été envoyé. Vous pouvez toujours ajouter des compétences à la main sur votre profil.",
-      "ai_failed": "Le modèle d’IA n’a pas pu lire vos postes à l’instant. Réessayez dans une minute."
-    }
+    "moveDown": "Descendre {{name}}"
   },
   "nudge": {
     "title": "Votre profil est solide à {{score}} %.",
@@ -531,50 +445,9 @@
     }
   },
   "grill": {
-    "title": "Posez-moi des questions",
-    "lead": "Un CV ne peut dire que ce qu’Applicamp sait. Choisissez un poste et répondez à une question à la fois. Les réponses vagues sont relancées et on vous demande des chiffres. Chaque fait tiré de vos réponses vous est montré d’abord ; rien n’est enregistré tant que vous ne l’avez pas gardé.",
-    "open": "Posez-moi des questions",
-    "aboutRole": "M’interroger sur ce poste",
-    "rolesLabel": "Vos postes",
     "loading": "Chargement de vos postes…",
-    "loadFailed": "Vos postes n’ont pas pu être chargés.",
-    "roleLoadFailed": "L’entretien de ce poste n’a pas pu être chargé.",
-    "back": "Retour à votre profil",
-    "noRolesTitle": "Aucun poste dont parler pour l’instant",
-    "noRolesLead": "Importez ou écrivez d’abord votre profil. L’entretien passe en revue un poste à la fois.",
-    "pickTitle": "Choisissez un poste",
-    "pickLead": "Un poste demande une douzaine de questions. Chacune est un seul petit appel à l’IA, environ 0,001 €, et rien ne tourne avant votre clic.",
     "years": "{{from}}–{{to}}",
     "yearsNow": "{{from}}–aujourd’hui",
-    "status": {
-      "not_started": "pas commencé",
-      "in_progress": "en cours",
-      "covered": "couvert"
-    },
-    "startTitle": "Quand vous voulez",
-    "startLead": "Cela commence par une question sur ce poste. Répondez avec vos mots ; la question revient si elle a besoin de plus.",
-    "start": "Commencer",
-    "starting": "Je pose la question…",
-    "continue": "Posez-moi une question",
-    "coveredBanner": "Les sept thèmes sont couverts pour ce poste.",
-    "coveredLead": "Les faits gardés sont sous ce poste, dans votre profil. Revenez pour en ajouter.",
-    "stoppedBanner": "Rien d’autre à demander pour l’instant.",
-    "labels": {
-      "question": "Question",
-      "push": "Relance",
-      "answer": "Vous"
-    },
-    "skippedNote": "Vous avez passé cette question.",
-    "doneNote": "Laissé pour l’instant. Recommencez quand vous voulez, cela reprend d’ici.",
-    "logLabel": "L’entretien jusqu’ici",
-    "answerLabel": "Votre réponse",
-    "answerHint": "Entrée l’envoie ; Maj et Entrée passent à la ligne.",
-    "answerPlaceholder": "Répondez avec vos mots. Approximatif suffit ; la question revient si elle a besoin de plus.",
-    "answer": "Répondre",
-    "answering": "Lecture de votre réponse…",
-    "skip": "Passer celle-ci",
-    "done": "En avoir fini avec ce poste pour l’instant",
-    "costLine": "Chaque question est un petit appel à l’IA, environ 0,001 €. Questions aujourd’hui : {{n}} sur {{cap}}.",
     "facts": {
       "title": "Faits tirés de votre réponse",
       "yourWords": "Vos mots :",
@@ -595,47 +468,6 @@
       "leftOut_one": "{{count}} ligne écartée : elle disait quelque chose que vous n’avez pas écrit.",
       "leftOut_other": "{{count}} lignes écartées : elles disaient quelque chose que vous n’avez pas écrit."
     },
-    "coverage": {
-      "title": "Couverture",
-      "count": "{{n}}/7",
-      "label": "{{n}} thèmes sur 7 couverts",
-      "note": "Il compare aussi vos réponses entre elles et avec votre profil. Si deux se contredisent, il demande laquelle est juste.",
-      "state": {
-        "ok": "Couvert",
-        "part": "Couvert en partie",
-        "none": "Pas encore couvert"
-      },
-      "areas": {
-        "context": {
-          "name": "Contexte",
-          "hint": "ce que vendait l’entreprise, à qui, taille de l’équipe"
-        },
-        "your_part": {
-          "name": "Votre part",
-          "hint": "ce que vous avez fait vous-même, pas l’équipe"
-        },
-        "stack_scale": {
-          "name": "Technique et échelle",
-          "hint": "outils, volume de données, trafic"
-        },
-        "results": {
-          "name": "Résultats avec preuve",
-          "hint": "des chiffres, et comment vous les connaissez"
-        },
-        "hard_problems": {
-          "name": "Problèmes difficiles",
-          "hint": "ce qui a mal tourné et ce que vous avez fait"
-        },
-        "people": {
-          "name": "Personnes",
-          "hint": "diriger, encadrer, recruter"
-        },
-        "stories": {
-          "name": "Histoires d’entretien",
-          "hint": "des histoires à raconter en entretien"
-        }
-      }
-    },
     "errors": {
       "generic": "Cela n’a pas marché. Réessayez.",
       "ai_unavailable": "Cet Applicamp n’a pas de modèle d’IA configuré, il ne peut donc pas poser de questions.",
@@ -653,8 +485,8 @@
       "not_found": "Cela n’existe plus. Retournez à vos postes."
     },
     "roleFacts": {
-      "title": "Ce que vous nous avez dit de chaque poste",
-      "lead": "Les faits gardés dans « Posez-moi des questions », avec vos propres mots. Un CV ne peut utiliser que ceux-ci et ce que vous avez écrit plus haut.",
+      "title": "Ce que vous avez dit à Applicamp de chaque poste",
+      "lead": "Les faits que vous avez gardés, avec vos propres mots. Un CV ne peut utiliser que ceux-ci et ce que dit votre profil.",
       "none": "Aucun fait gardé pour l’instant",
       "count_one": "{{count}} fait",
       "count_other": "{{count}} faits",
@@ -663,7 +495,8 @@
       "removeLabel": "Retirer ce fait : {{text}}",
       "removed": "Fait retiré.",
       "listLabel": "Faits gardés pour {{role}}",
-      "confirmed": "Vous avez confirmé cette hypothèse."
+      "confirmed": "Vous avez confirmé cette hypothèse.",
+      "tellMore": "En dire plus"
     }
   },
   "about": {
@@ -747,8 +580,8 @@
       "questionsNext": "Les questions sur les manques viennent ensuite.",
       "open_one": "{{count}} affirmation attend votre réponse avant que vous puissiez enregistrer.",
       "open_other": "{{count}} affirmations attendent votre réponse avant que vous puissiez enregistrer.",
-      "review": "Relire et enregistrer",
-      "back": "Retour"
+      "back": "Retour",
+      "questions": "Continuer vers les questions"
     },
     "flag": {
       "claim": "« {{claim}} » ne figure pas dans vos mots.",
@@ -800,7 +633,7 @@
       "ai_daily_limit_reached": "Vous avez atteint la limite d’IA d’aujourd’hui. Réessayez demain.",
       "ai_budget_reached": "Vous avez atteint la limite de dépense d’IA, donc rien n’a été envoyé. Ce que vous avez écrit est toujours dans la zone de texte.",
       "ai_failed": "Le modèle d’IA n’a pas pu répondre à l’instant. Ce que vous avez écrit est toujours dans la zone de texte ; réessayez dans une minute.",
-      "about_daily_cap": "Cette fonction est limitée à 30 étapes d’IA par jour. Elle reprend demain.",
+      "about_daily_cap": "Cette fonction est limitée à 60 étapes d’IA par jour. Elle reprend demain.",
       "profile_needed": "Ajoutez d’abord votre profil, puis parlez-moi de vous.",
       "changes_flagged": "Quelque chose de ce que vous avez écrit contient une affirmation que je ne retrouve pas dans vos mots. Réglez-le d’abord.",
       "invalid_text": "Écrivez entre 1 et 4 000 caractères.",
@@ -808,7 +641,34 @@
       "site_not_allowed": "Cette adresse ne peut pas être lue. Utilisez le site public de l’entreprise.",
       "invalid_change": "Écrivez ce que cela doit dire.",
       "research_unavailable": "La lecture de sites n’est pas configurée ici.",
-      "not_found": "Ce n’est plus là. Revenez en arrière et regardez à nouveau."
+      "not_found": "Ce n’est plus là. Revenez en arrière et regardez à nouveau.",
+      "portrait_needed": "Commencez par le portrait : les questions viennent ensuite.",
+      "invalid_choice": "Choisissez l’une des options affichées."
+    },
+    "questions": {
+      "title": "Quelques questions",
+      "progress": "Question {{n}} sur environ {{total}}",
+      "strength": "Solidité du profil : {{score}} %",
+      "strengthAfter": "Solidité du profil : {{score}} % → {{after}} % si vous répondez",
+      "tag": {
+        "assumed": "J’ai supposé",
+        "unknown": "Je ne sais pas",
+        "told": "Vous me l’avez dit"
+      },
+      "updated": "Mis à jour d’après votre réponse",
+      "savedLater": "Cela entre dans votre profil quand vous enregistrez.",
+      "goesTo": "Va dans : {{where}}.",
+      "role": "{{company}} · poste",
+      "answerLabel": "Votre réponse",
+      "answerPlaceholder": "Dites-le avec vos mots. Approximatif suffit.",
+      "answer": "Répondre",
+      "skip": "Passer",
+      "enough": "Cela suffit pour l’instant",
+      "cost": "1 petit appel IA · environ 0,001 €",
+      "asking": "Je cherche la question suivante…",
+      "reading": "Je lis votre réponse…",
+      "peek": "Voir ce que je sais de vous maintenant",
+      "toReview": "Aller à la relecture"
     }
   }
 }

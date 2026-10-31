@@ -9,15 +9,19 @@ import {
   signIn,
 } from "./helpers";
 
-/** An invented profile (nobody real): two roles, the second the older one. */
-function profile() {
+/**
+ * An invented profile (nobody real): two roles, the second the older one. The
+ * first starts in a month of the run's own: facts waiting on a role (24 hours)
+ * belong to that role, so each run starts from none.
+ */
+function profile(start: string) {
   return {
     basics: { profiles: [] },
     work: [
       {
         name: "Example Org",
         position: "Senior Engineer",
-        startDate: "2021-03",
+        startDate: start,
         summary: "Runs the billing platform.",
         highlights: [],
       },
@@ -55,7 +59,15 @@ test("someone prepares a job: reads the company's own pages, removes a wrong fac
 }, testInfo) => {
   const phone = testInfo.project.name === "phone";
   await signIn(page);
-  expect(await callApi(page, "PUT", "/api/v1/profile", profile())).toBe(200);
+  const month = (phone ? 6 : 3) + testInfo.retry;
+  expect(
+    await callApi(
+      page,
+      "PUT",
+      "/api/v1/profile",
+      profile(`2021-${String(month).padStart(2, "0")}`),
+    ),
+  ).toBe(200);
 
   // The desktop and phone runs (and a retry) share one stack and one person: a
   // company of their own makes each start from nothing (its facts are cached).

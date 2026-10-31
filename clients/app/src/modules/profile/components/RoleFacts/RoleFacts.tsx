@@ -17,16 +17,16 @@ import { useSaveProfile, type Profile } from "../../api/profile";
 
 export interface RoleFactsProps {
   profile: Profile;
-  /** Open Grill me on a position. */
-  onGrill: (position: number) => void;
+  /** Open "Tell me about you", where more is asked about the roles. */
+  onAbout: () => void;
 }
 
 /**
- * What the person confirmed about each role in Grill me, under that role,
- * each fact with their own words, Remove (with Undo) and a way into Grill me
- * for the role.
+ * What the person told Applicamp about each role (in Tell me about you, or
+ * to a tailored CV's questions), under that role, each fact with their own
+ * words, Remove (with Undo) and a way into Tell me about you.
  */
-export function RoleFacts({ profile, onGrill }: RoleFactsProps) {
+export function RoleFacts({ profile, onAbout }: RoleFactsProps) {
   const { t } = useTranslation("profile");
   const save = useSaveProfile();
   const undo = useUndoToast();
@@ -90,12 +90,10 @@ export function RoleFacts({ profile, onGrill }: RoleFactsProps) {
               trailing={
                 <Button
                   variant="secondary"
-                  data-testid={`role-grill-${String(position)}`}
-                  onClick={() => {
-                    onGrill(position);
-                  }}
+                  data-testid={`role-about-${String(position)}`}
+                  onClick={onAbout}
                 >
-                  {t("grill.aboutRole")}
+                  {t("grill.roleFacts.tellMore")}
                 </Button>
               }
             >

@@ -3,6 +3,7 @@ import {
   createRootRouteWithContext,
   createRoute,
   createRouter,
+  Navigate,
   Outlet,
   type RouterHistory,
 } from "@tanstack/react-router";
@@ -23,9 +24,6 @@ import { PipelineCv } from "./routes/pipeline-cv";
 import { PipelinePrepare } from "./routes/pipeline-prepare";
 import { Profile } from "./routes/profile";
 import { ProfileAbout } from "./routes/profile-about";
-import { ProfileGrill } from "./routes/profile-grill";
-import { ProfileImprove } from "./routes/profile-improve";
-import { ProfileSkills } from "./routes/profile-skills";
 import { Today } from "./routes/today";
 
 export interface RouterContext {
@@ -231,28 +229,17 @@ const profileRoute = createRoute({
         onStartGoals={(step) => {
           void navigate({ to: "/goals/interview", search: { step } });
         }}
-        onGrill={(position) => {
-          if (position === undefined) {
-            void navigate({ to: "/profile/grill" });
-          } else {
-            void navigate({ to: "/profile/grill/$position", params: { position } });
-          }
-        }}
         onAbout={() => {
           void navigate({ to: "/profile/about" });
         }}
         onAction={(action) => {
           switch (action.kind) {
-            case "improve": {
-              void navigate({ to: "/profile/improve" });
-              break;
-            }
-            case "question": {
-              void navigate({ to: "/profile/improve", search: { q: action.id } });
-              break;
-            }
+            // What a part of the strength still needs is asked in Tell me about
+            // you: the gaps, one question at a time.
+            case "improve":
+            case "question":
             case "skills": {
-              void navigate({ to: "/profile/skills" });
+              void navigate({ to: "/profile/about" });
               break;
             }
             case "import": {
@@ -264,26 +251,16 @@ const profileRoute = createRoute({
               break;
             }
             case "edit": {
-              void navigate({ to: "/profile", hash: action.section });
+              // Results on the roles are asked about in Tell me about you; the
+              // other parts are edited in place.
+              if (action.section === "work") {
+                void navigate({ to: "/profile/about" });
+              } else {
+                void navigate({ to: "/profile", hash: action.section });
+              }
               break;
             }
           }
-        }}
-      />
-    );
-  },
-});
-
-/** The skills page, in the app frame: Profile & goals' Skills, in order. */
-const profileSkillsRoute = createRoute({
-  getParentRoute: () => frameRoute,
-  path: "/profile/skills",
-  component: function ProfileSkillsRoute() {
-    const navigate = profileSkillsRoute.useNavigate();
-    return (
-      <ProfileSkills
-        onBack={() => {
-          void navigate({ to: "/profile" });
         }}
       />
     );
@@ -306,77 +283,33 @@ const profileAboutRoute = createRoute({
   },
 });
 
-/** Grill me: the roles, in the app frame. */
-const profileGrillRoute = createRoute({
-  getParentRoute: () => frameRoute,
-  path: "/profile/grill",
-  component: function ProfileGrillRoute() {
-    const navigate = profileGrillRoute.useNavigate();
-    return (
-      <ProfileGrill
-        position={undefined}
-        onPosition={(position) => {
-          void navigate({ to: "/profile/grill/$position", params: { position } });
-        }}
-        onBack={() => {
-          void navigate({ to: "/profile" });
-        }}
-      />
-    );
-  },
-});
+/**
+ * Improve my profile, Skills and Grill me are retired into Tell me about you
+ * (#44): their old addresses lead there.
+ */
+function ToAbout() {
+  return <Navigate to="/profile/about" replace />;
+}
 
-/** Grill me about one role (its place in the profile's positions). */
-const profileGrillRoleRoute = createRoute({
-  getParentRoute: () => frameRoute,
-  path: "/profile/grill/$position",
-  params: {
-    parse: (raw) => ({ position: Number(raw.position) }),
-    stringify: ({ position }) => ({ position: String(position) }),
-  },
-  component: function ProfileGrillRoleRoute() {
-    const { position } = profileGrillRoleRoute.useParams();
-    const navigate = profileGrillRoleRoute.useNavigate();
-    if (!Number.isInteger(position) || position < 0) {
-      return <NotFound />;
-    }
-    return (
-      <ProfileGrill
-        position={position}
-        onPosition={(next) => {
-          void navigate({ to: "/profile/grill/$position", params: { position: next } });
-        }}
-        onBack={() => {
-          void navigate({ to: "/profile" });
-        }}
-      />
-    );
-  },
-});
-
-/** `?q=` is the question asked for; none is the most useful open one. */
-const improveSearch = z.object({ q: z.string().min(1).max(64) });
-
-/** Improve my profile: signed in, outside the app frame, so nothing else competes with the question. */
 const improveRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/profile/improve",
-  validateSearch: (search: Record<string, unknown>): { q?: string | undefined } => {
-    const parsed = improveSearch.safeParse(search);
-    return { q: parsed.success ? parsed.data.q : undefined };
-  },
-  component: function ImproveRoute() {
-    const search = improveRoute.useSearch();
-    const navigate = improveRoute.useNavigate();
-    return (
-      <ProfileImprove
-        question={search.q}
-        onLeave={(reason) => {
-          void navigate({ to: reason === "done" ? "/profile" : "/" });
-        }}
-      />
-    );
-  },
+  component: ToAbout,
+});
+const profileSkillsRoute = createRoute({
+  getParentRoute: () => frameRoute,
+  path: "/profile/skills",
+  component: ToAbout,
+});
+const profileGrillRoute = createRoute({
+  getParentRoute: () => frameRoute,
+  path: "/profile/grill",
+  component: ToAbout,
+});
+const profileGrillRoleRoute = createRoute({
+  getParentRoute: () => frameRoute,
+  path: "/profile/grill/$position",
+  component: ToAbout,
 });
 
 /** `?step=` is the question on screen; none (or an unknown one) is the first. */

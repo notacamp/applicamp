@@ -84,14 +84,12 @@ function TodayBody({ state }: { state: TodayState }) {
   const nudge = state.next_profile_action ?? null;
   const nudgeLink = (action: NudgeAction) => {
     switch (action) {
-      case "improve": {
-        return inAppLink("/profile/improve", () => {
-          void navigate({ to: "/profile/improve" });
-        });
-      }
+      // Questions about the gaps, and the skills the roles name, are asked in
+      // Tell me about you.
+      case "improve":
       case "skills": {
-        return inAppLink("/profile/skills", () => {
-          void navigate({ to: "/profile/skills" });
+        return inAppLink("/profile/about", () => {
+          void navigate({ to: "/profile/about" });
         });
       }
       case "import": {

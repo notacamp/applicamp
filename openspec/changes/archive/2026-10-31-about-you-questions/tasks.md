@@ -1,0 +1,11 @@
+# Tasks
+- [x] 1 Gaps in code: ranking, coverage by what is kept and told, the limit by "Is this accurate?", the strength gain; strength counts results facts
+- [x] 2 Migration: wizard `questions` state, `question` and `answer` calls in the daily cap; cap raised to 60
+- [x] 3 Question and answer prompts, strict schema, `judge_question`; answer changes fitted to the gap and merged, flagged not dropped
+- [x] 4 Endpoints: next, answer, skip, enough; `AboutView.questions`; "Anything else" keeps the answers' changes
+- [x] 5 Rust tests: ranking and stop, later becomes a question, no context question, the prompt, flagged answers, skip, enough, the cap
+- [x] 6 Client: the questions screens (question n of about m, strength line, updated block, the question card, collapsible portrait), the wizard order, the review
+- [x] 7 Retire Improve, Skills and Grill me in the client: redirects, entry points, tests; skills reorder on the profile; rename the role facts section
+- [x] 8 Fake model: a question for each kind of gap and answers that become changes (one flagged); e2e for the wizard through the questions and the redirects; update the retired flows' e2e
+- [x] 9 OpenAPI regenerated, client types regenerated, changelog entry file
+- [ ] 10 Gates green in CI, recording (UI at 375px and desktop, by the lead)

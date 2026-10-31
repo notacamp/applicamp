@@ -118,11 +118,11 @@ test("someone reads what Applicamp knows and assumes about them, settles two ass
   await page.getByTestId("about-choice-right").click();
   await expect(led).toHaveAttribute("data-kind", "confirmed");
 
-  // One assumption is wrong: struck out.
-  const wrong = sentence("usually run on bookings, payments and building access");
-  await wrong.click();
-  await page.getByTestId("about-choice-wrong").click();
-  await expect(wrong).toHaveAttribute("data-kind", "wrong");
+  // One assumption is left for later: it becomes the first question.
+  const later = sentence("usually run on bookings, payments and building access");
+  await later.click();
+  await page.getByTestId("about-choice-later").click();
+  await expect(page.getByTestId("about-choice-later")).toHaveAttribute("aria-pressed", "true");
 
   // "Is this accurate?" is stored; "Anything else" is read.
   await page.getByTestId("about-accuracy-some").click();
@@ -159,8 +159,43 @@ test("someone reads what Applicamp knows and assumes about them, settles two ass
   await page.getByTestId("about-own-words-c1").click();
   await expect(page.getByTestId("about-flags-c1")).toHaveCount(0);
 
+  // The questions about the gaps, one at a time, each saying why.
+  await page.getByTestId("about-to-questions").click();
+  await expect(page.getByTestId("about-q")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("about-q-progress")).toContainText("Question 1 of about");
+  await expect(page.getByTestId("about-q-tag")).toHaveText("I assumed");
+  await expect(page.getByTestId("about-q-why-text")).toContainText("I assumed this:");
+  await expect(page.getByTestId("about-q-why-text")).toContainText("bookings, payments");
+  await expect(page.getByTestId("about-q-peek")).toContainText("See what I know about you now");
+  await expectPageFillsTheScreen(page, "about");
+  await expectNoSidewaysScroll(page);
+  await expectAccessible(page);
+  // It is a closed question: pick what they built, no words needed.
+  await page.getByTestId("about-q-choice-0").click();
+  await page.getByTestId("about-q-choice-1").click();
+  await page.getByTestId("about-q-send").click();
+
+  // The answer is shown at once, with where it goes; the next question is for another gap.
+  await expect(page.getByTestId("about-q-updated")).toContainText("Updated from your answer");
+  await expect(page.getByTestId("about-q-updated")).toContainText("Worked on bookings, payments");
+  await expect(page.getByTestId("about-q-updated")).toContainText("Goes to: Example Co · role.");
+  await expect(page.getByTestId("about-q-progress")).toContainText("Question 2 of about");
+  await expect(page.getByTestId("about-q-tag")).toHaveText("I don’t know");
+  await expect(page.getByTestId("about-q-why-text")).toContainText("none with a number");
+  await expectNoSidewaysScroll(page);
+  // "I don't know" is answered with a number.
+  await page.getByTestId("about-q-answer").fill("Invoice runs went from 6 hours to 40 minutes.");
+  await page.getByTestId("about-q-send").click();
+  await expect(page.getByTestId("about-q-updated")).toContainText("6 hours to 40 minutes");
+  // The third question is skipped.
+  await expect(page.getByTestId("about-q-progress")).toContainText("Question 3 of about");
+  await page.getByTestId("about-q-skip").click();
+  await expect(page.getByTestId("about-q-progress")).toContainText("Question 4 of about");
+  await expect(page.getByTestId("about-q-tag")).toHaveText("You told me");
+  await expectNoSidewaysScroll(page);
+
   // Review: every line, grouped, each marked; then Save.
-  await page.getByTestId("about-to-review").click();
+  await page.getByTestId("about-q-enough").click();
   await expect(page.getByTestId("about-review-step")).toBeVisible();
   for (const group of ["summary", "headline", "skills", "position-0", "background", "goals"]) {
     await expect(page.getByTestId(`about-group-${group}`)).toBeVisible();
@@ -169,6 +204,12 @@ test("someone reads what Applicamp knows and assumes about them, settles two ass
   await expect(page.getByTestId("about-group-position-0")).toContainText("Led 4 engineers");
   await expect(page.getByTestId("about-group-position-0")).toContainText(
     "Led a small team at Example Co (3 to 6 people)",
+  );
+  await expect(page.getByTestId("about-group-position-0")).toContainText(
+    "Worked on bookings, payments",
+  );
+  await expect(page.getByTestId("about-group-position-0")).toContainText(
+    "Invoice runs went from 6 hours to 40 minutes",
   );
   await expect(page.getByTestId("about-group-summary")).toContainText("You told me");
   await expect(page.getByTestId("about-left-out")).toBeVisible();
@@ -200,7 +241,9 @@ test("someone reads what Applicamp knows and assumes about them, settles two ass
   expect(facts.map((fact) => fact.text)).toContain("Led 4 engineers");
   const confirmed = facts.find((fact) => fact.status === "confirmed_assumption");
   expect(confirmed?.text).toBe("Led a small team at Example Co (3 to 6 people)");
-  expect(facts.some((fact) => fact.text.includes("bookings, payments"))).toBe(false);
+  // What the questions' answers proposed is saved with the rest, once the person saves.
+  expect(facts.map((fact) => fact.text)).toContain("Worked on bookings, payments");
+  expect(facts.map((fact) => fact.text)).toContain("Invoice runs went from 6 hours to 40 minutes");
   await expect(page.getByTestId("basics-summary")).toContainText("I ran events");
   await expect(page.getByTestId("basics-background")).toContainText("6 years");
   await expect(page.getByTestId("role-facts-list-0")).toContainText(
@@ -208,4 +251,15 @@ test("someone reads what Applicamp knows and assumes about them, settles two ass
   );
   await expect(page.getByTestId("role-facts-list-0")).not.toContainText("I assume you");
   await expectNoSidewaysScroll(page);
+});
+
+test("the retired Improve, Skills and Grill me addresses lead to Tell me about you", async ({
+  page,
+}) => {
+  await signIn(page);
+  for (const old of ["/profile/grill", "/profile/grill/0", "/profile/improve", "/profile/skills"]) {
+    await page.goto(old);
+    await expect(page).toHaveURL(/\/profile\/about$/);
+    await expect(page.getByTestId("about")).toBeVisible();
+  }
 });

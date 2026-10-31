@@ -292,57 +292,47 @@ describe("the app", () => {
       "Aucune exécution pour l’instant",
     );
   });
-  it("opens Grill me on its roles and on one role, and does not know a role that is not a number", async () => {
+  it("leads the retired Improve, Skills and Grill me addresses to Tell me about you", async () => {
     signedIn({
-      "GET /api/v1/profile/grill": {
+      "GET /api/v1/profile/about": {
         body: {
-          roles: [
-            {
-              position: 0,
-              role: {
-                position: "Senior Engineer",
-                company: "Example Org",
-                start_date: "2021-03",
-                end_date: null,
-              },
-              status: "not_started",
-              covered: 0,
-              kept: 0,
-            },
-          ],
-          calls_today: 0,
-          daily_cap: 150,
-        },
-      },
-      "GET /api/v1/profile/grill/0": {
-        body: {
-          position: 0,
-          role: {
-            position: "Senior Engineer",
-            company: "Example Org",
-            start_date: "2021-03",
-            end_date: null,
+          has_profile: false,
+          profile_version: 0,
+          built: false,
+          sentences: [],
+          employers: [],
+          accuracy: null,
+          extra: null,
+          changes: [],
+          questions: {
+            current: null,
+            answered: 0,
+            skipped: 0,
+            total: 0,
+            left: 0,
+            done: false,
+            strength: 0,
+            updated: [],
           },
-          status: "not_started",
-          coverage: [],
-          covered: 0,
-          turns: [],
-          question: null,
-          proposals: [],
-          kept: 0,
           calls_today: 0,
-          daily_cap: 150,
+          daily_cap: 60,
+          extra_max: 4000,
         },
       },
     });
-    const { router } = renderApp("/profile/grill");
-    expect(await screen.findByTestId("grill-pick")).toBeVisible();
-    await userEvent.setup().click(await screen.findByTestId("grill-role-0"));
-    await waitFor(() => {
-      expect(router.state.location.pathname).toBe("/profile/grill/0");
-    });
-    expect(await screen.findByTestId("grill-start")).toBeVisible();
-    await router.navigate({ to: "/profile/grill/$position", params: { position: Number.NaN } });
-    expect(await screen.findByTestId("not-found")).toBeVisible();
+    for (const old of [
+      "/profile/grill",
+      "/profile/grill/0",
+      "/profile/improve",
+      "/profile/improve?q=question:q1",
+      "/profile/skills",
+    ]) {
+      const { router, unmount } = renderApp(old);
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/profile/about");
+      });
+      expect(await screen.findByTestId("about")).toBeVisible();
+      unmount();
+    }
   });
 });

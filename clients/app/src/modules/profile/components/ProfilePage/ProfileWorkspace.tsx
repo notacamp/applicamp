@@ -19,12 +19,10 @@ export interface ProfileWorkspaceProps {
   onImporting: (open: boolean) => void;
   /** Open the goals interview at a question (the Goals section's buttons). */
   onStartGoals: (question: Question) => void;
-  /** The person chose what to do about their profile's strength (Improve, a part's Add). */
+  /** The person chose what to do about a part of their profile's strength (a part's Add). */
   onAction: (action: Action) => void;
-  /** Open Grill me: on a position, or on the list of roles when none is given. */
-  onGrill: (position?: number) => void;
-  /** Open "Tell me about you". */
-  onAbout?: (() => void) | undefined;
+  /** Open "Tell me about you": from the strength card, and from a role's kept facts. */
+  onAbout: () => void;
 }
 
 /**
@@ -37,7 +35,6 @@ export function ProfileWorkspace({
   onImporting,
   onStartGoals,
   onAction,
-  onGrill,
   onAbout,
 }: ProfileWorkspaceProps) {
   const { t } = useTranslation("profile");
@@ -114,20 +111,10 @@ export function ProfileWorkspace({
   }
   return (
     <Stack gap="lg">
-      <StrengthCard
-        onAction={onAction}
-        onAbout={onAbout}
-        onGrill={
-          view.profile.work.length > 0
-            ? () => {
-                onGrill();
-              }
-            : undefined
-        }
-      />
+      <StrengthCard onAction={onAction} onAbout={onAbout} />
       <ProfileView
         view={view}
-        onGrill={onGrill}
+        onAbout={onAbout}
         onImportAgain={() => {
           onImporting(true);
         }}

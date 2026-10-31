@@ -3437,6 +3437,294 @@
         ]
       }
     },
+    "/api/v1/profile/about/questions/enough": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "\"That's enough for now\": no more questions; on to the review. No model\ncall.",
+        "operationId": "profile.about_questions_enough",
+        "responses": {
+          "200": {
+            "description": "The wizard's state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AboutView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/about/questions/next": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Ask the next question.",
+        "description": "The question for the top gap, or the one already on screen (no call).\n**One small model call** words it: the model sees only that gap and its\ncontext, and says why it asks. When there is nothing more to ask, no call\nis made and the state says `done`.",
+        "operationId": "profile.about_question_next",
+        "parameters": [
+          {
+            "name": "locale",
+            "in": "query",
+            "description": "A language tag such as `pt-PT`; English when left out.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The wizard's state, with the question.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AboutView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`profile_needed`; `portrait_needed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`about_daily_cap`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/about/questions/{id}/answer": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Answer the question on screen.",
+        "description": "**One small model call** reads the answer (and the choices picked) into\nproposed changes, with the same structure and checks as \"Anything else\":\neach quotes their words, and a claim their words do not say is a flag,\nshown and never dropped. The changes join the pending ones, and the\nportrait gains their sentences as new. Nothing is saved yet.",
+        "operationId": "profile.about_question_answer",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The question on screen.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "description": "A language tag such as `pt-PT`; English when left out.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AboutAnswerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The wizard's state, with the changes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AboutView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_text`; `invalid_choice`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: that is not the question on screen",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`profile_needed`; `portrait_needed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`about_daily_cap`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/about/questions/{id}/skip": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Skip the question on screen, for this profile version. No model call.",
+        "operationId": "profile.about_question_skip",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The question on screen.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The wizard's state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AboutView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: that is not the question on screen",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/v1/profile/about/review": {
       "get": {
         "tags": [
@@ -5659,6 +5947,164 @@
   },
   "components": {
     "schemas": {
+      "AboutAnswerRequest": {
+        "type": "object",
+        "description": "An answer to a question.",
+        "properties": {
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The choices picked, from the question's own."
+          },
+          "text": {
+            "type": "string",
+            "description": "In their own words, up to 4000 characters; may be empty when a choice\nis picked."
+          }
+        },
+        "additionalProperties": false
+      },
+      "AboutQuestion": {
+        "type": "object",
+        "description": "The question to answer now.",
+        "required": [
+          "id",
+          "kind",
+          "question",
+          "why",
+          "tag",
+          "choices",
+          "strength_after"
+        ],
+        "properties": {
+          "area": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Area"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "For a closed question, the answers to pick from."
+          },
+          "id": {
+            "type": "string",
+            "description": "The gap's id: what the answer and skip routes name."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/GapKind"
+          },
+          "position": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The position it is about (its place in `work`).",
+            "minimum": 0
+          },
+          "question": {
+            "type": "string"
+          },
+          "strength_after": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The profile's strength if this is answered, 0 to 100 (the same as\n`strength` when the answer is not a part of the score).",
+            "minimum": 0
+          },
+          "tag": {
+            "$ref": "#/components/schemas/AboutQuestionTag"
+          },
+          "why": {
+            "type": "string",
+            "description": "What was assumed, or what is not known: why it is asked."
+          }
+        }
+      },
+      "AboutQuestionTag": {
+        "type": "string",
+        "description": "What the question says it is.",
+        "enum": [
+          "assumed",
+          "unknown",
+          "told"
+        ]
+      },
+      "AboutQuestions": {
+        "type": "object",
+        "description": "The questions about the gaps.",
+        "required": [
+          "answered",
+          "skipped",
+          "total",
+          "left",
+          "done",
+          "strength",
+          "updated"
+        ],
+        "properties": {
+          "answered": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Questions answered.",
+            "minimum": 0
+          },
+          "current": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AboutQuestion",
+                "description": "The question to ask now; none until `POST …/questions/next` made it."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "done": {
+            "type": "boolean",
+            "description": "Nothing more to ask: the gaps ran out, the limit was reached or the\nperson said \"That's enough for now\"."
+          },
+          "left": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Gaps left to ask about, the question on screen included.",
+            "minimum": 0
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Questions skipped.",
+            "minimum": 0
+          },
+          "strength": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The profile's strength with everything told so far, as if saved.",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32",
+            "description": "About how many questions in all: the asked ones and those left.",
+            "minimum": 0
+          },
+          "updated": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The changes (by id) the last answer proposed."
+          }
+        }
+      },
       "AboutReview": {
         "type": "object",
         "description": "What Save would do.",
@@ -5706,6 +6152,7 @@
           "sentences",
           "employers",
           "changes",
+          "questions",
           "calls_today",
           "daily_cap",
           "extra_max"
@@ -5737,7 +6184,7 @@
             "items": {
               "$ref": "#/components/schemas/ChangeView"
             },
-            "description": "The changes proposed from it."
+            "description": "The changes proposed from it and from the answers to the questions."
           },
           "daily_cap": {
             "type": "integer",
@@ -5773,6 +6220,10 @@
             "type": "integer",
             "format": "int32",
             "description": "The profile's version now."
+          },
+          "questions": {
+            "$ref": "#/components/schemas/AboutQuestions",
+            "description": "The questions about the gaps (#44)."
           },
           "sentences": {
             "type": "array",
@@ -8200,6 +8651,23 @@
         "enum": [
           "claim",
           "quote"
+        ]
+      },
+      "GapKind": {
+        "type": "string",
+        "description": "What a gap is about.",
+        "enum": [
+          "assumed",
+          "results",
+          "team_size",
+          "area",
+          "skills",
+          "skills_found",
+          "claim",
+          "summary",
+          "headline",
+          "background",
+          "goals"
         ]
       },
       "Goals": {

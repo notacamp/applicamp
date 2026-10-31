@@ -38,31 +38,15 @@ const STRENGTH = {
   ],
 };
 
-const questions = (n: number) => ({
-  status: "ready",
-  reason: null,
-  score: 45,
-  total: n,
-  answered: 0,
-  questions: Array.from({ length: n }, (_, i) => ({
-    id: `q${String(i + 1)}`,
-    section: "basics.label",
-    context: null,
-    question: "Q?",
-    why: "W",
-    expected_gain: 6,
-  })),
-});
-
 describe("the strength card", () => {
   it("shows the score, what is missing and what to do about it", async () => {
     stubApi({
       "GET /api/v1/profile/strength": { body: STRENGTH },
-      "GET /api/v1/profile/questions": { body: questions(9) },
     });
     const onAction = vi.fn();
+    const onAbout = vi.fn();
     const user = userEvent.setup();
-    renderWithProviders(<StrengthCard onAction={onAction} />);
+    renderWithProviders(<StrengthCard onAction={onAction} onAbout={onAbout} />);
     expect(await screen.findByTestId("strength-score")).toHaveTextContent("45%");
     expect(screen.getByTestId("strength-card")).toHaveTextContent("35 points to a strong profile");
     expect(screen.getByTestId("strength-card")).toHaveTextContent(
@@ -82,44 +66,24 @@ describe("the strength card", () => {
     expect(onAction).toHaveBeenLastCalledWith({ kind: "skills" });
     await user.click(screen.getByTestId("strength-summary-action"));
     expect(onAction).toHaveBeenLastCalledWith({ kind: "edit", section: "basics" });
-    expect(await screen.findByTestId("strength-improve")).toHaveTextContent(
-      "Improve my profile · 9 questions",
-    );
-    await user.click(screen.getByTestId("strength-improve"));
-    expect(onAction).toHaveBeenLastCalledWith({ kind: "improve" });
-  });
-
-  it("is quiet when the profile is strong and nothing is left to ask", async () => {
-    stubApi({
-      "GET /api/v1/profile/strength": {
-        body: {
-          ...STRENGTH,
-          score: 90,
-          strong: true,
-          items: STRENGTH.items.map((i) => ({ ...i, state: "ok" })),
-        },
-      },
-      "GET /api/v1/profile/questions": { body: questions(0) },
-    });
-    renderWithProviders(<StrengthCard onAction={vi.fn()} />);
-    expect(await screen.findByTestId("strength-card")).toHaveTextContent("Strong.");
+    // The way to a stronger profile is Tell me about you, not Improve or Grill me.
+    expect(screen.getByTestId("strength-about")).toHaveTextContent("Tell me about you");
     expect(screen.queryByTestId("strength-improve")).toBeNull();
+    expect(screen.queryByTestId("strength-grill")).toBeNull();
+    await user.click(screen.getByTestId("strength-about"));
+    expect(onAbout).toHaveBeenCalledTimes(1);
   });
 
-  it("works without the questions: the checklist stands on its own", async () => {
-    stubApi({
-      "GET /api/v1/profile/strength": { body: STRENGTH },
-      "GET /api/v1/profile/questions": {
-        body: { ...questions(0), status: "unavailable", reason: "ai_unavailable" },
-      },
-    });
-    renderWithProviders(<StrengthCard onAction={vi.fn()} />);
-    expect(await screen.findByTestId("strength-improve")).toHaveTextContent("Improve my profile");
+  it("asks nothing of the model by showing the strength", async () => {
+    const requests = stubApi({ "GET /api/v1/profile/strength": { body: STRENGTH } });
+    renderWithProviders(<StrengthCard onAction={vi.fn()} onAbout={vi.fn()} />);
+    expect(await screen.findByTestId("strength-card")).toBeVisible();
+    expect(requests.map(({ route }) => route)).toEqual(["GET /api/v1/profile/strength"]);
   });
 
   it("stays out of the way when the strength cannot be read", async () => {
     stubApi({ "GET /api/v1/profile/strength": { status: 500, body: { code: "internal_error" } } });
-    renderWithProviders(<StrengthCard onAction={vi.fn()} />);
+    renderWithProviders(<StrengthCard onAction={vi.fn()} onAbout={vi.fn()} />);
     await new Promise((resolve) => {
       setTimeout(resolve, 50);
     });

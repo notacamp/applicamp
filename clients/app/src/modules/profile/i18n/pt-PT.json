@@ -359,11 +359,7 @@
     "scoreLabel": "Força do perfil: {{score}} por cento",
     "strong": "Forte. Mantenha-o atualizado.",
     "growing": "Faltam {{left}} pontos para um perfil forte.",
-    "reading": "A IA está a ler o seu perfil à procura do que falta…",
     "checklist": "De que é feita a força do seu perfil",
-    "improve": "Melhorar o meu perfil",
-    "improveCount_one": "Melhorar o meu perfil · {{count}} pergunta",
-    "improveCount_other": "Melhorar o meu perfil · {{count}} perguntas",
     "add": "Adicionar",
     "improveItem": "Melhorar",
     "skillsFound_one": "{{count}} encontrada nas suas funções",
@@ -427,95 +423,13 @@
         "missing": "Diga aos agentes o que quer a seguir"
       }
     },
-    "grill": "Pergunte-me tudo",
     "about": "Fale-me de si"
   },
-  "improve": {
-    "eyebrow": "Pergunta {{n}} de {{total}}",
-    "readingTitle": "A ler o seu perfil…",
-    "readingLead": "A IA procura o que falta ou está fraco. Demora alguns segundos.",
-    "loadFailed": "Não foi possível carregar as perguntas.",
-    "later": "Terminar mais tarde",
-    "skip": "Saltar",
-    "draft": "Redigir a partir da resposta",
-    "drafting": "A redigir…",
-    "answerLabel": "A sua resposta",
-    "answerHint": "Enter redige a partir da resposta; Shift e Enter mudam de linha.",
-    "answerPlaceholder": "Responda por palavras suas. Pode ser desarrumado.",
-    "strengthNow": "Força {{from}}% → {{to}}% se responder",
-    "contextRole": "Da sua função · {{role}}",
-    "years": "{{from}}–{{to}}",
-    "yearsNow": "{{from}}–atual",
-    "context": {
-      "label": "O seu título",
-      "summary": "O seu resumo",
-      "education": "A sua formação",
-      "links": "As suas ligações"
-    },
-    "draftTitle": "Rascunho a partir da sua resposta",
-    "draftSource": "Usa só o que escreveu e o que o seu perfil diz. Nada é guardado até o manter.",
-    "nothingDrafted": "Nada na sua resposta se podia redigir sem acrescentar algo que não escreveu. Acrescente pormenores e redija de novo.",
-    "dropped_one": "{{count}} linha deixada de fora: mencionava algo que não escreveu.",
-    "dropped_other": "{{count}} linhas deixadas de fora: mencionavam algo que não escreveu.",
-    "keep": "Manter",
-    "edit": "Editar",
-    "discard": "Descartar",
-    "editLabel": "Edite o rascunho, uma linha por item",
-    "kept": "Mantido. O seu perfil tem agora {{score}}% de força.",
-    "doneTitle": "Por agora é tudo",
-    "doneLead": "Respondeu ou saltou todas as perguntas. O seu perfil tem {{score}}% de força.",
-    "backToProfile": "Voltar ao seu perfil",
-    "unavailableTitle": "As perguntas precisam de um modelo de IA",
-    "unavailableLead": "Esta instalação do Applicamp não tem um modelo de IA configurado, por isso não consegue ler o seu perfil à procura de lacunas. A lista no seu perfil continua a mostrar o que acrescentar.",
-    "noProfile": "Ainda não há nada para ler. Importe ou escreva primeiro o seu perfil.",
-    "failedTitle": "Não foi possível fazer as perguntas",
-    "reasons": {
-      "ai_unavailable": "Esta instalação do Applicamp não tem um modelo de IA configurado, por isso não consegue ler o seu perfil à procura de lacunas.",
-      "ai_daily_limit_reached": "Atingiu o limite de IA de hoje. Tente amanhã.",
-      "ai_budget_reached": "Atingiu o limite de gastos de IA, por isso nada foi enviado. Repõe-se com o dia ou o mês; a lista no seu perfil continua a mostrar o que acrescentar.",
-      "ai_failed": "O modelo de IA não conseguiu ler o seu perfil agora. Tente de novo dentro de um minuto."
-    },
-    "errors": {
-      "generic": "Não resultou. Tente de novo.",
-      "ai_unavailable": "Esta instalação do Applicamp não tem um modelo de IA configurado, por isso não consegue redigir a partir da sua resposta.",
-      "ai_daily_limit_reached": "Atingiu o limite de IA de hoje. Tente amanhã.",
-      "ai_budget_reached": "Atingiu o limite de gastos de IA, por isso nada foi enviado. Pode escrever isto no seu perfil.",
-      "ai_failed": "O modelo de IA não conseguiu redigir isto agora. Tente de novo dentro de um minuto.",
-      "profile_changed": "O seu perfil mudou desde que este rascunho foi feito. Descarte-o e redija de novo.",
-      "draft_not_ready": "Este rascunho já foi mantido ou descartado.",
-      "invalid_answer": "Escreva entre 1 e 2000 carateres.",
-      "invalid_items": "Verifique as linhas: nenhuma pode estar vazia ou ser demasiado longa.",
-      "not_found": "Esta pergunta já não existe. Termine mais tarde e volte."
-    }
-  },
   "skills": {
-    "yours": "As suas competências",
     "order": "As três primeiras guiam as pesquisas nos sites de emprego; ponha primeiro aquelas para que mais quer ser contratado.",
     "top": "Usada nas pesquisas",
-    "empty": "Ainda sem competências. Adicione as encontradas nas suas funções abaixo, ou no seu perfil.",
     "moveUp": "Subir {{name}}",
-    "moveDown": "Descer {{name}}",
-    "foundTitle": "Competências encontradas nas suas funções",
-    "foundLead": "Aparecem nas descrições das suas funções, mas ainda não estão na lista de competências. Adicione aquelas sobre as quais não se importaria de ser questionado numa entrevista.",
-    "found": "Competências encontradas nas suas funções",
-    "inRoles_one": "em {{count}} função",
-    "inRoles_other": "em {{count}} funções",
-    "add": "Adicionar",
-    "addLabel": "Adicionar {{name}}",
-    "notMine": "Não é minha",
-    "notMineLabel": "{{name}} não é minha",
-    "foundNote": "Encontradas a ler as suas próprias funções, com o número de funções que mencionam cada uma. Nada é adicionado sem o seu clique.",
-    "noneFound": "Nada mais a sugerir: todas as competências que as suas funções mencionam estão na lista ou postas de parte.",
-    "reading": "A ler as suas funções à procura de competências…",
-    "unavailable": "Encontrar competências nas suas funções precisa de um modelo de IA, que não está configurado aqui. Pode sempre adicionar competências à mão no seu perfil.",
-    "loadFailed": "Não foi possível carregar as competências encontradas nas suas funções.",
-    "back": "Voltar ao seu perfil",
-    "reasons": {
-      "ai_unavailable": "Encontrar competências nas suas funções precisa de um modelo de IA, que não está configurado aqui.",
-      "ai_daily_limit_reached": "Atingiu o limite de IA de hoje. Tente amanhã.",
-      "ai_budget_reached": "Atingiu o limite de gastos de IA, por isso nada foi enviado. Pode sempre adicionar competências à mão no seu perfil.",
-      "ai_failed": "O modelo de IA não conseguiu ler as suas funções agora. Tente de novo dentro de um minuto."
-    }
+    "moveDown": "Descer {{name}}"
   },
   "nudge": {
     "title": "O seu perfil tem {{score}}% de força.",
@@ -531,50 +445,9 @@
     }
   },
   "grill": {
-    "title": "Pergunte-me tudo",
-    "lead": "Um CV só pode dizer o que o Applicamp sabe. Escolha uma função e responda a uma pergunta de cada vez. As respostas vagas são contestadas e pedem-se números. Cada facto tirado das suas respostas é-lhe mostrado primeiro; nada é guardado até o manter.",
-    "open": "Pergunte-me tudo",
-    "aboutRole": "Perguntar sobre esta função",
-    "rolesLabel": "As suas funções",
     "loading": "A carregar as suas funções…",
-    "loadFailed": "Não foi possível carregar as suas funções.",
-    "roleLoadFailed": "Não foi possível carregar a entrevista desta função.",
-    "back": "Voltar ao seu perfil",
-    "noRolesTitle": "Ainda não há funções sobre as quais falar",
-    "noRolesLead": "Importe ou escreva primeiro o seu perfil. A entrevista trata uma função de cada vez.",
-    "pickTitle": "Escolha uma função",
-    "pickLead": "Uma função leva cerca de uma dúzia de perguntas. Cada uma é uma única chamada pequena à IA, cerca de 0,001 €, e nada corre até clicar.",
     "years": "{{from}}–{{to}}",
     "yearsNow": "{{from}}–atual",
-    "status": {
-      "not_started": "por começar",
-      "in_progress": "em curso",
-      "covered": "coberta"
-    },
-    "startTitle": "Quando quiser",
-    "startLead": "Começa com uma pergunta sobre esta função. Responda por palavras suas; pergunta de novo se precisar de mais.",
-    "start": "Começar",
-    "starting": "A perguntar…",
-    "continue": "Fazer-me uma pergunta",
-    "coveredBanner": "Os sete temas estão cobertos para esta função.",
-    "coveredLead": "Os factos que manteve estão sob esta função, no seu perfil. Volte para acrescentar mais.",
-    "stoppedBanner": "Por agora não há mais nada a perguntar.",
-    "labels": {
-      "question": "Pergunta",
-      "push": "A insistir",
-      "answer": "Você"
-    },
-    "skippedNote": "Saltou esta pergunta.",
-    "doneNote": "Deixada para já. Comece de novo quando quiser e continua daqui.",
-    "logLabel": "A entrevista até agora",
-    "answerLabel": "A sua resposta",
-    "answerHint": "Enter envia; Shift e Enter mudam de linha.",
-    "answerPlaceholder": "Responda por palavras suas. Pode ser desarrumado; pergunta de novo se precisar de mais.",
-    "answer": "Responder",
-    "answering": "A ler a sua resposta…",
-    "skip": "Saltar esta",
-    "done": "Terminar esta função por agora",
-    "costLine": "Cada pergunta é uma chamada pequena à IA, cerca de 0,001 €. Perguntas hoje: {{n}} de {{cap}}.",
     "facts": {
       "title": "Factos tirados da sua resposta",
       "yourWords": "As suas palavras:",
@@ -595,47 +468,6 @@
       "leftOut_one": "{{count}} linha deixada de fora: dizia algo que não escreveu.",
       "leftOut_other": "{{count}} linhas deixadas de fora: diziam algo que não escreveu."
     },
-    "coverage": {
-      "title": "Cobertura",
-      "count": "{{n}}/7",
-      "label": "{{n}} de 7 temas cobertos",
-      "note": "Também compara as respostas entre si e com o seu perfil. Se duas disserem coisas diferentes, pergunta qual está certa.",
-      "state": {
-        "ok": "Coberto",
-        "part": "Parcialmente coberto",
-        "none": "Ainda não coberto"
-      },
-      "areas": {
-        "context": {
-          "name": "Contexto",
-          "hint": "o que a empresa vendia, a quem, tamanho da equipa"
-        },
-        "your_part": {
-          "name": "O seu papel",
-          "hint": "o que fez você, não a equipa"
-        },
-        "stack_scale": {
-          "name": "Tecnologia e escala",
-          "hint": "ferramentas, volume de dados, tráfego"
-        },
-        "results": {
-          "name": "Resultados com prova",
-          "hint": "números, e como sabe que são esses"
-        },
-        "hard_problems": {
-          "name": "Problemas difíceis",
-          "hint": "o que correu mal e o que fez"
-        },
-        "people": {
-          "name": "Pessoas",
-          "hint": "liderar, orientar, contratar"
-        },
-        "stories": {
-          "name": "Histórias de entrevista",
-          "hint": "histórias que contaria numa entrevista"
-        }
-      }
-    },
     "errors": {
       "generic": "Não correu bem. Tente de novo.",
       "ai_unavailable": "Esta instalação do Applicamp não tem um modelo de IA configurado, por isso não pode fazer perguntas.",
@@ -653,8 +485,8 @@
       "not_found": "Já não está aqui. Volte às suas funções."
     },
     "roleFacts": {
-      "title": "O que nos contou sobre cada função",
-      "lead": "Factos que manteve no Pergunte-me tudo, com as suas próprias palavras. Um CV só pode usar estes e o que escreveu acima.",
+      "title": "O que contou à Applicamp sobre cada função",
+      "lead": "Factos que manteve, com as suas próprias palavras. Um CV só pode usar estes e o que o seu perfil diz.",
       "none": "Ainda sem factos mantidos",
       "count_one": "{{count}} facto",
       "count_other": "{{count}} factos",
@@ -663,7 +495,8 @@
       "removeLabel": "Remover este facto: {{text}}",
       "removed": "Facto removido.",
       "listLabel": "Factos mantidos de {{role}}",
-      "confirmed": "Confirmou esta suposição."
+      "confirmed": "Confirmou esta suposição.",
+      "tellMore": "Contar mais"
     }
   },
   "about": {
@@ -747,8 +580,8 @@
       "questionsNext": "As perguntas sobre as lacunas vêm a seguir.",
       "open_one": "{{count}} afirmação precisa da sua resposta antes de poder guardar.",
       "open_other": "{{count}} afirmações precisam da sua resposta antes de poder guardar.",
-      "review": "Rever e guardar",
-      "back": "Voltar"
+      "back": "Voltar",
+      "questions": "Continuar para as perguntas"
     },
     "flag": {
       "claim": "“{{claim}}” não consta das suas palavras.",
@@ -800,7 +633,7 @@
       "ai_daily_limit_reached": "Atingiu o limite de IA de hoje. Tente amanhã.",
       "ai_budget_reached": "Atingiu o limite de gastos de IA, por isso nada foi enviado. O que escreveu continua na caixa.",
       "ai_failed": "O modelo de IA não conseguiu responder agora. O que escreveu continua na caixa; tente daqui a um minuto.",
-      "about_daily_cap": "Isto está limitado a 30 passos de IA por dia. Continua amanhã.",
+      "about_daily_cap": "Isto está limitado a 60 passos de IA por dia. Continua amanhã.",
       "profile_needed": "Adicione primeiro o seu perfil e depois fale-me de si.",
       "changes_flagged": "Algo do que escreveu tem uma afirmação que não encontro nas suas palavras. Resolva isso primeiro.",
       "invalid_text": "Escreva entre 1 e 4000 carateres.",
@@ -808,7 +641,34 @@
       "site_not_allowed": "Esse endereço não pode ser lido. Use o site público da empresa.",
       "invalid_change": "Escreva o que deve dizer.",
       "research_unavailable": "A leitura de sites não está configurada aqui.",
-      "not_found": "Isto já não está aqui. Volte atrás e veja de novo."
+      "not_found": "Isto já não está aqui. Volte atrás e veja de novo.",
+      "portrait_needed": "Comece pelo retrato: as perguntas vêm depois.",
+      "invalid_choice": "Escolha uma das opções mostradas."
+    },
+    "questions": {
+      "title": "Algumas perguntas",
+      "progress": "Pergunta {{n}} de cerca de {{total}}",
+      "strength": "Força do perfil: {{score}}%",
+      "strengthAfter": "Força do perfil: {{score}}% → {{after}}% se responder",
+      "tag": {
+        "assumed": "Presumi",
+        "unknown": "Não sei",
+        "told": "Disse-me"
+      },
+      "updated": "Atualizado com a sua resposta",
+      "savedLater": "Passa para o seu perfil quando guardar.",
+      "goesTo": "Vai para: {{where}}.",
+      "role": "{{company}} · função",
+      "answerLabel": "A sua resposta",
+      "answerPlaceholder": "Diga pelas suas palavras. Pode ser aproximado.",
+      "answer": "Responder",
+      "skip": "Saltar",
+      "enough": "Por agora chega",
+      "cost": "1 pequena chamada de IA · cerca de 0,001 €",
+      "asking": "A pensar na pergunta seguinte…",
+      "reading": "A ler a sua resposta…",
+      "peek": "Ver o que sei sobre si agora",
+      "toReview": "Ir para a revisão"
     }
   }
 }

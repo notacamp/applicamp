@@ -2,7 +2,7 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/r
 
 import { api, CSRF_HEADERS, unwrap, type Schema } from "~/lib/api";
 
-import { QUESTIONS_QUERY_KEY, STRENGTH_QUERY_KEY } from "./completion";
+import { STRENGTH_QUERY_KEY } from "./completion";
 import { PROFILE_QUERY_KEY } from "./profile";
 
 /** What Applicamp knows and assumes about you (`GET /api/v1/profile/about`). */
@@ -18,6 +18,10 @@ export type AboutReview = Schema<"AboutReview">;
 export type ReviewGroup = Schema<"ReviewGroup">;
 export type ReviewRow = Schema<"ReviewRow">;
 export type AboutSaved = Schema<"Saved">;
+/** The questions about the gaps (`AboutView.questions`) and the one on screen. */
+export type AboutQuestions = Schema<"AboutQuestions">;
+export type AboutQuestion = Schema<"AboutQuestion">;
+export type AboutQuestionTag = Schema<"AboutQuestionTag">;
 
 /** Longest "Anything else", in characters (the server's limit). */
 export const MAX_EXTRA = 4000;
@@ -182,9 +186,72 @@ export function useSaveAbout() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY, exact: true });
       void queryClient.invalidateQueries({ queryKey: STRENGTH_QUERY_KEY });
-      void queryClient.invalidateQueries({ queryKey: QUESTIONS_QUERY_KEY });
       void queryClient.invalidateQueries({ queryKey: ["today"] });
       void queryClient.invalidateQueries({ queryKey: ABOUT_QUERY_KEY });
     },
+  });
+}
+
+/** Asks the next question: the one on screen, or one more small model call to word the top gap. */
+export function useNextQuestion(language: string) {
+  const store = useStore();
+  return useMutation({
+    mutationFn: async (): Promise<AboutView> =>
+      unwrap(
+        await api.POST("/api/v1/profile/about/questions/next", {
+          params: { query: { locale: language } },
+          headers: CSRF_HEADERS,
+        }),
+      ),
+    onSuccess: store,
+  });
+}
+
+/** Answers the question on screen: one model call turns the words into proposed changes. */
+export function useAnswerQuestion(language: string) {
+  const store = useStore();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      text,
+      choices,
+    }: {
+      id: string;
+      text: string;
+      choices: readonly string[];
+    }): Promise<AboutView> =>
+      unwrap(
+        await api.POST("/api/v1/profile/about/questions/{id}/answer", {
+          params: { path: { id }, query: { locale: language } },
+          headers: CSRF_HEADERS,
+          body: { text, choices: [...choices] },
+        }),
+      ),
+    onSuccess: store,
+  });
+}
+
+/** Skips the question on screen for this profile version. No model. */
+export function useSkipQuestion() {
+  const store = useStore();
+  return useMutation({
+    mutationFn: async (id: string): Promise<AboutView> =>
+      unwrap(
+        await api.POST("/api/v1/profile/about/questions/{id}/skip", {
+          params: { path: { id } },
+          headers: CSRF_HEADERS,
+        }),
+      ),
+    onSuccess: store,
+  });
+}
+
+/** "That's enough for now": no more questions. No model. */
+export function useEnoughQuestions() {
+  const store = useStore();
+  return useMutation({
+    mutationFn: async (): Promise<AboutView> =>
+      unwrap(await api.POST("/api/v1/profile/about/questions/enough", { headers: CSRF_HEADERS })),
+    onSuccess: store,
   });
 }

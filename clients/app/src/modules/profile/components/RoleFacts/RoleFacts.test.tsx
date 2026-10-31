@@ -36,14 +36,14 @@ const PROFILE: Profile = {
   projects: [],
 };
 
-describe("What you told us about each role", () => {
-  it("lists every role with the facts kept under it, in the person's words, and a way into Grill me", async () => {
+describe("What you told Applicamp about each role", () => {
+  it("lists every role with the facts kept under it, in the person's words, and a way into Tell me about you", async () => {
     stubApi({});
-    const onGrill = vi.fn();
+    const onAbout = vi.fn();
     const user = userEvent.setup();
     renderWithProviders(
       <UndoProvider>
-        <RoleFacts profile={PROFILE} onGrill={onGrill} />
+        <RoleFacts profile={PROFILE} onAbout={onAbout} />
       </UndoProvider>,
     );
     const list = screen.getByTestId("role-facts-list-0");
@@ -51,8 +51,12 @@ describe("What you told us about each role", () => {
     expect(list).toHaveTextContent("Your words: I led it");
     expect(screen.queryByTestId("role-facts-list-1")).toBeNull();
     expect(screen.getByTestId("role-facts-row-1")).toHaveTextContent("Engineer");
-    await user.click(screen.getByTestId("role-grill-1"));
-    expect(onGrill).toHaveBeenCalledWith(1);
+    expect(screen.getByTestId("role-facts")).toHaveTextContent(
+      "What you told Applicamp about each role",
+    );
+    expect(screen.getByTestId("role-facts")).not.toHaveTextContent("Grill me");
+    await user.click(screen.getByTestId("role-about-1"));
+    expect(onAbout).toHaveBeenCalledTimes(1);
   });
 
   it("removes a fact, and puts it back on Undo", async () => {
@@ -67,7 +71,7 @@ describe("What you told us about each role", () => {
     const user = userEvent.setup();
     renderWithProviders(
       <UndoProvider>
-        <RoleFacts profile={PROFILE} onGrill={vi.fn()} />
+        <RoleFacts profile={PROFILE} onAbout={vi.fn()} />
       </UndoProvider>,
     );
     await user.click(screen.getByTestId("role-fact-remove-f1"));

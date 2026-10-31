@@ -12,19 +12,23 @@
 //!   question at a time and versioned.
 //!
 //! - **Grill me** ([`features::grill`]): a deep interview about one position
-//!   at a time; the facts the person keeps live on the position.
+//!   at a time; the facts the person keeps live on the position. **Retired
+//!   from the client (#44)**: its interview endpoints are deprecated and
+//!   no longer called; its proposals still turn an answer about a job into
+//!   facts. Removal is tracked in #49.
 //!
 //! - **Tell me about you** ([`features::about`]): what Applicamp knows and
-//!   assumes about a person as one portrait, confirmed by them, then saved
-//!   in one write.
+//!   assumes about a person as one portrait, confirmed by them, then the
+//!   questions about the gaps (decided in code, worded by the model), then
+//!   saved in one write.
 //!
 //! - **Matching** ([`matching`]): how far a person is, and what a job search
 //!   matches against, for the ports the server wires to other modules.
 //!
 //! - **Completion** ([`features::completion`]): how strong the profile is
-//!   ([`strength`]), the AI's questions about its gaps, drafts from the
-//!   person's answers (checked against their own words) and skills found
-//!   in their positions.
+//!   ([`strength`]). Its AI questions, drafts and found skills are
+//!   **retired from the client (#44)** and deprecated: Tell me about you
+//!   asks about the gaps now. Removal is tracked in #49.
 //!
 //! Publishes `profile.updated` (ids only) whenever a profile changes and
 //! `profile.goals_updated` (id and version) whenever the goals do.
@@ -101,6 +105,10 @@ pub fn module(deps: ProfileDeps) -> Module {
         .routes(routes!(about::change, about::remove_change))
         .routes(routes!(about::review))
         .routes(routes!(about::save))
+        .routes(routes!(about::questions::next))
+        .routes(routes!(about::questions::enough))
+        .routes(routes!(about::questions::answer))
+        .routes(routes!(about::questions::skip))
         .routes(routes!(imports::get))
         .routes(routes!(imports::apply))
         .routes(routes!(imports::discard))

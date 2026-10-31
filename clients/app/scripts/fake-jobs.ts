@@ -501,6 +501,175 @@ function aboutChanges(userContent: string) {
   return { changes };
 }
 
+/** The choices the fake offers: what a picked one looks like in an answer. */
+const QUESTION_CHOICES: ReadonlySet<string> = new Set([
+  "Bookings",
+  "Payments",
+  "Door and building access",
+  "None of these",
+  "1 to 2",
+  "3 to 6",
+  "7 to 15",
+  "More than 15",
+]);
+
+/** The gap a question is about (`<gap>` of the prompt). */
+interface AskedGap {
+  kind?: string;
+  area?: string | null;
+  basis?: string;
+  names?: string[];
+}
+
+/** One position as the question call shows it (`<role>`). */
+interface AskedRole {
+  index?: number;
+  title?: string | null;
+  company?: string | null;
+}
+
+/**
+ * "Tell me about you", the questions about the gaps (#44): the model words one
+ * question about the one gap it is shown (system prompt "You word one question
+ * that a job-hunting app asks…"), always saying what was assumed or what is
+ * not known, in its `why`, tagged, with choices for a closed question. The
+ * server has already decided what to ask.
+ */
+function aboutQuestion(userContent: string) {
+  const gap = parsedBetween<AskedGap>(userContent, "gap", {});
+  const role = parsedBetween<AskedRole | null>(userContent, "role", null);
+  const assumption = parsedBetween<{ text?: string; why?: string } | null>(
+    userContent,
+    "assumption",
+    null,
+  );
+  const company = role?.company ?? "your last employer";
+  const title = role?.title ?? "your role";
+  const names = gap.names ?? [];
+  const basis = gap.basis ?? "";
+  const ask = (question: string, why: string, tag: string, choices: string[] = []) => ({
+    question,
+    why,
+    tag,
+    choices,
+  });
+  switch (gap.kind) {
+    case "assumed": {
+      return ask(
+        `Which of these did you build at ${company}?`,
+        `I assumed this: ${assumption?.text ?? basis} ${assumption?.why ?? ""}`.trim(),
+        "assumed",
+        ["Bookings", "Payments", "Door and building access", "None of these"],
+      );
+    }
+    case "results": {
+      return ask(
+        `What changed because of your work at ${company}? Give one result with a number.`,
+        `${basis} A result with a number is what a recruiter reads first, and I don’t know yours.`,
+        "unknown",
+      );
+    }
+    case "team_size": {
+      return ask(
+        `How many people did you lead at ${company}?`,
+        `Your title was ${title}, which usually means leading 3 to 6 engineers. Your profile doesn’t say, and recruiters ask.`,
+        "assumed",
+        ["1 to 2", "3 to 6", "7 to 15", "More than 15"],
+      );
+    }
+    case "skills_found": {
+      return ask(
+        `Which of these do you use?`,
+        `Your roles mention ${names.join(", ")}, but they aren’t in your skills.`,
+        "unknown",
+        [...names, "None of these"],
+      );
+    }
+    case "claim": {
+      return ask(
+        `Where did you use ${names[0] ?? "it"}?`,
+        `You mentioned ${names[0] ?? "it"}, but none of your roles do.`,
+        "told",
+      );
+    }
+    default: {
+      return ask(
+        `What should I know about your work at ${company}?`,
+        `${basis} I don’t know it yet.`,
+        "unknown",
+      );
+    }
+  }
+}
+
+/**
+ * An answer to one of those questions (system prompt "You read a person's
+ * answer to one question about their own profile…"): a fact on the position
+ * asked about, quoting the answer. A number is a result; picked choices are
+ * what the person built; a team size also names the company, which the
+ * answer never wrote (the server must flag it).
+ */
+function aboutAnswer(userContent: string) {
+  const words = between(userContent, "text");
+  const about = parsedBetween<{ index?: number | null; area?: string | null }>(
+    userContent,
+    "about",
+    {},
+  );
+  const held = parsedBetween<{ positions?: { index: number; company?: string | null }[] }>(
+    userContent,
+    "profile",
+    {},
+  );
+  const company = held.positions?.find((role) => role.index === about.index)?.company ?? "";
+  // The server puts what was typed first and the choices picked after it.
+  const lines = words.split("\n");
+  const choices = lines.filter((line) => QUESTION_CHOICES.has(line) && line !== "None of these");
+  const first = lines.find((line) => !QUESTION_CHOICES.has(line)) ?? choices[0] ?? "";
+  const change = (value: string, quote: string, area: string, sentence: string) => ({
+    field: about.index === null || about.index === undefined ? "skill" : "role_fact",
+    value,
+    position: about.index ?? null,
+    area,
+    quote,
+    sentence,
+  });
+  if (about.area === "people") {
+    return {
+      changes: [
+        change(
+          `Led ${first.replace(/[.!?]+$/, "")} at ${company}`,
+          first,
+          "people",
+          `You led ${first.replace(/[.!?]+$/, "")}.`,
+        ),
+      ],
+    };
+  }
+  if (about.area === "results" && /\d/.test(words)) {
+    const value = first.replace(/[.!?]+$/, "");
+    return { changes: [change(value, first, "results", `You told me: ${value}.`)] };
+  }
+  if (choices.length > 0 && about.index !== null && about.index !== undefined) {
+    const value = `Worked on ${choices.join(", ").toLowerCase()}`;
+    return {
+      changes: [
+        change(
+          value,
+          choices.join("\n"),
+          about.area ?? "your_part",
+          `You worked on ${choices.join(", ").toLowerCase()}.`,
+        ),
+      ],
+    };
+  }
+  const tech = ABOUT_TECH.find((name) => new RegExp(String.raw`\b${name}\b`, "i").test(words));
+  if (tech !== undefined && (about.index === null || about.index === undefined)) {
+    return { changes: [change(tech, tech, "context", "")] };
+  }
+  return { changes: [] };
+}
+
 /** An OpenAI-compatible chat completion whose message is `content` (as JSON text). */
 function completion(content: unknown) {
   return {
@@ -546,6 +715,14 @@ async function complete(request: IncomingMessage, response: ServerResponse) {
     }
     if (system.startsWith("You read what a person wrote about themselves")) {
       json(response, 200, completion(aboutChanges(user?.content ?? "")));
+      return;
+    }
+    if (system.startsWith("You word one question that a job-hunting app asks")) {
+      json(response, 200, completion(aboutQuestion(user?.content ?? "")));
+      return;
+    }
+    if (system.startsWith("You read a person's answer to one question about their own profile")) {
+      json(response, 200, completion(aboutAnswer(user?.content ?? "")));
       return;
     }
     if (system.startsWith("You read pages from a company")) {

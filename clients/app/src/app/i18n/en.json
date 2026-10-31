@@ -64,11 +64,6 @@
     "lead": "The link may be old, or the address mistyped.",
     "home": "Go to Today"
   },
-  "profileSkills": {
-    "eyebrow": "Profile & goals",
-    "title": "Skills",
-    "lead": "The skills agents match jobs against, in the order they count, and the ones your own roles mention."
-  },
   "cvs": {
     "title": "CVs",
     "lead": "Every CV you’ve made: the PDFs you can open and send, and the drafts still being reviewed."

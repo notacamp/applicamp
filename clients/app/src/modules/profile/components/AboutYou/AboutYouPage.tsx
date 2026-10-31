@@ -7,6 +7,7 @@ import { useAbout, useMakePortrait } from "../../api/about";
 import { AddedStep } from "./AddedStep";
 import { errorCode } from "./labels";
 import { PortraitStep } from "./PortraitStep";
+import { QuestionsStep } from "./QuestionsStep";
 import { ReviewStep } from "./ReviewStep";
 
 export interface AboutYouPageProps {
@@ -16,13 +17,14 @@ export interface AboutYouPageProps {
   spend?: ReactNode;
 }
 
-type Step = "portrait" | "added" | "review";
+type Step = "portrait" | "added" | "questions" | "review";
 
 /**
  * `/profile/about`, "Tell me about you": what Applicamp knows and assumes
- * about you, as a portrait to confirm; anything else you want to add; and a
- * last look before it all is saved in one go. Opening it makes the portrait
- * (one model call per profile version); nothing is saved until Save.
+ * about you, as a portrait to confirm; anything else you want to add; the
+ * questions about the gaps, one at a time, each saying why; and a last look
+ * before it all is saved in one go. Opening it makes the portrait (one model
+ * call per profile version); nothing is saved until Save.
  */
 export function AboutYouPage({ onBack, spend }: AboutYouPageProps) {
   const { t, i18n } = useTranslation("profile");
@@ -44,14 +46,13 @@ export function AboutYouPage({ onBack, spend }: AboutYouPageProps) {
     }
   }, [needs, mutate]);
 
-  let title = t("about.title");
-  if (saved !== null) {
-    title = t("about.saved.title");
-  } else if (step === "review") {
-    title = t("about.reviewTitle");
-  } else if (step === "added") {
-    title = t("about.addedTitle");
-  }
+  const titles: Record<Step, string> = {
+    portrait: t("about.title"),
+    added: t("about.addedTitle"),
+    questions: t("about.questions.title"),
+    review: t("about.reviewTitle"),
+  };
+  const title = saved === null ? titles[step] : t("about.saved.title");
 
   const body = () => {
     if (saved !== null) {
@@ -142,6 +143,16 @@ export function AboutYouPage({ onBack, spend }: AboutYouPageProps) {
         </Tagged>
       );
     }
+    if (step === "questions") {
+      return (
+        <QuestionsStep
+          view={view}
+          onDone={() => {
+            setStep("review");
+          }}
+        />
+      );
+    }
     if (step === "review") {
       return (
         <ReviewStep
@@ -159,8 +170,8 @@ export function AboutYouPage({ onBack, spend }: AboutYouPageProps) {
           onBack={() => {
             setStep("portrait");
           }}
-          onReview={() => {
-            setStep("review");
+          onQuestions={() => {
+            setStep("questions");
           }}
         />
       );
@@ -169,7 +180,7 @@ export function AboutYouPage({ onBack, spend }: AboutYouPageProps) {
       <PortraitStep
         view={view}
         onContinue={(added) => {
-          setStep(added ? "added" : "review");
+          setStep(added ? "added" : "questions");
         }}
       />
     );
@@ -178,7 +189,7 @@ export function AboutYouPage({ onBack, spend }: AboutYouPageProps) {
   return (
     <Page testId="about" eyebrow={t("about.eyebrow")} title={title}>
       {body()}
-      {step === "portrait" ? spend : null}
+      {step === "portrait" || step === "questions" ? spend : null}
     </Page>
   );
 }

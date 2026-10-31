@@ -31,6 +31,19 @@ import {
 /** The lists shown as tags (short names), not as rows. */
 const COMPACT: ReadonlySet<ListKey> = new Set(["skills", "languages"]);
 
+/** How many skills drive the job board searches. */
+const TOP_SKILLS = 3;
+
+/** `list` with the item at `from` moved to `to`. */
+function moved<T>(list: readonly T[], from: number, to: number): T[] {
+  const next = [...list];
+  const [item] = next.splice(from, 1);
+  if (item !== undefined) {
+    next.splice(to, 0, item);
+  }
+  return next;
+}
+
 /** How an entry reads in its row: a title and a line under it. */
 export function useDescribe() {
   const { t, i18n } = useTranslation("profile");
@@ -221,6 +234,10 @@ export function EntryList({ list, entries, onChange, busy }: EntryListProps) {
     onChange(entries.filter((_, at) => at !== index));
     close();
   };
+  const ordered = list === "skills";
+  const move = (from: number, to: number) => {
+    onChange(moved(entries, from, to));
+  };
 
   const add = (
     <Button
@@ -237,7 +254,13 @@ export function EntryList({ list, entries, onChange, busy }: EntryListProps) {
   );
 
   return (
-    <Section title={t(`sections.${list}`)} action={add} testId={testId} anchor={list}>
+    <Section
+      title={t(`sections.${list}`)}
+      description={ordered ? t("skills.order") : undefined}
+      action={add}
+      testId={testId}
+      anchor={list}
+    >
       {entries.length === 0 && editing === null ? (
         <Tagged testId={`${testId}-empty`}>
           <Button
@@ -287,17 +310,48 @@ export function EntryList({ list, entries, onChange, busy }: EntryListProps) {
               <ListRow
                 key={index}
                 title={<Tagged testId={`${testId}-row`}>{title}</Tagged>}
+                badge={
+                  ordered && index < TOP_SKILLS ? (
+                    <Tagged testId={`${testId}-top-${String(index)}`}>
+                      <Tag icon="search">{t("skills.top")}</Tag>
+                    </Tagged>
+                  ) : undefined
+                }
                 meta={meta === "" ? undefined : meta}
                 trailing={
-                  <IconButton
-                    icon="edit"
-                    label={t("form.edit", { what: title })}
-                    disabled={busy || editing !== null}
-                    data-testid={`${testId}-edit-${String(index)}`}
-                    onClick={() => {
-                      setEditing(index);
-                    }}
-                  />
+                  <Cluster>
+                    {ordered ? (
+                      <>
+                        <IconButton
+                          icon="chevron-up"
+                          label={t("skills.moveUp", { name: title })}
+                          disabled={busy || editing !== null || index === 0}
+                          data-testid={`${testId}-up-${String(index)}`}
+                          onClick={() => {
+                            move(index, index - 1);
+                          }}
+                        />
+                        <IconButton
+                          icon="chevron-down"
+                          label={t("skills.moveDown", { name: title })}
+                          disabled={busy || editing !== null || index === entries.length - 1}
+                          data-testid={`${testId}-down-${String(index)}`}
+                          onClick={() => {
+                            move(index, index + 1);
+                          }}
+                        />
+                      </>
+                    ) : null}
+                    <IconButton
+                      icon="edit"
+                      label={t("form.edit", { what: title })}
+                      disabled={busy || editing !== null}
+                      data-testid={`${testId}-edit-${String(index)}`}
+                      onClick={() => {
+                        setEditing(index);
+                      }}
+                    />
+                  </Cluster>
                 }
               />
             );

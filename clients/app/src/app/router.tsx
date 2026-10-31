@@ -19,6 +19,7 @@ import { GoalsInterview } from "./routes/goals-interview";
 import { NotFound } from "./routes/not-found";
 import { Pipeline } from "./routes/pipeline";
 import { Profile } from "./routes/profile";
+import { ProfileGrill } from "./routes/profile-grill";
 import { ProfileImprove } from "./routes/profile-improve";
 import { ProfileSkills } from "./routes/profile-skills";
 import { Today } from "./routes/today";
@@ -155,6 +156,13 @@ const profileRoute = createRoute({
         onStartGoals={(step) => {
           void navigate({ to: "/goals/interview", search: { step } });
         }}
+        onGrill={(position) => {
+          if (position === undefined) {
+            void navigate({ to: "/profile/grill" });
+          } else {
+            void navigate({ to: "/profile/grill/$position", params: { position } });
+          }
+        }}
         onAction={(action) => {
           switch (action.kind) {
             case "improve": {
@@ -196,6 +204,54 @@ const profileSkillsRoute = createRoute({
     const navigate = profileSkillsRoute.useNavigate();
     return (
       <ProfileSkills
+        onBack={() => {
+          void navigate({ to: "/profile" });
+        }}
+      />
+    );
+  },
+});
+
+/** Grill me: the roles, in the app frame. */
+const profileGrillRoute = createRoute({
+  getParentRoute: () => frameRoute,
+  path: "/profile/grill",
+  component: function ProfileGrillRoute() {
+    const navigate = profileGrillRoute.useNavigate();
+    return (
+      <ProfileGrill
+        position={undefined}
+        onPosition={(position) => {
+          void navigate({ to: "/profile/grill/$position", params: { position } });
+        }}
+        onBack={() => {
+          void navigate({ to: "/profile" });
+        }}
+      />
+    );
+  },
+});
+
+/** Grill me about one role (its place in the profile's positions). */
+const profileGrillRoleRoute = createRoute({
+  getParentRoute: () => frameRoute,
+  path: "/profile/grill/$position",
+  params: {
+    parse: (raw) => ({ position: Number(raw.position) }),
+    stringify: ({ position }) => ({ position: String(position) }),
+  },
+  component: function ProfileGrillRoleRoute() {
+    const { position } = profileGrillRoleRoute.useParams();
+    const navigate = profileGrillRoleRoute.useNavigate();
+    if (!Number.isInteger(position) || position < 0) {
+      return <NotFound />;
+    }
+    return (
+      <ProfileGrill
+        position={position}
+        onPosition={(next) => {
+          void navigate({ to: "/profile/grill/$position", params: { position: next } });
+        }}
         onBack={() => {
           void navigate({ to: "/profile" });
         }}
@@ -269,6 +325,8 @@ const routeTree = rootRoute.addChildren([
     agentsRoute,
     profileRoute,
     profileSkillsRoute,
+    profileGrillRoute,
+    profileGrillRoleRoute,
   ]),
 ]);
 

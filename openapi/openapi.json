@@ -1511,6 +1511,694 @@
         ]
       }
     },
+    "/api/v1/profile/grill": {
+      "get": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Every position with how far its interview is.",
+        "description": "Computed from the stored interviews; never calls the model.",
+        "operationId": "profile.grill_roles",
+        "responses": {
+          "200": {
+            "description": "The positions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrillList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/grill/proposals/{id}/drop": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Drop a fact: it is not kept and not shown again.",
+        "operationId": "profile.grill_drop",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The fact waiting.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The interview, after the fact was dropped.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrillView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such fact, or it expired",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`proposal_not_ready`: already kept",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/grill/proposals/{id}/keep": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Keep a fact, as it is or fixed.",
+        "description": "Writes it on the position in the profile as a new profile version. A\nfixed `text` is checked like the model's: it may say only what the quote\nor the profile says (400 `fact_not_supported` names the words that are\nnot there); the quote never changes.",
+        "operationId": "profile.grill_keep",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The fact waiting.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeepFactRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The interview, after the fact was kept.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrillView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_fact`; `fact_not_supported`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such fact, or it expired",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`proposal_not_ready`: already kept or dropped; `profile_changed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/grill/{position}": {
+      "get": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "The interview of one position: its turns, coverage, the facts waiting and\nthe question waiting for an answer. Never calls the model.",
+        "operationId": "profile.grill_role",
+        "parameters": [
+          {
+            "name": "position",
+            "in": "path",
+            "description": "The position's place in the profile's `work` list.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The interview.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrillView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such position",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/grill/{position}/answer": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Answer the question waiting.",
+        "description": "**One model call** reads the answer: it returns the facts the answer\nstates (each with the person's exact words), what it covered and the next\nquestion, which pushes back when the answer was vague. A fact whose quote\nis not in the answer, or that says a number, name or tool neither the\nquote nor the profile says, is left out and counted in the turn's\n`dropped`. Nothing reaches the profile until a fact is kept.",
+        "operationId": "profile.grill_answer",
+        "parameters": [
+          {
+            "name": "position",
+            "in": "path",
+            "description": "The position's place in the profile's `work` list.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "description": "A language tag such as `pt-PT`; English when left out.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrillAnswerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The interview, after the answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrillView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_answer`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such position, or not started",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`no_open_question`; `grill_changed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`grill_daily_cap`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/grill/{position}/done": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "End the interview for now. No model call; the question waiting is put\naway, and starting again makes a new one. Facts waiting stay for their\n24 hours.",
+        "operationId": "profile.grill_done",
+        "parameters": [
+          {
+            "name": "position",
+            "in": "path",
+            "description": "The position's place in the profile's `work` list.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The interview.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrillView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such position, or not started",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/grill/{position}/keep-all": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Keep every fact waiting on a position, as they are. One profile version.",
+        "operationId": "profile.grill_keep_all",
+        "parameters": [
+          {
+            "name": "position",
+            "in": "path",
+            "description": "The position's place in the profile's `work` list.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The interview, after the facts were kept.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrillView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such position",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`profile_changed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/grill/{position}/skip": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Skip the question waiting.",
+        "description": "Its area is left alone until the interview is started again, and the\nnext question is made: **one model call**, or none when nothing is left\nto ask.",
+        "operationId": "profile.grill_skip",
+        "parameters": [
+          {
+            "name": "position",
+            "in": "path",
+            "description": "The position's place in the profile's `work` list.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "description": "A language tag such as `pt-PT`; English when left out.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The interview, after the skip.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrillView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such position, or not started",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`no_open_question`; `grill_changed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`grill_daily_cap`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/grill/{position}/start": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Start (or take up) the interview of a position.",
+        "description": "With a question waiting, that one is shown again and the model is not\ncalled. Otherwise this is **one model call** that makes the next question.\nAreas skipped before are asked about again.",
+        "operationId": "profile.grill_start",
+        "parameters": [
+          {
+            "name": "position",
+            "in": "path",
+            "description": "The position's place in the profile's `work` list.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "description": "A language tag such as `pt-PT`; English when left out.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The interview, with its question.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrillView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such position",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`grill_daily_cap`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/v1/profile/imports": {
       "post": {
         "tags": [
@@ -2726,6 +3414,19 @@
           "merge"
         ]
       },
+      "Area": {
+        "type": "string",
+        "description": "What a fact about a position is about: the seven things \"Grill me\" goes\nthrough, in order.",
+        "enum": [
+          "context",
+          "your_part",
+          "stack_scale",
+          "results",
+          "hard_problems",
+          "people",
+          "stories"
+        ]
+      },
       "Autonomy": {
         "type": "string",
         "description": "How much agents may do alone. Applying and emailing always wait for the\nperson, whatever this says.",
@@ -3567,6 +4268,15 @@
         },
         "additionalProperties": false
       },
+      "CoverageLevel": {
+        "type": "string",
+        "description": "How well an area is covered.",
+        "enum": [
+          "none",
+          "part",
+          "ok"
+        ]
+      },
       "DeclineBoard": {
         "type": "object",
         "description": "Why a board is declined.",
@@ -3712,6 +4422,61 @@
           "unclear"
         ]
       },
+      "FactProposal": {
+        "type": "object",
+        "description": "A fact taken from an answer.",
+        "required": [
+          "id",
+          "text",
+          "quote",
+          "area",
+          "turn_seq",
+          "status",
+          "expires_at"
+        ],
+        "properties": {
+          "area": {
+            "$ref": "#/components/schemas/Area",
+            "description": "What it is about."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it is deleted if nobody keeps it."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Its id."
+          },
+          "quote": {
+            "type": "string",
+            "description": "The person's exact words it was taken from."
+          },
+          "status": {
+            "$ref": "#/components/schemas/FactProposalStatus",
+            "description": "Waiting, kept or dropped."
+          },
+          "text": {
+            "type": "string",
+            "description": "The fact (as the person fixed it, once kept)."
+          },
+          "turn_seq": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The answer it was taken from."
+          }
+        }
+      },
+      "FactProposalStatus": {
+        "type": "string",
+        "description": "Where a fact taken from an answer is.",
+        "enum": [
+          "ready",
+          "kept",
+          "dropped"
+        ]
+      },
       "Goals": {
         "type": "object",
         "description": "The answers to the goals interview. Nothing is required.",
@@ -3849,6 +4614,321 @@
             "type": "integer",
             "format": "int32",
             "description": "0 until something is saved; each save adds one."
+          }
+        }
+      },
+      "GrillAnswerRequest": {
+        "type": "object",
+        "description": "The person's answer.",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "In their own words, 1 to 2000 characters."
+          }
+        }
+      },
+      "GrillAreaCoverage": {
+        "type": "object",
+        "description": "How well one area is covered.",
+        "required": [
+          "area",
+          "level"
+        ],
+        "properties": {
+          "area": {
+            "$ref": "#/components/schemas/Area",
+            "description": "The area."
+          },
+          "level": {
+            "$ref": "#/components/schemas/CoverageLevel",
+            "description": "How well."
+          }
+        }
+      },
+      "GrillList": {
+        "type": "object",
+        "description": "Every position with how far its interview is.",
+        "required": [
+          "roles",
+          "calls_today",
+          "daily_cap"
+        ],
+        "properties": {
+          "calls_today": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Model calls made today by this account, of `daily_cap`.",
+            "minimum": 0
+          },
+          "daily_cap": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The most model calls an account can make for Grill me in a UTC day.",
+            "minimum": 0
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GrillRoleItem"
+            },
+            "description": "The positions, in the profile's order."
+          }
+        }
+      },
+      "GrillQuestion": {
+        "type": "object",
+        "description": "The question waiting for an answer.",
+        "required": [
+          "text",
+          "push"
+        ],
+        "properties": {
+          "area": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Area",
+                "description": "What it is about."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "push": {
+            "type": "boolean",
+            "description": "It pushes back, or asks about a contradiction."
+          },
+          "text": {
+            "type": "string",
+            "description": "The question."
+          }
+        }
+      },
+      "GrillRole": {
+        "type": "object",
+        "description": "The position an interview is about.",
+        "properties": {
+          "company": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its company."
+          },
+          "end_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "As `start_date`; none while it is their current position."
+          },
+          "position": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its title."
+          },
+          "start_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`YYYY`, `YYYY-MM` or `YYYY-MM-DD`."
+          }
+        }
+      },
+      "GrillRoleItem": {
+        "type": "object",
+        "description": "One position in the list.",
+        "required": [
+          "position",
+          "role",
+          "status",
+          "covered",
+          "kept"
+        ],
+        "properties": {
+          "covered": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Areas at `ok`, of 7.",
+            "minimum": 0
+          },
+          "kept": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Facts kept on it.",
+            "minimum": 0
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The position's place in the profile's `work` list.",
+            "minimum": 0
+          },
+          "role": {
+            "$ref": "#/components/schemas/GrillRole",
+            "description": "The position."
+          },
+          "status": {
+            "$ref": "#/components/schemas/GrillStatus",
+            "description": "Where its interview is."
+          }
+        }
+      },
+      "GrillStatus": {
+        "type": "string",
+        "description": "Where an interview is.",
+        "enum": [
+          "not_started",
+          "in_progress",
+          "covered"
+        ]
+      },
+      "GrillTurn": {
+        "type": "object",
+        "description": "One turn of the interview.",
+        "required": [
+          "seq",
+          "kind",
+          "text",
+          "push",
+          "dropped"
+        ],
+        "properties": {
+          "area": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Area",
+                "description": "What it is about."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dropped": {
+            "type": "integer",
+            "format": "int32",
+            "description": "On an answer: lines the checks left out (a quote that was not in the\nanswer, a number nobody wrote)."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/GrillTurnKind",
+            "description": "What it is."
+          },
+          "push": {
+            "type": "boolean",
+            "description": "A question that pushes back on a vague answer or asks about a\ncontradiction."
+          },
+          "seq": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Its place in the interview, from 1."
+          },
+          "text": {
+            "type": "string",
+            "description": "The question, the answer, or `skipped` / `done` for a note."
+          }
+        }
+      },
+      "GrillTurnKind": {
+        "type": "string",
+        "description": "What a turn is.",
+        "enum": [
+          "question",
+          "answer",
+          "note"
+        ]
+      },
+      "GrillView": {
+        "type": "object",
+        "description": "The interview of one position.",
+        "required": [
+          "position",
+          "role",
+          "status",
+          "coverage",
+          "covered",
+          "turns",
+          "proposals",
+          "kept",
+          "calls_today",
+          "daily_cap"
+        ],
+        "properties": {
+          "calls_today": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Model calls made today by this account, of `daily_cap`.",
+            "minimum": 0
+          },
+          "coverage": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GrillAreaCoverage"
+            },
+            "description": "The seven areas, in order."
+          },
+          "covered": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Areas at `ok`, of 7.",
+            "minimum": 0
+          },
+          "daily_cap": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The most model calls an account can make for Grill me in a UTC day.",
+            "minimum": 0
+          },
+          "kept": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Facts the person has kept on this position, in all.",
+            "minimum": 0
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The position's place in the profile's `work` list.",
+            "minimum": 0
+          },
+          "proposals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FactProposal"
+            },
+            "description": "Facts taken from answers in the last 24 hours, whether they wait for\nKeep, Fix or Drop, were kept or were dropped."
+          },
+          "question": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GrillQuestion",
+                "description": "The question waiting for an answer; none when there is none (before\nthe start, after \"done\", or when everything is covered)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "role": {
+            "$ref": "#/components/schemas/GrillRole",
+            "description": "The position."
+          },
+          "status": {
+            "$ref": "#/components/schemas/GrillStatus",
+            "description": "Where the interview is."
+          },
+          "turns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GrillTurn"
+            },
+            "description": "The conversation so far."
           }
         }
       },
@@ -4015,6 +5095,19 @@
           "hybrid",
           "onsite"
         ]
+      },
+      "KeepFactRequest": {
+        "type": "object",
+        "description": "What the person keeps.",
+        "properties": {
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The fact, fixed. Left out, the fact is kept as it is. Whatever is\nwritten must still be said by the quote or the profile; the quote\nitself never changes."
+          }
+        }
       },
       "KeepRequest": {
         "type": "object",
@@ -4738,6 +5831,41 @@
           "import",
           "goals"
         ]
+      },
+      "ProfileFact": {
+        "type": "object",
+        "description": "One thing the person confirmed about a position, with their own words.",
+        "required": [
+          "id",
+          "text",
+          "quote",
+          "area",
+          "kept_at"
+        ],
+        "properties": {
+          "area": {
+            "$ref": "#/components/schemas/Area",
+            "description": "What it is about."
+          },
+          "id": {
+            "type": "string",
+            "description": "Its id."
+          },
+          "kept_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the person kept it."
+          },
+          "quote": {
+            "type": "string",
+            "description": "The person's exact words it was taken from."
+          },
+          "text": {
+            "type": "string",
+            "description": "The fact, one short sentence. It says only what the quote or the\nprofile says."
+          }
+        },
+        "additionalProperties": false
       },
       "ProfileSource": {
         "type": "string",
@@ -5909,6 +7037,13 @@
               "null"
             ],
             "description": "As `startDate`; none while it is their current position."
+          },
+          "facts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfileFact"
+            },
+            "description": "What they told Applicamp about this position when it was grilled\n(\"Grill me\"): facts they confirmed, each with their own words. The\nimport and the model never write these."
           },
           "highlights": {
             "type": "array",

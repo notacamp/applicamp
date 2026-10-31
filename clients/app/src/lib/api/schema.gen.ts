@@ -413,6 +413,193 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/profile/grill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every position with how far its interview is.
+         * @description Computed from the stored interviews; never calls the model.
+         */
+        get: operations["profile.grill_roles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/grill/proposals/{id}/drop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Drop a fact: it is not kept and not shown again. */
+        post: operations["profile.grill_drop"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/grill/proposals/{id}/keep": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Keep a fact, as it is or fixed.
+         * @description Writes it on the position in the profile as a new profile version. A
+         *     fixed `text` is checked like the model's: it may say only what the quote
+         *     or the profile says (400 `fact_not_supported` names the words that are
+         *     not there); the quote never changes.
+         */
+        post: operations["profile.grill_keep"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/grill/{position}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The interview of one position: its turns, coverage, the facts waiting and
+         *     the question waiting for an answer. Never calls the model.
+         */
+        get: operations["profile.grill_role"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/grill/{position}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer the question waiting.
+         * @description **One model call** reads the answer: it returns the facts the answer
+         *     states (each with the person's exact words), what it covered and the next
+         *     question, which pushes back when the answer was vague. A fact whose quote
+         *     is not in the answer, or that says a number, name or tool neither the
+         *     quote nor the profile says, is left out and counted in the turn's
+         *     `dropped`. Nothing reaches the profile until a fact is kept.
+         */
+        post: operations["profile.grill_answer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/grill/{position}/done": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End the interview for now. No model call; the question waiting is put
+         *     away, and starting again makes a new one. Facts waiting stay for their
+         *     24 hours.
+         */
+        post: operations["profile.grill_done"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/grill/{position}/keep-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Keep every fact waiting on a position, as they are. One profile version. */
+        post: operations["profile.grill_keep_all"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/grill/{position}/skip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Skip the question waiting.
+         * @description Its area is left alone until the interview is started again, and the
+         *     next question is made: **one model call**, or none when nothing is left
+         *     to ask.
+         */
+        post: operations["profile.grill_skip"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/grill/{position}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start (or take up) the interview of a position.
+         * @description With a question waiting, that one is shown again and the model is not
+         *     called. Otherwise this is **one model call** that makes the next question.
+         *     Areas skipped before are asked about again.
+         */
+        post: operations["profile.grill_start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/profile/imports": {
         parameters: {
             query?: never;
@@ -914,6 +1101,12 @@ export interface components {
          */
         ApplyMode: "replace" | "merge";
         /**
+         * @description What a fact about a position is about: the seven things "Grill me" goes
+         *     through, in order.
+         * @enum {string}
+         */
+        Area: "context" | "your_part" | "stack_scale" | "results" | "hard_problems" | "people" | "stories";
+        /**
          * @description How much agents may do alone. Applying and emailing always wait for the
          *     person, whatever this says.
          * @enum {string}
@@ -1245,6 +1438,11 @@ export interface components {
             /** Format: int32 */
             year: number;
         };
+        /**
+         * @description How well an area is covered.
+         * @enum {string}
+         */
+        CoverageLevel: "none" | "part" | "ok";
         /** @description Why a board is declined. */
         DeclineBoard: {
             /** @description Up to 500 characters. */
@@ -1307,6 +1505,37 @@ export interface components {
          * @enum {string}
          */
         Fact: "yes" | "no" | "unclear";
+        /** @description A fact taken from an answer. */
+        FactProposal: {
+            /** @description What it is about. */
+            area: components["schemas"]["Area"];
+            /**
+             * Format: date-time
+             * @description When it is deleted if nobody keeps it.
+             */
+            expires_at: string;
+            /**
+             * Format: uuid
+             * @description Its id.
+             */
+            id: string;
+            /** @description The person's exact words it was taken from. */
+            quote: string;
+            /** @description Waiting, kept or dropped. */
+            status: components["schemas"]["FactProposalStatus"];
+            /** @description The fact (as the person fixed it, once kept). */
+            text: string;
+            /**
+             * Format: int32
+             * @description The answer it was taken from.
+             */
+            turn_seq: number;
+        };
+        /**
+         * @description Where a fact taken from an answer is.
+         * @enum {string}
+         */
+        FactProposalStatus: "ready" | "kept" | "dropped";
         /** @description The answers to the goals interview. Nothing is required. */
         Goals: {
             autonomy?: components["schemas"]["Autonomy"] | null;
@@ -1345,6 +1574,150 @@ export interface components {
              * @description 0 until something is saved; each save adds one.
              */
             version: number;
+        };
+        /** @description The person's answer. */
+        GrillAnswerRequest: {
+            /** @description In their own words, 1 to 2000 characters. */
+            text: string;
+        };
+        /** @description How well one area is covered. */
+        GrillAreaCoverage: {
+            /** @description The area. */
+            area: components["schemas"]["Area"];
+            /** @description How well. */
+            level: components["schemas"]["CoverageLevel"];
+        };
+        /** @description Every position with how far its interview is. */
+        GrillList: {
+            /**
+             * Format: int32
+             * @description Model calls made today by this account, of `daily_cap`.
+             */
+            calls_today: number;
+            /**
+             * Format: int32
+             * @description The most model calls an account can make for Grill me in a UTC day.
+             */
+            daily_cap: number;
+            /** @description The positions, in the profile's order. */
+            roles: components["schemas"]["GrillRoleItem"][];
+        };
+        /** @description The question waiting for an answer. */
+        GrillQuestion: {
+            area?: components["schemas"]["Area"] | null;
+            /** @description It pushes back, or asks about a contradiction. */
+            push: boolean;
+            /** @description The question. */
+            text: string;
+        };
+        /** @description The position an interview is about. */
+        GrillRole: {
+            /** @description Its company. */
+            company?: string | null;
+            /** @description As `start_date`; none while it is their current position. */
+            end_date?: string | null;
+            /** @description Its title. */
+            position?: string | null;
+            /** @description `YYYY`, `YYYY-MM` or `YYYY-MM-DD`. */
+            start_date?: string | null;
+        };
+        /** @description One position in the list. */
+        GrillRoleItem: {
+            /**
+             * Format: int32
+             * @description Areas at `ok`, of 7.
+             */
+            covered: number;
+            /**
+             * Format: int32
+             * @description Facts kept on it.
+             */
+            kept: number;
+            /**
+             * Format: int32
+             * @description The position's place in the profile's `work` list.
+             */
+            position: number;
+            /** @description The position. */
+            role: components["schemas"]["GrillRole"];
+            /** @description Where its interview is. */
+            status: components["schemas"]["GrillStatus"];
+        };
+        /**
+         * @description Where an interview is.
+         * @enum {string}
+         */
+        GrillStatus: "not_started" | "in_progress" | "covered";
+        /** @description One turn of the interview. */
+        GrillTurn: {
+            area?: components["schemas"]["Area"] | null;
+            /**
+             * Format: int32
+             * @description On an answer: lines the checks left out (a quote that was not in the
+             *     answer, a number nobody wrote).
+             */
+            dropped: number;
+            /** @description What it is. */
+            kind: components["schemas"]["GrillTurnKind"];
+            /**
+             * @description A question that pushes back on a vague answer or asks about a
+             *     contradiction.
+             */
+            push: boolean;
+            /**
+             * Format: int32
+             * @description Its place in the interview, from 1.
+             */
+            seq: number;
+            /** @description The question, the answer, or `skipped` / `done` for a note. */
+            text: string;
+        };
+        /**
+         * @description What a turn is.
+         * @enum {string}
+         */
+        GrillTurnKind: "question" | "answer" | "note";
+        /** @description The interview of one position. */
+        GrillView: {
+            /**
+             * Format: int32
+             * @description Model calls made today by this account, of `daily_cap`.
+             */
+            calls_today: number;
+            /** @description The seven areas, in order. */
+            coverage: components["schemas"]["GrillAreaCoverage"][];
+            /**
+             * Format: int32
+             * @description Areas at `ok`, of 7.
+             */
+            covered: number;
+            /**
+             * Format: int32
+             * @description The most model calls an account can make for Grill me in a UTC day.
+             */
+            daily_cap: number;
+            /**
+             * Format: int32
+             * @description Facts the person has kept on this position, in all.
+             */
+            kept: number;
+            /**
+             * Format: int32
+             * @description The position's place in the profile's `work` list.
+             */
+            position: number;
+            /**
+             * @description Facts taken from answers in the last 24 hours, whether they wait for
+             *     Keep, Fix or Drop, were kept or were dropped.
+             */
+            proposals: components["schemas"]["FactProposal"][];
+            question?: components["schemas"]["GrillQuestion"] | null;
+            /** @description The position. */
+            role: components["schemas"]["GrillRole"];
+            /** @description Where the interview is. */
+            status: components["schemas"]["GrillStatus"];
+            /** @description The conversation so far. */
+            turns: components["schemas"]["GrillTurn"][];
         };
         /** @description The instance's health. */
         Health: {
@@ -1432,6 +1805,15 @@ export interface components {
          * @enum {string}
          */
         JobWorkMode: "remote" | "hybrid" | "onsite";
+        /** @description What the person keeps. */
+        KeepFactRequest: {
+            /**
+             * @description The fact, fixed. Left out, the fact is kept as it is. Whatever is
+             *     written must still be said by the quote or the profile; the quote
+             *     itself never changes.
+             */
+            text?: string | null;
+        };
         /** @description What the person keeps: the draft as it is, or edited. */
         KeepRequest: {
             education?: components["schemas"]["Education"] | null;
@@ -1711,6 +2093,25 @@ export interface components {
          * @enum {string}
          */
         ProfileAction: "improve" | "skills" | "import" | "goals";
+        /** @description One thing the person confirmed about a position, with their own words. */
+        ProfileFact: {
+            /** @description What it is about. */
+            area: components["schemas"]["Area"];
+            /** @description Its id. */
+            id: string;
+            /**
+             * Format: date-time
+             * @description When the person kept it.
+             */
+            kept_at: string;
+            /** @description The person's exact words it was taken from. */
+            quote: string;
+            /**
+             * @description The fact, one short sentence. It says only what the quote or the
+             *     profile says.
+             */
+            text: string;
+        };
         /**
          * @description Where the profile came from last.
          * @enum {string}
@@ -2216,6 +2617,12 @@ export interface components {
         Work: {
             /** @description As `startDate`; none while it is their current position. */
             endDate?: string | null;
+            /**
+             * @description What they told Applicamp about this position when it was grilled
+             *     ("Grill me"): facts they confirmed, each with their own words. The
+             *     import and the model never write these.
+             */
+            facts?: components["schemas"]["ProfileFact"][];
             /** @description Achievements, one sentence each. */
             highlights: string[];
             /** @description Where. */
@@ -3321,6 +3728,497 @@ export interface operations {
             };
             /** @description `draft_not_ready`: already kept or discarded; `profile_changed` */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.grill_roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The positions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrillList"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.grill_drop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The fact waiting. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The interview, after the fact was dropped. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrillView"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: no such fact, or it expired */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `proposal_not_ready`: already kept */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.grill_keep": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The fact waiting. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeepFactRequest"];
+            };
+        };
+        responses: {
+            /** @description The interview, after the fact was kept. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrillView"];
+                };
+            };
+            /** @description `invalid_fact`; `fact_not_supported` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: no such fact, or it expired */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `proposal_not_ready`: already kept or dropped; `profile_changed` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.grill_role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The position's place in the profile's `work` list. */
+                position: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The interview. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrillView"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: no such position */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.grill_answer": {
+        parameters: {
+            query?: {
+                /** @description A language tag such as `pt-PT`; English when left out. */
+                locale?: string;
+            };
+            header?: never;
+            path: {
+                /** @description The position's place in the profile's `work` list. */
+                position: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GrillAnswerRequest"];
+            };
+        };
+        responses: {
+            /** @description The interview, after the answer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrillView"];
+                };
+            };
+            /** @description `invalid_answer` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: no such position, or not started */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `no_open_question`; `grill_changed` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `grill_daily_cap` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.grill_done": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The position's place in the profile's `work` list. */
+                position: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The interview. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrillView"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: no such position, or not started */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.grill_keep_all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The position's place in the profile's `work` list. */
+                position: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The interview, after the facts were kept. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrillView"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: no such position */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `profile_changed` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.grill_skip": {
+        parameters: {
+            query?: {
+                /** @description A language tag such as `pt-PT`; English when left out. */
+                locale?: string;
+            };
+            header?: never;
+            path: {
+                /** @description The position's place in the profile's `work` list. */
+                position: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The interview, after the skip. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrillView"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: no such position, or not started */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `no_open_question`; `grill_changed` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `grill_daily_cap` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.grill_start": {
+        parameters: {
+            query?: {
+                /** @description A language tag such as `pt-PT`; English when left out. */
+                locale?: string;
+            };
+            header?: never;
+            path: {
+                /** @description The position's place in the profile's `work` list. */
+                position: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The interview, with its question. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrillView"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: no such position */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `grill_daily_cap` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed` */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

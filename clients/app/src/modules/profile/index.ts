@@ -26,3 +26,4 @@ export {
   type NudgeAction,
   type StrengthNudgeProps,
 } from "./components/StrengthNudge/StrengthNudge";
+export { GrillPage, type GrillPageProps } from "./components/Grill/GrillPage";

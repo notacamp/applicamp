@@ -10,3 +10,4 @@
 | [0006](0006-jobs-from-public-boards-only.md) | Jobs come from public boards; no LinkedIn or Indeed automation |
 | [0007](0007-tailored-cvs-typst.md) | Tailored CVs: JSON Resume data, fact-check gate, Typst PDFs |
 | [0008](0008-stack.md) | Rust modular monolith + slim React client |
+| [0009](0009-agent-harness.md) | The agent harness: disposable agents, a durable server |

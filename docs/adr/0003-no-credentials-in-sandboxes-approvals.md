@@ -1,6 +1,6 @@
 # 0003 — Sandboxes hold no credentials; outward actions need an approval
 
-**Status:** Accepted · 2026-10-25
+**Status:** Accepted · 2026-10-25 · amended by [0009](0009-agent-harness.md): applying is a prepare run and a scripted submit run, not a paused sandbox
 
 ## Context
 Job pages and recruiter emails are untrusted text that can carry prompt

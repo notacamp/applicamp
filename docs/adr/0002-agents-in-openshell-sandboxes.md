@@ -1,6 +1,6 @@
 # 0002 — Agents run in NVIDIA OpenShell sandboxes
 
-**Status:** Accepted · 2026-10-25 (spike #2 passed on v0.1.4)
+**Status:** Accepted · 2026-10-25 (spike #2 passed on v0.1.4) · amended by [0009](0009-agent-harness.md): model calls go through the server, not OpenShell's router (removed in v0.1.0)
 
 ## Context
 Agents browse untrusted job pages, fill forms in a real browser and read

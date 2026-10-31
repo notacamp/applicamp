@@ -75,18 +75,21 @@ neutral `example.com` defaults. Demo and test data are invented.
   `clients/app/src/lib/`; colours, spacing and type come from tokens only.
   Tests locate elements by `data-testid`. *(CI: ESLint rules.)*
 
-## Agent and sandbox rules (ADR 0002, ADR 0003)
+## Agent and sandbox rules (ADR 0002, ADR 0003, ADR 0009)
 
 - **Agents run only inside sandboxes** created per run and always deleted at
-  the end (success, failure or timeout). Nothing agent-driven runs in the
-  server process.
+  the end (success, failure or timeout). A single structured model call may
+  run in a server job; anything that loops over tools or drives a browser
+  runs in a sandbox. Background work is a standing order that starts a fresh,
+  bounded run, never a sandbox kept alive.
 - **Sandboxes hold no credentials.** No mailbox token, no OAuth token, no API
-  key enters a sandbox. Model calls go through the sandbox runtime's model
-  router; everything else goes through the server's agent API with a
-  short-lived, single-run token that can only call that run's tools.
+  key enters a sandbox. Model calls and tools go through the server's agent
+  API with a short-lived, single-run token that names the tools it may call;
+  the server reserves each model call's budget before forwarding it.
 - **Network is deny-by-default.** Each run kind has a committed policy file
-  listing the hosts it may reach. LinkedIn, Indeed and other sites whose terms
-  forbid automation are never on any list. *(CI: policy lint.)*
+  listing the hosts it may reach, with every rule enforced (never `audit`).
+  LinkedIn, Indeed and other sites whose terms forbid automation are never on
+  any list. *(CI: policy lint.)*
 - **Outward actions need an approval.** Submitting an application and sending
   an email create an `approval` the user must accept; the server executes the
   action, never the agent. *(Server test: no outward tool runs without an

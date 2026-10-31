@@ -38,6 +38,18 @@ function profile() {
   };
 }
 
+/**
+ * The opportunities a test added: put away at the end ("Not for me"), so the
+ * other tests' pipeline (they open its first row) is as they expect it.
+ */
+const added: string[] = [];
+
+test.afterEach(async ({ page }) => {
+  for (const id of added.splice(0)) {
+    await callApiJson(page, "PATCH", `/api/v1/opportunities/${id}`, { dismissed: true });
+  }
+});
+
 test("someone prepares a job: reads the company's own pages, removes a wrong fact and undoes it, sees what the job wants, answers one question into a fact they keep and puts a skill away", async ({
   page,
 }, testInfo) => {
@@ -50,14 +62,15 @@ test("someone prepares a job: reads the company's own pages, removes a wrong fac
   const tag = `${testInfo.project.name}-${String(testInfo.retry)}-${Date.now().toString(36)}`;
   const company = `Example Co ${tag}`;
   // A posting on the company's own site (a fake, with a robots.txt that forbids /private).
-  const added = await callApiJson(page, "POST", "/api/v1/opportunities", {
+  const created = await callApiJson(page, "POST", "/api/v1/opportunities", {
     // The skill it asks for is the run's own: one put away is not asked about again.
     url: `http://example-co.test:9020/jobs/staff-engineer?run=${tag}&skill=Hotwire-${tag}`,
     title: "Staff Engineer",
     company,
   });
-  expect(added.status).toBe(201);
-  const id = (added.body as { id: string }).id;
+  expect(created.status).toBe(201);
+  const id = (created.body as { id: string }).id;
+  added.push(id);
   expect(
     (await callApiJson(page, "PATCH", `/api/v1/opportunities/${id}`, { stage: "shortlisted" }))
       .status,
@@ -171,12 +184,13 @@ test("a posting on a job board's own tracker says the company's website is neede
 }, testInfo) => {
   await signIn(page);
   const tag = `${testInfo.project.name}-${String(testInfo.retry)}-${Date.now().toString(36)}`;
-  const added = await callApiJson(page, "POST", "/api/v1/opportunities", {
+  const created = await callApiJson(page, "POST", "/api/v1/opportunities", {
     url: `https://careers.example.org/${tag}/jobs/42`,
     title: "Platform Engineer",
     company: `Tracker Co ${tag}`,
   });
-  const id = (added.body as { id: string }).id;
+  const id = (created.body as { id: string }).id;
+  added.push(id);
   await callApiJson(page, "PATCH", `/api/v1/opportunities/${id}`, { stage: "shortlisted" });
   await page.goto(`/pipeline/${id}/prepare`);
   // Its own link counts: the careers site's host is the company's.

@@ -605,7 +605,7 @@ function companyFacts(userContent: string) {
  * The job reader (system prompt "You compare a job posting…"): what the
  * posting asks for, quoting it, and up to three questions: the Hotwire one
  * (a skill, on the first position), one about owning billing (no position
- * named) and a Kafka one (a skill).
+ * named) and a Kafka one (no skill, no position).
  */
 function jobAnalysis(userContent: string) {
   const posting = between(userContent, "posting");
@@ -636,7 +636,7 @@ function jobAnalysis(userContent: string) {
     {
       question: "Kafka is a plus for this job. Have you run it in production?",
       about: null,
-      skill: "Kafka",
+      skill: null,
     },
   ].filter(
     (question) =>

@@ -16,10 +16,13 @@ use axum::{
         rejection::{JsonRejection, QueryRejection},
     },
     http::{HeaderMap, StatusCode},
-    response::sse::{Event, KeepAlive, Sse},
+    response::{
+        IntoResponse as _, Response,
+        sse::{Event, KeepAlive, Sse},
+    },
 };
 use chrono::{DateTime, Utc};
-use futures::{StreamExt as _, stream::BoxStream};
+use futures::StreamExt as _;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::{IntoParams, ToSchema};
@@ -442,7 +445,7 @@ pub async fn stream(
     Path(id): Path<Uuid>,
     headers: HeaderMap,
     query: std::result::Result<Query<EventsQuery>, QueryRejection>,
-) -> Result<Sse<BoxStream<'static, std::result::Result<Event, Infallible>>>> {
+) -> Result<Response> {
     let Query(query) =
         query.map_err(|rejection| Error::BadRequest("invalid_query", rejection.body_text()))?;
     store::fetch(&state.db, principal.account_id, id)
@@ -467,7 +470,9 @@ pub async fn stream(
         .flat_map(futures::stream::iter)
         .map(Ok::<_, Infallible>)
         .boxed();
-    Ok(Sse::new(frames).keep_alive(KeepAlive::default()))
+    Ok(Sse::new(frames)
+        .keep_alive(KeepAlive::default())
+        .into_response())
 }
 
 /// The live stream's position.

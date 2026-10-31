@@ -12,6 +12,7 @@ pub struct RunKind {
     pub limits: Limits,              // max_steps, wall_clock, max_tokens
     pub tools: Vec<ToolSpec>,
     pub output: serde_json::Value,   // JSON schema of finish's summary
+    pub manual: bool,                // a person may start it (Agents page)
 }
 pub struct ToolSpec { pub name: &'static str, pub class: ToolClass, pub cap: u32,
                       pub schema: serde_json::Value, pub handler: Arc<dyn ToolHandler> }
@@ -29,9 +30,9 @@ module starts a run through a port the server implements
 the caller's transaction) and hears the end by consuming `runs.finished`.
 
 ## Data (schema `runs`)
-- `runs(id uuid pk, account_id, kind, subject_id uuid null, status text, outcome text null, inputs jsonb, deadline timestamptz, created_at, started_at, finished_at, sandbox text, image text, policy text, model text, tokens_in int default 0, tokens_out int default 0, cost_eur numeric default 0, error_kind text, summary jsonb, cancel_requested bool default false, claimed_by text, claimed_until timestamptz)`.
+- `runs(id uuid pk, account_id, kind, subject_id uuid null, status text, outcome text null, inputs jsonb, deadline timestamptz, created_at, started_at, finished_at, sandbox text, image text, policy text, model text, tokens_in int default 0, tokens_out int default 0, cost_eur double precision default 0 (as `ai.usage.cost_usd`), error_kind text, summary jsonb, cancel_requested bool default false, claimed_by text, claimed_until timestamptz, last_seq bigint default 0)`.
   `status`: `queued | starting | running | finished`. `outcome` (when finished): `succeeded | nothing_new | needs_you | ended_max_steps | ended_budget | ended_timeout | ended_loop | failed | cancelled`.
-- `events(run_id, seq bigint, at, layer text check in ('agent','sandbox'), level text check in ('info','tool','model','deny','ask','error'), operation text null, tool_name text null, message text check (length(message) <= 2000), data jsonb, primary key (run_id, seq))`. `seq` is the SSE `Last-Event-ID`; agent events carry their own `seq` so a line seen on stdout and through `POST events` is stored once. Retention: 30 days (a daily job deletes older runs' events; runs keep their summary).
+- `events(run_id, seq bigint, agent_seq bigint null unique per run, at, layer text check in ('agent','sandbox'), level text check in ('info','tool','model','deny','ask','error'), operation text null, tool_name text null, message text check (length(message) <= 2000), data jsonb, primary key (run_id, seq))`. `seq` is the SSE `Last-Event-ID`, given out from `runs.last_seq`; agent events carry their own number (`agent_seq`) so a line seen on stdout and through `POST events` is stored once. Retention: 30 days (a daily job deletes older runs' events; runs keep their summary).
 - `tokens(run_id pk, hash bytea, tools jsonb, calls jsonb, expires_at)`: 32 random bytes sent once to the sandbox, stored as SHA-256, with the kind's tools and their caps and a count of calls made; expires at the deadline + 5 minutes; deleted on finish.
 - Events published: `runs.finished` v1 `{ run, account, kind, subject, outcome }`.
 
@@ -51,9 +52,13 @@ account, 3 per instance). For each claimed run it:
 5. **always** deletes the sandbox, also on error,
 6. records the outcome, tokens, cost and summary, deletes the token, and
    publishes `runs.finished`.
-At startup a sweep deletes sandboxes labelled `applicamp-run=*` whose run is
-finished or unknown, and marks runs left `starting`/`running` by a dead
-server `failed` (`error_kind = server_restarted`).
+A claim lasts 30 s and is renewed every second while its run goes (the same
+query reads Stop). A run whose claim lapsed (its server died) is marked
+`failed` (`error_kind = server_restarted`) at startup and by every turn of the
+loop; then a sweep deletes the sandboxes labelled `applicamp=run` whose
+`applicamp-run=<id>` is not a run going (at startup, after each such end, and
+every five minutes). OpenShell's label selector has no "exists" operator,
+hence the two labels.
 `POST /api/v1/runs { kind }` (session, CSRF) queues a run a person may start
 (`runs.probe` only, for now); `POST /api/v1/runs/{id}/cancel` asks it to stop.
 
@@ -84,20 +89,24 @@ trait SandboxRuntime: Send + Sync {
   stable `kid`) and mints five-minute JWTs (`iss` = the public origin, `aud` =
   `openshell-gateway`, `sub` = `applicamp-server`, `roles` =
   `["openshell-admin"]`) for its own gRPC calls. Nothing else is issued.
+- **Unset** `APPLICAMP_SANDBOX__RUNTIME`: no runtime; runs cannot start
+  (`503 sandboxes_unavailable`) and the Agents page says so (`available`).
 - **Fake**: runs the agent binary (`APPLICAMP_SANDBOX__FAKE_AGENT`, default
   `target/debug/applicamp-agent`) as a child process with the same
   arguments, behind a local CONNECT proxy that applies the kind's policy
   hosts and writes OCSF-style `DENIED` lines into the sandbox log. Logs are its
-  stdout. Never in production: it refuses to start when `APPLICAMP_PUBLIC_URL`
+  stdout; the agent API is reached directly (`NO_PROXY`), with an empty
+environment otherwise. The server image carries the runner at
+`/app/applicamp-agent` for it (e2e, local development). Never in production: it refuses to start when `APPLICAMP_PUBLIC_URL`
   is https unless `APPLICAMP_SANDBOX__ALLOW_FAKE=true`.
 
 ## Agent API (bearer run token; a request with a cookie is refused)
 - `GET /api/agent/v1/context` → `{ run, kind, inputs, subject, limits, tools: [{ name, class, schema, cap }] }`.
 - `POST /api/agent/v1/events` `[{ seq, level, message, operation?, tool_name?, data? }]` (≤ 50 per call, message ≤ 2000 chars, data ≤ 8 KB).
 - `POST /api/agent/v1/tools/{name}` `{ args }` → the handler's result. Refused (404) when the tool is not the kind's; `tool_cap_reached` past its cap; `invalid_arguments` (with the schema error) when `args` does not match.
-- `POST /api/agent/v1/complete` `{ messages, response_format?, max_tokens ≤ 16000 }` → the `complete` role through `applicamp-ai` with the run's account and caps; the run's tokens and cost grow; past the kind's `max_tokens` the answer is `run_budget_reached`.
+- `POST /api/agent/v1/complete` `{ messages, response_format?, max_tokens ≤ 16000 }` → the `complete` role through `applicamp-ai` with the run's account and caps (refusals keep the gateway's codes: `ai_daily_limit_reached`, `ai_budget_reached`, recorded as an event); the run's tokens and cost grow; when its tokens plus this call's `max_tokens` would pass the kind's `max_tokens` the answer is `429 run_budget_reached`.
 - `POST /api/agent/v1/finish` `{ outcome: succeeded | nothing_new | needs_you | failed, summary }` (summary checked against the kind's output schema).
-- Every call checks the token's hash and expiry and that the run is `running`; 404 otherwise. 10 requests a second per run.
+- Every call checks the token's hash and expiry and that the run is `running` and not yet finished by its agent; 404 otherwise (401 `run_token_required` without a bearer, 400 `cookies_refused` with a cookie). 10 requests a second per run (`429 rate_limited`). `tool_cap_reached` is 409; bad arguments do not count against the cap.
 - The door is exempt from the CSRF middleware and refuses `Cookie`; `cargo xtask arch` knows a `run_token` security scheme allowed only under `/api/agent/`.
 
 ## Agent runner (`crates/agent`)

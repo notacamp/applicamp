@@ -30,6 +30,10 @@ ignore = [
     { id = "RUSTSEC-2024-0436", reason = "paste is an unmaintained proc-macro (hayagriva), compile time only" },
     { id = "RUSTSEC-2024-0449", reason = "unsafe-libyaml (serde_yaml, hayagriva) is unmaintained; no YAML is ever parsed" },
     { id = "RUSTSEC-2024-0320", reason = "yaml-rust (syntect) is unmaintained; no YAML is ever parsed" },
+    # NVIDIA OpenShell's SDK (the runs module's sandboxes, ADR 0002) reads PEM
+    # through openshell-core; we hand it the gateway's CA only. Drop this once
+    # OpenShell moves to rustls-pki-types' PEM parser.
+    { id = "RUSTSEC-2025-0134", reason = "rustls-pemfile is unmaintained; openshell-core parses only the gateway CA we configure with it" },
 ]
 
 [licenses]
@@ -70,6 +74,6 @@ deny = [
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
-# NVIDIA OpenShell's Rust SDK is published as a git tag (ADR 0002); the runs
-# module will depend on it.
+# NVIDIA OpenShell's Rust SDK and policy parser are published as a git tag
+# (ADR 0002); the runs module and the policy lint depend on them.
 allow-git = ["https://github.com/NVIDIA/OpenShell"]

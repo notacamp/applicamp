@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -21,6 +21,7 @@ import {
 } from "../../api/profile";
 import { BASICS, LISTS, withList, type BasicsKey, type Entry } from "../../api/sections";
 import { EntryList } from "../EntryList/EntryList";
+import { RoleFacts } from "../RoleFacts/RoleFacts";
 
 export interface ProfileViewProps {
   view: View;
@@ -28,6 +29,8 @@ export interface ProfileViewProps {
   onImportAgain: () => void;
   /** Goals, between the about-you properties and the lists. */
   goals?: ReactNode;
+  /** Open Grill me on a position (a role's "Grill me about this role"). */
+  onGrill?: ((position: number) => void) | undefined;
 }
 
 /**
@@ -35,7 +38,7 @@ export interface ProfileViewProps {
  * you) and its lists, every value edited in place; each change saves the
  * whole profile.
  */
-export function ProfileView({ view, onImportAgain, goals }: ProfileViewProps) {
+export function ProfileView({ view, onImportAgain, goals, onGrill }: ProfileViewProps) {
   const { t, i18n } = useTranslation("profile");
   const save = useSaveProfile();
   const { profile } = view;
@@ -102,13 +105,17 @@ export function ProfileView({ view, onImportAgain, goals }: ProfileViewProps) {
       ) : null}
       {goals}
       {LISTS.map((list) => (
-        <EntryList
-          key={list}
-          list={list}
-          entries={profile[list]}
-          busy={save.isPending}
-          onChange={saveList(list)}
-        />
+        <Fragment key={list}>
+          <EntryList
+            list={list}
+            entries={profile[list]}
+            busy={save.isPending}
+            onChange={saveList(list)}
+          />
+          {list === "work" && onGrill !== undefined && profile.work.length > 0 ? (
+            <RoleFacts profile={profile} onGrill={onGrill} />
+          ) : null}
+        </Fragment>
       ))}
     </Stack>
   );

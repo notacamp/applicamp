@@ -13,10 +13,12 @@ export interface ProfileProps {
   onStartGoals: (question: Question) => void;
   /** What to do about the profile's strength (Improve, a part's Add). */
   onAction: (action: Action) => void;
+  /** Open Grill me, on a position or (none) on the list of roles. */
+  onGrill: (position?: number) => void;
 }
 
 /** `/profile`: what agents know about you, how you sign in, and what the AI cost this month. */
-export function Profile({ importing, onImporting, onStartGoals, onAction }: ProfileProps) {
+export function Profile({ importing, onImporting, onStartGoals, onAction, onGrill }: ProfileProps) {
   const { t } = useTranslation();
   const me = useMe();
   return (
@@ -26,6 +28,7 @@ export function Profile({ importing, onImporting, onStartGoals, onAction }: Prof
         onImporting={onImporting}
         onStartGoals={onStartGoals}
         onAction={onAction}
+        onGrill={onGrill}
       />
       {me.data === undefined ? null : (
         <Tagged testId="profile-account">

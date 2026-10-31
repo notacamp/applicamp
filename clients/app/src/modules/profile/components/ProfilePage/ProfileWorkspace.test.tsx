@@ -3,6 +3,8 @@ import { userEvent } from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
+import { UndoProvider } from "~/lib/ui";
+
 import { renderWithProviders, stubApi, type Stub } from "../../../../../test/render";
 import { EMPTY_GOALS } from "../../api/goals";
 import { EMPTY_PROFILE, type Profile, type ProfileView } from "../../api/profile";
@@ -65,12 +67,15 @@ function draftOf(draft: Profile, dropped = 0) {
 function Workspace({ startImporting = false }: { startImporting?: boolean }) {
   const [importing, setImporting] = useState(startImporting);
   return (
-    <ProfileWorkspace
-      importing={importing}
-      onImporting={setImporting}
-      onStartGoals={vi.fn()}
-      onAction={vi.fn()}
-    />
+    <UndoProvider>
+      <ProfileWorkspace
+        importing={importing}
+        onImporting={setImporting}
+        onStartGoals={vi.fn()}
+        onAction={vi.fn()}
+        onGrill={vi.fn()}
+      />
+    </UndoProvider>
   );
 }
 

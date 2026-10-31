@@ -1,0 +1,26 @@
+.mark {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  inline-size: var(--space-5);
+  block-size: var(--space-5);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-none);
+}
+
+.mark[data-state="ok"] {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.mark[data-state="part"] {
+  background: var(--tag-yellow);
+  color: var(--text-primary);
+}
+
+.mark[data-state="none"] {
+  background: var(--danger-soft);
+  color: var(--danger);
+}

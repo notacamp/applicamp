@@ -11,6 +11,9 @@
 //! - **Goals** ([`goals::Goals`]): what they want next, answered one
 //!   question at a time and versioned.
 //!
+//! - **Grill me** ([`features::grill`]): a deep interview about one position
+//!   at a time; the facts the person keeps live on the position.
+//!
 //! - **Matching** ([`matching`]): how far a person is, and what a job search
 //!   matches against, for the ports the server wires to other modules.
 //!
@@ -51,7 +54,7 @@ pub struct ProfileDeps {
 
 /// The profile module, composed with `deps`.
 pub fn module(deps: ProfileDeps) -> Module {
-    use features::{completion, goals, imports, profile};
+    use features::{completion, goals, grill, imports, profile};
     // Uploads take up to a 20 MB export; every other route keeps axum's
     // default body limit.
     let uploads = OpenApiRouter::new()
@@ -71,6 +74,15 @@ pub fn module(deps: ProfileDeps) -> Module {
         .routes(routes!(completion::skills::add_skill))
         .routes(routes!(completion::skills::dismiss_skill))
         .routes(routes!(completion::skills::order_skills))
+        .routes(routes!(grill::list))
+        .routes(routes!(grill::get))
+        .routes(routes!(grill::start))
+        .routes(routes!(grill::answer))
+        .routes(routes!(grill::skip))
+        .routes(routes!(grill::done))
+        .routes(routes!(grill::keep_all))
+        .routes(routes!(grill::keep_proposal))
+        .routes(routes!(grill::drop_proposal))
         .routes(routes!(imports::get))
         .routes(routes!(imports::apply))
         .routes(routes!(imports::discard))

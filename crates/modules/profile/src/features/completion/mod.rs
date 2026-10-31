@@ -5,7 +5,7 @@
 //! Nothing here writes to the profile unless the person keeps a draft or
 //! adds a skill, and every question can be skipped.
 
-mod check;
+pub(crate) mod check;
 pub mod draft;
 pub mod review;
 pub mod skills;

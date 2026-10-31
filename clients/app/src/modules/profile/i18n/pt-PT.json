@@ -424,7 +424,8 @@
         "partial": "{{have}} de {{of}} respondidas",
         "missing": "Diga aos agentes o que quer a seguir"
       }
-    }
+    },
+    "grill": "Pergunte-me tudo"
   },
   "improve": {
     "eyebrow": "Pergunta {{n}} de {{total}}",
@@ -524,6 +525,141 @@
       "skills": "Adicione as competências que as suas funções mencionam: as pesquisas usam as três primeiras.",
       "import": "Importe um perfil mais completo: as correspondências são avaliadas com base nas suas funções.",
       "goals": "Responda a algumas perguntas sobre o que quer: as pesquisas respeitam-nas."
+    }
+  },
+  "grill": {
+    "title": "Pergunte-me tudo",
+    "lead": "Um CV só pode dizer o que o Applicamp sabe. Escolha uma função e responda a uma pergunta de cada vez. As respostas vagas são contestadas e pedem-se números. Cada facto tirado das suas respostas é-lhe mostrado primeiro; nada é guardado até o manter.",
+    "open": "Pergunte-me tudo",
+    "aboutRole": "Perguntar sobre esta função",
+    "rolesLabel": "As suas funções",
+    "loading": "A carregar as suas funções…",
+    "loadFailed": "Não foi possível carregar as suas funções.",
+    "roleLoadFailed": "Não foi possível carregar a entrevista desta função.",
+    "back": "Voltar ao seu perfil",
+    "noRolesTitle": "Ainda não há funções sobre as quais falar",
+    "noRolesLead": "Importe ou escreva primeiro o seu perfil. A entrevista trata uma função de cada vez.",
+    "pickTitle": "Escolha uma função",
+    "pickLead": "Uma função leva cerca de uma dúzia de perguntas. Cada uma é uma única chamada pequena à IA, cerca de 0,001 €, e nada corre até clicar.",
+    "years": "{{from}}–{{to}}",
+    "yearsNow": "{{from}}–atual",
+    "status": {
+      "not_started": "por começar",
+      "in_progress": "em curso",
+      "covered": "coberta"
+    },
+    "startTitle": "Quando quiser",
+    "startLead": "Começa com uma pergunta sobre esta função. Responda por palavras suas; pergunta de novo se precisar de mais.",
+    "start": "Começar",
+    "starting": "A perguntar…",
+    "continue": "Fazer-me uma pergunta",
+    "coveredBanner": "Os sete temas estão cobertos para esta função.",
+    "coveredLead": "Os factos que manteve estão sob esta função, no seu perfil. Volte para acrescentar mais.",
+    "stoppedBanner": "Por agora não há mais nada a perguntar.",
+    "labels": {
+      "question": "Pergunta",
+      "push": "A insistir",
+      "answer": "Você"
+    },
+    "skippedNote": "Saltou esta pergunta.",
+    "doneNote": "Deixada para já. Comece de novo quando quiser e continua daqui.",
+    "logLabel": "A entrevista até agora",
+    "answerLabel": "A sua resposta",
+    "answerHint": "Enter envia; Shift e Enter mudam de linha.",
+    "answerPlaceholder": "Responda por palavras suas. Pode ser desarrumado; pergunta de novo se precisar de mais.",
+    "answer": "Responder",
+    "answering": "A ler a sua resposta…",
+    "skip": "Saltar esta",
+    "done": "Terminar esta função por agora",
+    "costLine": "Cada pergunta é uma chamada pequena à IA, cerca de 0,001 €. Perguntas hoje: {{n}} de {{cap}}.",
+    "facts": {
+      "title": "Factos tirados da sua resposta",
+      "yourWords": "As suas palavras:",
+      "keep": "Manter",
+      "keepLabel": "Manter: {{text}}",
+      "fix": "Corrigir",
+      "fixLabel": "Corrigir: {{text}}",
+      "drop": "Descartar",
+      "dropLabel": "Descartar: {{text}}",
+      "keepAll": "Manter tudo",
+      "kept": "Mantido",
+      "dropped": "Descartado",
+      "savedTo": "Guardados em {{role}}, no seu perfil, quando os mantiver. Um CV só pode usar os factos listados aqui.",
+      "fixField": "Corrigir o facto",
+      "fixHint": "Diga só o que as suas palavras dizem. As suas palavras ficam como estão.",
+      "fixSave": "Manter esta versão",
+      "fixCancel": "Cancelar",
+      "leftOut_one": "{{count}} linha deixada de fora: dizia algo que não escreveu.",
+      "leftOut_other": "{{count}} linhas deixadas de fora: diziam algo que não escreveu."
+    },
+    "coverage": {
+      "title": "Cobertura",
+      "count": "{{n}}/7",
+      "label": "{{n}} de 7 temas cobertos",
+      "note": "Também compara as respostas entre si e com o seu perfil. Se duas disserem coisas diferentes, pergunta qual está certa.",
+      "state": {
+        "ok": "Coberto",
+        "part": "Parcialmente coberto",
+        "none": "Ainda não coberto"
+      },
+      "areas": {
+        "context": {
+          "name": "Contexto",
+          "hint": "o que a empresa vendia, a quem, tamanho da equipa"
+        },
+        "your_part": {
+          "name": "O seu papel",
+          "hint": "o que fez você, não a equipa"
+        },
+        "stack_scale": {
+          "name": "Tecnologia e escala",
+          "hint": "ferramentas, volume de dados, tráfego"
+        },
+        "results": {
+          "name": "Resultados com prova",
+          "hint": "números, e como sabe que são esses"
+        },
+        "hard_problems": {
+          "name": "Problemas difíceis",
+          "hint": "o que correu mal e o que fez"
+        },
+        "people": {
+          "name": "Pessoas",
+          "hint": "liderar, orientar, contratar"
+        },
+        "stories": {
+          "name": "Histórias de entrevista",
+          "hint": "histórias que contaria numa entrevista"
+        }
+      }
+    },
+    "errors": {
+      "generic": "Não correu bem. Tente de novo.",
+      "ai_unavailable": "Esta instalação do Applicamp não tem um modelo de IA configurado, por isso não pode fazer perguntas.",
+      "ai_daily_limit_reached": "Atingiu o limite de IA de hoje. Tente amanhã.",
+      "ai_budget_reached": "Atingiu o limite de gastos de IA, por isso nada foi enviado. A sua resposta continua na caixa.",
+      "ai_failed": "O modelo de IA não conseguiu responder agora. A sua resposta continua na caixa; tente de novo daqui a um minuto.",
+      "grill_daily_cap": "São 150 perguntas hoje, o máximo que o Pergunte-me tudo faz num dia. Continua amanhã.",
+      "invalid_answer": "Escreva entre 1 e 2000 caracteres.",
+      "no_open_question": "Não há nenhuma pergunta à espera. Peça uma nova.",
+      "grill_changed": "Esta entrevista mudou enquanto respondia. Foi carregada de novo.",
+      "profile_changed": "Esta função mudou no seu perfil. Comece de novo.",
+      "fact_not_supported": "As suas palavras e o seu perfil não dizem isso. Mude a linha ou retire os pormenores novos.",
+      "invalid_fact": "Escreva entre 1 e 300 caracteres.",
+      "proposal_not_ready": "Este facto já foi mantido ou descartado.",
+      "not_found": "Já não está aqui. Volte às suas funções."
+    },
+    "roleFacts": {
+      "title": "O que nos contou sobre cada função",
+      "lead": "Factos que manteve no Pergunte-me tudo, com as suas próprias palavras. Um CV só pode usar estes e o que escreveu acima.",
+      "none": "Ainda sem factos mantidos",
+      "count_one": "{{count}} facto",
+      "count_other": "{{count}} factos",
+      "yourWords": "As suas palavras:",
+      "remove": "Remover",
+      "removeLabel": "Remover este facto: {{text}}",
+      "removed": "Facto removido.",
+      "listLabel": "Factos mantidos de {{role}}"
     }
   }
 }

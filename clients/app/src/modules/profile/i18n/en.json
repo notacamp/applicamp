@@ -424,7 +424,8 @@
         "partial": "{{have}} of {{of}} answered",
         "missing": "Tell agents what you want next"
       }
-    }
+    },
+    "grill": "Grill me"
   },
   "improve": {
     "eyebrow": "Question {{n}} of {{total}}",
@@ -524,6 +525,141 @@
       "skills": "Add the skills your roles mention: searches use your top three.",
       "import": "Import a fuller profile: matches are scored against your positions.",
       "goals": "Answer a few questions about what you want: searches keep to them."
+    }
+  },
+  "grill": {
+    "title": "Grill me",
+    "lead": "A CV can only say what Applicamp knows. Pick a role and answer one question at a time. Vague answers get pushed back on and numbers get asked about. Every fact taken from your answers is shown to you first; nothing is saved until you keep it.",
+    "open": "Grill me",
+    "aboutRole": "Grill me about this role",
+    "rolesLabel": "Your roles",
+    "loading": "Loading your roles…",
+    "loadFailed": "Your roles couldn’t be loaded.",
+    "roleLoadFailed": "This role’s interview couldn’t be loaded.",
+    "back": "Back to your profile",
+    "noRolesTitle": "No roles to talk about yet",
+    "noRolesLead": "Import or write your profile first. Grill me goes through one role at a time.",
+    "pickTitle": "Pick a role",
+    "pickLead": "A role takes about a dozen questions. Each one is a single small AI call, about €0.001, and nothing runs until you click.",
+    "years": "{{from}}–{{to}}",
+    "yearsNow": "{{from}}–now",
+    "status": {
+      "not_started": "not started",
+      "in_progress": "in progress",
+      "covered": "covered"
+    },
+    "startTitle": "Ready when you are",
+    "startLead": "It starts with one question about this role. Answer in your own words; it asks again if it needs more.",
+    "start": "Start",
+    "starting": "Asking…",
+    "continue": "Ask me a question",
+    "coveredBanner": "All seven areas are covered for this role.",
+    "coveredLead": "Your kept facts are under this role on your profile. Come back to add more.",
+    "stoppedBanner": "Nothing left to ask for now.",
+    "labels": {
+      "question": "Question",
+      "push": "Pushing back",
+      "answer": "You"
+    },
+    "skippedNote": "You skipped this one.",
+    "doneNote": "Left for now. Start again any time and it carries on from here.",
+    "logLabel": "The interview so far",
+    "answerLabel": "Your answer",
+    "answerHint": "Enter sends it; Shift and Enter start a new line.",
+    "answerPlaceholder": "Answer in your own words. Rough is fine; it asks again if it needs more.",
+    "answer": "Answer",
+    "answering": "Reading your answer…",
+    "skip": "Skip this one",
+    "done": "Done with this role for now",
+    "costLine": "Each question is one small AI call, about €0.001. Questions today: {{n}} of {{cap}}.",
+    "facts": {
+      "title": "Facts taken from your answer",
+      "yourWords": "Your words:",
+      "keep": "Keep",
+      "keepLabel": "Keep: {{text}}",
+      "fix": "Fix",
+      "fixLabel": "Fix: {{text}}",
+      "drop": "Drop",
+      "dropLabel": "Drop: {{text}}",
+      "keepAll": "Keep all",
+      "kept": "Kept",
+      "dropped": "Dropped",
+      "savedTo": "Saved to {{role}} in your profile when you keep them. A CV can only use facts listed here.",
+      "fixField": "Fix the fact",
+      "fixHint": "Say only what your words say. Your words stay as they are.",
+      "fixSave": "Keep this version",
+      "fixCancel": "Cancel",
+      "leftOut_one": "{{count}} line left out: it said something you didn’t write.",
+      "leftOut_other": "{{count}} lines left out: they said something you didn’t write."
+    },
+    "coverage": {
+      "title": "Coverage",
+      "count": "{{n}}/7",
+      "label": "{{n}} of 7 areas covered",
+      "note": "It also checks your answers against each other and against your profile. If two say different things, it asks which is right.",
+      "state": {
+        "ok": "Covered",
+        "part": "Partly covered",
+        "none": "Not covered yet"
+      },
+      "areas": {
+        "context": {
+          "name": "Context",
+          "hint": "what the company sold, to whom, team size"
+        },
+        "your_part": {
+          "name": "Your part",
+          "hint": "what you did yourself, not the team"
+        },
+        "stack_scale": {
+          "name": "Stack and scale",
+          "hint": "tools, data size, traffic"
+        },
+        "results": {
+          "name": "Results with proof",
+          "hint": "numbers, and how you know them"
+        },
+        "hard_problems": {
+          "name": "Hard problems",
+          "hint": "what went wrong and what you did"
+        },
+        "people": {
+          "name": "People",
+          "hint": "leading, mentoring, hiring"
+        },
+        "stories": {
+          "name": "Interview stories",
+          "hint": "stories you would tell in an interview"
+        }
+      }
+    },
+    "errors": {
+      "generic": "That didn’t work. Try again.",
+      "ai_unavailable": "This Applicamp has no AI model set up, so it can’t ask questions.",
+      "ai_daily_limit_reached": "You’ve reached today’s AI limit. Try again tomorrow.",
+      "ai_budget_reached": "You’ve reached the AI spending limit, so nothing was sent. Your answer is still in the box.",
+      "ai_failed": "The AI model couldn’t answer just now. Your answer is still in the box; try again in a minute.",
+      "grill_daily_cap": "That’s 150 questions today, the most Grill me asks in a day. It carries on tomorrow.",
+      "invalid_answer": "Write between 1 and 2,000 characters.",
+      "no_open_question": "There is no question waiting. Ask for a new one.",
+      "grill_changed": "This interview changed while you were answering. It has been loaded again.",
+      "profile_changed": "This role changed in your profile. Start it again.",
+      "fact_not_supported": "Your words and your profile don’t say that. Change the line, or drop the new details.",
+      "invalid_fact": "Write between 1 and 300 characters.",
+      "proposal_not_ready": "This fact was already kept or dropped.",
+      "not_found": "That isn’t there any more. Go back to your roles."
+    },
+    "roleFacts": {
+      "title": "What you told us about each role",
+      "lead": "Facts you kept in Grill me, with your own words. A CV can use only these and what you wrote above.",
+      "none": "No facts kept yet",
+      "count_one": "{{count}} fact",
+      "count_other": "{{count}} facts",
+      "yourWords": "Your words:",
+      "remove": "Remove",
+      "removeLabel": "Remove this fact: {{text}}",
+      "removed": "Fact removed.",
+      "listLabel": "Facts kept for {{role}}"
     }
   }
 }

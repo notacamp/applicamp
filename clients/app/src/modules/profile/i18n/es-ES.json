@@ -424,7 +424,8 @@
         "partial": "{{have}} de {{of}} respondidas",
         "missing": "Dile a los agentes qué quieres a continuación"
       }
-    }
+    },
+    "grill": "Pregúntame todo"
   },
   "improve": {
     "eyebrow": "Pregunta {{n}} de {{total}}",
@@ -524,6 +525,141 @@
       "skills": "Añade las habilidades que mencionan tus puestos: las búsquedas usan las tres primeras.",
       "import": "Importa un perfil más completo: las coincidencias se puntúan con base en tus puestos.",
       "goals": "Responde unas preguntas sobre lo que quieres: las búsquedas se ciñen a ellas."
+    }
+  },
+  "grill": {
+    "title": "Pregúntame todo",
+    "lead": "Un CV solo puede decir lo que Applicamp sabe. Elige un puesto y responde una pregunta cada vez. A las respuestas vagas se les insiste y se piden cifras. Cada dato sacado de tus respuestas se te muestra primero; no se guarda nada hasta que lo conserves.",
+    "open": "Pregúntame todo",
+    "aboutRole": "Preguntarme sobre este puesto",
+    "rolesLabel": "Tus puestos",
+    "loading": "Cargando tus puestos…",
+    "loadFailed": "No se pudieron cargar tus puestos.",
+    "roleLoadFailed": "No se pudo cargar la entrevista de este puesto.",
+    "back": "Volver a tu perfil",
+    "noRolesTitle": "Aún no hay puestos de los que hablar",
+    "noRolesLead": "Importa o escribe primero tu perfil. Pregúntame todo repasa un puesto cada vez.",
+    "pickTitle": "Elige un puesto",
+    "pickLead": "Un puesto lleva una docena de preguntas. Cada una es una sola llamada pequeña a la IA, unos 0,001 €, y no se ejecuta nada hasta que hagas clic.",
+    "years": "{{from}}–{{to}}",
+    "yearsNow": "{{from}}–actual",
+    "status": {
+      "not_started": "sin empezar",
+      "in_progress": "en curso",
+      "covered": "cubierto"
+    },
+    "startTitle": "Cuando quieras",
+    "startLead": "Empieza con una pregunta sobre este puesto. Responde con tus palabras; vuelve a preguntar si necesita más.",
+    "start": "Empezar",
+    "starting": "Preguntando…",
+    "continue": "Hazme una pregunta",
+    "coveredBanner": "Las siete áreas están cubiertas para este puesto.",
+    "coveredLead": "Los datos que conservaste están bajo este puesto en tu perfil. Vuelve para añadir más.",
+    "stoppedBanner": "Por ahora no queda nada que preguntar.",
+    "labels": {
+      "question": "Pregunta",
+      "push": "Insistiendo",
+      "answer": "Tú"
+    },
+    "skippedNote": "Omitiste esta pregunta.",
+    "doneNote": "Dejado por ahora. Empieza de nuevo cuando quieras y sigue desde aquí.",
+    "logLabel": "La entrevista hasta ahora",
+    "answerLabel": "Tu respuesta",
+    "answerHint": "Intro la envía; Mayús e Intro hacen un salto de línea.",
+    "answerPlaceholder": "Responde con tus palabras. Puede ser a grandes rasgos; vuelve a preguntar si necesita más.",
+    "answer": "Responder",
+    "answering": "Leyendo tu respuesta…",
+    "skip": "Omitir esta",
+    "done": "Terminar este puesto por ahora",
+    "costLine": "Cada pregunta es una llamada pequeña a la IA, unos 0,001 €. Preguntas hoy: {{n}} de {{cap}}.",
+    "facts": {
+      "title": "Datos sacados de tu respuesta",
+      "yourWords": "Tus palabras:",
+      "keep": "Conservar",
+      "keepLabel": "Conservar: {{text}}",
+      "fix": "Corregir",
+      "fixLabel": "Corregir: {{text}}",
+      "drop": "Descartar",
+      "dropLabel": "Descartar: {{text}}",
+      "keepAll": "Conservar todo",
+      "kept": "Conservado",
+      "dropped": "Descartado",
+      "savedTo": "Se guardan en {{role}}, en tu perfil, cuando los conserves. Un CV solo puede usar los datos que aparecen aquí.",
+      "fixField": "Corregir el dato",
+      "fixHint": "Di solo lo que dicen tus palabras. Tus palabras se quedan como están.",
+      "fixSave": "Conservar esta versión",
+      "fixCancel": "Cancelar",
+      "leftOut_one": "{{count}} línea omitida: decía algo que no escribiste.",
+      "leftOut_other": "{{count}} líneas omitidas: decían algo que no escribiste."
+    },
+    "coverage": {
+      "title": "Cobertura",
+      "count": "{{n}}/7",
+      "label": "{{n}} de 7 áreas cubiertas",
+      "note": "También compara tus respuestas entre sí y con tu perfil. Si dos dicen cosas distintas, pregunta cuál es la correcta.",
+      "state": {
+        "ok": "Cubierta",
+        "part": "Cubierta en parte",
+        "none": "Aún sin cubrir"
+      },
+      "areas": {
+        "context": {
+          "name": "Contexto",
+          "hint": "qué vendía la empresa, a quién, tamaño del equipo"
+        },
+        "your_part": {
+          "name": "Tu parte",
+          "hint": "lo que hiciste tú, no el equipo"
+        },
+        "stack_scale": {
+          "name": "Tecnología y escala",
+          "hint": "herramientas, volumen de datos, tráfico"
+        },
+        "results": {
+          "name": "Resultados con prueba",
+          "hint": "cifras, y cómo sabes que son esas"
+        },
+        "hard_problems": {
+          "name": "Problemas difíciles",
+          "hint": "qué salió mal y qué hiciste"
+        },
+        "people": {
+          "name": "Personas",
+          "hint": "liderar, orientar, contratar"
+        },
+        "stories": {
+          "name": "Historias de entrevista",
+          "hint": "historias que contarías en una entrevista"
+        }
+      }
+    },
+    "errors": {
+      "generic": "No ha funcionado. Inténtalo de nuevo.",
+      "ai_unavailable": "Este Applicamp no tiene un modelo de IA configurado, así que no puede hacer preguntas.",
+      "ai_daily_limit_reached": "Has alcanzado el límite de IA de hoy. Inténtalo mañana.",
+      "ai_budget_reached": "Has alcanzado el límite de gasto de IA, así que no se envió nada. Tu respuesta sigue en el cuadro.",
+      "ai_failed": "El modelo de IA no pudo responder ahora. Tu respuesta sigue en el cuadro; inténtalo de nuevo en un minuto.",
+      "grill_daily_cap": "Son 150 preguntas hoy, el máximo que hace Pregúntame todo en un día. Sigue mañana.",
+      "invalid_answer": "Escribe entre 1 y 2000 caracteres.",
+      "no_open_question": "No hay ninguna pregunta esperando. Pide una nueva.",
+      "grill_changed": "Esta entrevista cambió mientras respondías. Se ha cargado de nuevo.",
+      "profile_changed": "Este puesto cambió en tu perfil. Empieza de nuevo.",
+      "fact_not_supported": "Tus palabras y tu perfil no dicen eso. Cambia la línea o quita los detalles nuevos.",
+      "invalid_fact": "Escribe entre 1 y 300 caracteres.",
+      "proposal_not_ready": "Este dato ya se conservó o se descartó.",
+      "not_found": "Ya no está aquí. Vuelve a tus puestos."
+    },
+    "roleFacts": {
+      "title": "Lo que nos contaste de cada puesto",
+      "lead": "Datos que conservaste en Pregúntame todo, con tus propias palabras. Un CV solo puede usar estos y lo que escribiste arriba.",
+      "none": "Aún no hay datos conservados",
+      "count_one": "{{count}} dato",
+      "count_other": "{{count}} datos",
+      "yourWords": "Tus palabras:",
+      "remove": "Quitar",
+      "removeLabel": "Quitar este dato: {{text}}",
+      "removed": "Dato quitado.",
+      "listLabel": "Datos conservados de {{role}}"
     }
   }
 }

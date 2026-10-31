@@ -2,5 +2,6 @@
 
 pub mod completion;
 pub mod goals;
+pub mod grill;
 pub mod imports;
 pub mod profile;

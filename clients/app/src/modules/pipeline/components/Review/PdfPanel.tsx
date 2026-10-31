@@ -143,7 +143,7 @@ export function VersionsSection({
               </Cluster>
             }
             subtitle={t("cv.versions.facts", {
-              pages: version.pages,
+              count: version.pages,
               size: formatSize(version.size_bytes, i18n.language),
               made: formatShortDate(version.created_at, i18n.language),
             })}

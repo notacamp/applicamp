@@ -6,6 +6,7 @@ import {
   Bullets,
   Button,
   ChipList,
+  Cluster,
   Label,
   Stack,
   Tagged,
@@ -92,16 +93,15 @@ export function ReviewAside({
     <>
       {draft.status === "approved" ? (
         <Tagged testId="cv-banner-approved">
-          <Banner
-            icon="check"
-            title={t("cv.aside.approvedTitle", { version: draft.version ?? 1 })}
-            action={
-              <Button variant="secondary" data-testid="cv-back-to-pipeline" onClick={onBack}>
-                {t("cv.aside.toPipeline")}
-              </Button>
-            }
-          >
-            {t("cv.aside.approvedBody")}
+          <Banner icon="check" title={t("cv.aside.approvedTitle", { version: draft.version ?? 1 })}>
+            <Stack gap="sm">
+              <Text>{t("cv.aside.approvedBody")}</Text>
+              <Cluster>
+                <Button variant="secondary" data-testid="cv-back-to-pipeline" onClick={onBack}>
+                  {t("cv.aside.toPipeline")}
+                </Button>
+              </Cluster>
+            </Stack>
           </Banner>
         </Tagged>
       ) : draft.flagged > 0 ? (
@@ -110,13 +110,15 @@ export function ReviewAside({
             tone="danger"
             icon="warning"
             title={t("cv.aside.flagged", { count: draft.flagged })}
-            action={
-              <Button variant="secondary" data-testid="cv-first-flagged" onClick={onFirst}>
-                {t("cv.aside.goFirst")}
-              </Button>
-            }
           >
-            {t("cv.aside.flaggedBody")}
+            <Stack gap="sm">
+              <Text>{t("cv.aside.flaggedBody")}</Text>
+              <Cluster>
+                <Button variant="secondary" data-testid="cv-first-flagged" onClick={onFirst}>
+                  {t("cv.aside.goFirst")}
+                </Button>
+              </Cluster>
+            </Stack>
           </Banner>
         </Tagged>
       ) : (

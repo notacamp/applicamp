@@ -129,11 +129,11 @@ test("someone drafts a CV, sees the lines that can't be traced to their profile,
   await expect(reworded.getByTestId(/^cv-from-l\d+$/)).toContainText(
     "Moved invoicing onto PostgreSQL",
   );
-  // The line that is the profile's own words, word for word (the other one that
-  // starts the same way is the flagged company fact).
-  const verbatim = lines
-    .filter({ hasText: "Led a team of 4 engineers" })
-    .filter({ hasNot: page.getByTestId(/^cv-flag-/) });
+  // A highlight copied word for word (the summary quotes it too, so look in Experience).
+  const verbatim = page
+    .getByTestId("cv-experience")
+    .getByTestId(/^cv-line-l\d+$/)
+    .filter({ hasText: "from 6 hours to 40 minutes" });
   await expect(verbatim.getByTestId(/^cv-line-mark-/)).toContainText("As in profile");
 
   // Three things can't be traced: Approve is off and the aside says so first.

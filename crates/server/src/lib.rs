@@ -127,7 +127,10 @@ impl Composition {
                 applicamp_runs::RunsConfig::default(),
                 pipeline.ai.clone(),
             ),
-            profile: applicamp_profile::ProfileDeps { ai: profile_ai },
+            profile: applicamp_profile::ProfileDeps {
+                ai: profile_ai,
+                research: research_of(&pipeline),
+            },
             pipeline,
             sources,
         })
@@ -144,6 +147,7 @@ impl Composition {
             })),
             ai: self.pipeline.ai.clone(),
         };
+        self.profile.research = research_of(&self.pipeline);
         self
     }
 
@@ -155,6 +159,15 @@ impl Composition {
             .and_then(|g| g.config().complete.as_ref())
             .map(|p| p.model.as_str())
     }
+}
+
+/// Past employers are researched through the pipeline's company facts.
+fn research_of(
+    pipeline: &applicamp_pipeline::PipelineDeps,
+) -> applicamp_profile::ports::Researcher {
+    applicamp_profile::ports::Researcher(Some(std::sync::Arc::new(wiring::ResearchWiring {
+        pipeline: pipeline.clone(),
+    })))
 }
 
 /// Every module, in mount order, composed inertly (for catalogues: the

@@ -393,6 +393,8 @@ pub async fn keep_fact(
         quote: text.to_owned(),
         area,
         kept_at: state.clock.now(),
+        status: Default::default(),
+        basis: None,
     });
     let profile = profile.tidied();
     profile.validate()?;

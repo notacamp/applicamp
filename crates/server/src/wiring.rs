@@ -30,6 +30,79 @@ use sqlx::PgPool;
 use url::Url;
 use uuid::Uuid;
 
+/// What "Tell me about you" asks of the pipeline: a past employer is read as
+/// any job's company is, with the same site choice, reader, quote check and
+/// 30-day cache.
+#[derive(Debug, Clone)]
+pub struct ResearchWiring {
+    /// The pipeline as composed (its reader and its gateway).
+    pub pipeline: applicamp_pipeline::PipelineDeps,
+}
+
+impl applicamp_profile::ports::EmployerResearch for ResearchWiring {
+    fn known_site<'a>(
+        &'a self,
+        db: &'a PgPool,
+        account: Uuid,
+        company: &'a str,
+    ) -> BoxFuture<'a, Result<Option<String>>> {
+        Box::pin(applicamp_pipeline::features::brief::employer::site_of(
+            db, account, company,
+        ))
+    }
+
+    fn set_site<'a>(
+        &'a self,
+        state: &'a AppState,
+        account: Uuid,
+        company: &'a str,
+        url: &'a str,
+    ) -> BoxFuture<'a, Result<String>> {
+        Box::pin(applicamp_pipeline::features::brief::employer::set_site(
+            &self.pipeline,
+            state,
+            account,
+            company,
+            url,
+        ))
+    }
+
+    fn run<'a>(
+        &'a self,
+        state: &'a AppState,
+        account: Uuid,
+        company: &'a str,
+        now: DateTime<Utc>,
+    ) -> BoxFuture<'a, Result<applicamp_profile::ports::Research>> {
+        use applicamp_profile::ports::{FactBasis, ProposedFact, Research};
+        Box::pin(async move {
+            let found = applicamp_pipeline::features::brief::employer::facts(
+                &self.pipeline,
+                state,
+                account,
+                company,
+                now,
+            )
+            .await?;
+            Ok(Research {
+                site: found.site,
+                read: found.read,
+                facts: found
+                    .facts
+                    .into_iter()
+                    .map(|fact| ProposedFact {
+                        claim: fact.text,
+                        status: FactBasis::Sourced,
+                        quote: Some(fact.quote),
+                        source_url: Some(fact.url),
+                        reason: "Read on the company's own website.".to_owned(),
+                    })
+                    .collect(),
+            })
+        })
+    }
+}
+
 /// What the search asks of the profile and the pipeline.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SourcesWiring;

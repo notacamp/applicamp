@@ -84,6 +84,12 @@ pub struct Basics {
     /// A few sentences about them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
+    /// Where they come from: the domains and earlier careers behind their
+    /// work ("six years in events and restaurants"), in their words. Written
+    /// by "Tell me about you"; the import and the model never write it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(skip)]
+    pub background: Option<String>,
     /// Their own site.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
@@ -209,6 +215,34 @@ pub struct ProfileFact {
     pub area: Area,
     /// When the person kept it.
     pub kept_at: DateTime<Utc>,
+    /// What the person did to make it theirs: said it themselves (the
+    /// default), or confirmed an assumption Applicamp made about them.
+    #[serde(default, skip_serializing_if = "FactStatus::is_told")]
+    pub status: FactStatus,
+    /// For a confirmed assumption, what it was based on: the reason it was
+    /// assumed, or the page it was read on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub basis: Option<String>,
+}
+
+/// How a fact became the person's.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum FactStatus {
+    /// The person said it, in their own words (`quote`).
+    #[default]
+    Told,
+    /// Applicamp assumed it ("Lead Engineer usually means leading people")
+    /// and the person said "That's right". `quote` is the assumption as
+    /// they confirmed it; `basis` says what it was based on.
+    ConfirmedAssumption,
+}
+
+impl FactStatus {
+    /// Whether it is the default, which is not written out.
+    pub const fn is_told(&self) -> bool {
+        matches!(self, Self::Told)
+    }
 }
 
 /// A school or degree.
@@ -341,6 +375,7 @@ impl Profile {
         visitor.value(Kind::Short, &mut basics.email);
         visitor.value(Kind::Short, &mut basics.location);
         visitor.value(Kind::Long, &mut basics.summary);
+        visitor.value(Kind::Long, &mut basics.background);
         visitor.value(Kind::Short, &mut basics.url);
         basics.profiles.retain_mut(|link| {
             if !visitor.key(Kind::Short, &mut link.url) {
@@ -367,6 +402,7 @@ impl Profile {
             visitor.value(Kind::Date, &mut work.end_date);
             visitor.value(Kind::Long, &mut work.summary);
             work.facts.retain_mut(|fact| {
+                visitor.value(Kind::Long, &mut fact.basis);
                 visitor.key(Kind::Long, &mut fact.text) && visitor.key(Kind::Long, &mut fact.quote)
             });
             work.highlights.retain_mut(|highlight| {
@@ -579,6 +615,7 @@ impl Profile {
         fill(&mut basics.email, draft.basics.email);
         fill(&mut basics.location, draft.basics.location);
         fill(&mut basics.summary, draft.basics.summary);
+        fill(&mut basics.background, draft.basics.background);
         fill(&mut basics.url, draft.basics.url);
         add_new(&mut basics.profiles, draft.basics.profiles, |a, b| {
             same(&a.url) == same(&b.url)

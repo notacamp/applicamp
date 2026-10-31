@@ -101,7 +101,8 @@
     "email": "Email",
     "url": "Website",
     "summary": "Summary",
-    "section": "About you"
+    "section": "About you",
+    "background": "Background"
   },
   "placeholders": {
     "name": "Add your name",
@@ -109,7 +110,8 @@
     "location": "Add where you are",
     "email": "Add an email for applications",
     "url": "Add your website",
-    "summary": "Add a few sentences about you"
+    "summary": "Add a few sentences about you",
+    "background": "Add where you come from"
   },
   "sections": {
     "work": "Experience",
@@ -425,7 +427,8 @@
         "missing": "Tell agents what you want next"
       }
     },
-    "grill": "Grill me"
+    "grill": "Grill me",
+    "about": "Tell me about you"
   },
   "improve": {
     "eyebrow": "Question {{n}} of {{total}}",
@@ -659,7 +662,153 @@
       "remove": "Remove",
       "removeLabel": "Remove this fact: {{text}}",
       "removed": "Fact removed.",
-      "listLabel": "Facts kept for {{role}}"
+      "listLabel": "Facts kept for {{role}}",
+      "confirmed": "You confirmed this assumption."
+    }
+  },
+  "about": {
+    "eyebrow": "Profile & goals",
+    "title": "Here’s what I know about you",
+    "addedTitle": "What I added from what you wrote",
+    "reviewTitle": "Here’s you now",
+    "lead": "Written from your profile, what your past employers say about themselves on their own websites, and what’s usually true for people in your roles. I only ask you what I can’t find out myself. The highlighted parts are my assumptions. Select one to tell me if it’s right.",
+    "loading": "Loading…",
+    "loadFailed": "This couldn’t be loaded.",
+    "making": "Reading your profile and your past employers’ websites…",
+    "noProfileTitle": "Add your profile first",
+    "noProfileLead": "I need your profile to write about you. Import it or write it, then come back.",
+    "back": "Back to Profile & goals",
+    "portraitLabel": "What I know about you",
+    "legend": {
+      "label": "What the colours mean",
+      "known": "From your profile",
+      "told": "You told me",
+      "assumed": "I assumed",
+      "confirmed": "You confirmed"
+    },
+    "panel": {
+      "label": "About this assumption",
+      "assumed": "I assumed:",
+      "why": "Why:",
+      "downgraded": "This isn’t in your profile in these words.",
+      "guess": "I’m guessing from your role.",
+      "right": "That’s right",
+      "wrong": "That’s wrong",
+      "later": "Ask me about it later",
+      "save": "If right, I’ll save: {{claim}}"
+    },
+    "employers": {
+      "title": "Past employers I looked at",
+      "lead": "I read an employer’s own website only when I know it, and only the pages it allows. Add a website to let me read it.",
+      "state": {
+        "read_one": "Read its website: {{count}} fact found",
+        "read_other": "Read its website: {{count}} facts found",
+        "unread": "Website known: {{site}}. I’ll read it when you update the portrait.",
+        "no_site": "Website not known, so I read nothing.",
+        "failed": "It couldn’t be read ({{error}})."
+      },
+      "siteLabel": "Website of {{company}}",
+      "sitePlaceholder": "https://example.com",
+      "add": "Add website",
+      "update": "Update the portrait",
+      "updateCost": "1 small AI call per website read · about €0.002"
+    },
+    "accuracy": {
+      "title": "Is this accurate?",
+      "yes": "Yes, mostly",
+      "some": "Some of it’s wrong",
+      "no": "Not really"
+    },
+    "extra": {
+      "title": "Anything else I should know about you?",
+      "lead": "Your background, what you’re good at, what you want next. Write it however it comes. I’ll fit it into your profile and show you what changed.",
+      "label": "Anything else I should know",
+      "hint": "{{left}} characters left",
+      "reading": "Reading what you wrote…"
+    },
+    "continue": "Continue",
+    "cost": "1 small AI call · about €0.002",
+    "yourWords": "Your words:",
+    "fields": {
+      "summary": "Summary",
+      "headline": "Headline",
+      "skill": "Skill",
+      "background": "Background",
+      "goal_role": "Role you want",
+      "goal_avoid": "Avoid",
+      "goal_must_have": "Must have",
+      "goal_location": "Place",
+      "role_fact": "At work"
+    },
+    "added": {
+      "title": "Added from what you wrote",
+      "savedLater": "It goes into your profile when you save.",
+      "none": "Nothing in what you wrote needed a change to your profile.",
+      "questionsNext": "Questions about the gaps come next.",
+      "open_one": "{{count}} claim needs your answer before you can save.",
+      "open_other": "{{count}} claims need your answer before you can save.",
+      "review": "Review and save",
+      "back": "Back"
+    },
+    "flag": {
+      "claim": "“{{claim}}” isn’t in your words.",
+      "quote": "I can’t find the words I quoted in what you wrote."
+    },
+    "resolution": {
+      "true": "You said this is true.",
+      "fixed": "You fixed this.",
+      "own_words": "Using your own words."
+    },
+    "change": {
+      "true": "It’s true",
+      "fix": "Fix",
+      "edit": "Edit",
+      "ownWords": "Use my own words",
+      "remove": "Remove",
+      "editLabel": "What it should say",
+      "recheck": "Check and keep",
+      "cancel": "Cancel"
+    },
+    "groups": {
+      "summary": "Summary",
+      "headline": "Headline",
+      "skills": "Skills",
+      "position": "Position",
+      "background": "Background",
+      "goals": "Goals"
+    },
+    "review": {
+      "lead": "This is what I’ll save to your profile. Every line is from your profile, something you told me, or an assumption you confirmed. Nothing you didn’t confirm is saved.",
+      "changes": "Changes to your profile",
+      "nothing": "There’s nothing to save yet.",
+      "told": "You told me",
+      "confirmed": "Confirmed",
+      "leftOut_one": "{{count}} assumption you didn’t confirm is left out.",
+      "leftOut_other": "{{count}} assumptions you didn’t confirm are left out.",
+      "save": "Save to my profile",
+      "back": "Back"
+    },
+    "saved": {
+      "title": "Saved",
+      "banner": "Saved to your profile.",
+      "lead": "Your profile is now {{score}}% strong. Agents and CVs use it from now on. You can come back any time to add more.",
+      "done": "Back to Profile & goals"
+    },
+    "errors": {
+      "generic": "That didn’t work. Try again.",
+      "ai_unavailable": "This Applicamp has no AI model set up, so it can’t write about you.",
+      "ai_daily_limit_reached": "You’ve reached today’s AI limit. Try again tomorrow.",
+      "ai_budget_reached": "You’ve reached the AI spending limit, so nothing was sent. What you wrote is still in the box.",
+      "ai_failed": "The AI model couldn’t answer just now. What you wrote is still in the box; try again in a minute.",
+      "about_daily_cap": "This is limited to 30 AI steps a day. It continues tomorrow.",
+      "profile_needed": "Add your profile first, then tell me about you.",
+      "changes_flagged": "Something you wrote has a claim I can’t find in your words. Settle it first.",
+      "invalid_text": "Write between 1 and 4,000 characters.",
+      "invalid_site": "Write the company’s website, starting with https://.",
+      "site_not_allowed": "That address can’t be read. Use the company’s public website.",
+      "invalid_change": "Write what it should say.",
+      "research_unavailable": "Reading websites isn’t set up here.",
+      "not_found": "That isn’t here any more. Go back and look again."
     }
   }
 }

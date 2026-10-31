@@ -406,6 +406,12 @@ pub struct PdfQuery {
     pub download: Option<String>,
 }
 
+/// The bytes of a PDF (documentation only: the answer is the file itself).
+#[derive(ToSchema)]
+#[schema(value_type = String, format = Binary)]
+#[allow(dead_code)]
+pub struct PdfFile(Vec<u8>);
+
 #[derive(sqlx::FromRow)]
 struct PdfRow {
     pdf: Vec<u8>,
@@ -429,7 +435,7 @@ struct PdfRow {
         ("version" = u32, Path, description = "The version."), PdfQuery),
     responses(
         (status = 200, description = "The PDF.", content_type = "application/pdf",
-            body = Vec<u8>),
+            body = PdfFile),
         (status = 401, description = "`session_required`", body = Problem,
             content_type = "application/problem+json"),
         (status = 404, description = "`not_found`", body = Problem,

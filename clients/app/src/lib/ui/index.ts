@@ -62,7 +62,18 @@ export { MatchBar, type MatchBarProps } from "./components/MatchBar/MatchBar";
 export { Page, type PageProps } from "./components/Page/Page";
 export { SidePeek, type SidePeekProps } from "./components/SidePeek/SidePeek";
 export { NARROW_QUERY, useNarrowScreen } from "./hooks/narrow";
+export {
+  PdfViewer,
+  type PdfViewerLabels,
+  type PdfViewerProps,
+} from "./components/PdfViewer/PdfViewer";
 export { Placeholder, type PlaceholderProps } from "./components/Placeholder/Placeholder";
+export {
+  RowItem,
+  RowList,
+  type RowItemProps,
+  type RowListProps,
+} from "./components/RowList/RowList";
 export { Property, PropertyList, type PropertyProps } from "./components/Properties/Properties";
 export { Tagged } from "./components/Tagged/Tagged";
 export { TextArea, type TextAreaProps } from "./components/TextArea/TextArea";

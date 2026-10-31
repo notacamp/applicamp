@@ -2814,12 +2814,7 @@
             "content": {
               "application/pdf": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "integer",
-                    "format": "int32",
-                    "minimum": 0
-                  }
+                  "$ref": "#/components/schemas/PdfFile"
                 }
               }
             }
@@ -8780,6 +8775,11 @@
             "description": "There is text, and no picture: one text layer."
           }
         }
+      },
+      "PdfFile": {
+        "type": "string",
+        "format": "binary",
+        "description": "The bytes of a PDF (documentation only: the answer is the file itself)."
       },
       "Period": {
         "type": "string",

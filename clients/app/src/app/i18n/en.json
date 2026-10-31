@@ -6,7 +6,9 @@
   },
   "commands": {
     "account": "Account",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "go": "Go to",
+    "goCvs": "CVs"
   },
   "today": {
     "title": "Today",
@@ -66,5 +68,9 @@
     "eyebrow": "Profile & goals",
     "title": "Skills",
     "lead": "The skills agents match jobs against, in the order they count, and the ones your own roles mention."
+  },
+  "cvs": {
+    "title": "CVs",
+    "lead": "Every CV you’ve made: the PDFs you can open and send, and the drafts still being reviewed."
   }
 }

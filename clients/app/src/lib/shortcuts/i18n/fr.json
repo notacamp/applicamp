@@ -4,7 +4,8 @@
     "pipeline": "Opportunités",
     "boards": "Sites d’emploi",
     "agents": "Agents",
-    "profile": "Profil et objectifs"
+    "profile": "Profil et objectifs",
+    "cvs": "CV"
   },
   "command": {
     "open": "Menu des commandes"

@@ -6,7 +6,9 @@
   },
   "commands": {
     "account": "Conta",
-    "signOut": "Terminar sessão"
+    "signOut": "Terminar sessão",
+    "go": "Ir para",
+    "goCvs": "CVs"
   },
   "today": {
     "title": "Hoje",
@@ -66,5 +68,9 @@
     "eyebrow": "Perfil e objetivos",
     "title": "Competências",
     "lead": "As competências com que os agentes comparam as ofertas, pela ordem em que contam, e as que as suas funções mencionam."
+  },
+  "cvs": {
+    "title": "CVs",
+    "lead": "Todos os CVs que fez: os PDFs que pode abrir e enviar, e os rascunhos ainda em revisão."
   }
 }

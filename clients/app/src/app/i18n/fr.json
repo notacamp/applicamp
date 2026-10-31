@@ -6,7 +6,9 @@
   },
   "commands": {
     "account": "Compte",
-    "signOut": "Se déconnecter"
+    "signOut": "Se déconnecter",
+    "go": "Aller à",
+    "goCvs": "CV"
   },
   "today": {
     "title": "Aujourd’hui",
@@ -66,5 +68,9 @@
     "eyebrow": "Profil et objectifs",
     "title": "Compétences",
     "lead": "Les compétences avec lesquelles les agents comparent les offres, dans l’ordre où elles comptent, et celles que mentionnent vos propres postes."
+  },
+  "cvs": {
+    "title": "CV",
+    "lead": "Tous les CV que vous avez faits : les PDF que vous pouvez ouvrir et envoyer, et les brouillons encore en relecture."
   }
 }

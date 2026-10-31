@@ -216,6 +216,40 @@ test("someone drafts a CV, sees the lines that can't be traced to their profile,
   await expect(page.getByTestId("cv-approve")).toHaveCount(0);
   await expectNoSidewaysScroll(page);
 
+  // The PDF: read back, opened in the viewer (a page drawn on a canvas), downloadable.
+  await expect(page.getByTestId("cv-pdf-checks")).toContainText("Read back from the PDF");
+  await expect(page.getByTestId("cv-pdf-check-contact")).toBeVisible();
+  await page.getByTestId("cv-open-pdf").click();
+  await expect(page.getByTestId("pdf-viewer")).toBeVisible();
+  await expect(page.getByTestId("pdf-viewer-page-1")).toHaveAttribute("data-drawn", "");
+  await expect(page.getByTestId("pdf-viewer-download")).toHaveAttribute(
+    "href",
+    `/api/v1/opportunities/${id}/cv/versions/1/pdf?download=1`,
+  );
+  await expectNoSidewaysScroll(page);
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("pdf-viewer")).toHaveCount(0);
+
+  // Compact: a new version, no AI; v1 stays.
+  await page.getByTestId("cv-template-compact").click();
+  await page.getByTestId("cv-layout-confirm").click();
+  await expect(page.getByTestId("cv-version-2")).toBeVisible();
+  await expect(page.getByTestId("cv-version-1")).toBeVisible();
+  await expectNoSidewaysScroll(page);
+
+  // The CVs page lists both and opens a PDF.
+  await page.goto("/cvs");
+  await expect(page.getByTestId("cvs")).toBeVisible();
+  await page.getByTestId("cvs-filter-approved").click();
+  const mine = page.getByTestId("cvs-row").filter({ hasText: `Example Co ${tag}` });
+  await expect(mine).toHaveCount(2);
+  await expect(mine.first().getByTestId("cvs-row-version")).toContainText("v2");
+  await mine.nth(1).getByTestId("cvs-view").click();
+  await expect(page.getByTestId("pdf-viewer-page-1")).toHaveAttribute("data-drawn", "");
+  await page.getByTestId("pdf-viewer-close").click();
+  await expectNoSidewaysScroll(page);
+  await page.goBack();
+
   // The peek says so.
   await page.goto("/pipeline");
   await page.getByTestId("pipeline-search").fill(`Example Co ${tag}`);

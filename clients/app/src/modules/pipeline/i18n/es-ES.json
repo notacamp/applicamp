@@ -117,7 +117,9 @@
       "needsYou_other": "Borrador {{n}}: {{count}} líneas te necesitan.",
       "clean": "Borrador {{n}}: todas las líneas se apoyan en tu perfil.",
       "approvedBefore": "La v{{version}} está aprobada; este borrador más reciente todavía no.",
-      "review": "Revisar el CV"
+      "review": "Revisar el CV",
+      "viewPdf": "Ver PDF",
+      "download": "Descargar"
     }
   },
   "hidden": {
@@ -332,7 +334,7 @@
       "clean": "Todas las líneas se apoyan en tu perfil",
       "cleanBody": "Aprueba para guardar este borrador como v{{version}}.",
       "approvedTitle": "Aprobado · v{{version}}",
-      "approvedBody": "Esta versión no puede cambiar. Rehaz el CV para tener otra. El PDF viene después.",
+      "approvedBody": "Este texto no puede cambiar, y el PDF se hace con él. Rehaz el CV para otro borrador.",
       "toPipeline": "Volver al pipeline"
     },
     "keywords": {
@@ -381,7 +383,106 @@
       "lines_flagged": "Algunas líneas todavía no se pueden rastrear hasta tu perfil. Corrígelas o elimínalas primero.",
       "already_on_cv": "Eso ya está en el CV.",
       "not_found": "No se ha encontrado este CV.",
-      "generic": "Algo ha ido mal. Inténtalo de nuevo."
+      "generic": "Algo ha ido mal. Inténtalo de nuevo.",
+      "cv_doesnt_fit_one": "No cabe en 1 página: pasa a 2 páginas o quita unas cuantas líneas",
+      "cv_doesnt_fit_other": "No cabe en {{count}} páginas: quita unas cuantas líneas",
+      "cv_pdf_check_failed": "El PDF no ha pasado su comprobación, así que no se ha aprobado nada. Lo que ha fallado:",
+      "cv_pdf_unavailable": "No se ha podido hacer el PDF ahora. No se ha aprobado nada; inténtalo de nuevo.",
+      "cv_versions_cap": "Ya has guardado 20 versiones en PDF de este CV. Es el máximo.",
+      "not_approved": "Aprueba primero el CV: el PDF se hace con el texto aprobado.",
+      "same_layout": "Ese ya es el diseño de la versión más reciente.",
+      "invalid_length": "Elige 1 o 2 páginas.",
+      "invalid_layout": "Elige una plantilla y 1 o 2 páginas."
+    },
+    "layout": {
+      "template": "Plantilla",
+      "templates": {
+        "clean": "Limpia",
+        "compact": "Compacta"
+      },
+      "length": "Extensión",
+      "pages_one": "{{count}} página",
+      "pages_other": "{{count}} páginas",
+      "language": "Idioma",
+      "note": "La plantilla y la extensión hacen un PDF con el mismo texto aprobado, sin IA. Otro idioma es un borrador nuevo: una llamada a la IA y una revisión. Usa «Rehacer».",
+      "confirmTitle": "¿Hacer una versión nueva?",
+      "confirmBody": "Esto deja la v{{version}} como está y hace la v{{next}} con el mismo texto aprobado, con la plantilla {{template}} en {{pages}}. No se usa IA.",
+      "confirm": "Hacer la v{{next}}",
+      "cancel": "Cancelar",
+      "making": "Haciendo el PDF…"
+    },
+    "pdf": {
+      "open": "Abrir el PDF",
+      "download": "Descargar",
+      "checksTitle": "Leído de nuevo desde el PDF",
+      "sections_one": "{{count}} sección encontrada bajo su título habitual",
+      "sections_other": "Las {{count}} secciones encontradas bajo títulos habituales",
+      "keywords_one": "La {{count}} palabra clave de la oferta que estaba en el CV sobrevivió",
+      "keywords_other": "Las {{count}} palabras clave de la oferta que estaban en el CV sobrevivieron",
+      "noKeywords": "Ninguna palabra clave de la oferta estaba en el CV para conservar",
+      "textLayer": "Una sola capa de texto, sin texto en imágenes",
+      "contact": "Nombre, correo y enlaces son texto de verdad",
+      "size_one": "{{count}} página · {{size}}",
+      "size_other": "{{count}} páginas · {{size}}"
+    },
+    "versions": {
+      "title": "Versiones",
+      "lead": "Cada PDF hecho con este CV se conserva, para que siempre puedas ver exactamente lo que enviaste. Guardado en privado con tu cuenta.",
+      "name": "v{{version}} · {{template}}",
+      "current": "Actual",
+      "facts_one": "{{count}} página · {{size}} · hecho el {{made}}",
+      "facts_other": "{{count}} páginas · {{size}} · hecho el {{made}}",
+      "neverDownloaded": "Aún no descargado",
+      "downloaded": "Descargado el {{date}}",
+      "view": "Ver PDF"
+    },
+    "viewer": {
+      "title": "CV · v{{version}}",
+      "subtitle": "{{date}} · {{template}} · {{pages}} · {{size}}",
+      "close": "Cerrar",
+      "loading": "Cargando el PDF…",
+      "failed": "No se ha podido abrir el PDF. Aún puedes descargarlo.",
+      "page": "Página {{page}} de {{pages}}"
+    }
+  },
+  "cvs": {
+    "label": "Tus CV",
+    "filter": {
+      "label": "Mostrar",
+      "all": "Todos",
+      "approved": "Aprobados",
+      "drafts": "Borradores"
+    },
+    "title": "{{role}} · {{company}}",
+    "version": "v{{version}}",
+    "draftN": "Borrador {{n}}",
+    "approved": "Aprobado",
+    "draft": "Borrador",
+    "current": "Actual",
+    "noPdf": "Aprobado, aún sin PDF",
+    "facts_one": "{{template}} · {{count}} página · {{size}}",
+    "facts_other": "{{template}} · {{count}} páginas · {{size}}",
+    "made": "Hecho el {{date}}",
+    "started": "Empezado el {{date}}",
+    "neverDownloaded": "Aún no descargado",
+    "downloaded": "Descargado el {{date}}",
+    "viewPdf": "Ver PDF",
+    "download": "Descargar",
+    "review": "Revisar",
+    "opportunity": "Abrir la oferta",
+    "empty": {
+      "title": "Aún no hay CV",
+      "body": "Preselecciona una oferta, abre «Preparar» y haz el borrador del CV. Cuando lo apruebes, su PDF se guarda aquí.",
+      "action": "Ir al embudo"
+    },
+    "emptyFiltered": {
+      "title": "Nada por aquí",
+      "body": "Ningún CV coincide con este filtro."
+    },
+    "loading": "Cargando tus CV…",
+    "loadFailed": "No se han podido cargar tus CV.",
+    "viewer": {
+      "title": "{{company}} · v{{version}}"
     }
   }
 }

@@ -37,6 +37,8 @@ const MANY: ReadonlySet<AboutQuestion["kind"]> = new Set([
   "assumed",
   "skills",
   "skills_found",
+  "skills_few",
+  "languages",
   "results",
 ]);
 

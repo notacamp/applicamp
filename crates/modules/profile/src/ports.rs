@@ -1,6 +1,6 @@
 //! What the profile module needs from other modules, as ports the server
 //! wires (modules never import each other): reading a past employer's own
-//! website for "Tell me about you" (#43).
+//! website for "Tell me about you" (#43), and the person's own (#60).
 //!
 //! The server answers with the pipeline's company facts, so a past employer
 //! and a job's company are one mechanism and one cache. The wizard sees only
@@ -115,6 +115,33 @@ pub trait EmployerResearch: Send + Sync + 'static {
         company: &'a str,
         now: DateTime<Utc>,
     ) -> BoxFuture<'a, Result<Research>>;
+
+    /// The person's own website at `url` (the profile's link): its home page
+    /// and the pages it links to about them, on the same host and where its
+    /// robots.txt allows. Never a search, never another host, no model call.
+    /// An instance that cannot read sites reads nothing.
+    fn own_site<'a>(&'a self, _url: &'a str, _now: DateTime<Utc>) -> BoxFuture<'a, OwnSite> {
+        Box::pin(async { OwnSite::default() })
+    }
+}
+
+/// A person's own website, read.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct OwnSite {
+    /// The pages, the home page first.
+    pub pages: Vec<OwnPage>,
+    /// Why nothing was read (`robots_disallows`, `site_unreachable`,
+    /// `no_pages_readable`, `site_not_allowed`), when nothing was.
+    pub error: Option<&'static str>,
+}
+
+/// One page of it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OwnPage {
+    /// Where it was read.
+    pub url: String,
+    /// Its text.
+    pub text: String,
 }
 
 /// The port, if the instance has one: an extension of the router.

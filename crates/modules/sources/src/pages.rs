@@ -1,6 +1,8 @@
 //! Reading a company's own pages, for the facts a tailored CV is built on.
 //!
-//! One function, [`read_site`], and nothing else reaches the web for it:
+//! One function, [`read_site`] (and [`read_personal_site`], the same for a
+//! person's own website, following [`PERSONAL_TOPICS`]), and nothing else
+//! reaches the web for it:
 //!
 //! - the **posting page** itself (its own host, its own robots.txt),
 //! - the company's **home page**,
@@ -42,6 +44,21 @@ pub const TOPICS: [&str; 9] = [
     "team",
     "blog",
     "careers",
+];
+
+/// What a linked page of a person's own website must name, most wanted
+/// first.
+pub const PERSONAL_TOPICS: [&str; 10] = [
+    "about",
+    "projects",
+    "work",
+    "portfolio",
+    "experience",
+    "resume",
+    "cv",
+    "talks",
+    "writing",
+    "blog",
 ];
 
 /// Why a page of a site is read.
@@ -146,6 +163,27 @@ pub async fn read_site(
     posting: Option<&Url>,
     now: DateTime<Utc>,
 ) -> Result<SiteRead, Failure> {
+    read_site_on(reader, site, posting, now, &TOPICS).await
+}
+
+/// A person's own website, read like a company's ([`read_site`]): its home
+/// page and the pages it links to about the person ([`PERSONAL_TOPICS`]),
+/// where robots.txt allows, never another host.
+pub async fn read_personal_site(
+    reader: &Reader,
+    site: &Url,
+    now: DateTime<Utc>,
+) -> Result<SiteRead, Failure> {
+    read_site_on(reader, site, None, now, &PERSONAL_TOPICS).await
+}
+
+async fn read_site_on(
+    reader: &Reader,
+    site: &Url,
+    posting: Option<&Url>,
+    now: DateTime<Utc>,
+    topics: &[&str],
+) -> Result<SiteRead, Failure> {
     let mut rules = Rules::new(reader);
     let mut read = SiteRead::default();
 
@@ -175,7 +213,7 @@ pub async fn read_site(
     push(&mut read, home.url, &home.body, Kind::Home, now);
 
     let mut taken = 0;
-    for link in linked_pages(&html, &home_url) {
+    for link in linked_pages_on(&html, &home_url, topics) {
         if taken == MOST_LINKED {
             break;
         }
@@ -236,6 +274,11 @@ const NOT_PAGES: [&str; 14] = [
 /// or link text names a topic, most wanted topic first, then in the order
 /// the page lists them; each once, never the home page itself.
 pub fn linked_pages(html: &str, home: &Url) -> Vec<Url> {
+    linked_pages_on(html, home, &TOPICS)
+}
+
+/// The same pages as [`linked_pages`], naming one of `topics`.
+pub fn linked_pages_on(html: &str, home: &Url, topics: &[&str]) -> Vec<Url> {
     let mut found: Vec<(usize, usize, Url)> = Vec::new();
     for (order, caps) in ANCHOR.captures_iter(html).enumerate() {
         let href = caps
@@ -257,7 +300,7 @@ pub fn linked_pages(html: &str, home: &Url) -> Vec<Url> {
         if path == "/" || path == home.path() || NOT_PAGES.iter().any(|ext| path.ends_with(ext)) {
             continue;
         }
-        let rank = TOPICS
+        let rank = topics
             .iter()
             .position(|topic| path.contains(topic) || label.contains(topic));
         let Some(rank) = rank else {

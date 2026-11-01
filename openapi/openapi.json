@@ -4440,194 +4440,6 @@
         ]
       }
     },
-    "/api/v1/profile/drafts/{id}/discard": {
-      "post": {
-        "tags": [
-          "profile"
-        ],
-        "summary": "Throw a draft away.",
-        "description": "The profile is unchanged. Discarding twice is fine; a kept draft cannot\nbe discarded.",
-        "operationId": "profile.discard_draft",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "The draft.",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Discarded."
-          },
-          "401": {
-            "description": "`session_required`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "`not_found`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "`draft_not_ready`: already kept",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "session": []
-          }
-        ]
-      }
-    },
-    "/api/v1/profile/drafts/{id}/keep": {
-      "post": {
-        "tags": [
-          "profile"
-        ],
-        "summary": "Keep a draft.",
-        "description": "Writes it into the profile as a new profile version whose source is\n`answer`, and marks the question done. `items` may be edited first.\nRefused with 409 `profile_changed` when the profile changed since the\ndraft was made.",
-        "operationId": "profile.keep_draft",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "The draft.",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/KeepRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "The profile, now.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProfileView"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "`invalid_items`; `invalid_profile`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "`session_required`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "`not_found`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "`draft_not_ready`: already kept or discarded; `profile_changed`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "session": []
-          }
-        ]
-      }
-    },
-    "/api/v1/profile/grill": {
-      "get": {
-        "tags": [
-          "profile"
-        ],
-        "summary": "Every position with how far its interview is.",
-        "description": "Computed from the stored interviews; never calls the model.",
-        "operationId": "profile.grill_roles",
-        "responses": {
-          "200": {
-            "description": "The positions.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GrillList"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "`session_required`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "session": []
-          }
-        ]
-      }
-    },
     "/api/v1/profile/grill/proposals/{id}/drop": {
       "post": {
         "tags": [
@@ -4790,7 +4602,7 @@
         "tags": [
           "profile"
         ],
-        "summary": "The interview of one position: its turns, coverage, the facts waiting and\nthe question waiting for an answer. Never calls the model.",
+        "summary": "The facts waiting on one position, and how many are kept. Never calls the\nmodel.",
         "operationId": "profile.grill_role",
         "parameters": [
           {
@@ -4828,184 +4640,6 @@
           },
           "404": {
             "description": "`not_found`: no such position",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "session": []
-          }
-        ]
-      }
-    },
-    "/api/v1/profile/grill/{position}/answer": {
-      "post": {
-        "tags": [
-          "profile"
-        ],
-        "summary": "Answer the question waiting.",
-        "description": "**One model call** reads the answer: it returns the facts the answer\nstates (each with the person's exact words), what it covered and the next\nquestion, which pushes back when the answer was vague. A fact whose quote\nis not in the answer, or that says a number, name or tool neither the\nquote nor the profile says, is left out and counted in the turn's\n`dropped`. Nothing reaches the profile until a fact is kept.",
-        "operationId": "profile.grill_answer",
-        "parameters": [
-          {
-            "name": "position",
-            "in": "path",
-            "description": "The position's place in the profile's `work` list.",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "minimum": 0
-            }
-          },
-          {
-            "name": "locale",
-            "in": "query",
-            "description": "A language tag such as `pt-PT`; English when left out.",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GrillAnswerRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "The interview, after the answer.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GrillView"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "`invalid_answer`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "`session_required`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "`not_found`: no such position, or not started",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "`no_open_question`; `grill_changed`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "`grill_daily_cap`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "`ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "session": []
-          }
-        ]
-      }
-    },
-    "/api/v1/profile/grill/{position}/done": {
-      "post": {
-        "tags": [
-          "profile"
-        ],
-        "summary": "End the interview for now. No model call; the question waiting is put\naway, and starting again makes a new one. Facts waiting stay for their\n24 hours.",
-        "operationId": "profile.grill_done",
-        "parameters": [
-          {
-            "name": "position",
-            "in": "path",
-            "description": "The position's place in the profile's `work` list.",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "minimum": 0
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The interview.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GrillView"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "`session_required`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "`not_found`: no such position, or not started",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5075,194 +4709,6 @@
           },
           "409": {
             "description": "`profile_changed`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "session": []
-          }
-        ]
-      }
-    },
-    "/api/v1/profile/grill/{position}/skip": {
-      "post": {
-        "tags": [
-          "profile"
-        ],
-        "summary": "Skip the question waiting.",
-        "description": "Its area is left alone until the interview is started again, and the\nnext question is made: **one model call**, or none when nothing is left\nto ask.",
-        "operationId": "profile.grill_skip",
-        "parameters": [
-          {
-            "name": "position",
-            "in": "path",
-            "description": "The position's place in the profile's `work` list.",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "minimum": 0
-            }
-          },
-          {
-            "name": "locale",
-            "in": "query",
-            "description": "A language tag such as `pt-PT`; English when left out.",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The interview, after the skip.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GrillView"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "`session_required`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "`not_found`: no such position, or not started",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "`no_open_question`; `grill_changed`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "`grill_daily_cap`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "`ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "session": []
-          }
-        ]
-      }
-    },
-    "/api/v1/profile/grill/{position}/start": {
-      "post": {
-        "tags": [
-          "profile"
-        ],
-        "summary": "Start (or take up) the interview of a position.",
-        "description": "With a question waiting, that one is shown again and the model is not\ncalled. Otherwise this is **one model call** that makes the next question.\nAreas skipped before are asked about again.",
-        "operationId": "profile.grill_start",
-        "parameters": [
-          {
-            "name": "position",
-            "in": "path",
-            "description": "The position's place in the profile's `work` list.",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "minimum": 0
-            }
-          },
-          {
-            "name": "locale",
-            "in": "query",
-            "description": "A language tag such as `pt-PT`; English when left out.",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The interview, with its question.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GrillView"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "`session_required`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "`not_found`: no such position",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "`grill_daily_cap`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "`ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed`",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5556,239 +5002,6 @@
         ]
       }
     },
-    "/api/v1/profile/questions": {
-      "get": {
-        "tags": [
-          "profile"
-        ],
-        "summary": "The questions that would make the profile stronger.",
-        "description": "The first request for a profile and goals version starts the AI review in\nthe background (one model call) and answers 202 `running`; ask again in a\nmoment. The review is kept until the profile or goals change by any other\nway than the person's own kept answers. Without a model, or over a\nspending limit, the status says so (`unavailable`, `failed`) and the\nchecklist from `GET /api/v1/profile/strength` still works.",
-        "operationId": "profile.questions",
-        "responses": {
-          "200": {
-            "description": "The questions (or why there are none).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QuestionsView"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "The review is running.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QuestionsView"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "`session_required`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "session": []
-          }
-        ]
-      }
-    },
-    "/api/v1/profile/questions/review": {
-      "post": {
-        "tags": [
-          "profile"
-        ],
-        "summary": "Try the review again after it failed.",
-        "description": "Only a failed review is started again, and the spending limits still\napply: over one, it fails again at once without calling the model.",
-        "operationId": "profile.review_again",
-        "responses": {
-          "200": {
-            "description": "The questions (or why there are none).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QuestionsView"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "The review is running.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QuestionsView"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "`session_required`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "session": []
-          }
-        ]
-      }
-    },
-    "/api/v1/profile/questions/{id}/draft": {
-      "post": {
-        "tags": [
-          "profile"
-        ],
-        "summary": "Make a draft from an answer.",
-        "description": "One small model call. The draft may say only what the answer or the\nprofile says: a line with a number, a name or a tool that neither\ncontains is left out and counted in `dropped`. Nothing is saved until the\ndraft is kept. Asking again for the same question replaces the draft.",
-        "operationId": "profile.draft_answer",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "The question.",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DraftRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "description": "The draft.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DraftView"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "`invalid_answer`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "`session_required`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "`not_found`: no such open question",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "`ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "session": []
-          }
-        ]
-      }
-    },
-    "/api/v1/profile/questions/{id}/skip": {
-      "post": {
-        "tags": [
-          "profile"
-        ],
-        "summary": "Skip a question.",
-        "description": "It is not asked again for this version of the profile.",
-        "operationId": "profile.skip_question",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "The question.",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Skipped."
-          },
-          "401": {
-            "description": "`session_required`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "`not_found`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "session": []
-          }
-        ]
-      }
-    },
     "/api/v1/profile/skills/order": {
       "put": {
         "tags": [
@@ -5846,186 +5059,13 @@
         ]
       }
     },
-    "/api/v1/profile/skills/suggested": {
-      "get": {
-        "tags": [
-          "profile"
-        ],
-        "summary": "Skills found in the roles.",
-        "description": "Skills that the person's own position descriptions mention but their\nskills list does not, with the number of positions each is in. Each\nname is checked against the text of the positions (whole words), so\nnothing is suggested that the profile does not say. Uses the same\nreview as the questions; 202 while it runs.",
-        "operationId": "profile.suggested_skills",
-        "responses": {
-          "200": {
-            "description": "The skills.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SuggestedSkills"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "The review is running.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SuggestedSkills"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "`session_required`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "session": []
-          }
-        ]
-      }
-    },
-    "/api/v1/profile/skills/suggested/{name}/add": {
-      "post": {
-        "tags": [
-          "profile"
-        ],
-        "summary": "Add a suggested skill to the profile.",
-        "description": "It goes at the end of the skills, in the order the person adds them.",
-        "operationId": "profile.add_suggested_skill",
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "description": "The skill, as suggested.",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The skills still suggested.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SuggestedSkills"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "`invalid_profile`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "`session_required`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "`not_found`: not a suggestion",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "session": []
-          }
-        ]
-      }
-    },
-    "/api/v1/profile/skills/suggested/{name}/dismiss": {
-      "post": {
-        "tags": [
-          "profile"
-        ],
-        "summary": "Say a suggested skill is not theirs.",
-        "description": "It is not suggested again, whatever the profile says later.",
-        "operationId": "profile.dismiss_suggested_skill",
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "description": "The skill, as suggested.",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The skills still suggested.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SuggestedSkills"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "`session_required`",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "`not_found`: not a suggestion",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "session": []
-          }
-        ]
-      }
-    },
     "/api/v1/profile/strength": {
       "get": {
         "tags": [
           "profile"
         ],
         "summary": "The strength of the signed-in person's profile.",
-        "description": "Computed from the profile and goals, never by a model. Each part that is\nnot full says what to do about it. Reading it never starts a review.",
+        "description": "Computed from the profile and goals, never by a model. Each part that is\nnot full says what to do about it.",
         "operationId": "profile.strength",
         "responses": {
           "200": {
@@ -9515,30 +8555,6 @@
         },
         "additionalProperties": false
       },
-      "DraftKind": {
-        "type": "string",
-        "description": "What a draft is, and where keeping it writes.",
-        "enum": [
-          "highlights",
-          "label",
-          "summary",
-          "education",
-          "link"
-        ]
-      },
-      "DraftRequest": {
-        "type": "object",
-        "description": "The answer to turn into a draft.",
-        "required": [
-          "answer"
-        ],
-        "properties": {
-          "answer": {
-            "type": "string",
-            "description": "In the person's own words, 1 to 2000 characters."
-          }
-        }
-      },
       "DraftStatus": {
         "type": "string",
         "description": "The status of a draft.",
@@ -9547,62 +8563,6 @@
           "approved",
           "discarded"
         ]
-      },
-      "DraftView": {
-        "type": "object",
-        "description": "A draft, waiting to be kept, edited or discarded.",
-        "required": [
-          "id",
-          "question_id",
-          "kind",
-          "items",
-          "dropped",
-          "expires_at"
-        ],
-        "properties": {
-          "dropped": {
-            "type": "integer",
-            "format": "int32",
-            "description": "Lines left out because they said something the answer and the profile\ndo not (or did not fit).",
-            "minimum": 0
-          },
-          "education": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/Education",
-                "description": "The school, for `education`."
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "expires_at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "When the draft is deleted if it is not kept."
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "description": "The draft."
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "The lines of the draft: achievements, the headline, the summary, the\nlinks; for a school, one line saying it."
-          },
-          "kind": {
-            "$ref": "#/components/schemas/DraftKind",
-            "description": "What it is."
-          },
-          "question_id": {
-            "type": "string",
-            "description": "The question it answers."
-          }
-        }
       },
       "Education": {
         "type": "object",
@@ -10069,19 +9029,6 @@
           }
         }
       },
-      "GrillAnswerRequest": {
-        "type": "object",
-        "description": "The person's answer.",
-        "required": [
-          "text"
-        ],
-        "properties": {
-          "text": {
-            "type": "string",
-            "description": "In their own words, 1 to 2000 characters."
-          }
-        }
-      },
       "GrillAreaCoverage": {
         "type": "object",
         "description": "How well one area is covered.",
@@ -10097,36 +9044,6 @@
           "level": {
             "$ref": "#/components/schemas/CoverageLevel",
             "description": "How well."
-          }
-        }
-      },
-      "GrillList": {
-        "type": "object",
-        "description": "Every position with how far its interview is.",
-        "required": [
-          "roles",
-          "calls_today",
-          "daily_cap"
-        ],
-        "properties": {
-          "calls_today": {
-            "type": "integer",
-            "format": "int32",
-            "description": "Model calls made today by this account, of `daily_cap`.",
-            "minimum": 0
-          },
-          "daily_cap": {
-            "type": "integer",
-            "format": "int32",
-            "description": "The most model calls an account can make for Grill me in a UTC day.",
-            "minimum": 0
-          },
-          "roles": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/GrillRoleItem"
-            },
-            "description": "The positions, in the profile's order."
           }
         }
       },
@@ -10190,45 +9107,6 @@
               "null"
             ],
             "description": "`YYYY`, `YYYY-MM` or `YYYY-MM-DD`."
-          }
-        }
-      },
-      "GrillRoleItem": {
-        "type": "object",
-        "description": "One position in the list.",
-        "required": [
-          "position",
-          "role",
-          "status",
-          "covered",
-          "kept"
-        ],
-        "properties": {
-          "covered": {
-            "type": "integer",
-            "format": "int32",
-            "description": "Areas at `ok`, of 7.",
-            "minimum": 0
-          },
-          "kept": {
-            "type": "integer",
-            "format": "int32",
-            "description": "Facts kept on it.",
-            "minimum": 0
-          },
-          "position": {
-            "type": "integer",
-            "format": "int32",
-            "description": "The position's place in the profile's `work` list.",
-            "minimum": 0
-          },
-          "role": {
-            "$ref": "#/components/schemas/GrillRole",
-            "description": "The position."
-          },
-          "status": {
-            "$ref": "#/components/schemas/GrillStatus",
-            "description": "Where its interview is."
           }
         }
       },
@@ -10298,7 +9176,7 @@
       },
       "GrillView": {
         "type": "object",
-        "description": "The interview of one position.",
+        "description": "The facts waiting on one position, and how many are kept. The interview\nfields (`status`, `coverage`, `turns`, `question`, `calls_today`,\n`daily_cap`) are what is left of Grill me's interview (removed in #49):\nalways empty or zero, kept so the client's types stay as they are.",
         "required": [
           "position",
           "role",
@@ -10572,33 +9450,6 @@
               "null"
             ],
             "description": "The fact, fixed. Left out, the fact is kept as it is. Whatever is\nwritten must still be said by the quote or the profile; the quote\nitself never changes."
-          }
-        }
-      },
-      "KeepRequest": {
-        "type": "object",
-        "description": "What the person keeps: the draft as it is, or edited.",
-        "properties": {
-          "education": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/Education",
-                "description": "The school, possibly edited, for an `education` draft."
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "items": {
-            "type": [
-              "array",
-              "null"
-            ],
-            "items": {
-              "type": "string"
-            },
-            "description": "The lines, possibly edited; the draft's own when left out. Edited\nlines are the person's own words and skip the source check."
           }
         }
       },
@@ -11950,63 +10801,6 @@
         },
         "additionalProperties": false
       },
-      "Question": {
-        "type": "object",
-        "description": "A question about a gap in the profile.",
-        "required": [
-          "id",
-          "section",
-          "question",
-          "why",
-          "expected_gain"
-        ],
-        "properties": {
-          "context": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/RoleContext",
-                "description": "The position it is about, for `work`."
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "expected_gain": {
-            "type": "integer",
-            "format": "int32",
-            "description": "Points the profile strength would gain if it were answered.",
-            "minimum": 0
-          },
-          "id": {
-            "type": "string",
-            "description": "The question's id."
-          },
-          "question": {
-            "type": "string",
-            "description": "The question, at most 160 characters."
-          },
-          "section": {
-            "$ref": "#/components/schemas/QuestionSection",
-            "description": "What it is about."
-          },
-          "why": {
-            "type": "string",
-            "description": "Why it matters, at most 140 characters."
-          }
-        }
-      },
-      "QuestionSection": {
-        "type": "string",
-        "description": "What a question is about, and where its answer goes.",
-        "enum": [
-          "work",
-          "basics.label",
-          "basics.summary",
-          "education",
-          "links"
-        ]
-      },
       "QuestionState": {
         "type": "string",
         "description": "Where a question is.",
@@ -12016,55 +10810,6 @@
           "skipped",
           "dont_have"
         ]
-      },
-      "QuestionsView": {
-        "type": "object",
-        "description": "The questions that would fill the profile's gaps.",
-        "required": [
-          "status",
-          "score",
-          "total",
-          "answered",
-          "questions"
-        ],
-        "properties": {
-          "answered": {
-            "type": "integer",
-            "format": "int32",
-            "description": "Questions kept or skipped so far.",
-            "minimum": 0
-          },
-          "questions": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Question"
-            },
-            "description": "The questions still open, the most useful first."
-          },
-          "reason": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Why it is unavailable or failed: `ai_unavailable`,\n`ai_budget_reached`, `ai_daily_limit_reached`, `ai_failed`; none when\nthere is simply no profile."
-          },
-          "score": {
-            "type": "integer",
-            "format": "int32",
-            "description": "The profile strength now.",
-            "minimum": 0
-          },
-          "status": {
-            "$ref": "#/components/schemas/ReviewStatus",
-            "description": "Where the review is."
-          },
-          "total": {
-            "type": "integer",
-            "format": "int32",
-            "description": "Questions in the review.",
-            "minimum": 0
-          }
-        }
       },
       "RankingBasis": {
         "type": "string",
@@ -12282,16 +11027,6 @@
           }
         }
       },
-      "ReviewStatus": {
-        "type": "string",
-        "description": "Where the review is.",
-        "enum": [
-          "running",
-          "ready",
-          "unavailable",
-          "failed"
-        ]
-      },
       "RobotsReport": {
         "type": "object",
         "description": "What a board's robots.txt says to us.",
@@ -12358,40 +11093,6 @@
           },
           "pattern": {
             "type": "string"
-          }
-        }
-      },
-      "RoleContext": {
-        "type": "object",
-        "description": "The position a question is about.",
-        "properties": {
-          "company": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Its company."
-          },
-          "end_date": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "As `start_date`; none while it is their current position."
-          },
-          "position": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Its title."
-          },
-          "start_date": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "`YYYY`, `YYYY-MM` or `YYYY-MM-DD`."
           }
         }
       },
@@ -13504,7 +12205,7 @@
               "string",
               "null"
             ],
-            "description": "What to do about it, when it is not full: `question:<id>` (an open\nquestion about it), `skills`, `import`, `goals`, or\n`edit:<section>` (`basics`, `work`, `education`, `languages`)."
+            "description": "What to do about it, when it is not full: `skills`, `import`,\n`goals`, or `edit:<section>` (`basics`, `work`, `education`,\n`languages`)."
           },
           "earned": {
             "type": "integer",
@@ -13586,7 +12287,7 @@
               "null"
             ],
             "format": "int32",
-            "description": "Open questions of the review for the current profile; none when\nthere is no review (yet).",
+            "description": "Always none: the review questions were removed (#49). Kept so the\nclient's types stay as they are.",
             "minimum": 0
           },
           "score": {
@@ -13605,56 +12306,8 @@
               "null"
             ],
             "format": "int32",
-            "description": "Skills the positions mention that the profile does not list; none\nwhen there is no review (yet).",
+            "description": "Always none: the found skills were removed (#49). Kept so the\nclient's types stay as they are.",
             "minimum": 0
-          }
-        }
-      },
-      "SuggestedSkill": {
-        "type": "object",
-        "description": "A skill the person's positions mention and their skills list does not.",
-        "required": [
-          "name",
-          "roles"
-        ],
-        "properties": {
-          "name": {
-            "type": "string",
-            "description": "The skill, as the positions write it."
-          },
-          "roles": {
-            "type": "integer",
-            "format": "int32",
-            "description": "In how many positions it appears.",
-            "minimum": 0
-          }
-        }
-      },
-      "SuggestedSkills": {
-        "type": "object",
-        "description": "Skills found in the person's roles.",
-        "required": [
-          "status",
-          "skills"
-        ],
-        "properties": {
-          "reason": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Why there are none: `ai_unavailable`, `ai_budget_reached`,\n`ai_daily_limit_reached` or `ai_failed`."
-          },
-          "skills": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SuggestedSkill"
-            },
-            "description": "The skills, the most roles first."
-          },
-          "status": {
-            "$ref": "#/components/schemas/ReviewStatus",
-            "description": "Where the review is (the same review as the questions')."
           }
         }
       },

@@ -109,19 +109,19 @@ the person saves.
 - **THEN** the fact is its plain claim ("Led a small team at Example Co (3 to 6 people)", shown before saving, checked against the sentence's own text and falling back to the sentence without "I assume"), on that position, marked as a confirmed assumption with the reason it was assumed, shown as such on the profile, and used as evidence like any other fact
 
 ### Requirement: An answer about a job becomes facts on a position
-An answer to a question that comes from a job SHALL be read by Grill me's own
-pipeline with one small model call and the same checks: a fact's quote SHALL be
+An answer to a question that comes from a job SHALL be read with one small model
+call and checks: a fact's quote SHALL be
 a verbatim part of the answer, and its text SHALL say no number, name or tool
 that neither the quote nor the profile says; what fails SHALL be left out and
 counted. The question SHALL be context for the model, never evidence. The
 facts SHALL wait on the position the question names, or on the most recent
 position when it names none (and the person SHALL be told), and SHALL be kept,
-fixed or dropped with Grill me's own controls. Nothing SHALL reach the profile
+fixed or dropped with the facts' own controls. Nothing SHALL reach the profile
 until the person keeps it.
 
 #### Scenario: A question that names no position
 - **WHEN** the person answers a question that is about no particular position
-- **THEN** the facts wait on their most recent position, the page says so, and Keep, Fix and Drop work as in Grill me
+- **THEN** the facts wait on their most recent position, the page says so, and Keep, Fix and Drop work
 
 #### Scenario: More than the answer says
 - **WHEN** the model adds a number the answer never wrote
@@ -130,8 +130,8 @@ until the person keeps it.
 ### Requirement: A CV can add a fact or a skill in the person's own words
 When the person says a line of a tailored CV is true, the profile SHALL keep
 their words as a fact on the position the line is about, with those words as its
-quote and an area (`results` by default), as a new profile version, as Grill me's
-Keep does. The position SHALL still be the one the CV was made from, else it is
+quote and an area (`results` by default), as a new profile version, as keeping a
+proposed fact does. The position SHALL still be the one the CV was made from, else it is
 refused (`profile_changed`). Adding a skill SHALL add it at the end of the skills
 unless the profile already lists it under another spelling, and SHALL forget an
 earlier "not mine" for it.
@@ -271,8 +271,8 @@ The page SHALL show every pending line grouped as Summary, Headline, Skills,
 each position, Background and Goals, each marked "You told me" or "Confirmed",
 with Edit (checked again against their words) and Remove. Save SHALL write all
 changes and all confirmed assumptions in one profile write (and one goals write
-when the goals changed), adding one profile version so the profile strength and
-the gap review refresh. An assumption the person did not confirm SHALL NOT be
+when the goals changed), adding one profile version so the profile strength
+refreshes. An assumption the person did not confirm SHALL NOT be
 saved. Save SHALL wait while a flag is unsettled. Pending state SHALL last seven
 days.
 
@@ -441,3 +441,23 @@ The app SHALL show how strong the profile is and what is missing, and lead the p
 #### Scenario: The way in
 - **WHEN** the person opens Profile & goals, or follows Today's profile card, or chooses a part of the checklist that needs more from them
 - **THEN** they arrive at Tell me about you
+
+### Requirement: The retired Improve, draft, suggested-skills and Grill me interview endpoints are gone
+The API SHALL NOT offer the AI profile review and its questions
+(`/api/v1/profile/questions*`), drafts made from an answer
+(`/api/v1/profile/drafts/*`), suggested skills (`/api/v1/profile/skills/suggested*`)
+or Grill me's interview (`GET /api/v1/profile/grill` and
+`/api/v1/profile/grill/{position}/start|answer|skip|done`), and no background job
+SHALL run a profile review. Their tables SHALL NOT exist. What is left of Grill me is
+the facts taken from an answer about a job and their controls
+(`GET /api/v1/profile/grill/{position}`, `POST /api/v1/profile/grill/proposals/{id}/keep|drop`,
+`POST /api/v1/profile/grill/{position}/keep-all`), and the order of the skills
+(`PUT /api/v1/profile/skills/order`).
+
+#### Scenario: A retired endpoint
+- **WHEN** a request is made to a retired endpoint
+- **THEN** it is not found, and nothing is read, written or asked of a model
+
+#### Scenario: The facts from a job's question survive
+- **WHEN** the person answers a question that comes from a job
+- **THEN** the facts wait on the position and can be kept, fixed or dropped, as before

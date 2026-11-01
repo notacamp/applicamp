@@ -1,15 +1,13 @@
-//! Grill me: a deep interview about one position at a time.
+//! Grill me's proposals: the facts taken from an answer about a job, waiting
+//! for the person to keep, fix or drop them.
 //!
-//! The model asks one question, pushes back on vague answers, asks for
-//! numbers and how the person knows them, and turns each answer into short
-//! **facts** with the person's exact words. A fact waits as a *proposal* until
-//! the person keeps it (as it is, or fixed), then it lives in the profile
-//! document on the position (`work[].facts`), so the draft source check and
-//! every later CV treat it as evidence. Nothing is saved without a click.
-//!
-//! One model call per start, answer or skip, no background calls, a hard cap
-//! of [`DAILY_CAP`] calls per account per UTC day on top of the AI budget.
-//! What the model says is trusted only as far as [`judge`] allows.
+//! The interview itself (a deep interview about one position at a time, one
+//! model call per question) was retired from the client in #44 and removed
+//! in #49. What stays is how a fact becomes part of a position: a tailored
+//! CV's question is answered in [`about`], which stores the facts here as
+//! proposals; keeping one writes it on the position in the profile document
+//! (`work[].facts`), so the draft source check and every later CV treat it as
+//! evidence. Nothing reaches the profile without a click.
 
 pub mod about;
 pub mod judge;
@@ -17,44 +15,28 @@ pub mod prompt;
 #[cfg(test)]
 mod tests;
 
-use applicamp_ai::{Caller, ChatRequest, Gateway, Message, ResponseFormat};
 use applicamp_kernel::{AppState, Error, Problem, Result, auth::SignedIn, jobs};
 use axum::{
-    Extension, Json,
-    extract::{Path, Query, State, rejection::JsonRejection},
+    Json,
+    extract::{Path, State, rejection::JsonRejection},
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, PgPool, Row as _};
-use utoipa::{IntoParams, ToSchema};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
-use self::{
-    judge::{Coverage, CoverageLevel, Input, NewFact, Outcome, Raw},
-    prompt::{Context, Event, INSTRUCTIONS},
-};
+use self::judge::{Coverage, CoverageLevel, NewFact};
 use crate::{
     features::{
-        completion::{Current, carry_forward, check::Evidence, current, write_profile},
-        imports::{Ai, DRAFT_LIFETIME, ExpireImports, source_check::squash},
+        completion::{Current, check::Evidence, current, write_profile},
+        imports::{DRAFT_LIFETIME, ExpireImports, source_check::squash},
     },
     schema::{Area, Profile, ProfileFact, Work},
 };
 
-/// Hard cap on model calls per account per UTC day.
-pub const DAILY_CAP: i64 = 150;
 /// Longest answer, in characters.
 pub const MAX_ANSWER: usize = 2_000;
-/// Answer budgets in tokens: the first attempt, and the one retry after a
-/// cut-off (a reasoning model thinks first, and thinking counts).
-const BUDGETS: [u32; 2] = [4_000, 8_000];
-/// Most turns a view carries.
-const MAX_TURNS_SHOWN: i64 = 400;
-
-/// Whether `calls` already made today leave no room for another.
-pub const fn over_cap(calls: i64) -> bool {
-    calls >= DAILY_CAP
-}
 
 // ---- views ----------------------------------------------------------------
 
@@ -68,25 +50,6 @@ pub enum GrillTurnKind {
     Answer,
     /// A short marker: `skipped` or `done`.
     Note,
-}
-
-impl GrillTurnKind {
-    const fn as_str(self) -> &'static str {
-        match self {
-            Self::Question => "question",
-            Self::Answer => "answer",
-            Self::Note => "note",
-        }
-    }
-
-    fn parse(raw: &str) -> Option<Self> {
-        match raw {
-            "question" => Some(Self::Question),
-            "answer" => Some(Self::Answer),
-            "note" => Some(Self::Note),
-            _ => None,
-        }
-    }
 }
 
 /// One turn of the interview.
@@ -118,16 +81,6 @@ pub enum GrillStatus {
     InProgress,
     /// All seven areas are covered.
     Covered,
-}
-
-fn status_of(started: bool, covered: u8) -> GrillStatus {
-    if usize::from(covered) == Area::ALL.len() {
-        GrillStatus::Covered
-    } else if started {
-        GrillStatus::InProgress
-    } else {
-        GrillStatus::NotStarted
-    }
 }
 
 /// How well one area is covered.
@@ -214,7 +167,10 @@ fn role_summary(work: &Work) -> GrillRole {
     }
 }
 
-/// The interview of one position.
+/// The facts waiting on one position, and how many are kept. The interview
+/// fields (`status`, `coverage`, `turns`, `question`, `calls_today`,
+/// `daily_cap`) are what is left of Grill me's interview (removed in #49):
+/// always empty or zero, kept so the client's types stay as they are.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct GrillView {
     /// The position's place in the profile's `work` list.
@@ -243,47 +199,6 @@ pub struct GrillView {
     pub daily_cap: u32,
 }
 
-/// One position in the list.
-#[derive(Debug, Clone, Serialize, ToSchema)]
-pub struct GrillRoleItem {
-    /// The position's place in the profile's `work` list.
-    pub position: u32,
-    /// The position.
-    pub role: GrillRole,
-    /// Where its interview is.
-    pub status: GrillStatus,
-    /// Areas at `ok`, of 7.
-    pub covered: u8,
-    /// Facts kept on it.
-    pub kept: u32,
-}
-
-/// Every position with how far its interview is.
-#[derive(Debug, Clone, Serialize, ToSchema)]
-pub struct GrillList {
-    /// The positions, in the profile's order.
-    pub roles: Vec<GrillRoleItem>,
-    /// Model calls made today by this account, of `daily_cap`.
-    pub calls_today: u32,
-    /// The most model calls an account can make for Grill me in a UTC day.
-    pub daily_cap: u32,
-}
-
-/// The language of the questions, as the client's.
-#[derive(Debug, Deserialize, IntoParams)]
-#[into_params(parameter_in = Query)]
-pub struct LanguageQuery {
-    /// A language tag such as `pt-PT`; English when left out.
-    locale: Option<String>,
-}
-
-/// The person's answer.
-#[derive(Debug, Clone, Deserialize, ToSchema)]
-pub struct GrillAnswerRequest {
-    /// In their own words, 1 to 2000 characters.
-    pub text: String,
-}
-
 /// What the person keeps.
 #[derive(Debug, Clone, Default, Deserialize, ToSchema)]
 pub struct KeepFactRequest {
@@ -309,13 +224,11 @@ pub(crate) fn role_key(work: &Work) -> String {
 struct Session {
     id: Uuid,
     role_key: String,
-    coverage: Coverage,
-    skipped: Vec<Area>,
 }
 
 async fn session_of(db: &PgPool, account: Uuid, position: i32) -> Result<Option<Session>> {
     let row = sqlx::query(
-        "SELECT id, role_key, coverage, skipped FROM profile.grill_sessions
+        "SELECT id, role_key FROM profile.grill_sessions
           WHERE account_id = $1 AND position = $2",
     )
     .bind(account)
@@ -323,13 +236,9 @@ async fn session_of(db: &PgPool, account: Uuid, position: i32) -> Result<Option<
     .fetch_optional(db)
     .await?;
     row.map(|row| {
-        let coverage: sqlx::types::Json<Coverage> = row.try_get("coverage")?;
-        let skipped: sqlx::types::Json<Vec<Area>> = row.try_get("skipped")?;
         Ok(Session {
             id: row.try_get("id")?,
             role_key: row.try_get("role_key")?,
-            coverage: coverage.0,
-            skipped: skipped.0,
         })
     })
     .transpose()
@@ -346,35 +255,6 @@ async fn session_for(
     Ok(session_of(db, account, index)
         .await?
         .filter(|s| s.role_key == role_key(work)))
-}
-
-async fn turns_of(db: &PgPool, session: Uuid) -> Result<Vec<GrillTurn>> {
-    // The last turns, in order.
-    let rows = sqlx::query(
-        "SELECT seq, kind, text, push, area, dropped FROM (
-            SELECT seq, kind, text, push, area, dropped FROM profile.grill_turns
-             WHERE session_id = $1 ORDER BY seq DESC LIMIT $2
-         ) latest ORDER BY seq",
-    )
-    .bind(session)
-    .bind(MAX_TURNS_SHOWN)
-    .fetch_all(db)
-    .await?;
-    rows.into_iter()
-        .map(|row| {
-            let kind: String = row.try_get("kind")?;
-            let area: Option<String> = row.try_get("area")?;
-            Ok(GrillTurn {
-                seq: row.try_get("seq")?,
-                kind: GrillTurnKind::parse(&kind)
-                    .ok_or_else(|| Error::internal("an unknown turn kind"))?,
-                text: row.try_get("text")?,
-                push: row.try_get("push")?,
-                area: area.as_deref().and_then(Area::parse),
-                dropped: row.try_get("dropped")?,
-            })
-        })
-        .collect()
 }
 
 async fn proposals_of(db: &PgPool, session: Uuid, now: DateTime<Utc>) -> Result<Vec<FactProposal>> {
@@ -405,34 +285,6 @@ async fn proposals_of(db: &PgPool, session: Uuid, now: DateTime<Utc>) -> Result<
         .collect()
 }
 
-/// Model calls `account` made since the start of the UTC day.
-async fn calls_today(db: &PgPool, account: Uuid, now: DateTime<Utc>) -> Result<i64> {
-    Ok(sqlx::query_scalar(
-        "SELECT count(*) FROM profile.grill_turns
-          WHERE account_id = $1 AND ai_call AND created_at >= $2",
-    )
-    .bind(account)
-    .bind(applicamp_ai::usage::day_start(now))
-    .fetch_one(db)
-    .await?)
-}
-
-/// Refuse a call that would be over the daily cap.
-async fn ensure_room(db: &PgPool, account: Uuid, now: DateTime<Utc>) -> Result<i64> {
-    let calls = calls_today(db, account, now).await?;
-    if over_cap(calls) {
-        return Err(Error::TooManyRequests(
-            "grill_daily_cap",
-            format!("Grill me is limited to {DAILY_CAP} questions a day. It continues tomorrow."),
-        ));
-    }
-    Ok(calls)
-}
-
-fn counted(n: i64) -> u32 {
-    u32::try_from(n).unwrap_or(u32::MAX)
-}
-
 fn coverage_view(coverage: &Coverage) -> Vec<GrillAreaCoverage> {
     Area::ALL
         .iter()
@@ -443,18 +295,6 @@ fn coverage_view(coverage: &Coverage) -> Vec<GrillAreaCoverage> {
         .collect()
 }
 
-/// The open question: the last turn, when it is a question.
-fn open_question(turns: &[GrillTurn]) -> Option<GrillQuestion> {
-    turns
-        .last()
-        .filter(|t| t.kind == GrillTurnKind::Question)
-        .map(|t| GrillQuestion {
-            text: t.text.clone(),
-            area: t.area,
-            push: t.push,
-        })
-}
-
 async fn view_of(
     state: &AppState,
     account: Uuid,
@@ -462,29 +302,23 @@ async fn view_of(
     position: usize,
 ) -> Result<GrillView> {
     let work = current.profile.work.get(position).ok_or(Error::NotFound)?;
-    let now = state.clock.now();
     let session = session_for(&state.db, account, position, work).await?;
-    let (coverage, turns, proposals) = match &session {
-        Some(s) => (
-            s.coverage.clone(),
-            turns_of(&state.db, s.id).await?,
-            proposals_of(&state.db, s.id, now).await?,
-        ),
-        None => (Coverage::default(), Vec::new(), Vec::new()),
+    let proposals = match &session {
+        Some(s) => proposals_of(&state.db, s.id, state.clock.now()).await?,
+        None => Vec::new(),
     };
-    let covered = coverage.ok_count();
     Ok(GrillView {
         position: u32::try_from(position).map_err(Error::internal)?,
         role: role_summary(work),
-        status: status_of(!turns.is_empty(), covered),
-        coverage: coverage_view(&coverage),
-        covered,
-        question: open_question(&turns),
-        turns,
+        status: GrillStatus::NotStarted,
+        coverage: coverage_view(&Coverage::default()),
+        covered: 0,
+        turns: Vec::new(),
+        question: None,
         proposals,
-        kept: counted(i64::try_from(work.facts.len()).unwrap_or(i64::MAX)),
-        calls_today: counted(calls_today(&state.db, account, now).await?),
-        daily_cap: counted(DAILY_CAP),
+        kept: u32::try_from(work.facts.len()).unwrap_or(u32::MAX),
+        calls_today: 0,
+        daily_cap: 0,
     })
 }
 
@@ -498,65 +332,6 @@ async fn load(state: &AppState, account: Uuid, position: u32) -> Result<(Current
     Ok((current, index))
 }
 
-fn gateway(ai: &Ai) -> Result<&Gateway> {
-    match (&ai.0, ai.can_structure()) {
-        (Some(gateway), true) => Ok(gateway),
-        _ => Err(Error::Unavailable(applicamp_ai::AI_UNAVAILABLE)),
-    }
-}
-
-/// Ask the interviewer: one call, a second only after a cut-off. A spending
-/// limit ends the attempt at once; nothing retries.
-async fn ask(
-    state: &AppState,
-    gateway: &Gateway,
-    account: Uuid,
-    context: &Context<'_>,
-) -> Result<Raw> {
-    let caller = Caller {
-        db: &state.db,
-        account,
-        now: state.clock.now(),
-    };
-    let mut last = Error::Unavailable(applicamp_ai::AI_FAILED);
-    for max_tokens in BUDGETS {
-        let request = ChatRequest {
-            temperature: Some(0.0),
-            max_tokens: Some(max_tokens),
-            response_format: Some(ResponseFormat::json_schema(
-                "profile_grill",
-                prompt::schema(),
-            )),
-            ..ChatRequest::new(vec![
-                Message::system(INSTRUCTIONS),
-                Message::user(prompt::user_message(context)),
-            ])
-        };
-        let reply = gateway.complete(caller, request).await?;
-        if reply.finish_reason.as_deref() == Some("length") {
-            tracing::warn!(max_tokens, "a grill answer was cut off");
-            continue;
-        }
-        match reply.json::<Raw>() {
-            Ok(raw) => return Ok(raw),
-            Err(error) => {
-                tracing::warn!(%error, "a grill answer was unusable");
-                last = Error::from(error);
-            }
-        }
-    }
-    Err(last)
-}
-
-/// The facts still waiting for the person, as the model is shown them.
-fn ready_texts(proposals: &[FactProposal]) -> Vec<(Area, String)> {
-    proposals
-        .iter()
-        .filter(|p| p.status == FactProposalStatus::Ready)
-        .map(|p| (p.area, p.text.clone()))
-        .collect()
-}
-
 /// Facts kept, waiting or dropped, squashed: not proposed again.
 fn known_facts(work: &Work, waiting: &[FactProposal]) -> Vec<String> {
     work.facts
@@ -564,66 +339,6 @@ fn known_facts(work: &Work, waiting: &[FactProposal]) -> Vec<String> {
         .map(|f| squash(&f.text))
         .chain(waiting.iter().map(|p| squash(&p.text)))
         .collect()
-}
-
-/// What `turns` last said: its last sequence number.
-fn last_seq(turns: &[GrillTurn]) -> i32 {
-    turns.last().map_or(0, |t| t.seq)
-}
-
-#[allow(clippy::too_many_arguments)]
-async fn insert_turn(
-    tx: &mut PgConnection,
-    account: Uuid,
-    session: Uuid,
-    seq: i32,
-    kind: GrillTurnKind,
-    text: &str,
-    push: bool,
-    area: Option<Area>,
-    dropped: u32,
-    ai_call: bool,
-    now: DateTime<Utc>,
-) -> Result<()> {
-    sqlx::query(
-        "INSERT INTO profile.grill_turns
-            (session_id, seq, account_id, kind, text, push, area, dropped, ai_call, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
-    )
-    .bind(session)
-    .bind(seq)
-    .bind(account)
-    .bind(kind.as_str())
-    .bind(text)
-    .bind(push)
-    .bind(area.map(Area::as_str))
-    .bind(i32::try_from(dropped).unwrap_or(i32::MAX))
-    .bind(ai_call)
-    .bind(now)
-    .execute(&mut *tx)
-    .await?;
-    Ok(())
-}
-
-/// Lock the session and say where its turns end now.
-async fn lock_and_last_seq(tx: &mut PgConnection, session: Uuid) -> Result<i32> {
-    sqlx::query("SELECT 1 FROM profile.grill_sessions WHERE id = $1 FOR UPDATE")
-        .bind(session)
-        .execute(&mut *tx)
-        .await?;
-    Ok(sqlx::query_scalar(
-        "SELECT coalesce(max(seq), 0) FROM profile.grill_turns WHERE session_id = $1",
-    )
-    .bind(session)
-    .fetch_one(&mut *tx)
-    .await?)
-}
-
-fn changed() -> Error {
-    Error::Conflict(
-        "grill_changed",
-        "This interview changed while the question was being asked. Look again.".to_owned(),
-    )
 }
 
 async fn store_proposals(
@@ -677,85 +392,8 @@ fn position_index(position: usize) -> Result<i32> {
     i32::try_from(position).map_err(Error::internal)
 }
 
-// ---- endpoints ------------------------------------------------------------
-
-/// Every position with how far its interview is.
-///
-/// Computed from the stored interviews; never calls the model.
-#[utoipa::path(
-    get,
-    path = "/api/v1/profile/grill",
-    tag = "profile",
-    operation_id = "profile.grill_roles",
-    security(("session" = [])),
-    responses(
-        (status = 200, description = "The positions.", body = GrillList),
-        (status = 401, description = "`session_required`", body = Problem,
-            content_type = "application/problem+json"),
-    ),
-)]
-pub async fn list(
-    State(state): State<AppState>,
-    SignedIn(principal): SignedIn,
-) -> Result<Json<GrillList>> {
-    let account = principal.account_id;
-    let now = state.clock.now();
-    let Some(current) = current(&state.db, account).await? else {
-        return Ok(Json(GrillList {
-            roles: Vec::new(),
-            calls_today: counted(calls_today(&state.db, account, now).await?),
-            daily_cap: counted(DAILY_CAP),
-        }));
-    };
-    let rows = sqlx::query(
-        "SELECT s.position, s.role_key, s.coverage,
-                (SELECT count(*) FROM profile.grill_turns t WHERE t.session_id = s.id) AS turns
-           FROM profile.grill_sessions s WHERE s.account_id = $1",
-    )
-    .bind(account)
-    .fetch_all(&state.db)
-    .await?;
-    let mut sessions: std::collections::HashMap<i32, (String, Coverage, i64)> = rows
-        .into_iter()
-        .map(|row| {
-            let coverage: sqlx::types::Json<Coverage> = row.try_get("coverage")?;
-            Ok((
-                row.try_get("position")?,
-                (row.try_get("role_key")?, coverage.0, row.try_get("turns")?),
-            ))
-        })
-        .collect::<Result<_>>()?;
-    let roles = current
-        .profile
-        .work
-        .iter()
-        .enumerate()
-        .map(|(index, work)| {
-            let session = i32::try_from(index)
-                .ok()
-                .and_then(|i| sessions.remove(&i))
-                .filter(|(key, ..)| *key == role_key(work));
-            let (covered, started) = session.map_or((0, false), |(_, coverage, turns)| {
-                (coverage.ok_count(), turns > 0)
-            });
-            Ok(GrillRoleItem {
-                position: u32::try_from(index).map_err(Error::internal)?,
-                role: role_summary(work),
-                status: status_of(started, covered),
-                covered,
-                kept: counted(i64::try_from(work.facts.len()).unwrap_or(i64::MAX)),
-            })
-        })
-        .collect::<Result<Vec<_>>>()?;
-    Ok(Json(GrillList {
-        roles,
-        calls_today: counted(calls_today(&state.db, account, now).await?),
-        daily_cap: counted(DAILY_CAP),
-    }))
-}
-
-/// The interview of one position: its turns, coverage, the facts waiting and
-/// the question waiting for an answer. Never calls the model.
+/// The facts waiting on one position, and how many are kept. Never calls the
+/// model.
 #[utoipa::path(
     get,
     path = "/api/v1/profile/grill/{position}",
@@ -778,528 +416,6 @@ pub async fn get(
 ) -> Result<Json<GrillView>> {
     let account = principal.account_id;
     let (current, index) = load(&state, account, position).await?;
-    Ok(Json(view_of(&state, account, &current, index).await?))
-}
-
-/// Start (or take up) the interview of a position.
-///
-/// With a question waiting, that one is shown again and the model is not
-/// called. Otherwise this is **one model call** that makes the next question.
-/// Areas skipped before are asked about again.
-#[utoipa::path(
-    post,
-    path = "/api/v1/profile/grill/{position}/start",
-    tag = "profile",
-    operation_id = "profile.grill_start",
-    security(("session" = [])),
-    params(("position" = u32, Path, description = "The position's place in the profile's `work` list."),
-        LanguageQuery),
-    responses(
-        (status = 200, description = "The interview, with its question.", body = GrillView),
-        (status = 401, description = "`session_required`", body = Problem,
-            content_type = "application/problem+json"),
-        (status = 404, description = "`not_found`: no such position", body = Problem,
-            content_type = "application/problem+json"),
-        (status = 429, description = "`grill_daily_cap`", body = Problem,
-            content_type = "application/problem+json"),
-        (status = 503, description = "`ai_unavailable`; `ai_daily_limit_reached`; \
-            `ai_budget_reached`; `ai_failed`", body = Problem,
-            content_type = "application/problem+json"),
-    ),
-)]
-pub async fn start(
-    State(state): State<AppState>,
-    SignedIn(principal): SignedIn,
-    Extension(ai): Extension<Ai>,
-    Path(position): Path<u32>,
-    Query(query): Query<LanguageQuery>,
-) -> Result<Json<GrillView>> {
-    let account = principal.account_id;
-    let (current, index) = load(&state, account, position).await?;
-    let work = &current.profile.work[index];
-    let db_position = position_index(index)?;
-
-    // A session made for another position at this place goes.
-    if let Some(stale) = session_of(&state.db, account, db_position)
-        .await?
-        .filter(|s| s.role_key != role_key(work))
-    {
-        sqlx::query("DELETE FROM profile.grill_sessions WHERE id = $1")
-            .bind(stale.id)
-            .execute(&state.db)
-            .await?;
-    }
-    let session = session_for(&state.db, account, index, work).await?;
-    let turns = match &session {
-        Some(s) => turns_of(&state.db, s.id).await?,
-        None => Vec::new(),
-    };
-    let covered = session.as_ref().map_or(0, |s| s.coverage.ok_count());
-    if open_question(&turns).is_some() || usize::from(covered) == Area::ALL.len() {
-        return Ok(Json(view_of(&state, account, &current, index).await?));
-    }
-
-    let gateway = gateway(&ai)?;
-    let now = state.clock.now();
-    ensure_room(&state.db, account, now).await?;
-    let coverage = session
-        .as_ref()
-        .map(|s| s.coverage.clone())
-        .unwrap_or_default();
-    let waiting = match &session {
-        Some(s) => proposals_of(&state.db, s.id, now).await?,
-        None => Vec::new(),
-    };
-    let waiting_texts = ready_texts(&waiting);
-    let language = prompt::language(query.locale.as_deref());
-    let raw = ask(
-        &state,
-        gateway,
-        account,
-        &Context {
-            event: Event::Start,
-            work,
-            waiting: &waiting_texts,
-            coverage: &coverage,
-            skipped: &[],
-            turns: &turns,
-            answer: None,
-            language: language.as_deref(),
-        },
-    )
-    .await?;
-    let profile_value = serde_json::to_value(&current.profile).map_err(Error::internal)?;
-    let known = known_facts(work, &waiting);
-    let outcome = judge::judge(
-        raw,
-        &Input {
-            answer: None,
-            profile: &profile_value,
-            coverage: &coverage,
-            skipped: &[],
-            asked: None,
-            known: &known,
-        },
-    );
-    let Some(next) = outcome.next else {
-        return Err(Error::Unavailable(applicamp_ai::AI_FAILED));
-    };
-
-    let mut tx = state.db.begin().await?;
-    let session_id = match &session {
-        Some(s) => s.id,
-        None => {
-            sqlx::query_scalar(
-                "INSERT INTO profile.grill_sessions
-                    (id, account_id, position, role_key, created_at, updated_at)
-                 VALUES ($1, $2, $3, $4, $5, $5)
-                 ON CONFLICT (account_id, position) DO UPDATE SET updated_at = excluded.updated_at
-                 RETURNING id",
-            )
-            .bind(Uuid::now_v7())
-            .bind(account)
-            .bind(db_position)
-            .bind(role_key(work))
-            .bind(now)
-            .fetch_one(&mut *tx)
-            .await?
-        }
-    };
-    let seq = lock_and_last_seq(&mut tx, session_id).await?;
-    let seen = last_seq(&turns);
-    if seq != seen {
-        // Someone started it meanwhile: theirs stands.
-        tx.rollback().await?;
-        let current = self::current(&state.db, account)
-            .await?
-            .ok_or(Error::NotFound)?;
-        return Ok(Json(view_of(&state, account, &current, index).await?));
-    }
-    sqlx::query("UPDATE profile.grill_sessions SET skipped = '[]', updated_at = $2 WHERE id = $1")
-        .bind(session_id)
-        .bind(now)
-        .execute(&mut *tx)
-        .await?;
-    insert_turn(
-        &mut tx,
-        account,
-        session_id,
-        seq + 1,
-        GrillTurnKind::Question,
-        &next.question,
-        next.push,
-        Some(next.area),
-        0,
-        true,
-        now,
-    )
-    .await?;
-    tx.commit().await?;
-    tracing::info!(prompt = prompt::PROMPT_VERSION, "a grill interview started");
-    Ok(Json(view_of(&state, account, &current, index).await?))
-}
-
-/// Answer the question waiting.
-///
-/// **One model call** reads the answer: it returns the facts the answer
-/// states (each with the person's exact words), what it covered and the next
-/// question, which pushes back when the answer was vague. A fact whose quote
-/// is not in the answer, or that says a number, name or tool neither the
-/// quote nor the profile says, is left out and counted in the turn's
-/// `dropped`. Nothing reaches the profile until a fact is kept.
-#[utoipa::path(
-    post,
-    path = "/api/v1/profile/grill/{position}/answer",
-    tag = "profile",
-    operation_id = "profile.grill_answer",
-    security(("session" = [])),
-    params(("position" = u32, Path, description = "The position's place in the profile's `work` list."),
-        LanguageQuery),
-    request_body = GrillAnswerRequest,
-    responses(
-        (status = 200, description = "The interview, after the answer.", body = GrillView),
-        (status = 400, description = "`invalid_answer`", body = Problem,
-            content_type = "application/problem+json"),
-        (status = 401, description = "`session_required`", body = Problem,
-            content_type = "application/problem+json"),
-        (status = 404, description = "`not_found`: no such position, or not started", body = Problem,
-            content_type = "application/problem+json"),
-        (status = 409, description = "`no_open_question`; `grill_changed`", body = Problem,
-            content_type = "application/problem+json"),
-        (status = 429, description = "`grill_daily_cap`", body = Problem,
-            content_type = "application/problem+json"),
-        (status = 503, description = "`ai_unavailable`; `ai_daily_limit_reached`; \
-            `ai_budget_reached`; `ai_failed`", body = Problem,
-            content_type = "application/problem+json"),
-    ),
-)]
-pub async fn answer(
-    State(state): State<AppState>,
-    SignedIn(principal): SignedIn,
-    Extension(ai): Extension<Ai>,
-    Path(position): Path<u32>,
-    Query(query): Query<LanguageQuery>,
-    body: std::result::Result<Json<GrillAnswerRequest>, JsonRejection>,
-) -> Result<Json<GrillView>> {
-    let Json(GrillAnswerRequest { text }) =
-        body.map_err(|rejection| Error::BadRequest("invalid_answer", rejection.body_text()))?;
-    let text = text.trim().to_owned();
-    if text.is_empty() || text.chars().count() > MAX_ANSWER {
-        return Err(Error::BadRequest(
-            "invalid_answer",
-            format!("Write between 1 and {MAX_ANSWER} characters."),
-        ));
-    }
-    let account = principal.account_id;
-    let gateway = gateway(&ai)?;
-    let (current, index) = load(&state, account, position).await?;
-    let work = &current.profile.work[index];
-    let session = session_for(&state.db, account, index, work)
-        .await?
-        .ok_or(Error::NotFound)?;
-    let turns = turns_of(&state.db, session.id).await?;
-    let asked = open_question(&turns).ok_or_else(|| {
-        Error::Conflict(
-            "no_open_question",
-            "There is no question waiting. Start again.".to_owned(),
-        )
-    })?;
-    let now = state.clock.now();
-    ensure_room(&state.db, account, now).await?;
-    let waiting = proposals_of(&state.db, session.id, now).await?;
-    let waiting_texts = ready_texts(&waiting);
-    let language = prompt::language(query.locale.as_deref());
-    let raw = ask(
-        &state,
-        gateway,
-        account,
-        &Context {
-            event: Event::Answer,
-            work,
-            waiting: &waiting_texts,
-            coverage: &session.coverage,
-            skipped: &session.skipped,
-            turns: &turns,
-            answer: Some(&text),
-            language: language.as_deref(),
-        },
-    )
-    .await?;
-    let profile_value = serde_json::to_value(&current.profile).map_err(Error::internal)?;
-    let known = known_facts(work, &waiting);
-    let outcome: Outcome = judge::judge(
-        raw,
-        &Input {
-            answer: Some(&text),
-            profile: &profile_value,
-            coverage: &session.coverage,
-            skipped: &session.skipped,
-            asked: asked.area,
-            known: &known,
-        },
-    );
-
-    let mut tx = state.db.begin().await?;
-    let seq = lock_and_last_seq(&mut tx, session.id).await?;
-    if seq != last_seq(&turns) {
-        return Err(changed());
-    }
-    insert_turn(
-        &mut tx,
-        account,
-        session.id,
-        seq + 1,
-        GrillTurnKind::Answer,
-        &text,
-        false,
-        asked.area,
-        outcome.dropped,
-        true,
-        now,
-    )
-    .await?;
-    store_proposals(
-        &mut tx,
-        account,
-        session.id,
-        position_index(index)?,
-        seq + 1,
-        &outcome.facts,
-        now,
-    )
-    .await?;
-    sqlx::query("UPDATE profile.grill_sessions SET coverage = $2, updated_at = $3 WHERE id = $1")
-        .bind(session.id)
-        .bind(sqlx::types::Json(&outcome.coverage))
-        .bind(now)
-        .execute(&mut *tx)
-        .await?;
-    if let Some(next) = &outcome.next {
-        insert_turn(
-            &mut tx,
-            account,
-            session.id,
-            seq + 2,
-            GrillTurnKind::Question,
-            &next.question,
-            next.push,
-            Some(next.area),
-            0,
-            false,
-            now,
-        )
-        .await?;
-    }
-    tx.commit().await?;
-    // Ids, counts and kinds only: never the answer.
-    tracing::info!(
-        prompt = prompt::PROMPT_VERSION,
-        facts = outcome.facts.len(),
-        dropped = outcome.dropped,
-        covered = outcome.coverage.ok_count(),
-        "a grill answer read"
-    );
-    Ok(Json(view_of(&state, account, &current, index).await?))
-}
-
-/// Skip the question waiting.
-///
-/// Its area is left alone until the interview is started again, and the
-/// next question is made: **one model call**, or none when nothing is left
-/// to ask.
-#[utoipa::path(
-    post,
-    path = "/api/v1/profile/grill/{position}/skip",
-    tag = "profile",
-    operation_id = "profile.grill_skip",
-    security(("session" = [])),
-    params(("position" = u32, Path, description = "The position's place in the profile's `work` list."),
-        LanguageQuery),
-    responses(
-        (status = 200, description = "The interview, after the skip.", body = GrillView),
-        (status = 401, description = "`session_required`", body = Problem,
-            content_type = "application/problem+json"),
-        (status = 404, description = "`not_found`: no such position, or not started", body = Problem,
-            content_type = "application/problem+json"),
-        (status = 409, description = "`no_open_question`; `grill_changed`", body = Problem,
-            content_type = "application/problem+json"),
-        (status = 429, description = "`grill_daily_cap`", body = Problem,
-            content_type = "application/problem+json"),
-        (status = 503, description = "`ai_unavailable`; `ai_daily_limit_reached`; \
-            `ai_budget_reached`; `ai_failed`", body = Problem,
-            content_type = "application/problem+json"),
-    ),
-)]
-pub async fn skip(
-    State(state): State<AppState>,
-    SignedIn(principal): SignedIn,
-    Extension(ai): Extension<Ai>,
-    Path(position): Path<u32>,
-    Query(query): Query<LanguageQuery>,
-) -> Result<Json<GrillView>> {
-    let account = principal.account_id;
-    let (current, index) = load(&state, account, position).await?;
-    let work = &current.profile.work[index];
-    let session = session_for(&state.db, account, index, work)
-        .await?
-        .ok_or(Error::NotFound)?;
-    let turns = turns_of(&state.db, session.id).await?;
-    let asked = open_question(&turns).ok_or_else(|| {
-        Error::Conflict(
-            "no_open_question",
-            "There is no question waiting. Start again.".to_owned(),
-        )
-    })?;
-    let now = state.clock.now();
-    let mut skipped = session.skipped.clone();
-    if let Some(area) = asked.area
-        && !skipped.contains(&area)
-    {
-        skipped.push(area);
-    }
-
-    // Something left to ask: one call. Nothing left: none.
-    let mut next = None;
-    let mut called = false;
-    if session.coverage.first_open(&skipped).is_some() {
-        let gateway = gateway(&ai)?;
-        ensure_room(&state.db, account, now).await?;
-        let waiting = proposals_of(&state.db, session.id, now).await?;
-        let waiting_texts = ready_texts(&waiting);
-        let language = prompt::language(query.locale.as_deref());
-        let raw = ask(
-            &state,
-            gateway,
-            account,
-            &Context {
-                event: Event::Skip,
-                work,
-                waiting: &waiting_texts,
-                coverage: &session.coverage,
-                skipped: &skipped,
-                turns: &turns,
-                answer: None,
-                language: language.as_deref(),
-            },
-        )
-        .await?;
-        let profile_value = serde_json::to_value(&current.profile).map_err(Error::internal)?;
-        let known = known_facts(work, &waiting);
-        next = judge::judge(
-            raw,
-            &Input {
-                answer: None,
-                profile: &profile_value,
-                coverage: &session.coverage,
-                skipped: &skipped,
-                asked: asked.area,
-                known: &known,
-            },
-        )
-        .next;
-        called = true;
-    }
-
-    let mut tx = state.db.begin().await?;
-    let seq = lock_and_last_seq(&mut tx, session.id).await?;
-    if seq != last_seq(&turns) {
-        return Err(changed());
-    }
-    insert_turn(
-        &mut tx,
-        account,
-        session.id,
-        seq + 1,
-        GrillTurnKind::Note,
-        "skipped",
-        false,
-        asked.area,
-        0,
-        called,
-        now,
-    )
-    .await?;
-    sqlx::query("UPDATE profile.grill_sessions SET skipped = $2, updated_at = $3 WHERE id = $1")
-        .bind(session.id)
-        .bind(sqlx::types::Json(&skipped))
-        .bind(now)
-        .execute(&mut *tx)
-        .await?;
-    if let Some(next) = &next {
-        insert_turn(
-            &mut tx,
-            account,
-            session.id,
-            seq + 2,
-            GrillTurnKind::Question,
-            &next.question,
-            next.push,
-            Some(next.area),
-            0,
-            false,
-            now,
-        )
-        .await?;
-    }
-    tx.commit().await?;
-    Ok(Json(view_of(&state, account, &current, index).await?))
-}
-
-/// End the interview for now. No model call; the question waiting is put
-/// away, and starting again makes a new one. Facts waiting stay for their
-/// 24 hours.
-#[utoipa::path(
-    post,
-    path = "/api/v1/profile/grill/{position}/done",
-    tag = "profile",
-    operation_id = "profile.grill_done",
-    security(("session" = [])),
-    params(("position" = u32, Path, description = "The position's place in the profile's `work` list.")),
-    responses(
-        (status = 200, description = "The interview.", body = GrillView),
-        (status = 401, description = "`session_required`", body = Problem,
-            content_type = "application/problem+json"),
-        (status = 404, description = "`not_found`: no such position, or not started", body = Problem,
-            content_type = "application/problem+json"),
-    ),
-)]
-pub async fn done(
-    State(state): State<AppState>,
-    SignedIn(principal): SignedIn,
-    Path(position): Path<u32>,
-) -> Result<Json<GrillView>> {
-    let account = principal.account_id;
-    let (current, index) = load(&state, account, position).await?;
-    let work = &current.profile.work[index];
-    let session = session_for(&state.db, account, index, work)
-        .await?
-        .ok_or(Error::NotFound)?;
-    let mut tx = state.db.begin().await?;
-    let seq = lock_and_last_seq(&mut tx, session.id).await?;
-    let last: Option<String> = sqlx::query_scalar(
-        "SELECT kind FROM profile.grill_turns WHERE session_id = $1 AND seq = $2",
-    )
-    .bind(session.id)
-    .bind(seq)
-    .fetch_optional(&mut *tx)
-    .await?;
-    if last.as_deref() == Some("question") {
-        insert_turn(
-            &mut tx,
-            account,
-            session.id,
-            seq + 1,
-            GrillTurnKind::Note,
-            "done",
-            false,
-            None,
-            0,
-            false,
-            state.clock.now(),
-        )
-        .await?;
-    }
-    tx.commit().await?;
     Ok(Json(view_of(&state, account, &current, index).await?))
 }
 
@@ -1371,13 +487,12 @@ async fn keep_proposals(
     fixed: Option<&str>,
 ) -> Result<()> {
     let mut tx = state.db.begin().await?;
-    let row: Option<(sqlx::types::Json<Profile>, i32)> = sqlx::query_as(
-        "SELECT data, version FROM profile.profiles WHERE account_id = $1 FOR UPDATE",
-    )
-    .bind(account)
-    .fetch_optional(&mut *tx)
-    .await?;
-    let (profile, version) = row.ok_or(Error::NotFound)?;
+    let row: Option<(sqlx::types::Json<Profile>,)> =
+        sqlx::query_as("SELECT data FROM profile.profiles WHERE account_id = $1 FOR UPDATE")
+            .bind(account)
+            .fetch_optional(&mut *tx)
+            .await?;
+    let (profile,) = row.ok_or(Error::NotFound)?;
     let mut profile = profile.0;
     let evidence_source = serde_json::to_value(&profile).map_err(Error::internal)?;
     let now = state.clock.now();
@@ -1385,7 +500,7 @@ async fn keep_proposals(
         let stale = || {
             Error::Conflict(
                 "profile_changed",
-                "That position changed since the fact was taken. Start the interview again."
+                "That position changed since the fact was taken. Answer the question again."
                     .to_owned(),
             )
         };
@@ -1434,9 +549,7 @@ async fn keep_proposals(
     .bind(fixed.map(str::trim))
     .execute(&mut *tx)
     .await?;
-    let new_version = write_profile(state, &mut tx, account, &profile, Some("answer")).await?;
-    // The person's own kept fact does not make the gap review stale.
-    carry_forward(&mut tx, account, version, new_version, None).await?;
+    write_profile(state, &mut tx, account, &profile, Some("answer")).await?;
     tx.commit().await?;
     tracing::info!(facts = proposals.len(), "grill facts kept");
     Ok(())

@@ -129,7 +129,7 @@ impl Composition {
             ),
             profile: applicamp_profile::ProfileDeps {
                 ai: profile_ai,
-                research: research_of(&pipeline),
+                research: research_of(&pipeline, &sources),
             },
             pipeline,
             sources,
@@ -147,7 +147,7 @@ impl Composition {
             })),
             ai: self.pipeline.ai.clone(),
         };
-        self.profile.research = research_of(&self.pipeline);
+        self.profile.research = research_of(&self.pipeline, &self.sources);
         self
     }
 
@@ -161,12 +161,15 @@ impl Composition {
     }
 }
 
-/// Past employers are researched through the pipeline's company facts.
+/// Past employers are researched through the pipeline's company facts, and
+/// the person's own site with the sources' reader.
 fn research_of(
     pipeline: &applicamp_pipeline::PipelineDeps,
+    sources: &applicamp_sources::SourcesDeps,
 ) -> applicamp_profile::ports::Researcher {
     applicamp_profile::ports::Researcher(Some(std::sync::Arc::new(wiring::ResearchWiring {
         pipeline: pipeline.clone(),
+        sources: sources.clone(),
     })))
 }
 

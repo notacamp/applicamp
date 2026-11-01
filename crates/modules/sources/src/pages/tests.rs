@@ -76,6 +76,24 @@ fn only_same_site_pages_about_the_company_are_picked_most_wanted_first() {
     );
 }
 
+#[test]
+fn a_personal_site_follows_the_pages_about_the_person() {
+    let page = r#"
+        <a href="/pricing">Pricing</a>
+        <a href="/writing/rails-at-scale">Writing</a>
+        <a href="/projects">Things I built</a>
+        <a href="https://elsewhere.example/about">About someone else</a>
+        <a href="/cv.pdf">CV (PDF)</a>
+        <a href="/about">About me</a>
+    "#;
+    let picked = linked_pages_on(page, &home(), &PERSONAL_TOPICS);
+    assert_eq!(
+        paths(&picked),
+        ["/about", "/projects", "/writing/rails-at-scale"],
+        "the person's topics in order; other hosts and files never"
+    );
+}
+
 #[tokio::test]
 async fn a_site_is_read_where_robots_allows_and_never_beyond_it() {
     let server = exclusive().await;

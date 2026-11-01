@@ -8,6 +8,10 @@ import {
   signIn,
 } from "./helpers";
 
+// Filmed: CI keeps this spec's videos (the `e2e-recordings` artifact), the
+// recording of Tell me about you at desktop width and at 375px.
+test.use({ video: "on" });
+
 /** An invented profile (nobody real): two roles, one with a fact the person kept. */
 function profile(start: string) {
   return {

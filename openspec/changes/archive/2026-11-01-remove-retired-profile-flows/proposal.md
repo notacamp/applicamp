@@ -14,8 +14,8 @@ a background job that can spend model money, and tables nobody reads.
   `POST .../drafts/{id}/keep|discard`, `GET .../skills/suggested`,
   `POST .../skills/suggested/{name}/add|dismiss`, `GET .../grill` (the roles list) and
   `POST .../grill/{position}/start|answer|skip|done`.
-- **Removed job:** `profile.gap_review` (nothing enqueues it any more). Reviews still
-  waiting in the queue are deleted by the migration.
+- **Removed job:** `profile.gap_review` (nothing enqueues it any more). A review still
+  queued is never claimed, since its kind is no longer registered, and does nothing.
 - **Dropped tables:** `profile.gap_reviews`, `profile.drafts`, `profile.grill_turns`.
 - **Kept:** the facts taken from an answer about a job and their controls
   (`GET /grill/{position}`, `POST /grill/proposals/{id}/keep|drop`,

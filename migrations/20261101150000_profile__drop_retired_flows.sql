@@ -10,9 +10,9 @@
 -- it), profile.grill_sessions and profile.grill_proposals (the facts taken
 -- from an answer about a job still wait there for Keep, Fix or Drop).
 
--- Reviews still waiting to run would never be claimed (their kind is no
--- longer registered): remove them.
-DELETE FROM kernel.jobs WHERE kind = 'profile.gap_review';
+-- Any `profile.gap_review` job still queued is never claimed (its kind is no
+-- longer registered) and does nothing; a profile migration may not touch the
+-- kernel's schema to delete it.
 
 DROP TABLE IF EXISTS profile.gap_reviews;
 DROP TABLE IF EXISTS profile.drafts;

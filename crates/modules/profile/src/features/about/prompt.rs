@@ -8,6 +8,9 @@
 //! from the profile's work, education, skills and goals only. Page text from
 //! an employer's site is data, in `<sources>` as JSON, never instructions.
 
+use std::sync::LazyLock;
+
+use regex::Regex;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -341,13 +344,49 @@ pub fn site_schema() -> Value {
     })
 }
 
+/// An email address.
+static EMAIL: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}")
+        .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
+});
+/// A phone number: nine or more digits, with the usual separators (a date
+/// range such as "2017 - 2021" has eight, and stays).
+static PHONE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"[+(]*\d[\d\s().+-]{6,}\d")
+        .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
+});
+
+/// `text` without email addresses or phone numbers: the model reading a
+/// person's own site never sees how to reach them.
+pub fn without_contact(text: &str) -> String {
+    let text = EMAIL.replace_all(text, "[email]");
+    PHONE
+        .replace_all(&text, |caps: &regex::Captures<'_>| {
+            let digits = caps[0].chars().filter(char::is_ascii_digit).count();
+            if digits >= 9 {
+                "[phone]".to_owned()
+            } else {
+                caps[0].to_owned()
+            }
+        })
+        .into_owned()
+}
+
+/// Whether `text` holds an email address or a phone number.
+fn has_contact(text: &str) -> bool {
+    without_contact(text) != text
+}
+
 /// The user message of the site call: each page cut to [`SITE_PAGE`]
-/// characters, at most [`SITE_PAGES`] of them.
+/// characters, at most [`SITE_PAGES`] of them, without email addresses or
+/// phone numbers.
 pub fn site_message(pages: &[crate::ports::OwnPage]) -> String {
     let pages: Vec<Value> = pages
         .iter()
         .take(SITE_PAGES)
-        .map(|page| json!({ "url": page.url, "text": cut(&page.text, SITE_PAGE) }))
+        .map(
+            |page| json!({ "url": page.url, "text": without_contact(&cut(&page.text, SITE_PAGE)) }),
+        )
         .collect();
     format!("<pages>\n{}\n</pages>", Value::Array(pages))
 }
@@ -368,7 +407,11 @@ pub fn judge_site(raw: Vec<RawSiteFact>, pages: &[crate::ports::OwnPage]) -> Vec
     for fact in raw {
         let claim = cut(fact.claim.trim(), MAX_SOURCE);
         let quote = cut(fact.quote.trim(), 300);
-        if claim.is_empty() || squash(&quote).len() < 8 {
+        if claim.is_empty()
+            || squash(&quote).len() < 8
+            || has_contact(&claim)
+            || has_contact(&quote)
+        {
             continue;
         }
         let Some(page) = pages
@@ -378,7 +421,7 @@ pub fn judge_site(raw: Vec<RawSiteFact>, pages: &[crate::ports::OwnPage]) -> Vec
         else {
             continue;
         };
-        if !squash(&cut(&page.text, SITE_PAGE)).contains(&squash(&quote)) {
+        if !squash(&without_contact(&cut(&page.text, SITE_PAGE))).contains(&squash(&quote)) {
             continue;
         }
         if kept.iter().any(|k| squash(&k.claim) == squash(&claim)) {

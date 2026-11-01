@@ -569,10 +569,25 @@ mod contract {
             .delete(&handle)
             .await
             .expect("the sandbox is deleted");
-        assert_eq!(
-            runtime.sweep(&HashSet::new()).await.unwrap(),
-            0,
-            "nothing of ours is left"
-        );
+        // The gateway deletes in the background: it is listed a little while
+        // longer (a sweep then deletes it again, harmlessly), then gone.
+        let gone_by = Instant::now() + Duration::from_secs(60);
+        loop {
+            let ours = client
+                .list_all_sandboxes(ListOptions {
+                    label_selector: Some(format!("{RUN_LABEL}={run}")),
+                    ..ListOptions::default()
+                })
+                .await
+                .expect("the sandboxes are listed");
+            if ours.is_empty() {
+                break;
+            }
+            assert!(
+                Instant::now() < gone_by,
+                "the sandbox is still there after a minute"
+            );
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
     }
 }

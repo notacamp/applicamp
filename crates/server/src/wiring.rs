@@ -37,6 +37,8 @@ use uuid::Uuid;
 pub struct ResearchWiring {
     /// The pipeline as composed (its reader and its gateway).
     pub pipeline: applicamp_pipeline::PipelineDeps,
+    /// The sources as composed: their reader reads the person's own site.
+    pub sources: SourcesDeps,
 }
 
 impl applicamp_profile::ports::EmployerResearch for ResearchWiring {
@@ -111,6 +113,57 @@ impl applicamp_profile::ports::EmployerResearch for ResearchWiring {
                     .collect(),
             })
         })
+    }
+
+    fn own_site<'a>(
+        &'a self,
+        url: &'a str,
+        now: DateTime<Utc>,
+    ) -> BoxFuture<'a, applicamp_profile::ports::OwnSite> {
+        Box::pin(self.read_own_site(url, now))
+    }
+}
+
+impl ResearchWiring {
+    /// The person's own website, read with the sources' reader: the host
+    /// guard, robots.txt, the same host only.
+    async fn read_own_site(
+        &self,
+        url: &str,
+        now: DateTime<Utc>,
+    ) -> applicamp_profile::ports::OwnSite {
+        use applicamp_profile::ports::{OwnPage, OwnSite};
+        use applicamp_sources::pages::Failure;
+        let failed = |error| OwnSite {
+            pages: Vec::new(),
+            error: Some(error),
+        };
+        let Ok(site) = Url::parse(url.trim()) else {
+            return failed("site_not_allowed");
+        };
+        if applicamp_sources::net::check(&site, self.sources.config.allow_private_hosts()).is_err()
+        {
+            return failed("site_not_allowed");
+        }
+        let Some(reader) = &self.sources.reader else {
+            return failed("site_unreachable");
+        };
+        match applicamp_sources::pages::read_personal_site(reader, &site, now).await {
+            Ok(read) => OwnSite {
+                pages: read
+                    .pages
+                    .into_iter()
+                    .map(|page| OwnPage {
+                        url: page.url.to_string(),
+                        text: page.text,
+                    })
+                    .collect(),
+                error: None,
+            },
+            Err(Failure::RobotsDisallows) => failed("robots_disallows"),
+            Err(Failure::NothingReadable) => failed("no_pages_readable"),
+            Err(Failure::Unreachable) => failed("site_unreachable"),
+        }
     }
 }
 

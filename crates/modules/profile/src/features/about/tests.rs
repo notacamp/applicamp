@@ -1781,3 +1781,175 @@ fn a_language_or_education_answer_is_saved_in_its_own_shape() {
         ("Self-taught", None)
     );
 }
+
+/// A research port that knows no employer's site, and reads the person's
+/// own site as `site` (or fails with `error`).
+struct OwnSiteFake {
+    site: crate::ports::OwnSite,
+    asked: std::sync::Mutex<Vec<String>>,
+}
+
+impl EmployerResearch for OwnSiteFake {
+    fn known_site<'a>(
+        &'a self,
+        _: &'a PgPool,
+        _: Uuid,
+        _: &'a str,
+    ) -> BoxFuture<'a, Result<Option<String>>> {
+        Box::pin(async { Ok(None) })
+    }
+
+    fn set_site<'a>(
+        &'a self,
+        _: &'a AppState,
+        _: Uuid,
+        _: &'a str,
+        url: &'a str,
+    ) -> BoxFuture<'a, Result<String>> {
+        Box::pin(async move { Ok(url.to_owned()) })
+    }
+
+    fn run<'a>(
+        &'a self,
+        _: &'a AppState,
+        _: Uuid,
+        _: &'a str,
+        _: DateTime<Utc>,
+    ) -> BoxFuture<'a, Result<Research>> {
+        Box::pin(async { panic!("no employer has a known site") })
+    }
+
+    fn own_site<'a>(
+        &'a self,
+        url: &'a str,
+        _: DateTime<Utc>,
+    ) -> BoxFuture<'a, crate::ports::OwnSite> {
+        Box::pin(async move {
+            if let Ok(mut asked) = self.asked.lock() {
+                asked.push(url.to_owned());
+            }
+            self.site.clone()
+        })
+    }
+}
+
+fn own_site_port(site: crate::ports::OwnSite) -> (Researcher, Arc<OwnSiteFake>) {
+    let fake = Arc::new(OwnSiteFake {
+        site,
+        asked: std::sync::Mutex::new(Vec::new()),
+    });
+    (Researcher(Some(fake.clone())), fake)
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_persons_own_website_is_read_and_only_quoted_facts_reach_the_portrait(db: PgPool) {
+    let page = "https://alex.example.com/projects";
+    let site_reply = reply(&json!({ "facts": [
+        { "claim": "Built an open-source billing toolkit", "url": page,
+          "quote": "I built   Ledgerly, an open-source billing toolkit" },
+        // Not on the page: never passed on.
+        { "claim": "Spoke at a large conference", "url": page,
+          "quote": "keynote speaker at a large conference" },
+        // A page that was not read: never passed on.
+        { "claim": "Wrote a book", "url": "https://elsewhere.example/book",
+          "quote": "I wrote a book about billing" },
+    ]}));
+    let portrait = reply(&json!({ "sentences": [
+        sentence("You run the billing platform in Rust on PostgreSQL.", "known", &["w0"], "", None),
+        sentence("I assume, from your website, that you built an open-source billing toolkit.",
+                 "assumed", &["site0"], "Your website says so; it may be old.", None),
+    ]}));
+    let server = scripted_model(vec![site_reply, portrait]).await;
+    let (port, fake) = own_site_port(crate::ports::OwnSite {
+        pages: vec![crate::ports::OwnPage {
+            url: page.to_owned(),
+            text: "Projects. I built Ledgerly, an open-source billing toolkit used by small shops."
+                .to_owned(),
+        }],
+        error: None,
+    });
+    let h = Harness::with_research(db, Some(gateway(&server, None)), port);
+    saved(&h, &profile()).await;
+
+    let (status, view) = h.post("/api/v1/profile/about/portrait").await;
+    assert_eq!(status, 200, "{view}");
+    assert_eq!(
+        *fake.asked.lock().unwrap(),
+        ["https://alex.example.com"],
+        "the profile's own link, nothing else"
+    );
+    let sent = server.received_requests().await.unwrap();
+    assert_eq!(sent.len(), 2, "the site's facts, then the portrait");
+    let site_call = String::from_utf8(sent[0].body.clone()).unwrap();
+    assert!(site_call.contains("Ledgerly") && site_call.contains("<pages>"));
+    let portrait_call = String::from_utf8(sent[1].body.clone()).unwrap();
+    assert!(portrait_call.contains("open-source billing toolkit"));
+    assert!(
+        portrait_call.contains("site0"),
+        "the fact is a citable source"
+    );
+    assert!(!portrait_call.contains("large conference") && !portrait_call.contains("a book"));
+    // An assumption to confirm, linking the page; nothing is saved yet.
+    let assumed = find(
+        &view,
+        "I assume, from your website, that you built an open-source billing toolkit.",
+    );
+    assert_eq!(assumed["kind"], "assumed");
+    assert!(assumed.to_string().contains(page), "{assumed}");
+    // The read counts toward the daily cap, like an employer's.
+    assert_eq!(
+        h.count("SELECT count(*) FROM profile.about_calls WHERE kind = 'research'")
+            .await,
+        1
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_website_that_cannot_be_read_leaves_the_portrait_without_it(db: PgPool) {
+    let server = scripted_model(vec![portrait_reply()]).await;
+    let (port, _) = own_site_port(crate::ports::OwnSite {
+        pages: Vec::new(),
+        error: Some("robots_disallows"),
+    });
+    let h = Harness::with_research(db, Some(gateway(&server, None)), port);
+    saved(&h, &profile()).await;
+    let (status, view) = h.post("/api/v1/profile/about/portrait").await;
+    assert_eq!(status, 200, "{view}");
+    assert_eq!(calls(&server).await, 1, "only the portrait's call");
+}
+
+#[test]
+fn site_facts_are_kept_only_with_their_quote_on_their_page() {
+    let pages = vec![crate::ports::OwnPage {
+        url: "https://a.example/".to_owned(),
+        text: "Hi. I build Rails apps for clinics and teach Ruby.".to_owned(),
+    }];
+    let raw = |claim: &str, quote: &str, url: &str| prompt::RawSiteFact {
+        claim: claim.to_owned(),
+        quote: quote.to_owned(),
+        url: url.to_owned(),
+    };
+    let kept = prompt::judge_site(
+        vec![
+            raw(
+                "Builds Rails apps for clinics",
+                "I BUILD rails apps for clinics",
+                "https://a.example/",
+            ),
+            raw(
+                "Builds Rails apps for clinics",
+                "build Rails apps for clinics",
+                "https://a.example/",
+            ),
+            raw("Teaches Go", "teach Go", "https://a.example/"),
+            raw("Teaches Ruby", "teach Ruby", "https://b.example/"),
+            raw("", "and teach Ruby", "https://a.example/"),
+        ],
+        &pages,
+    );
+    assert_eq!(kept.len(), 1, "{kept:?}");
+    assert_eq!(kept[0].claim, "Builds Rails apps for clinics");
+    let sources = prompt::site_sources(&kept);
+    assert_eq!(sources[0].id, "site0");
+    assert_eq!(sources[0].url.as_deref(), Some("https://a.example/"));
+}

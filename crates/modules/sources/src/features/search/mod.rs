@@ -1167,7 +1167,7 @@ impl applicamp_kernel::Job for Nightly {
         let deps = ctx
             .deps::<SourcesDeps>()
             .ok_or_else(|| JobError::Permanent("the sources module is not composed".into()))?;
-        schedule_nightly(&ctx.db, deps).await?;
+        schedule_next_nightly(&ctx.db, deps).await?;
         nightly(deps, &ctx.db).await.map_err(JobError::from)
     }
 }
@@ -1181,6 +1181,19 @@ pub async fn schedule_nightly(db: &PgPool, deps: &SourcesDeps) -> Result<bool> {
     let at = lisbon::next_run(deps.clock.now());
     let mut tx = db.begin().await?;
     let added = jobs::enqueue_unique_at(&mut tx, &Nightly {}, at).await?;
+    tx.commit().await?;
+    Ok(added)
+}
+
+/// From inside a nightly search: schedule tomorrow's (this one, running,
+/// does not count).
+async fn schedule_next_nightly(db: &PgPool, deps: &SourcesDeps) -> Result<bool> {
+    if !deps.config.nightly() {
+        return Ok(false);
+    }
+    let at = lisbon::next_run(deps.clock.now());
+    let mut tx = db.begin().await?;
+    let added = jobs::enqueue_next_at(&mut tx, &Nightly {}, at).await?;
     tx.commit().await?;
     Ok(added)
 }

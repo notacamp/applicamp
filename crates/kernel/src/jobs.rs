@@ -339,8 +339,9 @@ pub async fn enqueue_at<J: Job>(
 }
 
 /// Enqueue `job` in `conn`'s transaction to run at `run_at`, unless a job
-/// of its kind is already waiting or running: a recurring job that
-/// schedules its next run. Whether it was enqueued. Concurrent callers are
+/// of its kind is already waiting or running: what a server schedules at
+/// start (a job scheduling its own next run uses [`enqueue_next_at`]).
+/// Whether it was enqueued. Concurrent callers are
 /// serialised on the kind, so two servers starting at once enqueue one.
 pub async fn enqueue_unique_at<J: Job>(
     conn: &mut PgConnection,
@@ -354,6 +355,34 @@ pub async fn enqueue_unique_at<J: Job>(
     let waiting: bool = sqlx::query_scalar(
         "SELECT EXISTS (SELECT 1 FROM kernel.jobs
                          WHERE kind = $1 AND state IN ('pending', 'running'))",
+    )
+    .bind(J::NAME)
+    .fetch_one(&mut *conn)
+    .await?;
+    if waiting {
+        return Ok(false);
+    }
+    enqueue_at(conn, job, run_at).await?;
+    Ok(true)
+}
+
+/// Enqueue the next run of a recurring job, from inside its own run, at
+/// `run_at`: unless a job of its kind is already waiting. The one running
+/// (this one) does not count, which [`enqueue_unique_at`] would: a job that
+/// schedules its next run with that never does, and recurs only when the
+/// server restarts. Whether it was enqueued. Serialised on the kind like
+/// [`enqueue_unique_at`].
+pub async fn enqueue_next_at<J: Job>(
+    conn: &mut PgConnection,
+    job: &J,
+    run_at: chrono::DateTime<chrono::Utc>,
+) -> Result<bool, sqlx::Error> {
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtext($1))")
+        .bind(J::NAME)
+        .execute(&mut *conn)
+        .await?;
+    let waiting: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM kernel.jobs WHERE kind = $1 AND state = 'pending')",
     )
     .bind(J::NAME)
     .fetch_one(&mut *conn)
@@ -704,6 +733,49 @@ mod tests {
         assert!(worker.run_once().await.unwrap());
         assert_eq!(WITH_DEPS.load(Ordering::SeqCst), before + 4);
         assert_eq!(state_of(&db, id).await, ("succeeded".to_owned(), 1));
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_running_job_can_schedule_its_next_run(db: PgPool) {
+        let later = chrono::Utc::now() + chrono::TimeDelta::hours(1);
+        let mut conn = db.acquire().await.unwrap();
+        let running = enqueue(&mut conn, &Count { by: 1 }).await.unwrap();
+        sqlx::query(
+            "UPDATE kernel.jobs SET state = 'running', locked_until = now() + interval '1 minute'
+              WHERE id = $1",
+        )
+        .bind(running)
+        .execute(&mut *conn)
+        .await
+        .unwrap();
+        drop(conn);
+        let mut tx = db.begin().await.unwrap();
+        assert!(
+            !enqueue_unique_at(&mut tx, &Count { by: 1 }, later)
+                .await
+                .unwrap(),
+            "the start-up schedule sees the running one"
+        );
+        assert!(
+            enqueue_next_at(&mut tx, &Count { by: 1 }, later)
+                .await
+                .unwrap(),
+            "the running one schedules its next run"
+        );
+        assert!(
+            !enqueue_next_at(&mut tx, &Count { by: 1 }, later)
+                .await
+                .unwrap(),
+            "once"
+        );
+        tx.commit().await.unwrap();
+        let pending: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM kernel.jobs WHERE kind = 'test.count' AND state = 'pending'",
+        )
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(pending, 1);
     }
 
     #[sqlx::test(migrations = "../../migrations")]

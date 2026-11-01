@@ -11,11 +11,9 @@
 //! - **Goals** ([`goals::Goals`]): what they want next, answered one
 //!   question at a time and versioned.
 //!
-//! - **Grill me** ([`features::grill`]): a deep interview about one position
-//!   at a time; the facts the person keeps live on the position. **Retired
-//!   from the client (#44)**: its interview endpoints are deprecated and
-//!   no longer called; its proposals still turn an answer about a job into
-//!   facts. Removal is tracked in #49.
+//! - **Grill me's proposals** ([`features::grill`]): the facts taken from an
+//!   answer about a job wait on the position to be kept, fixed or dropped.
+//!   Its interview was retired from the client (#44) and removed (#49).
 //!
 //! - **Tell me about you** ([`features::about`]): what Applicamp knows and
 //!   assumes about a person as one portrait, confirmed by them, then the
@@ -26,9 +24,8 @@
 //!   matches against, for the ports the server wires to other modules.
 //!
 //! - **Completion** ([`features::completion`]): how strong the profile is
-//!   ([`strength`]). Its AI questions, drafts and found skills are
-//!   **retired from the client (#44)** and deprecated: Tell me about you
-//!   asks about the gaps now. Removal is tracked in #49.
+//!   ([`strength`]) and the order of the skills. Its AI questions, drafts and
+//!   found skills were removed (#49): Tell me about you asks about the gaps.
 //!
 //! Publishes `profile.updated` (ids only) whenever a profile changes and
 //! `profile.goals_updated` (id and version) whenever the goals do.
@@ -77,22 +74,8 @@ pub fn module(deps: ProfileDeps) -> Module {
         .routes(routes!(profile::get, profile::update))
         .routes(routes!(goals::get, goals::update))
         .routes(routes!(completion::get_strength))
-        .routes(routes!(completion::get_questions))
-        .routes(routes!(completion::review_again))
-        .routes(routes!(completion::skip_question))
-        .routes(routes!(completion::draft::create_draft))
-        .routes(routes!(completion::draft::keep_draft))
-        .routes(routes!(completion::draft::discard_draft))
-        .routes(routes!(completion::skills::suggested_skills))
-        .routes(routes!(completion::skills::add_skill))
-        .routes(routes!(completion::skills::dismiss_skill))
         .routes(routes!(completion::skills::order_skills))
-        .routes(routes!(grill::list))
         .routes(routes!(grill::get))
-        .routes(routes!(grill::start))
-        .routes(routes!(grill::answer))
-        .routes(routes!(grill::skip))
-        .routes(routes!(grill::done))
         .routes(routes!(grill::keep_all))
         .routes(routes!(grill::keep_proposal))
         .routes(routes!(grill::drop_proposal))
@@ -121,7 +104,6 @@ pub fn module(deps: ProfileDeps) -> Module {
         router,
         background: Background::new()
             .job::<imports::ExpireImports>()
-            .job_with::<completion::review::GapReview, _>(Ai(deps.ai.clone()))
             .publishes::<events::ProfileUpdated>()
             .publishes::<events::GoalsUpdated>(),
         kinds: Vec::new(),
@@ -147,9 +129,6 @@ mod tests {
             module(ProfileDeps::default()).background,
         )])
         .unwrap();
-        assert_eq!(
-            registry.kinds(),
-            ["profile.expire_imports", "profile.gap_review"]
-        );
+        assert_eq!(registry.kinds(), ["profile.expire_imports"]);
     }
 }

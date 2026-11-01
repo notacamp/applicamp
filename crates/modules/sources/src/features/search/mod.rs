@@ -48,6 +48,9 @@ use crate::{
 
 /// How long a search may spend scoring before it keeps what it has.
 pub const SCORING_TIME: std::time::Duration = std::time::Duration::from_secs(10 * 60);
+/// Failed scoring calls in a row that end a search's scoring (the provider
+/// is down, not one bad answer).
+pub const FAILED_IN_A_ROW: u32 = 4;
 /// A search queued or running for longer than this is taken as dead.
 pub const STALE: TimeDelta = TimeDelta::minutes(30);
 /// Above this estimate (in euros), the app asks before searching.
@@ -1026,10 +1029,18 @@ pub(crate) async fn run(
     done.scored = scored.len();
     progress(db, id, &done).await?;
 
-    // Score the rest, ten at a time, within the limits.
+    // Score the rest, ten at a time, within the limits. A batch whose answer
+    // is unusable (cut off, or not the JSON asked for) is scored again as two
+    // halves, and a half that fails too is left for the next search: one bad
+    // answer never ends the search. Only failed calls in a row (the provider
+    // is down) stop it.
     let mut stopped = None;
+    let mut skipped = 0_usize;
+    let mut failed_in_a_row = 0_u32;
     let deadline = std::time::Instant::now() + SCORING_TIME;
-    for batch in unscored.chunks(BATCH) {
+    let mut queue: std::collections::VecDeque<(&[Job], bool)> =
+        unscored.chunks(BATCH).map(|batch| (batch, true)).collect();
+    while let Some((batch, may_split)) = queue.pop_front() {
         if std::time::Instant::now() > deadline {
             break;
         }
@@ -1041,6 +1052,7 @@ pub(crate) async fn run(
         };
         match scoring::score(ai, caller, &input, &jobs).await {
             Ok((scores, cost)) => {
+                failed_in_a_row = 0;
                 done.batches += 1;
                 done.cost_usd += cost;
                 // Each job of the batch bears its share, split between the
@@ -1063,22 +1075,39 @@ pub(crate) async fn run(
                 done.scored = scored.len();
                 progress(db, id, &done).await?;
             }
-            Err(e) => {
-                let stop = match e {
-                    applicamp_ai::Error::OverBudget { .. }
-                    | applicamp_ai::Error::OverDailyCap { .. } => SearchStop::AiBudgetReached,
-                    applicamp_ai::Error::NotConfigured(_) => SearchStop::AiUnavailable,
-                    _ => {
-                        // A call was made: count it.
-                        done.batches += 1;
-                        tracing::warn!(error = %e, "a scoring call failed; the search keeps what it has");
-                        SearchStop::AiFailed
-                    }
-                };
-                stopped = Some(stop);
+            Err(
+                applicamp_ai::Error::OverBudget { .. } | applicamp_ai::Error::OverDailyCap { .. },
+            ) => {
+                stopped = Some(SearchStop::AiBudgetReached);
                 break;
             }
+            Err(applicamp_ai::Error::NotConfigured(_)) => {
+                stopped = Some(SearchStop::AiUnavailable);
+                break;
+            }
+            Err(e) => {
+                // A call was made: count it.
+                done.batches += 1;
+                failed_in_a_row += 1;
+                if failed_in_a_row >= FAILED_IN_A_ROW {
+                    tracing::warn!(error = %e, "scoring calls keep failing; the search keeps what it has");
+                    stopped = Some(SearchStop::AiFailed);
+                    break;
+                }
+                if may_split && batch.len() > 1 {
+                    tracing::warn!(error = %e, jobs = batch.len(), "a scoring call failed; scoring it again in halves");
+                    let (first, second) = batch.split_at(batch.len() / 2);
+                    queue.push_front((second, false));
+                    queue.push_front((first, false));
+                } else {
+                    tracing::warn!(error = %e, jobs = batch.len(), "a scoring call failed again; these jobs wait for the next search");
+                    skipped += batch.len();
+                }
+            }
         }
+    }
+    if skipped > 0 {
+        tracing::info!(skipped, "jobs left unscored for the next search");
     }
 
     for (job, _) in &scored {
@@ -1138,7 +1167,7 @@ impl applicamp_kernel::Job for Nightly {
         let deps = ctx
             .deps::<SourcesDeps>()
             .ok_or_else(|| JobError::Permanent("the sources module is not composed".into()))?;
-        schedule_nightly(&ctx.db, deps).await?;
+        schedule_next_nightly(&ctx.db, deps).await?;
         nightly(deps, &ctx.db).await.map_err(JobError::from)
     }
 }
@@ -1152,6 +1181,19 @@ pub async fn schedule_nightly(db: &PgPool, deps: &SourcesDeps) -> Result<bool> {
     let at = lisbon::next_run(deps.clock.now());
     let mut tx = db.begin().await?;
     let added = jobs::enqueue_unique_at(&mut tx, &Nightly {}, at).await?;
+    tx.commit().await?;
+    Ok(added)
+}
+
+/// From inside a nightly search: schedule tomorrow's (this one, running,
+/// does not count).
+async fn schedule_next_nightly(db: &PgPool, deps: &SourcesDeps) -> Result<bool> {
+    if !deps.config.nightly() {
+        return Ok(false);
+    }
+    let at = lisbon::next_run(deps.clock.now());
+    let mut tx = db.begin().await?;
+    let added = jobs::enqueue_next_at(&mut tx, &Nightly {}, at).await?;
     tx.commit().await?;
     Ok(added)
 }

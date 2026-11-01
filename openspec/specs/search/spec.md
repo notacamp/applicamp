@@ -153,3 +153,31 @@ it SHALL read as before.
 #### Scenario: No skills
 - **WHEN** the profile lists no skills
 - **THEN** every board is read exactly as before
+
+### Requirement: The nightly search recurs every night
+Each nightly search SHALL schedule the next night's while it runs, whether or not the server
+restarts in between, and there SHALL be at most one waiting at a time. The weekly board
+discovery SHALL recur the same way.
+
+#### Scenario: A night with no restart
+- **WHEN** a nightly search runs and the server is not restarted before the next evening
+- **THEN** the next evening's nightly search runs
+
+#### Scenario: The server starts while one is waiting
+- **WHEN** the server starts and a nightly search is already scheduled
+- **THEN** no second one is scheduled
+
+### Requirement: One bad model answer never ends a search
+A search SHALL score a batch whose model answer is unusable (cut off, or not the JSON asked for)
+again as two halves, and SHALL leave the jobs of a half that fails again for the next search.
+Only four failed scoring calls in a row SHALL end a search's scoring (`ai_failed`), keeping what
+was scored. On OpenRouter, scoring calls SHALL ask for low reasoning effort and SHALL be routed
+only to providers that support every parameter sent.
+
+#### Scenario: An answer is cut off
+- **WHEN** the answer for a batch of ten is cut off and the answers for five jobs are not
+- **THEN** the ten are scored as two batches of five, the search goes on, and it ends without `ai_failed`
+
+#### Scenario: The provider keeps failing
+- **WHEN** every scoring answer is unusable
+- **THEN** the search makes four calls, then ends its scoring with `ai_failed`

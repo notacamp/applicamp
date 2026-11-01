@@ -177,7 +177,7 @@ impl applicamp_kernel::Job for Discover {
         let deps = ctx
             .deps::<SourcesDeps>()
             .ok_or_else(|| JobError::Permanent("the sources module is not composed".into()))?;
-        schedule(&ctx.db, deps).await?;
+        schedule_next(&ctx.db, deps).await?;
         discover(deps, &ctx.db).await.map_err(JobError::from)
     }
 }
@@ -299,6 +299,18 @@ pub async fn schedule(db: &PgPool, deps: &SourcesDeps) -> Result<bool> {
     }
     let mut tx = db.begin().await?;
     let added = jobs::enqueue_unique_at(&mut tx, &Discover {}, next_run(deps.clock.now())).await?;
+    tx.commit().await?;
+    Ok(added)
+}
+
+/// From inside a discovery: schedule next week's (this one, running, does
+/// not count).
+async fn schedule_next(db: &PgPool, deps: &SourcesDeps) -> Result<bool> {
+    if !deps.config.discovery() {
+        return Ok(false);
+    }
+    let mut tx = db.begin().await?;
+    let added = jobs::enqueue_next_at(&mut tx, &Discover {}, next_run(deps.clock.now())).await?;
     tx.commit().await?;
     Ok(added)
 }

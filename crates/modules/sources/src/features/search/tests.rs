@@ -1026,3 +1026,42 @@ async fn scores_cached_before_the_rules_version_are_scored_again(db: PgPool) {
     h.work().await;
     assert_eq!(model_calls(&model).await, 2, "and cached again");
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_nightly_search_schedules_the_next_night_while_it_runs(db: PgPool) {
+    let boards = greenhouse_boards().await;
+    let mut settings = config(&boards);
+    settings.nightly = Some(true);
+    let h = Harness::new(db, settings, None, Fake::ready()).await;
+    let pending = || async {
+        sqlx::query_scalar::<_, i64>(
+            "SELECT count(*) FROM kernel.jobs WHERE kind = 'sources.nightly' AND state = 'pending'",
+        )
+        .fetch_one(&h.db)
+        .await
+        .unwrap()
+    };
+    // Tonight's, as the server scheduled it at start, now running.
+    sqlx::query("DELETE FROM kernel.jobs WHERE kind = 'sources.nightly'")
+        .execute(&h.db)
+        .await
+        .unwrap();
+    assert!(super::schedule_nightly(&h.db, &h.deps).await.unwrap());
+    sqlx::query(
+        "UPDATE kernel.jobs SET state = 'running', locked_until = now() + interval '15 minutes'
+          WHERE kind = 'sources.nightly'",
+    )
+    .execute(&h.db)
+    .await
+    .unwrap();
+    assert_eq!(pending().await, 0);
+
+    // It schedules tomorrow's: it does not count itself.
+    assert!(super::schedule_next_nightly(&h.db, &h.deps).await.unwrap());
+    assert_eq!(pending().await, 1);
+    assert!(
+        !super::schedule_next_nightly(&h.db, &h.deps).await.unwrap(),
+        "once"
+    );
+    assert_eq!(pending().await, 1);
+}

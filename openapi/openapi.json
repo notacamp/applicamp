@@ -9862,7 +9862,9 @@
           "goal_avoid",
           "goal_must_have",
           "goal_location",
-          "role_fact"
+          "role_fact",
+          "language",
+          "education"
         ]
       },
       "Finish": {
@@ -9921,7 +9923,10 @@
           "summary",
           "headline",
           "background",
-          "goals"
+          "goals",
+          "languages",
+          "education",
+          "skills_few"
         ]
       },
       "Goals": {
@@ -10388,7 +10393,9 @@
           "skills",
           "position",
           "background",
-          "goals"
+          "goals",
+          "languages",
+          "education"
         ]
       },
       "Health": {

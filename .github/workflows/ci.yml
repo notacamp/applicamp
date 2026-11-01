@@ -119,17 +119,94 @@ jobs:
       - name: Tests
         run: cargo nextest run --workspace --locked --no-tests=fail --no-fail-fast
 
+  gateway-contract:
+    # The OpenShell runtime against a real gateway (v0.1.6, its Docker
+    # driver), which the fake runtime cannot stand in for: the gateway's own
+    # limits on template names, templates and policies (#62). Plaintext and
+    # open to unauthenticated users: CI only, on the runner's loopback.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      OPENSHELL_IMAGE_TAG: "0.1.6"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f # v2, reads rust-toolchain.toml
+        with: { cache: false }
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with: { save-if: "${{ github.ref == 'refs/heads/main' }}" }
+      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+        with: { tool: cargo-nextest }
+      - name: Start an OpenShell gateway
+        run: |
+          set -eu
+          dir="$RUNNER_TEMP/openshell"
+          mkdir -p "$dir/data"
+          image="ghcr.io/nvidia/openshell/gateway:$OPENSHELL_IMAGE_TAG"
+          # The sandbox JWT keys the Docker driver needs.
+          docker run --rm --user 0 -e HOME="$dir/data" -v "$dir:$dir" "$image" \
+            generate-certs --output-dir "$dir/data/tls"
+          cat > "$dir/gateway.toml" <<EOF
+          [openshell]
+          version = 2
+
+          [openshell.gateway]
+          name                = "contract"
+          bind_address        = "127.0.0.1:17670"
+          health_bind_address = "127.0.0.1:17671"
+          log_level           = "info"
+          compute_driver      = "docker"
+          disable_tls         = true
+
+          [openshell.gateway.auth]
+          allow_unauthenticated_users = true
+
+          [openshell.gateway.gateway_jwt]
+          signing_key_path = "$dir/data/tls/jwt/signing.pem"
+          public_key_path  = "$dir/data/tls/jwt/public.pem"
+          kid_path         = "$dir/data/tls/jwt/kid"
+          gateway_id       = "contract"
+
+          [openshell.drivers.docker]
+          socket_path           = "/var/run/docker.sock"
+          sandbox_runtime_image = "ghcr.io/nvidia/openshell/sandbox:$OPENSHELL_IMAGE_TAG"
+          supervisor_image      = "ghcr.io/nvidia/openshell/supervisor:$OPENSHELL_IMAGE_TAG"
+          image_pull_policy     = "if_not_present"
+          sandbox_label         = "applicamp"
+          sandbox_pids_limit    = 512
+          EOF
+          docker run -d --name openshell-gateway --network host --user 0 \
+            -v /var/run/docker.sock:/var/run/docker.sock -v "$dir:$dir" \
+            -e OPENSHELL_DB_URL="sqlite:$dir/data/gateway.db?mode=rwc" \
+            -e HOME="$dir/data" -e XDG_DATA_HOME="$dir/data/.local/share" \
+            "$image" --config "$dir/gateway.toml"
+          for _ in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:17671/readyz >/dev/null 2>&1; then exit 0; fi
+            sleep 2
+          done
+          docker logs openshell-gateway
+          exit 1
+      - name: Contract tests
+        env:
+          OPENSHELL_CONTRACT_GATEWAY: http://127.0.0.1:17670
+          OPENSHELL_CONTRACT_IMAGE: ghcr.io/notacamp/applicamp-agent:main
+        run: >-
+          cargo nextest run --locked --package applicamp-runs --run-ignored only
+          --no-tests=fail -E 'test(a_real_gateway_takes_our_templates_and_sandboxes)'
+      - name: The gateway's log
+        if: always()
+        run: docker logs openshell-gateway 2>&1 | tail -n 200
+
   rust:
     # The required check: every Rust job above passed.
     if: always()
-    needs: [rust-checks, rust-tests]
+    needs: [rust-checks, rust-tests, gateway-contract]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
-          echo "rust-checks, rust-tests: $RESULTS"
+          echo "rust-checks, rust-tests, gateway-contract: $RESULTS"
           for r in $RESULTS; do [ "$r" = success ] || exit 1; done
 
   deny:

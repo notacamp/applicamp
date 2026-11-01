@@ -1569,14 +1569,17 @@ fn review_of(profile: &Profile, row: &Row) -> AboutReview {
     for (at, entry) in rows {
         groups[at].rows.push(entry);
     }
-    // Summary, headline, skills, positions (newest first), background, goals.
+    // Summary, headline, skills, positions (newest first), languages,
+    // education, background, goals.
     let order = |g: &ReviewGroup| match g.key {
         GroupKey::Summary => 0,
         GroupKey::Headline => 1,
         GroupKey::Skills => 2,
         GroupKey::Position => 3,
-        GroupKey::Background => 4,
-        GroupKey::Goals => 5,
+        GroupKey::Languages => 4,
+        GroupKey::Education => 5,
+        GroupKey::Background => 6,
+        GroupKey::Goals => 7,
     };
     groups.sort_by_key(|g| (order(g), g.position));
     let open_flags = row.changes.0.iter().filter(|c| c.open()).count();

@@ -1755,11 +1755,14 @@ fn languages_education_and_enough_skills_close_their_gaps() {
         dismissed: &[],
     });
     let order = ids(&list);
-    for gone in ["languages", "education", "skills_few", "area:0:your_part"] {
+    for gone in ["languages", "education", "skills_few"] {
         assert!(!order.contains(&gone), "{gone} in {order:?}");
     }
-    // A described role is asked about its results first, as before.
+    // A described role is asked about its results first, as before; what
+    // they did there keeps its place among the areas.
     assert_eq!(order[0], "results:0", "{order:?}");
+    let at = |id: &str| order.iter().position(|o| *o == id).unwrap();
+    assert!(at("summary") < at("area:0:your_part"), "{order:?}");
 }
 
 #[test]

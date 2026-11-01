@@ -1,7 +1,8 @@
 //! NVIDIA OpenShell through its gateway (`openshell-sdk`, tag v0.1.6).
 //!
-//! - **Templates**: one per kind, `applicamp-<module>-<kind>`, carrying the
-//!   image and the resources (1 CPU, 1 GiB). Made at startup; the gateway
+//! - **Templates**: one per kind, named after it ([`template_name`]),
+//!   carrying the image and the resources (1 CPU, 1 GiB). Made at startup
+//!   (and again until the gateway takes them, [`crate::start`]); the gateway
 //!   has no update call, so a template that differs is deleted and made
 //!   again. A template carries no per-run environment, so the run id, its
 //!   token and the agent API reach the runner as its command's arguments.
@@ -132,19 +133,39 @@ fn failed(what: &str, err: &SdkError) -> RuntimeError {
     RuntimeError(format!("could not {what}: {kind}"))
 }
 
-/// A kind's template name: `runs.probe` is `applicamp-runs-probe`.
+/// The longest name the gateway takes for a template (v0.1.6 refuses a
+/// longer one with "name exceeds maximum length").
+pub const MAX_TEMPLATE_NAME: usize = 19;
+
+/// A kind's template name, a DNS label the gateway takes: `runs.probe` is
+/// `runs-probe`. A kind too long for [`MAX_TEMPLATE_NAME`] keeps its first
+/// twelve characters and a hash of the whole kind, so two long kinds never
+/// share a template: `pipeline.company_research` is `pipeline-com-` and six
+/// hex digits.
 pub fn template_name(kind: &str) -> String {
-    let slug: String = kind
-        .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() {
-                c.to_ascii_lowercase()
-            } else {
-                '-'
-            }
-        })
-        .collect();
-    format!("applicamp-{slug}")
+    let mut slug = String::with_capacity(kind.len());
+    for c in kind.chars() {
+        if c.is_ascii_alphanumeric() {
+            slug.push(c.to_ascii_lowercase());
+        } else if !slug.is_empty() && !slug.ends_with('-') {
+            slug.push('-');
+        }
+    }
+    while slug.ends_with('-') {
+        slug.pop();
+    }
+    if slug.len() <= MAX_TEMPLATE_NAME {
+        return slug;
+    }
+    let mut head: String = slug.chars().take(12).collect();
+    while head.ends_with('-') {
+        head.pop();
+    }
+    // FNV-1a: stable across builds and platforms, which `DefaultHasher` is not.
+    let hash = kind.bytes().fold(0x811c_9dc5_u32, |h, b| {
+        (h ^ u32::from(b)).wrapping_mul(0x0100_0193)
+    });
+    format!("{head}-{:06x}", hash & 0x00ff_ffff)
 }
 
 /// The template a kind's sandboxes are made from.
@@ -379,11 +400,41 @@ mod tests {
 
     #[test]
     fn templates_are_named_after_their_kind() {
-        assert_eq!(template_name("runs.probe"), "applicamp-runs-probe");
-        assert_eq!(
-            template_name("pipeline.company_research"),
-            "applicamp-pipeline-company-research"
-        );
+        assert_eq!(template_name("runs.probe"), "runs-probe");
+        assert_eq!(template_name("pipeline.prepare"), "pipeline-prepare");
+        assert_eq!(template_name("Runs..Probe_"), "runs-probe");
+    }
+
+    #[test]
+    fn every_template_name_is_one_the_gateway_takes() {
+        let long = template_name("pipeline.company_research");
+        assert!(long.starts_with("pipeline-com-"), "{long}");
+        assert_eq!(long, template_name("pipeline.company_research"));
+        assert_ne!(long, template_name("pipeline.company_reviews"));
+        for kind in [
+            "runs.probe",
+            "pipeline.company_research",
+            "pipeline.company_reviews",
+            "sources.board_search",
+            "a.b",
+            "x_______________________y",
+            "inbox.recruiter_reply_draft",
+        ] {
+            let name = template_name(kind);
+            assert!(
+                !name.is_empty() && name.len() <= MAX_TEMPLATE_NAME,
+                "{kind}: {name}"
+            );
+            assert!(
+                name.chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-'),
+                "{kind}: {name}"
+            );
+            assert!(
+                !name.starts_with('-') && !name.ends_with('-') && !name.contains("--"),
+                "{kind}: {name}"
+            );
+        }
     }
 
     #[test]

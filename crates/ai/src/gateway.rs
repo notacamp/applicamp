@@ -177,6 +177,10 @@ pub struct Usage {
     /// Completion tokens.
     #[serde(default)]
     pub completion_tokens: u32,
+    /// Of the completion tokens, the ones a reasoning model spent thinking
+    /// (when the provider says).
+    #[serde(default)]
+    pub reasoning_tokens: u32,
 }
 
 /// A chat completion.
@@ -193,6 +197,9 @@ pub struct ChatResponse {
     pub finish_reason: Option<String>,
     /// Tokens used, when the provider says.
     pub usage: Option<Usage>,
+    /// Which of the model's providers answered, when a router says
+    /// (OpenRouter).
+    pub provider: Option<String>,
 }
 
 impl std::fmt::Debug for ChatResponse {
@@ -202,6 +209,7 @@ impl std::fmt::Debug for ChatResponse {
             .field("model", &self.model)
             .field("finish_reason", &self.finish_reason)
             .field("usage", &self.usage)
+            .field("provider", &self.provider)
             .field("cost_usd", &self.cost_usd)
             .finish()
     }
@@ -287,6 +295,18 @@ struct UsageRequest {
     include: bool,
 }
 
+/// OpenRouter: how long a reasoning model may think.
+#[derive(Serialize)]
+struct ReasoningRequest<'a> {
+    effort: &'a str,
+}
+
+/// OpenRouter: which of a model's providers may answer.
+#[derive(Serialize)]
+struct RoutingRequest {
+    require_parameters: bool,
+}
+
 #[derive(Serialize)]
 struct WireRequest<'a> {
     model: &'a str,
@@ -300,12 +320,19 @@ struct WireRequest<'a> {
     stream: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     usage: Option<UsageRequest>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reasoning: Option<ReasoningRequest<'a>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    provider: Option<RoutingRequest>,
 }
 
 #[derive(Deserialize)]
 struct WireResponse {
     #[serde(default)]
     model: String,
+    /// OpenRouter: the provider that answered.
+    #[serde(default)]
+    provider: Option<String>,
     choices: Vec<WireChoice>,
     usage: Option<WireUsage>,
 }
@@ -319,6 +346,14 @@ struct WireUsage {
     /// OpenRouter: what the call cost, in USD credits.
     #[serde(default)]
     cost: Option<f64>,
+    #[serde(default)]
+    completion_tokens_details: Option<WireCompletionDetails>,
+}
+
+#[derive(Deserialize)]
+struct WireCompletionDetails {
+    #[serde(default)]
+    reasoning_tokens: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -539,6 +574,8 @@ impl Gateway {
             model = %model,
             tokens_in = tokens.prompt_tokens,
             tokens_out = tokens.completion_tokens,
+            reasoning_tokens = response.usage.map_or(0, |u| u.reasoning_tokens),
+            provider = response.provider.as_deref().unwrap_or("unknown"),
             cost_usd = cost,
             finish = response.finish_reason.as_deref().unwrap_or("none"),
             "ai call"
@@ -607,6 +644,12 @@ impl Gateway {
                 .include_usage
                 .unwrap_or(true)
                 .then_some(UsageRequest { include: true }),
+            reasoning: provider
+                .reasoning_effort()
+                .map(|effort| ReasoningRequest { effort }),
+            provider: provider.require_parameters().then_some(RoutingRequest {
+                require_parameters: true,
+            }),
         };
         let mut http = self
             .http
@@ -624,6 +667,7 @@ impl Gateway {
         Ok(ChatResponse {
             content: choice.message.content.unwrap_or_default(),
             model: wire.model,
+            provider: wire.provider.filter(|p| !p.trim().is_empty()),
             finish_reason: choice.finish_reason,
             cost_usd: wire
                 .usage
@@ -633,6 +677,10 @@ impl Gateway {
             usage: wire.usage.map(|u| Usage {
                 prompt_tokens: u.prompt_tokens,
                 completion_tokens: u.completion_tokens,
+                reasoning_tokens: u
+                    .completion_tokens_details
+                    .and_then(|d| d.reasoning_tokens)
+                    .unwrap_or(0),
             }),
         })
     }
@@ -759,6 +807,7 @@ mod tests {
             model: "m".to_owned(),
             finish_reason: Some("stop".to_owned()),
             usage: None,
+            provider: None,
             cost_usd: None,
         }
     }

@@ -283,6 +283,97 @@ async fn a_limit_reached_mid_search_keeps_what_was_scored(db: PgPool) {
     assert_eq!(body["code"], "ai_budget_reached");
 }
 
+/// A model that answers batches of at most `fits` jobs, and cuts off the
+/// answer of a bigger one (as a provider that thinks too long does);
+/// `fits` 0 cuts off every answer.
+async fn model_cut_off_above(fits: usize) -> MockServer {
+    let model = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(move |request: &wiremock::Request| {
+            let body: Value = serde_json::from_slice(&request.body).unwrap_or(Value::Null);
+            let user = body["messages"][1]["content"]
+                .as_str()
+                .unwrap_or("")
+                .to_owned();
+            let refs: Vec<String> = (1..=10)
+                .map(|i| format!("j{i}"))
+                .filter(|r| user.contains(&format!("\"ref\":\"{r}\"")))
+                .collect();
+            if fits == 0 || refs.len() > fits {
+                return ResponseTemplate::new(200).set_body_json(json!({
+                    "model": "test/model",
+                    "choices": [{
+                        "message": { "role": "assistant", "content": "{\"jobs\": [{\"ref\": \"j1\"," },
+                        "finish_reason": "length",
+                    }],
+                    "usage": { "prompt_tokens": 3000, "completion_tokens": 8000, "cost": 0.0001 },
+                }));
+            }
+            let jobs: Vec<Value> = refs
+                .iter()
+                .map(|r| answer_for(r, 80, &open_facts()))
+                .collect();
+            ResponseTemplate::new(200).set_body_json(completion(&json!({ "jobs": jobs }), 0.0001))
+        })
+        .mount(&model)
+        .await;
+    model
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_cut_off_answer_is_scored_again_in_halves(db: PgPool) {
+    let boards = board_of(15).await;
+    let model = model_cut_off_above(5).await;
+    let h = Harness::new(
+        db,
+        config(&boards),
+        Some(gateway(&model, BudgetConfig::default())),
+        Fake::ready(),
+    )
+    .await;
+    let (status, _) = h.post("/api/v1/searches").await;
+    assert_eq!(status, StatusCode::ACCEPTED);
+    h.work().await;
+
+    let search = latest(&h).await;
+    assert_eq!(search["status"], "finished", "{search}");
+    assert_eq!(
+        search["stopped"],
+        Value::Null,
+        "one bad answer does not end it"
+    );
+    assert_eq!(search["scored"], 15);
+    assert_eq!(search["added"], 15);
+    // Ten (cut off), its two halves of five, then the last five.
+    assert_eq!(model_calls(&model).await, 4);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn answers_cut_off_again_and_again_stop_the_scoring(db: PgPool) {
+    let boards = board_of(25).await;
+    let model = model_cut_off_above(0).await;
+    let h = Harness::new(
+        db,
+        config(&boards),
+        Some(gateway(&model, BudgetConfig::default())),
+        Fake::ready(),
+    )
+    .await;
+    let (status, _) = h.post("/api/v1/searches").await;
+    assert_eq!(status, StatusCode::ACCEPTED);
+    h.work().await;
+
+    let search = latest(&h).await;
+    assert_eq!(search["status"], "finished", "{search}");
+    assert_eq!(search["stopped"], "ai_failed");
+    assert_eq!(search["scored"], 0);
+    assert_eq!(
+        model_calls(&model).await,
+        usize::try_from(super::FAILED_IN_A_ROW).unwrap(),
+        "the provider is down: no more calls"
+    );
+}
+
 #[sqlx::test(migrations = "../../../migrations")]
 async fn at_the_monthly_limit_a_search_makes_no_model_call(db: PgPool) {
     let boards = greenhouse_boards().await;

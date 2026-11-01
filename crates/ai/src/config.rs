@@ -14,6 +14,15 @@
 //! - `APPLICAMP_AI__COMPLETE__INCLUDE_USAGE`: ask the provider for each
 //!   call's cost (`"usage": {"include": true}`, OpenRouter); default `true`,
 //!   `false` for a provider that refuses unknown fields.
+//! - `APPLICAMP_AI__COMPLETE__REASONING_EFFORT`: how long a reasoning model
+//!   may think before it answers (`"reasoning": {"effort": …}`: `minimal`,
+//!   `low`, `medium`, `high`); default `low` on OpenRouter, nothing sent
+//!   elsewhere; `none` sends nothing. Some of a model's providers think for
+//!   thousands of tokens by default and run out of room before the answer.
+//! - `APPLICAMP_AI__COMPLETE__REQUIRE_PARAMETERS`: route only to providers
+//!   that support every parameter sent, the answer's JSON shape included
+//!   (`"provider": {"require_parameters": true}`, OpenRouter); default
+//!   `true` on OpenRouter, `false` elsewhere.
 //! - `APPLICAMP_AI__COMPLETE__PRICE_IN_USD_PER_MTOK` and `…_PRICE_OUT_…`: the
 //!   model's price in US dollars per million tokens, when the built-in table
 //!   ([`crate::price`]) does not know it.
@@ -42,6 +51,9 @@ use crate::Error;
 
 /// Tokens one account may use per UTC day when nothing else is set.
 pub const DEFAULT_DAILY_TOKENS: u64 = 200_000;
+/// The reasoning effort sent to OpenRouter unless configured: enough to
+/// answer well, short enough to leave room for the answer.
+pub const DEFAULT_REASONING_EFFORT: &str = "low";
 /// What one account may spend per UTC day, in euros, by default.
 pub const DEFAULT_ACCOUNT_DAILY_EUR: f64 = 0.30;
 /// What one account may spend per calendar month (UTC), in euros, by default.
@@ -101,6 +113,14 @@ pub struct ProviderConfig {
     /// table.
     #[serde(default, deserialize_with = "lenient_f64")]
     pub price_out_usd_per_mtok: Option<f64>,
+    /// How long a reasoning model may think; `None` is the default for the
+    /// provider ([`ProviderConfig::reasoning_effort`]).
+    #[serde(default)]
+    pub reasoning_effort: Option<String>,
+    /// Route only to providers that support every parameter sent; `None`
+    /// is the default for the provider.
+    #[serde(default, deserialize_with = "lenient_bool")]
+    pub require_parameters: Option<bool>,
 }
 
 impl fmt::Debug for ProviderConfig {
@@ -124,7 +144,32 @@ impl ProviderConfig {
             include_usage: None,
             price_in_usd_per_mtok: None,
             price_out_usd_per_mtok: None,
+            reasoning_effort: None,
+            require_parameters: None,
         }
+    }
+
+    /// Whether this is OpenRouter, whose routing fields the defaults use.
+    pub fn is_openrouter(&self) -> bool {
+        self.base_url
+            .host_str()
+            .is_some_and(|host| host == "openrouter.ai" || host.ends_with(".openrouter.ai"))
+    }
+
+    /// The reasoning effort to send: as configured (`none` or blank sends
+    /// nothing), else `low` on OpenRouter and nothing elsewhere.
+    pub fn reasoning_effort(&self) -> Option<&str> {
+        match self.reasoning_effort.as_deref().map(str::trim) {
+            Some(effort) if effort.is_empty() || effort.eq_ignore_ascii_case("none") => None,
+            Some(effort) => Some(effort),
+            None => self.is_openrouter().then_some(DEFAULT_REASONING_EFFORT),
+        }
+    }
+
+    /// Whether to route only to providers that support every parameter.
+    pub fn require_parameters(&self) -> bool {
+        self.require_parameters
+            .unwrap_or_else(|| self.is_openrouter())
     }
 
     /// The same provider at this price, in US dollars per million tokens.
@@ -365,6 +410,48 @@ mod tests {
             Err(Error::NotConfigured(Role::Complete))
         ));
         assert_eq!(config.daily_token_cap(), Some(DEFAULT_DAILY_TOKENS));
+    }
+
+    #[test]
+    fn openrouter_gets_low_reasoning_and_strict_routing_unless_configured() {
+        let at = |base: &str| ProviderConfig::new(base.parse().unwrap(), "m");
+        let openrouter = at("https://openrouter.ai/api/v1");
+        assert!(openrouter.is_openrouter());
+        assert_eq!(
+            openrouter.reasoning_effort(),
+            Some(DEFAULT_REASONING_EFFORT)
+        );
+        assert!(openrouter.require_parameters());
+
+        let local = at("http://ollama:11434/v1");
+        assert!(!local.is_openrouter());
+        assert_eq!(local.reasoning_effort(), None);
+        assert!(!local.require_parameters());
+
+        let mut set = at("https://openrouter.ai/api/v1");
+        set.reasoning_effort = Some("none".to_owned());
+        set.require_parameters = Some(false);
+        assert_eq!(set.reasoning_effort(), None);
+        assert!(!set.require_parameters());
+        set.reasoning_effort = Some(" medium ".to_owned());
+        assert_eq!(set.reasoning_effort(), Some("medium"));
+        let mut elsewhere = at("http://ollama:11434/v1");
+        elsewhere.reasoning_effort = Some("high".to_owned());
+        assert_eq!(elsewhere.reasoning_effort(), Some("high"));
+    }
+
+    #[test]
+    fn reasoning_and_routing_are_read_from_the_environment() {
+        let config = load(serde_json::json!({ "ai": { "complete": {
+            "base_url": "https://openrouter.ai/api/v1",
+            "model": "some/model",
+            "reasoning_effort": "minimal",
+            "require_parameters": "false",
+        }}}))
+        .unwrap();
+        let provider = config.provider(Role::Complete).unwrap();
+        assert_eq!(provider.reasoning_effort(), Some("minimal"));
+        assert!(!provider.require_parameters());
     }
 
     #[test]

@@ -16,7 +16,7 @@ use serde::Deserialize;
 use crate::ports::ProfileDigest;
 
 /// Most facts a read keeps.
-pub const MOST_FACTS: usize = 12;
+pub const MOST_FACTS: usize = 10;
 /// Most things a job is said to want.
 pub const MOST_WANTS: usize = 6;
 /// Most questions asked about a job.
@@ -346,7 +346,7 @@ mod tests {
     }
 
     #[test]
-    fn at_most_twelve_facts_are_kept() {
+    fn at_most_ten_facts_are_kept() {
         let facts: Vec<_> = (0..15)
             .map(|n| {
                 json!({ "text": format!("Fact {n}"), "quote": "We are 40 people in Porto",
@@ -355,7 +355,7 @@ mod tests {
             .collect();
         let (kept, dropped) = judge_facts(raw_facts(json!({ "facts": facts })), &pages());
         assert_eq!(kept.len(), MOST_FACTS);
-        assert_eq!(dropped, 3);
+        assert_eq!(dropped, 5);
     }
 
     fn profile() -> ProfileDigest {

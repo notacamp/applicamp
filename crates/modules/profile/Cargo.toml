@@ -14,6 +14,7 @@ applicamp-kernel.workspace = true
 axum.workspace = true
 chrono.workspace = true
 csv.workspace = true
+futures.workspace = true
 pdf-extract.workspace = true
 regex.workspace = true
 schemars.workspace = true

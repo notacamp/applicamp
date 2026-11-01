@@ -33,7 +33,12 @@ import { errorCode, firstError } from "./labels";
 import { AboutLegend, PortraitText } from "./PortraitText";
 
 /** The kinds of question whose answer can be several of the choices. */
-const MANY: ReadonlySet<AboutQuestion["kind"]> = new Set(["assumed", "skills", "skills_found"]);
+const MANY: ReadonlySet<AboutQuestion["kind"]> = new Set([
+  "assumed",
+  "skills",
+  "skills_found",
+  "results",
+]);
 
 /** Where a change goes in the profile, in words. */
 function whereOf(t: TFunction<"profile">, change: AboutChange, view: AboutView): string {
@@ -314,8 +319,17 @@ function QuestionCard({
           ))}
         </Cluster>
       )}
+      {question.kind === "results" ? (
+        <Text tone="tertiary" size="sm" as="p">
+          <span data-testid="about-q-number-hint">{t("about.questions.numberHint")}</span>
+        </Text>
+      ) : null}
       <TextArea
-        label={t("about.questions.answerLabel")}
+        label={
+          question.choices.length === 0
+            ? t("about.questions.answerLabel")
+            : t("about.questions.answerLabelChoices")
+        }
         value={text}
         rows={4}
         maxLength={MAX_EXTRA}

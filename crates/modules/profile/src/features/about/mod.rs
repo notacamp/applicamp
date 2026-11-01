@@ -42,7 +42,11 @@ pub mod questions;
 #[cfg(test)]
 mod tests;
 
-use std::collections::{BTreeMap, HashSet};
+use std::{
+    collections::{BTreeMap, HashSet},
+    sync::Mutex,
+    time::Duration,
+};
 
 use applicamp_ai::{Caller, ChatRequest, Gateway, Message, ResponseFormat};
 use applicamp_kernel::{AppState, Error, Problem, Result, auth::SignedIn, jobs};
@@ -51,6 +55,7 @@ use axum::{
     extract::{Path, Query, State, rejection::JsonRejection},
 };
 use chrono::{DateTime, Datelike as _, TimeDelta, Utc};
+use futures::{StreamExt as _, stream};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use sqlx::{PgConnection, PgPool};
@@ -68,7 +73,7 @@ use crate::{
         imports::{Ai, ExpireImports},
     },
     goals::Goals,
-    ports::{FactBasis, ProposedFact, Researcher},
+    ports::{FactBasis, ProposedFact, Research, Researcher},
     schema::{Area, FactStatus, Profile, ProfileFact, Skill},
     strength,
 };
@@ -82,6 +87,17 @@ pub const DAILY_CAP: i64 = 60;
 pub const MAX_EXTRA: usize = 4_000;
 /// Most past employers researched (the latest).
 pub const MAX_EMPLOYERS: usize = 5;
+/// Past employers read at the same time.
+const PARALLEL_READS: usize = 3;
+/// The longest one employer's read may take.
+const EMPLOYER_TIMEOUT: Duration = Duration::from_secs(25);
+/// The longest the portrait waits for all the reads together; an employer
+/// still being read then is reported as such and the portrait goes on.
+const RESEARCH_WINDOW: Duration = Duration::from_secs(28);
+/// About the longest the portrait request takes, reads and call together.
+const PORTRAIT_TOTAL: Duration = Duration::from_secs(40);
+/// The least the portrait call itself is given.
+const PORTRAIT_MIN: Duration = Duration::from_secs(12);
 /// How long pending state lives after the last touch.
 pub const PENDING_LIFETIME: TimeDelta = TimeDelta::days(7);
 /// Answer budgets in tokens: the first attempt, and the one retry after a
@@ -431,6 +447,150 @@ async fn ask<T: DeserializeOwned>(
     Err(last)
 }
 
+// ---- researching the employers ------------------------------------------------
+
+/// A spending limit or a missing model: the one failure that ends the whole
+/// step, in plain words. Anything else is that employer's alone.
+fn is_limit(error: &Error) -> bool {
+    matches!(
+        error.code(),
+        applicamp_ai::AI_UNAVAILABLE
+            | applicamp_ai::AI_DAILY_LIMIT_REACHED
+            | applicamp_ai::AI_BUDGET_REACHED
+    )
+}
+
+/// An employer read, kept: its state, its facts counted, no error.
+fn mark_read(employer: &mut EmployerView, result: Research) -> Vec<ProposedFact> {
+    let facts: Vec<ProposedFact> = result
+        .facts
+        .into_iter()
+        .map(ProposedFact::checked)
+        .collect();
+    employer.site = result.site.or(employer.site.take());
+    employer.state = EmployerState::Read;
+    employer.facts = counted(
+        i64::try_from(
+            facts
+                .iter()
+                .filter(|f| f.status == FactBasis::Sourced)
+                .count(),
+        )
+        .unwrap_or(0),
+    );
+    employer.error = None;
+    facts
+}
+
+/// An employer that could not be read, with the reason's code.
+fn mark_failed(employer: &mut EmployerView, code: &str) {
+    employer.state = EmployerState::Failed;
+    employer.facts = 0;
+    employer.error = Some(code.to_owned());
+}
+
+/// Read one employer within its own time.
+async fn read_one(
+    port: &dyn crate::ports::EmployerResearch,
+    state: &AppState,
+    account: Uuid,
+    company: &str,
+    now: DateTime<Utc>,
+) -> std::result::Result<Research, Error> {
+    tokio::time::timeout(EMPLOYER_TIMEOUT, port.run(state, account, company, now))
+        .await
+        .unwrap_or_else(|_| Err(Error::Unavailable("research_timeout")))
+}
+
+/// Research the employers, best effort: at most [`PARALLEL_READS`] at a time,
+/// each within [`EMPLOYER_TIMEOUT`], all within [`RESEARCH_WINDOW`]. A read
+/// that fails is recorded on that employer only, and the portrait goes on
+/// with the ones that read. An employer whose last read failed is not read
+/// again here: only the person's *Try again* does that. Each read that
+/// started counts toward the daily cap, whatever came of it.
+async fn research_employers(
+    state: &AppState,
+    research: &Researcher,
+    account: Uuid,
+    employers: &mut [EmployerView],
+    now: DateTime<Utc>,
+) -> Result<Vec<(usize, Vec<ProposedFact>)>> {
+    let mut found: Vec<(usize, Vec<ProposedFact>)> = Vec::new();
+    let Some(port) = research.0.as_deref() else {
+        return Ok(found);
+    };
+    // Which to read: a known site, and not one that failed last time. The cap
+    // is checked up front, the portrait's own call kept in reserve.
+    let mut planned = calls_today(&state.db, account, now).await?;
+    let mut todo: Vec<usize> = Vec::new();
+    for (at, employer) in employers.iter_mut().enumerate() {
+        if employer.site.is_none() || employer.state == EmployerState::Failed {
+            continue;
+        }
+        if over_cap(planned, 2) {
+            mark_failed(employer, "about_daily_cap");
+            continue;
+        }
+        planned += 1;
+        todo.push(at);
+    }
+
+    let begun: Mutex<HashSet<usize>> = Mutex::new(HashSet::new());
+    let mut done: HashSet<usize> = HashSet::new();
+    let jobs: Vec<(usize, String)> = todo
+        .iter()
+        .map(|&at| (at, employers[at].company.clone()))
+        .collect();
+    let reads = stream::iter(jobs.into_iter().map(|(at, company)| {
+        let begun = &begun;
+        async move {
+            if let Ok(mut set) = begun.lock() {
+                set.insert(at);
+            }
+            (at, read_one(port, state, account, &company, now).await)
+        }
+    }))
+    .buffer_unordered(PARALLEL_READS);
+    tokio::pin!(reads);
+    let deadline = tokio::time::Instant::now() + RESEARCH_WINDOW;
+    while let Ok(Some((at, outcome))) = tokio::time::timeout_at(deadline, reads.next()).await {
+        done.insert(at);
+        match outcome {
+            Ok(result) => {
+                if result.read {
+                    record_call(&state.db, account, "research", now).await?;
+                }
+                let facts = mark_read(&mut employers[at], result);
+                found.push((employers[at].position as usize, facts));
+            }
+            Err(error) if is_limit(&error) => return Err(error),
+            Err(error) => {
+                // Charged all the same: the site was fetched and the model
+                // may have been reached.
+                record_call(&state.db, account, "research", now).await?;
+                mark_failed(&mut employers[at], error.code());
+            }
+        }
+    }
+    // Still running when the window closed: the portrait goes on without it.
+    let begun: HashSet<usize> = begun.lock().map(|set| set.clone()).unwrap_or_default();
+    for &at in todo.iter().filter(|at| !done.contains(at)) {
+        if begun.contains(&at) {
+            record_call(&state.db, account, "research", now).await?;
+        }
+        mark_failed(&mut employers[at], "research_timeout");
+    }
+    tracing::info!(
+        read = found.len(),
+        failed = employers
+            .iter()
+            .filter(|e| e.state == EmployerState::Failed)
+            .count(),
+        "the employers were researched"
+    );
+    Ok(found)
+}
+
 // ---- the view -------------------------------------------------------------
 
 /// The latest employers as they are now: stored results where the portrait
@@ -714,6 +874,7 @@ pub async fn portrait(
     Extension(research): Extension<Researcher>,
     Query(query): Query<PortraitQuery>,
 ) -> Result<Json<AboutView>> {
+    let started = tokio::time::Instant::now();
     let account = principal.account_id;
     let seen = current(&state.db, account)
         .await?
@@ -738,50 +899,7 @@ pub async fn portrait(
         .as_ref()
         .map_or_else(Vec::new, |r| r.employers.0.clone());
     let mut employers = employers_of(&state, &research, account, &seen.profile, &stored).await?;
-    let mut found: Vec<(usize, Vec<ProposedFact>)> = Vec::new();
-    if let Some(port) = research.0.as_deref() {
-        for employer in &mut employers {
-            if employer.site.is_none() {
-                continue;
-            }
-            if over_cap(calls_today(&state.db, account, now).await?, 2) {
-                employer.state = EmployerState::Failed;
-                employer.error = Some("about_daily_cap".to_owned());
-                continue;
-            }
-            match port.run(&state, account, &employer.company, now).await {
-                Ok(result) => {
-                    if result.read {
-                        record_call(&state.db, account, "research", now).await?;
-                    }
-                    let facts: Vec<ProposedFact> = result
-                        .facts
-                        .into_iter()
-                        .map(ProposedFact::checked)
-                        .collect();
-                    employer.site = result.site.or(employer.site.take());
-                    employer.state = EmployerState::Read;
-                    employer.facts = counted(
-                        i64::try_from(
-                            facts
-                                .iter()
-                                .filter(|f| f.status == FactBasis::Sourced)
-                                .count(),
-                        )
-                        .unwrap_or(0),
-                    );
-                    employer.error = None;
-                    found.push((employer.position as usize, facts));
-                }
-                // A spending limit ends the whole step, in plain words.
-                Err(error) if error.code().starts_with("ai_") => return Err(error),
-                Err(error) => {
-                    employer.state = EmployerState::Failed;
-                    employer.error = Some(error.code().to_owned());
-                }
-            }
-        }
-    }
+    let found = research_employers(&state, &research, account, &mut employers, now).await?;
 
     let sources = prompt::sources_of(&seen.profile, &seen.goals, &found, now.year());
     let role_keys: Vec<String> = seen.profile.work.iter().map(grill::role_key).collect();
@@ -791,17 +909,30 @@ pub async fn portrait(
         language(query.locale.as_deref()).as_deref(),
         &now.date_naive().to_string(),
     );
-    let raw: RawPortrait = ask(
-        gateway,
-        &state.db,
-        account,
-        now,
-        "profile_about_portrait",
-        &prompt::portrait_schema(),
-        prompt::PORTRAIT_INSTRUCTIONS,
-        &message,
+    // The portrait call gets what is left of the request's own time: an answer
+    // (or the error) always comes within about PORTRAIT_TOTAL, never after a
+    // minute of waiting.
+    let left = PORTRAIT_TOTAL
+        .saturating_sub(started.elapsed())
+        .max(PORTRAIT_MIN);
+    let raw: RawPortrait = tokio::time::timeout(
+        left,
+        ask(
+            gateway,
+            &state.db,
+            account,
+            now,
+            "profile_about_portrait",
+            &prompt::portrait_schema(),
+            prompt::PORTRAIT_INSTRUCTIONS,
+            &message,
+        ),
     )
-    .await?;
+    .await
+    .map_err(|_| {
+        tracing::warn!("the portrait call took too long");
+        Error::Unavailable(applicamp_ai::AI_FAILED)
+    })??;
     record_call(&state.db, account, "portrait", now).await?;
     let judged = judge::judge_portrait(raw, &sources, &role_keys);
     // Ids and counts only: never the profile or the sentences.
@@ -968,6 +1099,107 @@ pub async fn employer_site(
         .as_deref()
         .ok_or(Error::Unavailable("research_unavailable"))?;
     port.set_site(&state, account, company, &url).await?;
+    // A new address deserves a new read: forget that the last one failed.
+    let now = state.clock.now();
+    let mut tx = state.db.begin().await?;
+    if let Some(mut row) = lock(&mut tx, account, now).await? {
+        let mut changed = false;
+        for employer in &mut row.employers.0 {
+            if employer.company == company && employer.state == EmployerState::Failed {
+                employer.state = EmployerState::Unread;
+                employer.error = None;
+                changed = true;
+            }
+        }
+        if changed {
+            put(&mut tx, account, &row, now).await?;
+        }
+    }
+    tx.commit().await?;
+    respond(&state, &research, account).await
+}
+
+/// Read one past employer's website again, after it could not be read.
+///
+/// Only that employer: **one model call**, counted toward the day's limit
+/// like any other. Whatever comes of it is shown on that employer's row, and
+/// the portrait is not touched; *Update the portrait* uses what was found. A
+/// read that fails is never retried by itself: only this does it.
+#[utoipa::path(
+    post,
+    path = "/api/v1/profile/about/employers/{position}/retry",
+    tag = "profile",
+    operation_id = "profile.about_employer_retry",
+    security(("session" = [])),
+    params(("position" = u32, Path, description = "A position of the profile's `work` list.")),
+    responses(
+        (status = 200, description = "The wizard's state, with that employer's new state.",
+            body = AboutView),
+        (status = 401, description = "`session_required`", body = Problem,
+            content_type = "application/problem+json"),
+        (status = 404, description = "`not_found`: no such employer", body = Problem,
+            content_type = "application/problem+json"),
+        (status = 409, description = "`portrait_needed`", body = Problem,
+            content_type = "application/problem+json"),
+        (status = 429, description = "`about_daily_cap`", body = Problem,
+            content_type = "application/problem+json"),
+        (status = 503, description = "`research_unavailable`; `ai_unavailable`; \
+            `ai_daily_limit_reached`; `ai_budget_reached`", body = Problem,
+            content_type = "application/problem+json"),
+    ),
+)]
+pub async fn employer_retry(
+    State(state): State<AppState>,
+    SignedIn(principal): SignedIn,
+    Extension(research): Extension<Researcher>,
+    Path(position): Path<u32>,
+) -> Result<Json<AboutView>> {
+    let account = principal.account_id;
+    let now = state.clock.now();
+    let port = research
+        .0
+        .as_deref()
+        .ok_or(Error::Unavailable("research_unavailable"))?;
+    let row = row_of(&state.db, account, now)
+        .await?
+        .ok_or_else(|| Error::Conflict("portrait_needed", "Start with the portrait.".to_owned()))?;
+    let company = row
+        .employers
+        .0
+        .iter()
+        .find(|e| e.position == position && e.site.is_some())
+        .map(|e| e.company.clone())
+        .ok_or(Error::NotFound)?;
+    if over_cap(calls_today(&state.db, account, now).await?, 1) {
+        return Err(cap_reached());
+    }
+    let outcome = match read_one(port, &state, account, &company, now).await {
+        Err(error) if is_limit(&error) => return Err(error),
+        other => other,
+    };
+    // A failed read is charged all the same.
+    if !matches!(&outcome, Ok(result) if !result.read) {
+        record_call(&state.db, account, "research", now).await?;
+    }
+
+    let mut tx = state.db.begin().await?;
+    let mut row = lock(&mut tx, account, now)
+        .await?
+        .ok_or_else(|| Error::Conflict("portrait_needed", "Start with the portrait.".to_owned()))?;
+    let employer = row
+        .employers
+        .0
+        .iter_mut()
+        .find(|e| e.position == position && e.company == company)
+        .ok_or(Error::NotFound)?;
+    match outcome {
+        Ok(result) => {
+            mark_read(employer, result);
+        }
+        Err(error) => mark_failed(employer, error.code()),
+    }
+    put(&mut tx, account, &row, now).await?;
+    tx.commit().await?;
     respond(&state, &research, account).await
 }
 

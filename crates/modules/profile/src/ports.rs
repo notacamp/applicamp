@@ -93,6 +93,18 @@ pub trait EmployerResearch: Send + Sync + 'static {
         url: &'a str,
     ) -> BoxFuture<'a, Result<String>>;
 
+    /// The facts already kept about `company` (the texts, newest last), for
+    /// wording a question. Never reads a site and never calls a model; an
+    /// instance with nothing kept returns none.
+    fn known_facts<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        _account: Uuid,
+        _company: &'a str,
+    ) -> BoxFuture<'a, Result<Vec<String>>> {
+        Box::pin(async { Ok(Vec::new()) })
+    }
+
     /// What `company`'s own pages say: read now (**one model call**) unless
     /// the facts are fresh (30 days). Without a known site, nothing is
     /// fetched and nothing is found.

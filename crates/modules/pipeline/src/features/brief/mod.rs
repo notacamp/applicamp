@@ -69,6 +69,9 @@ pub const ANSWER_EUR: f64 = 0.0005;
 /// Answer budgets in tokens: the first attempt, and the one retry after a
 /// cut-off (a reasoning model thinks first, and thinking counts).
 const BUDGETS: [u32; 2] = [4_000, 8_000];
+/// The facts call's answer budget, both attempts (the second gets less to
+/// read, not more room).
+const FACTS_TOKENS: u32 = 4_000;
 /// Longest answer, in characters (Grill me's).
 const MAX_ANSWER: usize = 2_000;
 
@@ -591,29 +594,61 @@ pub(crate) async fn ask<T: DeserializeOwned>(
     system: &str,
     user: &str,
 ) -> Result<T> {
-    let caller = Caller { db, account, now };
     let mut last = Error::Unavailable(applicamp_ai::AI_FAILED);
     for max_tokens in BUDGETS {
-        let request = ChatRequest {
-            temperature: Some(0.0),
-            max_tokens: Some(max_tokens),
-            response_format: Some(ResponseFormat::json_schema(name, schema.clone())),
-            ..ChatRequest::new(vec![Message::system(system), Message::user(user)])
-        };
-        let reply = gateway.complete(caller, request).await?;
-        if reply.finish_reason.as_deref() == Some("length") {
-            tracing::warn!(max_tokens, call = name, "an answer was cut off");
-            continue;
-        }
-        match reply.json::<T>() {
-            Ok(read) => return Ok(read),
-            Err(error) => {
-                tracing::warn!(%error, call = name, "an answer was unusable");
-                last = Error::from(error);
-            }
+        match ask_attempt(
+            gateway, db, account, now, name, schema, system, user, max_tokens,
+        )
+        .await?
+        {
+            Attempt::Done(read) => return Ok(read),
+            Attempt::Retry(error) => last = error,
         }
     }
     Err(last)
+}
+
+/// What one call came to.
+pub(crate) enum Attempt<T> {
+    /// The answer.
+    Done(T),
+    /// Cut off, or not usable: try again, with the error to give if it was
+    /// the last try.
+    Retry(Error),
+}
+
+/// One call with `max_tokens`. A spending limit is an `Err` at once.
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn ask_attempt<T: DeserializeOwned>(
+    gateway: &Gateway,
+    db: &PgPool,
+    account: Uuid,
+    now: DateTime<Utc>,
+    name: &str,
+    schema: &Value,
+    system: &str,
+    user: &str,
+    max_tokens: u32,
+) -> Result<Attempt<T>> {
+    let caller = Caller { db, account, now };
+    let request = ChatRequest {
+        temperature: Some(0.0),
+        max_tokens: Some(max_tokens),
+        response_format: Some(ResponseFormat::json_schema(name, schema.clone())),
+        ..ChatRequest::new(vec![Message::system(system), Message::user(user)])
+    };
+    let reply = gateway.complete(caller, request).await?;
+    if reply.finish_reason.as_deref() == Some("length") {
+        tracing::warn!(max_tokens, call = name, "an answer was cut off");
+        return Ok(Attempt::Retry(Error::Unavailable(applicamp_ai::AI_FAILED)));
+    }
+    match reply.json::<T>() {
+        Ok(read) => Ok(Attempt::Done(read)),
+        Err(error) => {
+            tracing::warn!(%error, call = name, "an answer was unusable");
+            Ok(Attempt::Retry(Error::from(error)))
+        }
+    }
 }
 
 // ---- reading --------------------------------------------------------------
@@ -721,18 +756,39 @@ async fn fetch_and_store(
                 ),
             })?;
 
-    let (message, shown) = prompt::facts_message(company, &reading.pages);
-    let raw: RawFacts = ask(
-        gateway,
-        db,
-        account,
-        now,
-        "pipeline_company_facts",
-        &prompt::facts_schema(),
-        prompt::FACTS_INSTRUCTIONS,
-        &message,
-    )
-    .await?;
+    // Two attempts at the same answer size: when the first is cut off, the
+    // second is shown half the page text (the posting first, then the pages
+    // by priority), never the same input with more room.
+    let mut made: Option<(RawFacts, Vec<(String, String)>)> = None;
+    let mut last = Error::Unavailable(applicamp_ai::AI_FAILED);
+    for attempt in 0..2 {
+        let (message, shown) =
+            prompt::facts_message_within(company, &reading.pages, prompt::pages_budget(attempt));
+        match ask_attempt::<RawFacts>(
+            gateway,
+            db,
+            account,
+            now,
+            "pipeline_company_facts",
+            &prompt::facts_schema(),
+            prompt::FACTS_INSTRUCTIONS,
+            &message,
+            FACTS_TOKENS,
+        )
+        .await?
+        {
+            Attempt::Done(raw) => {
+                // Ids and counts only.
+                tracing::info!(attempt = attempt + 1, "a company read worked");
+                made = Some((raw, shown));
+                break;
+            }
+            Attempt::Retry(error) => last = error,
+        }
+    }
+    let Some((raw, shown)) = made else {
+        return Err(last);
+    };
     let (facts, dropped) = judge::judge_facts(raw, &shown);
 
     store_read(

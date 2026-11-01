@@ -53,6 +53,10 @@ services:
           # A company's own site (#34): a posting pasted at
           # http://example-co.test:9020/jobs/staff-engineer.
           - example-co.test
+          # Companies whose site fails the first visit (Try again, #51).
+          - flaky-desktop.test
+          - flaky-phone.test
+          - flaky-demo.test
     environment:
       FAKE_JOBS_HOST: 0.0.0.0
       FAKE_JOBS_PORT: "9020"

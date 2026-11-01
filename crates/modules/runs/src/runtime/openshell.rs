@@ -67,7 +67,9 @@ impl Refresh for GatewayToken {
 pub struct OpenShellRuntime {
     gateway: String,
     ca: Option<Vec<u8>>,
-    token: Arc<GatewayToken>,
+    /// The bearer of every call; none only for the contract test's
+    /// unauthenticated gateway.
+    token: Option<Arc<GatewayToken>>,
     image: String,
     client: OnceCell<OpenShellClient>,
 }
@@ -89,7 +91,20 @@ impl OpenShellRuntime {
         Self {
             gateway,
             ca,
-            token: Arc::new(GatewayToken(issuer)),
+            token: Some(Arc::new(GatewayToken(issuer))),
+            image,
+            client: OnceCell::new(),
+        }
+    }
+
+    /// The gateway at `gateway` with no authentication: the contract test's
+    /// plaintext gateway that lets unauthenticated users in. Never in a build.
+    #[cfg(test)]
+    pub(crate) fn anonymous(gateway: String, image: String) -> Self {
+        Self {
+            gateway,
+            ca: None,
+            token: None,
             image,
             client: OnceCell::new(),
         }
@@ -98,15 +113,17 @@ impl OpenShellRuntime {
     async fn client(&self) -> Result<&OpenShellClient> {
         self.client
             .get_or_try_init(|| async {
-                let (token, exp) = self.token.mint().map_err(RuntimeError)?;
                 let mut config = ClientConfig::new(self.gateway.clone());
                 config.ca_cert.clone_from(&self.ca);
-                let refresh: Arc<dyn Refresh> = self.token.clone();
-                config.auth = Some(AuthConfig::Oidc {
-                    token,
-                    expires_at: Some(exp),
-                    refresh: Some(refresh),
-                });
+                if let Some(minter) = &self.token {
+                    let (token, exp) = minter.mint().map_err(RuntimeError)?;
+                    let refresh: Arc<dyn Refresh> = minter.clone();
+                    config.auth = Some(AuthConfig::Oidc {
+                        token,
+                        expires_at: Some(exp),
+                        refresh: Some(refresh),
+                    });
+                }
                 OpenShellClient::connect(config)
                     .await
                     .map_err(|e| failed("connect to the gateway", &e))
@@ -482,5 +499,95 @@ mod tests {
         );
         assert_eq!(log_line("INFO", "Landlock ruleset built"), None);
         assert_eq!(log_line("INFO", r#"{"no":"seq"}"#), None);
+    }
+}
+
+/// Against a real OpenShell gateway (CI's `gateway-contract` job starts one,
+/// v0.1.6 with its Docker driver): what the fake runtime cannot check, such
+/// as the gateway's own limits on names, templates and policies. Ignored
+/// unless `OPENSHELL_CONTRACT_GATEWAY` names the gateway.
+#[cfg(test)]
+mod contract {
+    use std::time::Duration;
+
+    use url::Url;
+
+    use super::*;
+    use crate::{config::DEFAULT_AGENT_IMAGE, probe};
+
+    #[tokio::test]
+    #[ignore = "needs a real OpenShell gateway (OPENSHELL_CONTRACT_GATEWAY)"]
+    async fn a_real_gateway_takes_our_templates_and_sandboxes() {
+        let Ok(gateway) = std::env::var("OPENSHELL_CONTRACT_GATEWAY") else {
+            return;
+        };
+        let image = std::env::var("OPENSHELL_CONTRACT_IMAGE")
+            .unwrap_or_else(|_| DEFAULT_AGENT_IMAGE.to_owned());
+        let runtime = OpenShellRuntime::anonymous(gateway, image.clone());
+        let kinds = Kinds::new([probe::kind()]);
+
+        // Every kind's template is taken, and taken again unchanged: the
+        // gateway gives back the template we compare against, so a server
+        // start does not replace it.
+        runtime
+            .prepare(&kinds)
+            .await
+            .expect("the templates are taken");
+        let client = runtime.client().await.unwrap();
+        let there = client
+            .get_sandbox_template(&template_name(probe::KIND))
+            .await
+            .expect("the probe's template is there");
+        assert!(
+            same_template(&there, &template(&probe::kind(), &image)),
+            "the gateway's copy is the same template"
+        );
+        runtime.prepare(&kinds).await.expect("prepared again");
+
+        // A run's sandbox, with its policy, labels and command, as a run
+        // makes it. Its runner cannot reach the example agent API and ends.
+        let run = Uuid::now_v7();
+        let handle = runtime
+            .create(SandboxSpec {
+                run,
+                kind: probe::KIND,
+                image,
+                policy: probe::POLICY,
+                api: Url::parse("https://applicamp.example.com/").unwrap(),
+                token: "contract-test-token".to_owned(),
+            })
+            .await
+            .expect("the run's sandbox is taken");
+        // It is found by its labels, and kept while its run goes.
+        assert_eq!(runtime.sweep(&HashSet::from([run])).await.unwrap(), 0);
+        let exit = runtime
+            .wait(&handle, Instant::now() + Duration::from_secs(120))
+            .await
+            .expect("the sandbox can be watched");
+        eprintln!("the contract sandbox ended: {exit:?}");
+        runtime
+            .delete(&handle)
+            .await
+            .expect("the sandbox is deleted");
+        // The gateway deletes in the background: it is listed a little while
+        // longer (a sweep then deletes it again, harmlessly), then gone.
+        let gone_by = Instant::now() + Duration::from_secs(60);
+        loop {
+            let ours = client
+                .list_all_sandboxes(ListOptions {
+                    label_selector: Some(format!("{RUN_LABEL}={run}")),
+                    ..ListOptions::default()
+                })
+                .await
+                .expect("the sandboxes are listed");
+            if ours.is_empty() {
+                break;
+            }
+            assert!(
+                Instant::now() < gone_by,
+                "the sandbox is still there after a minute"
+            );
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
     }
 }

@@ -405,3 +405,64 @@ async fn a_refused_call_costs_nothing(db: PgPool) {
         .unwrap();
     assert_eq!(rows, 0, "the reservation is released");
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn reasoning_and_routing_are_sent_and_the_provider_is_read(db: PgPool) {
+    use wiremock::matchers::body_partial_json;
+    let server = MockServer::start().await;
+    let mut body = completion("{}");
+    body["provider"] = json!("SomeHost");
+    body["usage"]["completion_tokens_details"] = json!({ "reasoning_tokens": 12 });
+    Mock::given(method("POST"))
+        .and(body_partial_json(json!({
+            "reasoning": { "effort": "low" },
+            "provider": { "require_parameters": true },
+        })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(body))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let mut config = config(&server, None);
+    if let Some(provider) = config.complete.as_mut() {
+        provider.reasoning_effort = Some("low".to_owned());
+        provider.require_parameters = Some(true);
+    }
+    let answer = gateway(config)
+        .complete(
+            Caller {
+                db: &db,
+                account: Uuid::now_v7(),
+                now: Utc::now(),
+            },
+            request(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(answer.provider.as_deref(), Some("SomeHost"));
+    assert_eq!(answer.usage.map(|u| u.reasoning_tokens), Some(12));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_provider_off_openrouter_gets_no_routing_fields(db: PgPool) {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(completion("{}")))
+        .expect(1)
+        .mount(&server)
+        .await;
+    gateway(config(&server, None))
+        .complete(
+            Caller {
+                db: &db,
+                account: Uuid::now_v7(),
+                now: Utc::now(),
+            },
+            request(),
+        )
+        .await
+        .unwrap();
+    let sent = &server.received_requests().await.unwrap()[0];
+    let sent: serde_json::Value = serde_json::from_slice(&sent.body).unwrap();
+    assert!(sent.get("reasoning").is_none(), "{sent}");
+    assert!(sent.get("provider").is_none(), "{sent}");
+}

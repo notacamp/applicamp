@@ -51,6 +51,12 @@ function whereOf(t: TFunction<"profile">, change: AboutChange, view: AboutView):
     case "skill": {
       return t("about.groups.skills");
     }
+    case "language": {
+      return t("about.groups.languages");
+    }
+    case "education": {
+      return t("about.groups.education");
+    }
     case "role_fact": {
       const employer = view.employers.find((candidate) => candidate.position === change.position);
       return employer === undefined

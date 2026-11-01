@@ -582,7 +582,9 @@
       "goal_avoid": "Avoid",
       "goal_must_have": "Must have",
       "goal_location": "Place",
-      "role_fact": "At work"
+      "role_fact": "At work",
+      "language": "Language",
+      "education": "Education"
     },
     "added": {
       "title": "Added from what you wrote",
@@ -619,7 +621,9 @@
       "skills": "Skills",
       "position": "Position",
       "background": "Background",
-      "goals": "Goals"
+      "goals": "Goals",
+      "languages": "Languages",
+      "education": "Education"
     },
     "review": {
       "lead": "This is what I’ll save to your profile. Every line is from your profile, something you told me, or an assumption you confirmed. Nothing you didn’t confirm is saved.",

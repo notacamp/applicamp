@@ -74,7 +74,7 @@ use crate::{
     },
     goals::Goals,
     ports::{FactBasis, ProposedFact, Research, Researcher},
-    schema::{Area, FactStatus, Profile, ProfileFact, Skill},
+    schema::{Area, Education, FactStatus, Language, Profile, ProfileFact, Skill},
     strength,
 };
 
@@ -1423,6 +1423,8 @@ pub enum GroupKey {
     Position,
     Background,
     Goals,
+    Languages,
+    Education,
 }
 
 /// Where a row comes from.
@@ -1516,6 +1518,8 @@ fn review_of(profile: &Profile, row: &Row) -> AboutReview {
             Field::Headline => (GroupKey::Headline, None),
             Field::Skill => (GroupKey::Skills, None),
             Field::Background => (GroupKey::Background, None),
+            Field::Language => (GroupKey::Languages, None),
+            Field::Education => (GroupKey::Education, None),
             Field::RoleFact => match place_of(profile, change.role_key.as_deref()) {
                 Some(p) => (GroupKey::Position, Some(p)),
                 None => continue,
@@ -1629,6 +1633,45 @@ pub struct Saved {
     pub skipped: u32,
 }
 
+/// A language as an answer gives it, `Portuguese (native)`: the name, and
+/// how well in brackets when it says.
+fn language_of(value: &str) -> Language {
+    let value = value.trim();
+    match value.split_once('(') {
+        Some((name, rest)) if !name.trim().is_empty() => {
+            let fluency = rest.trim_end_matches(')').trim();
+            Language {
+                language: name.trim().to_owned(),
+                fluency: (!fluency.is_empty()).then(|| fluency.to_owned()),
+            }
+        }
+        _ => Language {
+            language: value.to_owned(),
+            fluency: None,
+        },
+    }
+}
+
+/// Education as an answer gives it, `BSc in Computer Science, University of
+/// Lisbon`: the school after the last comma, the course before it; without a
+/// comma, all of it is the school.
+fn education_of(value: &str) -> Education {
+    let value = value.trim();
+    match value.rsplit_once(',') {
+        Some((course, school)) if !course.trim().is_empty() && !school.trim().is_empty() => {
+            Education {
+                institution: school.trim().to_owned(),
+                study_type: Some(course.trim().to_owned()),
+                ..Education::default()
+            }
+        }
+        _ => Education {
+            institution: value.to_owned(),
+            ..Education::default()
+        },
+    }
+}
+
 /// Apply `row` to `profile` and `goals`: the number written and the number
 /// that no longer fit.
 fn apply(
@@ -1682,6 +1725,27 @@ fn apply(
                 } else {
                     false
                 }
+            }
+            Field::Language => {
+                let language = language_of(&value);
+                if !profile
+                    .languages
+                    .iter()
+                    .any(|l| judge::same(Field::Language, &l.language, &language.language))
+                {
+                    profile.languages.push(language);
+                }
+                true
+            }
+            Field::Education => {
+                let education = education_of(&value);
+                if !profile.education.iter().any(|e| {
+                    judge::same(Field::Education, &e.institution, &education.institution)
+                        && e.study_type == education.study_type
+                }) {
+                    profile.education.push(education);
+                }
+                true
             }
             Field::RoleFact => place_of(profile, change.role_key.as_deref())
                 .and_then(|at| profile.work.get_mut(at))

@@ -582,7 +582,9 @@
       "goal_avoid": "Evitar",
       "goal_must_have": "Imprescindible",
       "goal_location": "Lugar",
-      "role_fact": "En el trabajo"
+      "role_fact": "En el trabajo",
+      "language": "Idioma",
+      "education": "Formación"
     },
     "added": {
       "title": "Añadido de lo que escribiste",
@@ -619,7 +621,9 @@
       "skills": "Habilidades",
       "position": "Puesto",
       "background": "Trayectoria",
-      "goals": "Objetivos"
+      "goals": "Objetivos",
+      "languages": "Idiomas",
+      "education": "Formación"
     },
     "review": {
       "lead": "Esto es lo que guardaré en tu perfil. Cada línea viene de tu perfil, de algo que me dijiste o de una suposición que confirmaste. No se guarda nada que no hayas confirmado.",

@@ -1670,3 +1670,114 @@ fn merging_answers_gives_each_change_an_id_of_its_own_and_a_newer_summary_replac
     let values: Vec<&str> = pending.iter().map(|c| c.value.as_str()).collect();
     assert_eq!(values, ["Rust", "New summary", "Elixir"]);
 }
+
+#[test]
+fn a_role_nobody_described_is_asked_about_before_its_results() {
+    use std::collections::BTreeMap;
+    let profile: crate::schema::Profile = serde_json::from_value(json!({
+        "basics": {},
+        "work": [
+            { "name": "Example Org", "position": "Full Stack Developer", "startDate": "2023-07" },
+            { "name": "Sample Labs", "position": "Full Stack Developer", "startDate": "2021-01",
+              "endDate": "2023-06" },
+        ],
+        "skills": [{ "name": "Ruby" }, { "name": "TypeScript" }],
+    }))
+    .unwrap();
+    let goals = crate::goals::Goals {
+        languages_for_work: vec!["en".to_owned(), "pt-PT".to_owned()],
+        ..crate::goals::Goals::default()
+    };
+    let choices = BTreeMap::new();
+    let inputs = Inputs {
+        profile: &profile,
+        goals: &goals,
+        portrait: &[],
+        choices: &choices,
+        changes: &[],
+        accuracy: None,
+        dismissed: &[],
+    };
+    let list = gaps::gaps(&inputs);
+    let order = ids(&list);
+    let at = |id: &str| {
+        order
+            .iter()
+            .position(|o| *o == id)
+            .unwrap_or_else(|| panic!("{id} in {order:?}"))
+    };
+    // What they did there first, then what changed, for each recent role.
+    assert_eq!(&order[..2], ["area:0:your_part", "results:0"], "{order:?}");
+    assert!(at("area:1:your_part") < at("results:1"));
+    // Languages early (searches check a posting's languages), naming what the
+    // goals say they work in; a short skills list; education after the basics.
+    assert!(at("results:0") < at("languages") && at("languages") < at("results:1"));
+    let languages = list.iter().find(|g| g.id == "languages").unwrap();
+    assert_eq!(languages.kind, GapKind::Languages);
+    assert!(languages.basis.contains("en, pt-PT"), "{}", languages.basis);
+    let few = list.iter().find(|g| g.id == "skills_few").unwrap();
+    assert_eq!(few.names, ["Ruby", "TypeScript"]);
+    assert!(few.basis.contains("only 2 skills"), "{}", few.basis);
+    assert!(at("headline") < at("education"));
+    // Context is still never asked, and nothing asks twice.
+    assert!(!order.iter().any(|o| o.ends_with(":context")));
+    let mut unique = order.clone();
+    unique.sort_unstable();
+    unique.dedup();
+    assert_eq!(unique.len(), order.len());
+}
+
+#[test]
+fn languages_education_and_enough_skills_close_their_gaps() {
+    use std::collections::BTreeMap;
+    let skills: Vec<Value> = ["Ruby", "Rails", "TypeScript", "React", "Postgres", "Redis"]
+        .iter()
+        .map(|n| json!({ "name": n }))
+        .collect();
+    let profile: crate::schema::Profile = serde_json::from_value(json!({
+        "basics": {},
+        "work": [{ "name": "Example Org", "position": "Engineer", "startDate": "2023-07",
+                   "summary": "Builds the billing platform, its API and its admin screens." }],
+        "skills": skills,
+        "languages": [{ "language": "Portuguese", "fluency": "Native" }],
+        "education": [{ "institution": "University of Lisbon" }],
+    }))
+    .unwrap();
+    let goals = crate::goals::Goals::default();
+    let choices = BTreeMap::new();
+    let list = gaps::gaps(&Inputs {
+        profile: &profile,
+        goals: &goals,
+        portrait: &[],
+        choices: &choices,
+        changes: &[],
+        accuracy: None,
+        dismissed: &[],
+    });
+    let order = ids(&list);
+    for gone in ["languages", "education", "skills_few", "area:0:your_part"] {
+        assert!(!order.contains(&gone), "{gone} in {order:?}");
+    }
+    // A described role is asked about its results first, as before.
+    assert_eq!(order[0], "results:0", "{order:?}");
+}
+
+#[test]
+fn a_language_or_education_answer_is_saved_in_its_own_shape() {
+    let language = super::language_of("Portuguese (native)");
+    assert_eq!(language.language, "Portuguese");
+    assert_eq!(language.fluency.as_deref(), Some("native"));
+    let plain = super::language_of("English");
+    assert_eq!((plain.language.as_str(), plain.fluency), ("English", None));
+    let degree = super::education_of("BSc in Computer Science, University of Lisbon");
+    assert_eq!(degree.institution, "University of Lisbon");
+    assert_eq!(
+        degree.study_type.as_deref(),
+        Some("BSc in Computer Science")
+    );
+    let alone = super::education_of("Self-taught");
+    assert_eq!(
+        (alone.institution.as_str(), alone.study_type),
+        ("Self-taught", None)
+    );
+}

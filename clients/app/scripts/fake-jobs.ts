@@ -155,138 +155,10 @@ function factsOf(posting: Posting) {
       };
 }
 
-/** A position as the profile review is shown it. */
-interface ReviewPosition {
-  index: number;
-  title?: string | null;
-  company?: string | null;
-  summary?: string | null;
-  highlights?: string[];
-}
-
-/** The profile as the review is shown it (no name, no contact details). */
-interface ReviewView {
-  headline?: string | null;
-  summary?: string | null;
-  positions?: ReviewPosition[];
-  skills?: string[];
-  education?: unknown[];
-  links?: number;
-}
-
-/** Skills the review looks for in the positions' words. */
-const KNOWN_SKILLS = ["Rust", "PostgreSQL", "Kafka", "Terraform", "Kubernetes"] as const;
-
 /** The text between `<tag>` and `</tag>` in `content`. */
 function between(content: string, tag: string): string {
   return content.split(`<${tag}>`, 2)[1]?.split(`</${tag}>`, 1)[0]?.trim() ?? "";
 }
-
-/**
- * The profile review (system prompt "You review a person's job-search
- * profile…"): a question for each gap it can see, and the skills the
- * positions mention that the skills list lacks.
- */
-function gapReview(userContent: string) {
-  let view: ReviewView = {};
-  try {
-    view = JSON.parse(between(userContent, "profile")) as ReviewView;
-  } catch {
-    // An unreadable profile has no gaps to name.
-  }
-  const positions = view.positions ?? [];
-  const questions: {
-    section: string;
-    role_ref: number | null;
-    question: string;
-    why: string;
-  }[] = [];
-  for (const position of positions.slice(0, 3)) {
-    if ((position.highlights ?? []).length === 0) {
-      questions.push({
-        section: "work",
-        role_ref: position.index,
-        question: `What did you ship at ${position.company ?? "that company"} that you are proud of?`,
-        why: "Your recent role has no results yet.",
-      });
-    }
-  }
-  if ((view.headline ?? "") === "") {
-    questions.push({
-      section: "basics.label",
-      role_ref: null,
-      question: "In one line, what do you want to be known for?",
-      why: "There is no headline yet.",
-    });
-  }
-  if ((view.summary ?? "") === "") {
-    questions.push({
-      section: "basics.summary",
-      role_ref: null,
-      question: "What do you do best, in three or four sentences?",
-      why: "There is no summary yet.",
-    });
-  }
-  const listed = new Set((view.skills ?? []).map((skill) => skill.toLowerCase()));
-  const skills_in_roles = KNOWN_SKILLS.filter((name) => !listed.has(name.toLowerCase()))
-    .map((name) => ({
-      name,
-      roles: positions
-        .filter((position) =>
-          [position.title, position.summary, ...(position.highlights ?? [])]
-            .join(" ")
-            .toLowerCase()
-            .includes(name.toLowerCase()),
-        )
-        .map((position) => position.index),
-    }))
-    .filter((skill) => skill.roles.length > 0);
-  return { questions, skills_in_roles };
-}
-
-/**
- * A draft from an answer (system prompt "You turn a person's answer…"): the
- * answer's own sentences, so it says nothing the answer does not.
- */
-function draftOf(system: string, userContent: string) {
-  const answer = between(userContent, "answer");
-  const sentences = answer
-    .split(/[.;]\s+|\n/)
-    .map((sentence) => sentence.trim().replace(/\.$/, ""))
-    .filter((sentence) => sentence !== "");
-  if (system.includes("achievements for the position")) {
-    return { items: sentences.slice(0, 3), education: null };
-  }
-  if (system.includes("exactly one headline")) {
-    return { items: sentences.slice(0, 1), education: null };
-  }
-  if (system.includes("exactly one summary")) {
-    return { items: [answer], education: null };
-  }
-  return { items: [], education: null };
-}
-
-/** The seven areas "Grill me" works through, in order. */
-const GRILL_AREAS = [
-  "context",
-  "your_part",
-  "stack_scale",
-  "results",
-  "hard_problems",
-  "people",
-  "stories",
-] as const;
-
-/** What the fake interviewer asks about each area. */
-const GRILL_QUESTIONS: Record<(typeof GRILL_AREAS)[number], (company: string) => string> = {
-  context: (company) => `What did ${company} sell, to whom, and how big was the team?`,
-  your_part: () => "What did you do yourself, as against the rest of the team?",
-  stack_scale: () => "Which tools did you use, and how much data or traffic did they carry?",
-  results: () => "What changed because of your work? Give a number, and say how you know it.",
-  hard_problems: () => "What was the hardest problem, and what did you do about it?",
-  people: () => "Who did you lead, mentor or hire, and what changed for them?",
-  stories: () => "Which moment here would you tell in an interview?",
-};
 
 /** `JSON.parse` of the text between `<tag>` tags, or `fallback`. */
 function parsedBetween<T>(content: string, tag: string, fallback: T): T {
@@ -295,59 +167,6 @@ function parsedBetween<T>(content: string, tag: string, fallback: T): T {
   } catch {
     return fallback;
   }
-}
-
-/**
- * The interviewer (system prompt "You are interviewing a person about one
- * position…"): the first question of the first area not covered; an answer
- * without a digit is pushed back on; an answer with one yields up to three
- * facts quoted from it (plus one the quote check must drop), marks the area
- * covered and asks about the next.
- */
-function interview(userContent: string) {
-  const event = between(userContent, "event");
-  const answer = between(userContent, "answer");
-  const coverage = parsedBetween<Record<string, string>>(userContent, "coverage", {});
-  const skipped = parsedBetween<string[]>(userContent, "skipped", []);
-  const role = parsedBetween<{ company?: string | null }>(userContent, "role", {});
-  const company = role.company ?? "the company";
-  const open = GRILL_AREAS.filter((area) => coverage[area] !== "ok" && !skipped.includes(area));
-  const current = open[0];
-  const ask = (area: (typeof GRILL_AREAS)[number] | undefined, push: boolean) =>
-    area === undefined ? null : { question: GRILL_QUESTIONS[area](company), area, push };
-
-  if (event !== "answer" || current === undefined) {
-    return { facts: [], coverage: [], next: ask(current, false), conflict: null };
-  }
-  if (!/\d/.test(answer)) {
-    return {
-      facts: [],
-      coverage: [],
-      next: {
-        question:
-          "That won’t hold up in an interview. Who decided, how many people were involved, and how long did it take?",
-        area: current,
-        push: true,
-      },
-      conflict: null,
-    };
-  }
-  const quotes = answer
-    .split(/(?<=[.!?])\s+/)
-    .map((sentence) => sentence.replace(/[.!?]+$/, "").trim())
-    .filter((sentence) => sentence !== "")
-    .slice(0, 3);
-  const facts = [
-    ...quotes.map((quote) => ({ text: quote, quote, area: current })),
-    // Never said: the quote check drops it, and the person is told a line was left out.
-    { text: "Saved the company 30% of its costs", quote: "we saved 30% of costs", area: current },
-  ];
-  return {
-    facts,
-    coverage: [{ area: current, level: "ok" }],
-    next: ask(open[1], false),
-    conflict: null,
-  };
 }
 
 /** What the portrait's sources look like in the prompt (`<sources>`). */
@@ -702,9 +521,9 @@ function completion(content: unknown) {
 }
 
 /**
- * Answers a chat completion as the model would, by what it is asked: the
- * profile review, a draft from an answer, or (any other) the scoring of
- * every posting of the last user message, with its facts.
+ * Answers a chat completion as the model would, by what it is asked, or (any
+ * other) the scoring of every posting of the last user message, with its
+ * facts.
  */
 async function complete(request: IncomingMessage, response: ServerResponse) {
   let postings: Posting[] = [];
@@ -715,14 +534,6 @@ async function complete(request: IncomingMessage, response: ServerResponse) {
     const messages = parsed.messages ?? [];
     const system = messages.find((message) => message.role === "system")?.content ?? "";
     const user = messages.findLast((message) => message.role === "user");
-    if (system.startsWith("You review a person's job-search profile")) {
-      json(response, 200, completion(gapReview(user?.content ?? "")));
-      return;
-    }
-    if (system.startsWith("You are interviewing a person about one position")) {
-      json(response, 200, completion(interview(user?.content ?? "")));
-      return;
-    }
     if (system.startsWith("You write what a job-hunting app knows about one person")) {
       json(response, 200, completion(aboutPortrait(user?.content ?? "")));
       return;
@@ -753,10 +564,6 @@ async function complete(request: IncomingMessage, response: ServerResponse) {
     }
     if (system.startsWith("You read a person's answer to one question about a job")) {
       json(response, 200, completion(jobAnswer(user?.content ?? "")));
-      return;
-    }
-    if (system.startsWith("You turn a person's answer")) {
-      json(response, 200, completion(draftOf(system, user?.content ?? "")));
       return;
     }
     postings = postingsOf(user?.content ?? "").filter((posting) => (posting.ref ?? "") !== "");

@@ -600,12 +600,7 @@ impl Job for ExpireImports {
             .execute(&ctx.db)
             .await?
             .rows_affected();
-        // The drafts made from answers expire the same way.
-        deleted += sqlx::query("DELETE FROM profile.drafts WHERE expires_at <= now()")
-            .execute(&ctx.db)
-            .await?
-            .rows_affected();
-        // So do the facts "Grill me" took from an answer and nobody kept.
+        // The facts "Grill me" took from an answer and nobody kept.
         deleted += sqlx::query("DELETE FROM profile.grill_proposals WHERE expires_at <= now()")
             .execute(&ctx.db)
             .await?

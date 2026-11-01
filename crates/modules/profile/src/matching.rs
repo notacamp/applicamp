@@ -76,8 +76,8 @@ pub struct Status {
     pub strength: u8,
     /// Where to go to make it stronger; none once it is strong.
     pub next_action: Option<ProfileAction>,
-    /// Open questions of the current gap review; none when there is no
-    /// review for the current profile (yet).
+    /// Always none: the gap review was removed (#49). Kept for the ports
+    /// that carry it.
     pub questions_left: Option<u32>,
     /// They have a profile with something in it.
     pub profile_done: bool,
@@ -185,14 +185,10 @@ async fn goals_of(db: &PgPool, account: Uuid) -> Result<Option<(Goals, i32)>> {
     Ok(row.map(|(goals, version)| (goals.0, version)))
 }
 
-/// Where a weak profile should go next: the questions when there are any,
-/// else the heaviest part that is missing.
-fn next_action(strength: &Strength, questions_left: Option<u32>) -> Option<ProfileAction> {
+/// Where a weak profile should go next: the heaviest part that is missing.
+fn next_action(strength: &Strength) -> Option<ProfileAction> {
     if strength.is_strong() {
         return None;
-    }
-    if questions_left.is_some_and(|n| n > 0) {
-        return Some(ProfileAction::Improve);
     }
     let heaviest = strength
         .items
@@ -220,14 +216,10 @@ pub async fn status(db: &PgPool, account: Uuid) -> Result<Status> {
         profile.unwrap_or(&Profile::default()),
         goals.unwrap_or(&Goals::default()),
     );
-    let questions_left = match (&current, profile) {
-        (Some(current), Some(_)) => completion::questions_left(db, account, current).await?,
-        _ => None,
-    };
     Ok(Status {
         strength: strength.score,
-        next_action: profile.and_then(|_| next_action(&strength, questions_left)),
-        questions_left,
+        next_action: profile.and_then(|_| next_action(&strength)),
+        questions_left: None,
         profile_done: profile.is_some(),
         strength_hint: profile.and_then(strength_hint),
         no_skills: profile.is_some_and(no_stack),
@@ -374,7 +366,7 @@ pub async fn keep_fact(
         ));
     }
     let mut tx = state.db.begin().await?;
-    let (mut profile, version) = lock(&mut tx, account).await?;
+    let mut profile = lock(&mut tx, account).await?;
     let stale = || {
         Error::Conflict(
             "profile_changed",
@@ -398,9 +390,7 @@ pub async fn keep_fact(
     });
     let profile = profile.tidied();
     profile.validate()?;
-    let new_version =
-        completion::write_profile(state, &mut tx, account, &profile, Some("answer")).await?;
-    completion::carry_forward(&mut tx, account, version, new_version, None).await?;
+    completion::write_profile(state, &mut tx, account, &profile, Some("answer")).await?;
     tx.commit().await?;
     Ok(id)
 }
@@ -416,7 +406,7 @@ pub async fn add_skill(state: &AppState, account: Uuid, name: &str) -> Result<()
         ));
     }
     let mut tx = state.db.begin().await?;
-    let (mut profile, version) = lock(&mut tx, account).await?;
+    let mut profile = lock(&mut tx, account).await?;
     if !profile
         .skills
         .iter()
@@ -428,9 +418,7 @@ pub async fn add_skill(state: &AppState, account: Uuid, name: &str) -> Result<()
         });
         let profile = profile.tidied();
         profile.validate()?;
-        let new_version =
-            completion::write_profile(state, &mut tx, account, &profile, None).await?;
-        completion::carry_forward(&mut tx, account, version, new_version, None).await?;
+        completion::write_profile(state, &mut tx, account, &profile, None).await?;
     }
     sqlx::query("DELETE FROM profile.skill_dismissals WHERE account_id = $1 AND name_key = $2")
         .bind(account)
@@ -441,16 +429,15 @@ pub async fn add_skill(state: &AppState, account: Uuid, name: &str) -> Result<()
     Ok(())
 }
 
-/// The locked profile of `account` and its version.
-async fn lock(tx: &mut sqlx::PgConnection, account: Uuid) -> Result<(Profile, i32)> {
-    let row: Option<(sqlx::types::Json<Profile>, i32)> = sqlx::query_as(
-        "SELECT data, version FROM profile.profiles WHERE account_id = $1 FOR UPDATE",
-    )
-    .bind(account)
-    .fetch_optional(&mut *tx)
-    .await?;
-    let (profile, version) = row.ok_or(Error::NotFound)?;
-    Ok((profile.0, version))
+/// The locked profile of `account`.
+async fn lock(tx: &mut sqlx::PgConnection, account: Uuid) -> Result<Profile> {
+    let row: Option<(sqlx::types::Json<Profile>,)> =
+        sqlx::query_as("SELECT data FROM profile.profiles WHERE account_id = $1 FOR UPDATE")
+            .bind(account)
+            .fetch_optional(&mut *tx)
+            .await?;
+    let (profile,) = row.ok_or(Error::NotFound)?;
+    Ok(profile.0)
 }
 
 /// Say `name` is not one of the person's skills: it is not suggested or

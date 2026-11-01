@@ -90,12 +90,12 @@ pub fn schema() -> Value {
 }
 
 /// `text` cut to `most` characters.
-fn cut(text: &str, most: usize) -> String {
+pub(crate) fn cut(text: &str, most: usize) -> String {
     text.chars().take(most).collect()
 }
 
 /// `text` as data: the angle brackets that could close a tag are made plain.
-fn data(text: &str) -> String {
+pub(crate) fn data(text: &str) -> String {
     text.replace('<', "\u{2039}").replace('>', "\u{203a}")
 }
 
@@ -103,21 +103,9 @@ fn source_line(source: &Source) -> String {
     format!("[{}] {}", source.id, data(&source.text))
 }
 
-/// The user message: nothing in it is the person's name or how to reach
-/// them (the frame has none).
-pub fn message(
-    title: &str,
-    company: &str,
-    posting: &str,
-    wants: &[BriefWant],
-    frame: &Frame,
-    language: &str,
-) -> String {
-    let wants: Vec<String> = wants
-        .iter()
-        .take(6)
-        .map(|w| format!("- {} ({}): {}", data(&w.label), w.level, data(&w.quote)))
-        .collect();
+/// The company facts and the profile of `frame`, as the blocks the model is
+/// shown (the CV's prompt and the cover letter's share them).
+pub(crate) fn blocks(frame: &Frame) -> (String, String) {
     let facts: Vec<String> = frame
         .sources
         .iter()
@@ -159,13 +147,32 @@ pub fn message(
     }) {
         profile.push(source_line(source));
     }
+    (facts.join("\n"), profile.join("\n"))
+}
+
+/// The user message: nothing in it is the person's name or how to reach
+/// them (the frame has none).
+pub fn message(
+    title: &str,
+    company: &str,
+    posting: &str,
+    wants: &[BriefWant],
+    frame: &Frame,
+    language: &str,
+) -> String {
+    let wants: Vec<String> = wants
+        .iter()
+        .take(6)
+        .map(|w| format!("- {} ({}): {}", data(&w.label), w.level, data(&w.quote)))
+        .collect();
+    let (facts, profile) = blocks(frame);
     format!(
         "<language>{language}</language>\n<posting>\n{}\nCompany: {}\n\n{}\n</posting>\n<wants>\n{}\n</wants>\n<company_facts>\n{}\n</company_facts>\n<profile>\n{}\n</profile>",
         data(&cut(title, 200)),
         data(&cut(company, 200)),
         data(&cut(posting, POSTING_BUDGET)),
         wants.join("\n"),
-        facts.join("\n"),
-        profile.join("\n"),
+        facts,
+        profile,
     )
 }

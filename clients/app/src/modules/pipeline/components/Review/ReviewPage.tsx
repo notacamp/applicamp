@@ -13,6 +13,7 @@ import {
   Page,
   PdfViewer,
   ReviewLayout,
+  Section,
   Stack,
   Tagged,
   Text,
@@ -38,6 +39,7 @@ import {
 import { formatCost, formatShortDate } from "../../api/labels";
 import { useOpportunity } from "../../api/opportunities";
 import { titleOf } from "../PipelinePage/OpportunityViews";
+import { LetterSlot } from "../Letter/LetterSlot";
 import { CvSheet } from "./CvSheet";
 import { DraftSlot } from "./DraftSlot";
 import { cvLanguage, LayoutControls } from "./LayoutControls";
@@ -54,6 +56,8 @@ export interface ReviewPageProps {
   onPipeline: () => void;
   /** The month's AI spend line. */
   spend?: ReactNode;
+  /** Open the cover letter's review; none hides "Write the cover letter". */
+  onLetter?: ((id: string) => void) | undefined;
 }
 
 /** A language tag as a name in the person's language ("English"). */
@@ -71,7 +75,7 @@ export function languageName(tag: string, display: string): string {
  * to it, blocked with the reason and what to do; beside it the check, the
  * job's keywords and what changed. Approve is off while any line is blocked.
  */
-export function ReviewPage({ id, onBack, onPipeline, spend }: ReviewPageProps) {
+export function ReviewPage({ id, onBack, onPipeline, spend, onLetter }: ReviewPageProps) {
   const { t } = useTranslation("pipeline");
   const opportunity = useOpportunity(id);
   const cv = useCv(id);
@@ -129,6 +133,7 @@ export function ReviewPage({ id, onBack, onPipeline, spend }: ReviewPageProps) {
         draft={cv.data.draft}
         spend={spend}
         onPipeline={onPipeline}
+        onLetter={onLetter}
       />
     );
   }
@@ -157,12 +162,14 @@ function Review({
   draft,
   spend,
   onPipeline,
+  onLetter,
 }: {
   id: string;
   cv: Cv;
   draft: CvDraft;
   spend: ReactNode;
   onPipeline: () => void;
+  onLetter: ((id: string) => void) | undefined;
 }) {
   const { t, i18n } = useTranslation("pipeline");
   const change = useChangeLine(id, draft.n);
@@ -303,6 +310,19 @@ function Review({
               </Tagged>
             )}
           </Banner>
+        </Tagged>
+      )}
+      {onLetter === undefined || newest === undefined ? null : (
+        <Tagged testId="cv-letter">
+          <Section title={t("letter.fromCv.title")} description={t("letter.fromCv.body")}>
+            <LetterSlot
+              id={id}
+              testIdPrefix="cv-letter"
+              onReview={() => {
+                onLetter(id);
+              }}
+            />
+          </Section>
         </Tagged>
       )}
       <LayoutControls

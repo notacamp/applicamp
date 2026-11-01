@@ -278,6 +278,44 @@ Company: Example Co
     expect(claim.why).toBe("You mentioned Elixir, but none of your roles do.");
   });
 
+  it("writes a cover letter with a company fact, a superlative, a company-only claim, a closing that claims nothing, an answer it can support and one it cannot", async () => {
+    const letter = await model<{
+      paragraphs: { text: string; sentences: { text: string; sources: string[] }[] }[];
+      answers: { question: string; text: string; sources: string[] }[];
+    }>(
+      "You write a cover letter for one person and one job.",
+      `${PROMPT}\n<questions>\n1. Why do you want to work at Example Co?\n2. What's your notice period?\n</questions>`,
+    );
+    const sentences = letter.paragraphs.flatMap((paragraph) => paragraph.sentences);
+    expect(sentences[0]).toEqual({
+      text: "What draws me to Example Co: Builds ledgers for small shops.",
+      sources: ["cab12cd34"],
+    });
+    expect(sentences[1]?.sources).toEqual(["w0.h1"]);
+    expect(sentences[2]).toEqual({
+      text: "I'm the go-to person for the hardest billing problems.",
+      sources: [],
+    });
+    expect(sentences[3]).toEqual({
+      text: "I led our migration, as Example Co did.",
+      sources: ["cab12cd34"],
+    });
+    expect(sentences[4]).toEqual({
+      text: "I'd like to bring that experience to your team.",
+      sources: [],
+    });
+    expect(letter.answers[0]).toEqual({
+      question: "Why do you want to work at Example Co?",
+      text: "Builds ledgers for small shops matches the work I have done: Rebuilt the billing pipeline in Rust, cutting invoice runs from 6 hours to 40 minutes.",
+      sources: ["cab12cd34", "w0.h1"],
+    });
+    expect(letter.answers[1]).toEqual({
+      question: "What's your notice period?",
+      text: "",
+      sources: [],
+    });
+  });
+
   it("reads an answer into changes quoting it, one of them naming a company the answer never wrote", async () => {
     const answer = (area: string, words: string) =>
       model<Answered>(ANSWER_SYSTEM, answerPrompt(area, words));

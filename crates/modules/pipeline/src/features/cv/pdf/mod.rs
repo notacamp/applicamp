@@ -69,7 +69,7 @@ impl Template {
         }
     }
 
-    fn source(self) -> &'static str {
+    pub(crate) fn source(self) -> &'static str {
         match self {
             Self::Clean => include_str!("clean.typ"),
             Self::Compact => include_str!("compact.typ"),
@@ -121,13 +121,8 @@ pub enum Refusal {
 }
 
 /// The PDF's bytes and page count, or why not.
-fn compile(
-    template: Template,
-    prepared: &Prepared,
-    length: Length,
-) -> Result<(Vec<u8>, u32), Refusal> {
-    let world =
-        CvWorld::new(template.source(), prepared.json.clone()).ok_or(Refusal::Unavailable)?;
+fn compile(source: &str, prepared: &Prepared, length: Length) -> Result<(Vec<u8>, u32), Refusal> {
+    let world = CvWorld::new(source, prepared.json.clone()).ok_or(Refusal::Unavailable)?;
     let document = typst::compile::<PagedDocument>(&world)
         .output
         .map_err(|_| Refusal::Unavailable)?;
@@ -150,7 +145,7 @@ fn compile(
 
 /// Compile `prepared` and read the PDF back against what it must say.
 fn build(
-    template: Template,
+    source: &str,
     prepared: &Prepared,
     length: Length,
     keywords: &[String],
@@ -158,7 +153,7 @@ fn build(
     if !world::fonts_ready() {
         return Err(Refusal::Unavailable);
     }
-    let (bytes, pages) = compile(template, prepared, length)?;
+    let (bytes, pages) = compile(source, prepared, length)?;
     let extracted = readback::extract(&bytes).ok_or(Refusal::Unavailable)?;
     let checks = readback::check(
         &prepared.expect,
@@ -189,6 +184,19 @@ pub async fn make(
     keywords: Vec<String>,
 ) -> Result<Made, Refusal> {
     let prepared = data::prepare(content, frame, language).map_err(|_| Refusal::Unavailable)?;
+    make_prepared(template.source(), prepared, length, keywords).await
+}
+
+/// A document whose Typst `source` is fixed and embedded (a template of this
+/// crate), given `prepared` as its only input: compiled in the same bounded,
+/// file-less world, then read back against what `prepared` says it must hold.
+/// A cover letter is made this way.
+pub(crate) async fn make_prepared(
+    source: &'static str,
+    prepared: Prepared,
+    length: Length,
+    keywords: Vec<String>,
+) -> Result<Made, Refusal> {
     let permit = Arc::clone(&RENDERS)
         .acquire_owned()
         .await
@@ -197,12 +205,12 @@ pub async fn make(
     // still counts as running until it is done.
     let work = tokio::task::spawn_blocking(move || {
         let _permit = permit;
-        build(template, &prepared, length, &keywords)
+        build(source, &prepared, length, &keywords)
     });
     match tokio::time::timeout(TIMEOUT, work).await {
         Ok(Ok(result)) => result,
         Ok(Err(_)) | Err(_) => {
-            tracing::warn!("a CV PDF could not be made in time");
+            tracing::warn!("a PDF could not be made in time");
             Err(Refusal::Unavailable)
         }
     }

@@ -305,6 +305,7 @@ struct Routed {
     facts: Mutex<Value>,
     analysis: Mutex<Value>,
     cv: Mutex<Value>,
+    letter: Mutex<Value>,
 }
 
 impl wiremock::Respond for Routed {
@@ -315,6 +316,8 @@ impl wiremock::Respond for Routed {
             lock(&self.facts).clone()
         } else if system.starts_with(crate::features::cv::prompt::PREFIX) {
             lock(&self.cv).clone()
+        } else if system.starts_with(crate::features::cv::letter::prompt::PREFIX) {
+            lock(&self.letter).clone()
         } else {
             lock(&self.analysis).clone()
         };
@@ -338,6 +341,17 @@ impl Model {
 
     /// A model that also answers the CV prompt with `cv`.
     pub(crate) async fn with_cv(facts: Value, analysis: Value, cv: Value) -> Self {
+        Self::with_documents(facts, analysis, cv, Value::Null).await
+    }
+
+    /// A model that also answers the CV prompt with `cv` and the cover
+    /// letter's with `letter`.
+    pub(crate) async fn with_documents(
+        facts: Value,
+        analysis: Value,
+        cv: Value,
+        letter: Value,
+    ) -> Self {
         // Its own server, not one from wiremock's pool, which is shared across the
         // tests' runtimes: the calls counted are this test's alone.
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -351,6 +365,7 @@ impl Model {
                 facts: Mutex::new(facts),
                 analysis: Mutex::new(analysis),
                 cv: Mutex::new(cv),
+                letter: Mutex::new(letter),
             })
             .mount(&server)
             .await;

@@ -46,9 +46,10 @@ pub fn squash(text: &str) -> String {
 
 /// Capitalised words that name nothing: no claim.
 const COMMON: &[&str] = &[
-    "i", "a", "an", "the", "and", "or", "but", "to", "in", "on", "at", "for", "with", "by", "of",
-    "from", "as", "after", "before", "while", "when", "my", "our", "we", "it", "its", "this",
-    "that", "these", "those", "into", "over", "under", "across", "through",
+    "i", "i'm", "i've", "i'd", "i'll", "a", "an", "the", "and", "or", "but", "to", "in", "on",
+    "at", "for", "with", "by", "of", "from", "as", "after", "before", "while", "when", "my", "our",
+    "we", "it", "its", "this", "that", "these", "those", "into", "over", "under", "across",
+    "through",
 ];
 
 /// Every string and number a JSON value holds (never its keys).
@@ -225,6 +226,15 @@ mod tests {
                 e.unsupported(line)
             );
         }
+    }
+
+    #[test]
+    fn i_and_its_contractions_are_not_names() {
+        let e = evidence();
+        assert!(
+            e.unsupported("Today I'm glad that I've led it and I'd do it again")
+                .is_empty()
+        );
     }
 
     #[test]

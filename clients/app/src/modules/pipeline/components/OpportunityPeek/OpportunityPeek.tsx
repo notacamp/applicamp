@@ -17,6 +17,7 @@ import {
   Section,
   Select,
   SidePeek,
+  Stack,
   Tagged,
   Text,
   useUndoToast,
@@ -24,6 +25,7 @@ import {
 
 import { canPrepare, PREPARE_ESTIMATE_EUR } from "../../api/brief";
 import { cvPdfUrl, useCv } from "../../api/cv";
+import { letterPdfUrl, useLetter } from "../../api/letter";
 import {
   factsText,
   formatCost,
@@ -52,6 +54,8 @@ export interface OpportunityPeekProps {
   onPrepare?: ((id: string) => void) | undefined;
   /** Open the review of its tailored CV. */
   onReview?: ((id: string) => void) | undefined;
+  /** Open the review of its cover letter; none hides the Cover letter line. */
+  onLetter?: ((id: string) => void) | undefined;
 }
 
 /**
@@ -60,7 +64,13 @@ export interface OpportunityPeekProps {
  * gaps, the posting's text and link, notes, and Not for me. One that doesn't
  * meet the requirements says so. Opening it once marks a new match seen.
  */
-export function OpportunityPeek({ id, onClose, onPrepare, onReview }: OpportunityPeekProps) {
+export function OpportunityPeek({
+  id,
+  onClose,
+  onPrepare,
+  onReview,
+  onLetter,
+}: OpportunityPeekProps) {
   const { t } = useTranslation("pipeline");
   const opportunity = useOpportunity(id);
   const data = id === null ? undefined : opportunity.data;
@@ -90,6 +100,7 @@ export function OpportunityPeek({ id, onClose, onPrepare, onReview }: Opportunit
           onClose={onClose}
           onPrepare={onPrepare}
           onReview={onReview}
+          onLetter={onLetter}
         />
       )}
     </SidePeek>
@@ -101,10 +112,12 @@ function TailoredCv({
   opportunity,
   onPrepare,
   onReview,
+  onLetter,
 }: {
   opportunity: Opportunity;
   onPrepare: (id: string) => void;
   onReview: (id: string) => void;
+  onLetter: ((id: string) => void) | undefined;
 }) {
   const { t, i18n } = useTranslation("pipeline");
   const cv = useCv(opportunity.id);
@@ -188,6 +201,9 @@ function TailoredCv({
           </Text>
         ) : null}
       </Cluster>
+      {onLetter === undefined || approved === undefined ? null : (
+        <CoverLetter opportunity={opportunity} onLetter={onLetter} />
+      )}
       <PdfViewer
         open={viewing && approved !== undefined}
         onClose={() => {
@@ -211,16 +227,106 @@ function TailoredCv({
   );
 }
 
+/** The Cover letter line of the Tailored CV block: draft or approved, with Review and View PDF. */
+function CoverLetter({
+  opportunity,
+  onLetter,
+}: {
+  opportunity: Opportunity;
+  onLetter: (id: string) => void;
+}) {
+  const { t } = useTranslation("pipeline");
+  const letter = useLetter(opportunity.id);
+  const [viewing, setViewing] = useState(false);
+  if (letter.data === undefined) {
+    return null;
+  }
+  const draft = letter.data.draft ?? undefined;
+  const approved = letter.data.versions[0];
+  const state =
+    draft === undefined
+      ? t("peek.letter.none")
+      : draft.status === "approved"
+        ? t("peek.letter.approved", { version: draft.version ?? 1 })
+        : draft.flagged > 0
+          ? t("peek.letter.needsYou", { n: draft.n, count: draft.flagged })
+          : t("peek.letter.clean", { n: draft.n });
+  return (
+    <Tagged testId="peek-letter">
+      <Stack gap="sm">
+        <Text weight="semibold">{t("peek.letter.title")}</Text>
+        <Tagged testId="peek-letter-state">
+          <Text>{state}</Text>
+        </Tagged>
+        <Cluster>
+          <Button
+            variant={draft === undefined ? "primary" : "secondary"}
+            icon="arrow-right"
+            data-testid="peek-letter-review"
+            onClick={() => {
+              onLetter(opportunity.id);
+            }}
+          >
+            {draft === undefined ? t("peek.letter.write") : t("peek.letter.review")}
+          </Button>
+          {approved === undefined ? null : (
+            <>
+              <Button
+                variant="secondary"
+                data-testid="peek-letter-view-pdf"
+                onClick={() => {
+                  setViewing(true);
+                }}
+              >
+                {t("peek.letter.viewPdf")}
+              </Button>
+              <ButtonLink
+                variant="secondary"
+                icon="download"
+                href={letterPdfUrl(opportunity.id, approved.version, true)}
+                data-testid="peek-letter-download-pdf"
+              >
+                {t("peek.letter.download")}
+              </ButtonLink>
+            </>
+          )}
+        </Cluster>
+        <PdfViewer
+          open={viewing && approved !== undefined}
+          onClose={() => {
+            setViewing(false);
+          }}
+          url={letterPdfUrl(opportunity.id, approved?.version ?? 0)}
+          downloadUrl={letterPdfUrl(opportunity.id, approved?.version ?? 0, true)}
+          title={t("letter.viewerCompany", {
+            company: opportunity.company,
+            version: approved?.version ?? 0,
+          })}
+          labels={{
+            close: t("cv.viewer.close"),
+            download: t("cv.pdf.download"),
+            loading: t("cv.viewer.loading"),
+            failed: t("cv.viewer.failed"),
+            page: (page, pages) => t("cv.viewer.page", { page, pages }),
+          }}
+        />
+      </Stack>
+    </Tagged>
+  );
+}
+
 function PeekBody({
   opportunity,
   onClose,
   onPrepare,
   onReview,
+  onLetter,
 }: {
   opportunity: Opportunity;
   onClose: () => void;
   onPrepare: ((id: string) => void) | undefined;
   onReview: ((id: string) => void) | undefined;
+  onLetter: ((id: string) => void) | undefined;
 }) {
   const { t, i18n } = useTranslation("pipeline");
   const update = useUpdateOpportunity();
@@ -406,6 +512,7 @@ function PeekBody({
           opportunity={opportunity}
           onPrepare={onPrepare}
           onReview={onReview ?? onPrepare}
+          onLetter={onLetter}
         />
       )}
       <Section title={t("peek.notes")} testId="peek-notes">

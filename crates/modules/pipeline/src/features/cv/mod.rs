@@ -25,6 +25,7 @@
 
 pub mod check;
 pub mod judge;
+pub mod letter;
 pub mod model;
 pub mod pdf;
 pub mod prompt;
@@ -467,9 +468,16 @@ impl Job for ExpireCvDrafts {
         )
         .execute(&ctx.db)
         .await?
-        .rows_affected();
+        .rows_affected()
+            + sqlx::query(
+                "DELETE FROM pipeline.letter_drafts
+                  WHERE status <> 'approved' AND expires_at <= now()",
+            )
+            .execute(&ctx.db)
+            .await?
+            .rows_affected();
         if deleted > 0 {
-            tracing::info!(deleted, "expired CV drafts deleted");
+            tracing::info!(deleted, "expired CV and letter drafts deleted");
         }
         Ok(())
     }

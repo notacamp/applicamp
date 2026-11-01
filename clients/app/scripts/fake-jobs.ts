@@ -46,6 +46,14 @@
 // the summary (flagged), a summary that cites a company fact, a skill that is
 // not on the profile (flagged), and every position after the second left out.
 //
+// The cover letter (#45): the model answers the letter prompt ("You write a
+// cover letter…") by fixed rules: a paragraph citing a company fact and a
+// highlight, one with a superlative nobody wrote (flagged), one that cites
+// only a company fact yet says what the person did (flagged), a closing that
+// claims nothing, an answer to each of the posting's application questions it
+// can support, and an empty one for a notice period, salary, visa or move
+// (the profile cannot say). The posting lists two application questions.
+//
 // Every list answers with four new jobs (new ids each time); a board keeps to
 // its polling interval, so a search within it reads the last answer. The
 // fourth is remote only from Germany or Austria, in the words of the posting
@@ -562,6 +570,10 @@ async function complete(request: IncomingMessage, response: ServerResponse) {
       json(response, 200, completion(tailoredCv(user?.content ?? "")));
       return;
     }
+    if (system.startsWith("You write a cover letter")) {
+      json(response, 200, completion(coverLetter(user?.content ?? "")));
+      return;
+    }
     if (system.startsWith("You read a person's answer to one question about a job")) {
       json(response, 200, completion(jobAnswer(user?.content ?? "")));
       return;
@@ -717,7 +729,9 @@ const COMPANY_PAGES: Record<string, string> = {
 function posting(skill: string): string {
   return `<html><body><h1>Staff Engineer</h1>
     <p>You will own billing at Example Co.</p>
-    <ul><li>5+ years of Rails required</li><li>${skill} in production</li><li>Kafka is a plus</li></ul></body></html>`;
+    <ul><li>5+ years of Rails required</li><li>${skill} in production</li><li>Kafka is a plus</li></ul>
+    <h2>Application questions</h2>
+    <ul><li>Why do you want to work at Example Co?</li><li>What's your notice period?</li></ul></body></html>`;
 }
 
 /** The company's site, by its host name; whether it answered. */
@@ -945,6 +959,67 @@ function tailoredCv(userContent: string) {
     // One skill the profile does not list: the check flags it.
     skills: [...skills, "Kubernetes"],
   };
+}
+
+/** The job's own questions of the letter prompt: `1. text` lines. */
+function letterQuestionsOf(content: string): string[] {
+  const block = /<questions>\n([\s\S]*?)\n?<\/questions>/.exec(content)?.[1] ?? "";
+  return [...block.matchAll(/^\d+\. (.+)$/gm)].map((match) => match[1] ?? "");
+}
+
+/**
+ * The letter writer (system prompt "You write a cover letter…"): the rules at
+ * the head of this script, deterministic from the sources it is shown.
+ */
+function coverLetter(userContent: string) {
+  const sources = cvSourcesOf(userContent);
+  const company = /^Company: (.+)$/m.exec(userContent)?.[1]?.trim() ?? "";
+  const companyFact = sources.find((source) => /^c[0-9a-z]+$/.test(source.id));
+  const highlight = sources.find((source) => /^w\d+\.h\d+$/.test(source.id));
+  const stripped = (text: string) => text.replace(/[.!?]+$/, "");
+  const sentence = (text: string, cited: string[]) => ({ text, sources: cited });
+  const paragraph = (...sentences: { text: string; sources: string[] }[]) => ({
+    text: sentences.map((one) => one.text).join(" "),
+    sentences,
+  });
+
+  const paragraphs: ReturnType<typeof paragraph>[] = [];
+  const opening: { text: string; sources: string[] }[] = [];
+  if (companyFact !== undefined) {
+    opening.push(
+      sentence(`What draws me to ${company}: ${stripped(companyFact.text)}.`, [companyFact.id]),
+    );
+  }
+  if (highlight !== undefined) {
+    opening.push(sentence(`${stripped(highlight.text)}.`, [highlight.id]));
+  }
+  if (opening.length > 0) {
+    paragraphs.push(paragraph(...opening));
+  }
+  // Praise nobody wrote: the check flags it.
+  paragraphs.push(
+    paragraph(sentence("I'm the go-to person for the hardest billing problems.", [])),
+  );
+  if (companyFact !== undefined) {
+    // What the company did, said as if the person did it: the check flags it.
+    paragraphs.push(
+      paragraph(sentence(`I led our migration, as ${company} did.`, [companyFact.id])),
+    );
+  }
+  paragraphs.push(paragraph(sentence("I'd like to bring that experience to your team.", [])));
+
+  const answers = letterQuestionsOf(userContent).map((question) => {
+    const unknown = /notice|salary|visa|relocat/i.test(question);
+    if (unknown || companyFact === undefined || highlight === undefined) {
+      return { question, text: "", sources: [] as string[] };
+    }
+    return {
+      question,
+      text: `${stripped(companyFact.text)} matches the work I have done: ${stripped(highlight.text)}.`,
+      sources: [companyFact.id, highlight.id],
+    };
+  });
+  return { paragraphs, answers };
 }
 
 const server = createServer((request, response) => {

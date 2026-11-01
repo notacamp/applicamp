@@ -120,6 +120,18 @@
       "review": "Relire le CV",
       "viewPdf": "Voir le PDF",
       "download": "Télécharger"
+    },
+    "letter": {
+      "title": "Lettre de motivation",
+      "none": "Pas encore de lettre de motivation.",
+      "approved": "v{{version}} approuvée.",
+      "needsYou_one": "Brouillon {{n}} : {{count}} chose a besoin de vous.",
+      "needsYou_other": "Brouillon {{n}} : {{count}} choses ont besoin de vous.",
+      "clean": "Brouillon {{n}} : chaque phrase s’appuie sur votre profil.",
+      "write": "Rédiger la lettre de motivation",
+      "review": "Relire la lettre",
+      "viewPdf": "Voir le PDF",
+      "download": "Télécharger"
     }
   },
   "hidden": {
@@ -450,8 +462,9 @@
     "filter": {
       "label": "Afficher",
       "all": "Tous",
-      "approved": "Approuvés",
-      "drafts": "Brouillons"
+      "drafts": "Brouillons",
+      "cvs": "CV",
+      "letters": "Lettres"
     },
     "title": "{{role}} · {{company}}",
     "version": "v{{version}}",
@@ -483,6 +496,163 @@
     "loadFailed": "Vos CV n’ont pas pu être chargés.",
     "viewer": {
       "title": "{{company}} · v{{version}}"
+    },
+    "cvLabel": "CV",
+    "letterLabel": "Lettre de motivation",
+    "letterTitle": "Lettre de motivation · {{role}} · {{company}}",
+    "letterFacts_one": "{{count}} page · {{size}}",
+    "letterFacts_other": "{{count}} pages · {{size}}",
+    "letterViewer": {
+      "title": "Lettre de motivation · {{company}} · v{{version}}"
+    }
+  },
+  "letter": {
+    "title": "Lettre de motivation",
+    "eyebrow": "Lettre de motivation",
+    "heading": "Votre lettre de motivation pour {{company}}",
+    "lead": "Rédigée à côté de votre CV approuvé, à partir de votre profil et des faits lus sur le site de l’entreprise elle-même. Chaque paragraphe montre d’où il vient. Les phrases qui ne remontent à rien restent bloquées jusqu’à ce que vous les corrigiez.",
+    "back": "Retour au CV",
+    "loading": "Chargement de la lettre de motivation…",
+    "loadFailed": "La lettre de motivation n’a pas pu être chargée.",
+    "viewerCompany": "Lettre de motivation · {{company}} · v{{version}}",
+    "empty": {
+      "body": "Pas encore de lettre de motivation. Elle est rédigée à côté de votre CV approuvé."
+    },
+    "fromCv": {
+      "title": "Ensuite : la lettre de motivation",
+      "body": "Votre CV est approuvé. Rédigez la lettre qui l’accompagne, à partir du même profil et des mêmes faits."
+    },
+    "slot": {
+      "write": "Rédiger la lettre de motivation · environ {{cost}}",
+      "writing": "Rédaction…",
+      "review": "Relire la lettre de motivation",
+      "hint": "Un appel d’IA. Ensuite, chaque phrase est vérifiée par rapport à votre profil, sans IA.",
+      "blocked": {
+        "stage_too_early": "Présélectionnez d’abord ce poste : on écrit une lettre pour les postes que vous visez.",
+        "no_approved_cv": "Approuvez d’abord votre CV pour ce poste : la lettre est rédigée à côté de lui.",
+        "per_opportunity_cap": "Vous avez déjà rédigé 10 brouillons de lettre pour ce poste. Relisez-en un.",
+        "daily_cap": "Vous avez déjà rédigé 20 brouillons de lettre aujourd’hui. Vous pourrez continuer demain.",
+        "ai_unavailable": "L’IA n’est pas configurée sur ce serveur : rien ne peut être rédigé."
+      }
+    },
+    "toolbar": {
+      "draft": "Brouillon {{n}}",
+      "draftPill": "Brouillon",
+      "approvedPill": "Approuvée · v{{version}}",
+      "language": "Rédigée en {{language}}",
+      "languageLabel": "Langue",
+      "length": "Longueur",
+      "sizes": {
+        "short": "Courte · environ 180 mots",
+        "standard": "Standard · environ 300"
+      },
+      "note": "Une autre longueur ou une autre langue est un nouveau brouillon : Refaire.",
+      "makeAgain": "Refaire · environ {{cost}}",
+      "making": "Rédaction…",
+      "approve": "Approuver",
+      "approving": "Approbation…",
+      "approveWhy": "Approuver s’active quand toutes les phrases et questions bloquées sont corrigées, supprimées ou répondues."
+    },
+    "sheet": {
+      "label": "Votre lettre de motivation"
+    },
+    "tags": {
+      "company_fact": "Fait sur l’entreprise",
+      "from_profile": "De votre profil",
+      "no_claims": "Aucune affirmation",
+      "edited": "Modifiée par vous"
+    },
+    "from": {
+      "show": "D’où cela vient",
+      "companyPage": "(lu sur {{page}})",
+      "none": "Ne dit rien sur vous qui demande une source."
+    },
+    "flag": {
+      "label": "Pas dans votre profil",
+      "claim": "« {{claim}} » n’est pas dans les sources que cite cette phrase.",
+      "noSource": "Cette phrase dit quelque chose sur vous mais ne cite rien de votre profil.",
+      "companyOnly": "Cette phrase ne cite qu’un fait sur l’entreprise, mais dit quelque chose sur vous. Les faits sur l’entreprise ne peuvent pas être vos réalisations.",
+      "superlative": "« {{word}} » n’est pas dans votre profil. Est-ce vrai ?",
+      "notInProfile": "Votre profil et vos objectifs ne le disent pas. Répondez vous-même."
+    },
+    "actions": {
+      "itsTrue": "C’est vrai : l’ajouter à mon profil",
+      "edit": "Modifier",
+      "remove": "Supprimer la phrase",
+      "editLabel": "Modifier la phrase",
+      "save": "Enregistrer",
+      "cancel": "Annuler",
+      "confirmLabel": "Dites-le avec vos mots",
+      "confirmHint": "Vos mots sont enregistrés dans {{where}}, puis la phrase est vérifiée de nouveau.",
+      "confirmSave": "Enregistrer dans mon profil et revérifier",
+      "whereProfile": "votre profil"
+    },
+    "questions": {
+      "title": "Les questions propres au poste",
+      "lead": "La candidature pose ces questions. Chaque réponse passe par la même vérification et vous pouvez la copier dans le formulaire. Elles ne font pas partie du PDF.",
+      "copy": "Copier",
+      "copied": "Copié",
+      "yourAnswer": "Votre réponse",
+      "useMine": "Utiliser ma réponse",
+      "write": "Écrire ma propre réponse",
+      "leaveOut": "La laisser de côté",
+      "own": "Votre réponse"
+    },
+    "aside": {
+      "flagged_one": "{{count}} chose a besoin de vous",
+      "flagged_other": "{{count}} choses ont besoin de vous",
+      "flaggedBody": "Approuver s’active quand chacune est corrigée, supprimée ou répondue.",
+      "goFirst": "Aller à la première",
+      "clean": "Chaque ligne remonte à votre profil",
+      "cleanBody": "Approuver fait le PDF à côté de votre CV.",
+      "approvedTitle": "Approuvée · v{{version}}",
+      "approvedBody": "Le texte ne peut plus changer et le PDF en est fait. Refaites la lettre pour un autre brouillon.",
+      "toPipeline": "Retour au pipeline",
+      "glance": "En un coup d’œil",
+      "words_one": "{{count}} mot · 1 page",
+      "words_other": "{{count}} mots · 1 page",
+      "wordsCv_one": "{{count}} mot · 1 page · correspond au CV v{{cv}}",
+      "wordsCv_other": "{{count}} mots · 1 page · correspond au CV v{{cv}}",
+      "facts_one": "{{count}} fait du site de l’entreprise : {{list}}",
+      "facts_other": "{{count}} faits du site de l’entreprise : {{list}}",
+      "noFacts": "Aucun fait du site de l’entreprise n’a été utilisé."
+    },
+    "pdf": {
+      "open": "Ouvrir le PDF",
+      "download": "Télécharger",
+      "size_one": "{{count}} page · {{size}}. Le texte a été relu depuis le PDF et trouvé entier.",
+      "size_other": "{{count}} pages · {{size}}. Le texte a été relu depuis le PDF et trouvé entier."
+    },
+    "spend": {
+      "drafts": "Brouillons de lettre aujourd’hui : {{n}} sur {{cap}}",
+      "day": "Ce brouillon coûte environ {{cost}} · IA du jour : {{spent}} sur {{limit}}",
+      "dayNoLimit": "Ce brouillon coûte environ {{cost}} · IA du jour : {{spent}}"
+    },
+    "viewer": {
+      "title": "Lettre de motivation · v{{version}}",
+      "subtitle": "{{date}} · {{pages}} · {{size}}"
+    },
+    "errors": {
+      "stage_too_early": "Présélectionnez d’abord ce poste : on écrit une lettre pour les postes que vous visez.",
+      "no_approved_cv": "Approuvez d’abord votre CV pour ce poste : la lettre est rédigée à côté de lui.",
+      "profile_needed": "Ajoutez d’abord un poste à votre profil : la lettre est faite à partir de lui.",
+      "letter_drafts_per_opportunity_cap": "Vous avez déjà rédigé 10 brouillons de lettre pour ce poste. Relisez-en un.",
+      "letter_drafts_daily_cap": "Vous avez déjà rédigé 20 brouillons de lettre aujourd’hui. Vous pourrez continuer demain.",
+      "ai_unavailable": "L’IA n’est pas configurée sur ce serveur : rien ne peut être rédigé.",
+      "ai_daily_limit_reached": "Vous avez atteint la limite d’IA du jour. Elle reprend demain.",
+      "ai_budget_reached": "Vous avez atteint votre limite de dépenses d’IA. Elle reprend quand la limite se réinitialise.",
+      "ai_failed": "L’IA n’a pas pu répondre cette fois. Rien n’a été perdu ; réessayez.",
+      "invalid_text": "Écrivez entre 1 et 1200 caractères.",
+      "invalid_fact": "Écrivez entre 1 et 300 caractères.",
+      "profile_changed": "Ce poste a changé dans votre profil depuis que ce brouillon a été fait. Rédigez de nouveau la lettre.",
+      "draft_frozen": "Ce brouillon a été approuvé ou mis de côté, il ne peut donc plus changer. Rédigez de nouveau la lettre.",
+      "letter_flagged": "Certaines phrases ne remontent pas à votre profil, ou une question attend votre réponse. Corrigez-les ou supprimez-les d’abord.",
+      "letter_empty": "Il ne reste plus de paragraphe dans la lettre. Rédigez-la de nouveau.",
+      "letter_doesnt_fit": "Ne tient pas sur 1 page : supprimez quelques phrases ou écrivez une lettre plus courte.",
+      "letter_pdf_check_failed": "Le PDF n’a pas passé sa vérification, rien n’a donc été approuvé. Réessayez.",
+      "letter_pdf_unavailable": "Le PDF n’a pas pu être fait pour le moment. Rien n’a été approuvé ; réessayez.",
+      "not_found": "Cette lettre de motivation est introuvable.",
+      "generic": "Un problème est survenu. Réessayez."
     }
   }
 }

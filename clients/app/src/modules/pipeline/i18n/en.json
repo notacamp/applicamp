@@ -120,6 +120,18 @@
       "review": "Review the CV",
       "viewPdf": "View PDF",
       "download": "Download"
+    },
+    "letter": {
+      "title": "Cover letter",
+      "none": "No cover letter yet.",
+      "approved": "v{{version}} approved.",
+      "needsYou_one": "Draft {{n}}: {{count}} thing needs you.",
+      "needsYou_other": "Draft {{n}}: {{count}} things need you.",
+      "clean": "Draft {{n}}: every sentence traces to your profile.",
+      "write": "Write the cover letter",
+      "review": "Review the letter",
+      "viewPdf": "View PDF",
+      "download": "Download"
     }
   },
   "hidden": {
@@ -450,8 +462,9 @@
     "filter": {
       "label": "Show",
       "all": "All",
-      "approved": "Approved",
-      "drafts": "Drafts"
+      "drafts": "Drafts",
+      "cvs": "CVs",
+      "letters": "Letters"
     },
     "title": "{{role}} · {{company}}",
     "version": "v{{version}}",
@@ -483,6 +496,163 @@
     "loadFailed": "Your CVs couldn’t be loaded.",
     "viewer": {
       "title": "{{company}} · v{{version}}"
+    },
+    "cvLabel": "CV",
+    "letterLabel": "Cover letter",
+    "letterTitle": "Cover letter · {{role}} · {{company}}",
+    "letterFacts_one": "{{count}} page · {{size}}",
+    "letterFacts_other": "{{count}} pages · {{size}}",
+    "letterViewer": {
+      "title": "Cover letter · {{company}} · v{{version}}"
+    }
+  },
+  "letter": {
+    "title": "Cover letter",
+    "eyebrow": "Cover letter",
+    "heading": "Your cover letter for {{company}}",
+    "lead": "Written next to your approved CV, from your profile and the facts read on the company’s own site. Every paragraph shows where it came from. Sentences that can’t be traced are blocked until you fix them.",
+    "back": "Back to the CV",
+    "loading": "Loading the cover letter…",
+    "loadFailed": "The cover letter couldn’t be loaded.",
+    "viewerCompany": "Cover letter · {{company}} · v{{version}}",
+    "empty": {
+      "body": "No cover letter yet. It is written next to your approved CV."
+    },
+    "fromCv": {
+      "title": "Next: the cover letter",
+      "body": "Your CV is approved. Write the letter that goes with it, from the same profile and the same facts."
+    },
+    "slot": {
+      "write": "Write the cover letter · about {{cost}}",
+      "writing": "Writing…",
+      "review": "Review the cover letter",
+      "hint": "One AI call. Then every sentence is checked against your profile, without AI.",
+      "blocked": {
+        "stage_too_early": "Shortlist this job first: a letter is written for the jobs you’re going after.",
+        "no_approved_cv": "Approve your CV for this job first: the letter is written next to it.",
+        "per_opportunity_cap": "You’ve written 10 letter drafts for this job. Review one of them.",
+        "daily_cap": "You’ve written 20 letter drafts today. Writing continues tomorrow.",
+        "ai_unavailable": "The AI isn’t set up on this server, so nothing can be written."
+      }
+    },
+    "toolbar": {
+      "draft": "Draft {{n}}",
+      "draftPill": "Draft",
+      "approvedPill": "Approved · v{{version}}",
+      "language": "Written in {{language}}",
+      "languageLabel": "Language",
+      "length": "Length",
+      "sizes": {
+        "short": "Short · about 180 words",
+        "standard": "Standard · about 300"
+      },
+      "note": "A different length or language is a new draft: Make again.",
+      "makeAgain": "Make again · about {{cost}}",
+      "making": "Writing…",
+      "approve": "Approve",
+      "approving": "Approving…",
+      "approveWhy": "Approve turns on when every blocked sentence and question is fixed, removed or answered."
+    },
+    "sheet": {
+      "label": "Your cover letter"
+    },
+    "tags": {
+      "company_fact": "Company fact",
+      "from_profile": "From your profile",
+      "no_claims": "No claims",
+      "edited": "Edited by you"
+    },
+    "from": {
+      "show": "Where this came from",
+      "companyPage": "(read on {{page}})",
+      "none": "Says nothing about you that needs a source."
+    },
+    "flag": {
+      "label": "Not in your profile",
+      "claim": "“{{claim}}” isn’t in the sources this sentence cites.",
+      "noSource": "This sentence says something about you but cites nothing from your profile.",
+      "companyOnly": "This sentence cites only a fact about the company, yet says something about you. Company facts can’t be your achievements.",
+      "superlative": "“{{word}}” isn’t in your profile. Is it true?",
+      "notInProfile": "Your profile and goals don’t say. Answer it yourself."
+    },
+    "actions": {
+      "itsTrue": "It’s true: add it to my profile",
+      "edit": "Edit",
+      "remove": "Remove the sentence",
+      "editLabel": "Edit the sentence",
+      "save": "Save",
+      "cancel": "Cancel",
+      "confirmLabel": "Say it in your words",
+      "confirmHint": "This saves your words to {{where}}, then checks the sentence again.",
+      "confirmSave": "Save to my profile and check again",
+      "whereProfile": "your profile"
+    },
+    "questions": {
+      "title": "The job’s own questions",
+      "lead": "The application asks these. Each answer goes through the same check, and you can copy it into the form. They aren’t part of the PDF.",
+      "copy": "Copy",
+      "copied": "Copied",
+      "yourAnswer": "Your answer",
+      "useMine": "Use my answer",
+      "write": "Write my own answer",
+      "leaveOut": "Leave it out",
+      "own": "Your answer"
+    },
+    "aside": {
+      "flagged_one": "{{count}} thing needs you",
+      "flagged_other": "{{count}} things need you",
+      "flaggedBody": "Approve turns on when each one is fixed, removed or answered.",
+      "goFirst": "Go to the first one",
+      "clean": "Every line traces back",
+      "cleanBody": "Approve makes the PDF next to your CV.",
+      "approvedTitle": "Approved · v{{version}}",
+      "approvedBody": "The text can’t change, and the PDF is made from it. Make the letter again for another draft.",
+      "toPipeline": "Back to the pipeline",
+      "glance": "At a glance",
+      "words_one": "{{count}} word · 1 page",
+      "words_other": "{{count}} words · 1 page",
+      "wordsCv_one": "{{count}} word · 1 page · matches CV v{{cv}}",
+      "wordsCv_other": "{{count}} words · 1 page · matches CV v{{cv}}",
+      "facts_one": "{{count}} fact from the company’s site: {{list}}",
+      "facts_other": "{{count}} facts from the company’s site: {{list}}",
+      "noFacts": "No facts from the company’s site used."
+    },
+    "pdf": {
+      "open": "Open the PDF",
+      "download": "Download",
+      "size_one": "{{count}} page · {{size}}. The text was read back out of the PDF and found whole.",
+      "size_other": "{{count}} pages · {{size}}. The text was read back out of the PDF and found whole."
+    },
+    "spend": {
+      "drafts": "Letter drafts today: {{n}} of {{cap}}",
+      "day": "This draft costs about {{cost}} · today’s AI: {{spent}} of {{limit}}",
+      "dayNoLimit": "This draft costs about {{cost}} · today’s AI: {{spent}}"
+    },
+    "viewer": {
+      "title": "Cover letter · v{{version}}",
+      "subtitle": "{{date}} · {{pages}} · {{size}}"
+    },
+    "errors": {
+      "stage_too_early": "Shortlist this job first: a letter is written for the jobs you’re going after.",
+      "no_approved_cv": "Approve your CV for this job first: the letter is written next to it.",
+      "profile_needed": "Add a position to your profile first: the letter is made from it.",
+      "letter_drafts_per_opportunity_cap": "You’ve written 10 letter drafts for this job. Review one of them.",
+      "letter_drafts_daily_cap": "You’ve written 20 letter drafts today. Writing continues tomorrow.",
+      "ai_unavailable": "The AI isn’t set up on this server, so nothing can be written.",
+      "ai_daily_limit_reached": "You’ve reached today’s AI limit. It continues tomorrow.",
+      "ai_budget_reached": "You’ve reached your AI spending limit. It continues when the limit resets.",
+      "ai_failed": "The AI couldn’t answer this time. Nothing was lost; try again.",
+      "invalid_text": "Write between 1 and 1200 characters.",
+      "invalid_fact": "Write between 1 and 300 characters.",
+      "profile_changed": "That position changed in your profile since this draft was made. Write the letter again.",
+      "draft_frozen": "This draft was approved or put away, so it can’t change. Write the letter again.",
+      "letter_flagged": "Some sentences can’t be traced to your profile, or a question waits for your answer. Fix or remove them first.",
+      "letter_empty": "The letter has no paragraphs left. Write it again.",
+      "letter_doesnt_fit": "Doesn’t fit on 1 page: remove a few sentences or write a shorter letter.",
+      "letter_pdf_check_failed": "The PDF didn’t pass its check, so nothing was approved. Try again.",
+      "letter_pdf_unavailable": "The PDF couldn’t be made right now. Nothing was approved; try again.",
+      "not_found": "This cover letter wasn’t found.",
+      "generic": "Something went wrong. Try again."
     }
   }
 }

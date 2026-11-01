@@ -280,7 +280,7 @@ pub struct CvVersion {
     pub checks: PdfChecks,
 }
 
-fn role_of(info: &PositionInfo) -> String {
+pub(super) fn role_of(info: &PositionInfo) -> String {
     match (info.title.as_deref(), info.company.as_deref()) {
         (Some(title), Some(company)) => format!("{title} · {company}"),
         (Some(one), None) | (None, Some(one)) => one.to_owned(),
@@ -288,7 +288,7 @@ fn role_of(info: &PositionInfo) -> String {
     }
 }
 
-fn to_u32(n: usize) -> u32 {
+pub(super) fn to_u32(n: usize) -> u32 {
     u32::try_from(n).unwrap_or(u32::MAX)
 }
 

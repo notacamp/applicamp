@@ -21,6 +21,7 @@ import { GoalsInterview } from "./routes/goals-interview";
 import { NotFound } from "./routes/not-found";
 import { Pipeline } from "./routes/pipeline";
 import { PipelineCv } from "./routes/pipeline-cv";
+import { PipelineLetter } from "./routes/pipeline-letter";
 import { PipelinePrepare } from "./routes/pipeline-prepare";
 import { Profile } from "./routes/profile";
 import { ProfileAbout } from "./routes/profile-about";
@@ -110,6 +111,9 @@ const pipelineRoute = createRoute({
         onReview={(id) => {
           void navigate({ to: "/pipeline/$id/cv", params: { id } });
         }}
+        onLetter={(id) => {
+          void navigate({ to: "/pipeline/$id/letter", params: { id } });
+        }}
       />
     );
   },
@@ -152,6 +156,30 @@ const cvRoute = createRoute({
         onPipeline={() => {
           void navigate({ to: "/pipeline" });
         }}
+        onLetter={(letterId) => {
+          void navigate({ to: "/pipeline/$id/letter", params: { id: letterId } });
+        }}
+      />
+    );
+  },
+});
+
+/** Review the cover letter: every sentence traced, the job's own questions answered. */
+const letterRoute = createRoute({
+  getParentRoute: () => frameRoute,
+  path: "/pipeline/$id/letter",
+  component: function LetterRoute() {
+    const { id } = letterRoute.useParams();
+    const navigate = letterRoute.useNavigate();
+    return (
+      <PipelineLetter
+        id={id}
+        onBack={() => {
+          void navigate({ to: "/pipeline/$id/cv", params: { id } });
+        }}
+        onPipeline={() => {
+          void navigate({ to: "/pipeline" });
+        }}
       />
     );
   },
@@ -167,6 +195,9 @@ const cvsRoute = createRoute({
       <Cvs
         onReview={(id) => {
           void navigate({ to: "/pipeline/$id/cv", params: { id } });
+        }}
+        onReviewLetter={(id) => {
+          void navigate({ to: "/pipeline/$id/letter", params: { id } });
         }}
         onOpportunity={() => {
           void navigate({ to: "/pipeline" });
@@ -368,6 +399,7 @@ const routeTree = rootRoute.addChildren([
     pipelineRoute,
     prepareRoute,
     cvRoute,
+    letterRoute,
     cvsRoute,
     boardsRoute,
     agentsRoute,

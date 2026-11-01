@@ -21,6 +21,7 @@ import {
   MAX_EXTRA,
   useAccuracy,
   useChoose,
+  useEmployerRetry,
   useEmployerSite,
   useMakePortrait,
   useSubmitExtra,
@@ -28,7 +29,7 @@ import {
   type AboutChoice,
   type AboutView,
 } from "../../api/about";
-import { errorCode, firstError } from "./labels";
+import { errorCode, firstError, reasonCode } from "./labels";
 import { AboutLegend, PortraitText } from "./PortraitText";
 
 const ACCURACY: readonly AboutAccuracyValue[] = ["yes", "some", "no"];
@@ -196,12 +197,13 @@ function Employers({ view }: { view: AboutView }) {
   const { t, i18n } = useTranslation("profile");
   const site = useEmployerSite();
   const again = useMakePortrait(i18n.language);
+  const retry = useEmployerRetry();
   const [typed, setTyped] = useState<Record<number, string>>({});
   if (view.employers.length === 0) {
     return null;
   }
   const waiting = view.employers.some((employer) => employer.state === "unread");
-  const failure = firstError(site.error, again.error);
+  const failure = firstError(site.error, again.error, retry.error);
   return (
     <Section
       title={t("about.employers.title")}
@@ -214,13 +216,35 @@ function Employers({ view }: { view: AboutView }) {
             <ListRow
               key={employer.position}
               title={employer.company}
-              meta={t(`about.employers.state.${employer.state}`, {
-                count: employer.facts,
-                site: employer.site ?? "",
-                error: employer.error ?? "",
-              })}
+              meta={
+                employer.state === "failed"
+                  ? undefined
+                  : t(`about.employers.state.${employer.state}`, {
+                      count: employer.facts,
+                      site: employer.site ?? "",
+                    })
+              }
               trailing={
-                employer.site === null || employer.site === undefined ? (
+                employer.state === "failed" ? (
+                  <Cluster>
+                    <Tagged testId={`about-employer-failed-${String(employer.position)}`}>
+                      <Text tone="secondary" size="sm" as="span">
+                        {t("about.employers.state.failed")}{" "}
+                        {t(`about.employers.reason.${reasonCode(employer.error)}`)}
+                      </Text>
+                    </Tagged>
+                    <Button
+                      variant="secondary"
+                      disabled={retry.isPending || again.isPending}
+                      data-testid={`about-employer-retry-${String(employer.position)}`}
+                      onClick={() => {
+                        retry.mutate(employer.position);
+                      }}
+                    >
+                      {t("about.employers.retry")}
+                    </Button>
+                  </Cluster>
+                ) : employer.site === null || employer.site === undefined ? (
                   <Cluster>
                     <TextField
                       label={t("about.employers.siteLabel", { company: employer.company })}
@@ -267,6 +291,11 @@ function Employers({ view }: { view: AboutView }) {
               {t("about.employers.updateCost")}
             </Text>
           </Cluster>
+        ) : null}
+        {view.employers.some((employer) => employer.state === "failed") ? (
+          <Text tone="tertiary" size="sm" as="p">
+            {t("about.employers.retryCost")}
+          </Text>
         ) : null}
         {failure === undefined ? null : (
           <Banner

@@ -501,6 +501,9 @@ function aboutChanges(userContent: string) {
   return { changes };
 }
 
+/** The outcomes the fake offers for a "what changed" question (all invented). */
+const RESULT_CHOICES = ["Fewer manual steps", "Faster month-end close", "More shops onboarded"];
+
 /** The choices the fake offers: what a picked one looks like in an answer. */
 const QUESTION_CHOICES: ReadonlySet<string> = new Set([
   "Bookings",
@@ -511,6 +514,7 @@ const QUESTION_CHOICES: ReadonlySet<string> = new Set([
   "3 to 6",
   "7 to 15",
   "More than 15",
+  ...RESULT_CHOICES,
 ]);
 
 /** The gap a question is about (`<gap>` of the prompt). */
@@ -563,10 +567,14 @@ function aboutQuestion(userContent: string) {
       );
     }
     case "results": {
+      // Plain words, and example outcomes that fit the company to pick from.
       return ask(
-        `What changed because of your work at ${company}? Give one result with a number.`,
-        `${basis} A result with a number is what a recruiter reads first, and I don’t know yours.`,
+        role?.title === undefined || role.title === null
+          ? `At ${company} you worked on a ledger product for small shops. What got better because of your work?`
+          : `At ${company} you were ${/^[aeiou]/i.test(title) ? "an" : "a"} ${title.toLowerCase()} on a ledger product for small shops. What got better because of your work?`,
+        `${basis} CVs that show a difference get more replies.`,
         "unknown",
+        RESULT_CHOICES,
       );
     }
     case "team_size": {
@@ -649,6 +657,12 @@ function aboutAnswer(userContent: string) {
   if (about.area === "results" && /\d/.test(words)) {
     const value = first.replace(/[.!?]+$/, "");
     return { changes: [change(value, first, "results", `You told me: ${value}.`)] };
+  }
+  if (about.area === "results" && choices.length > 0) {
+    // Picked outcomes are the person's own words: one fact each, no number added.
+    return {
+      changes: choices.map((pick) => change(pick, pick, "results", `You told me: ${pick}.`)),
+    };
   }
   if (choices.length > 0 && about.index !== null && about.index !== undefined) {
     const value = `Worked on ${choices.join(", ").toLowerCase()}`;
@@ -816,8 +830,8 @@ function waitingFeed(site: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel>${items}</channel></rss>`;
 }
 
-function text(response: ServerResponse, type: string, body: string) {
-  response.writeHead(200, { "content-type": type, "cache-control": "no-store" });
+function text(response: ServerResponse, type: string, body: string, status = 200) {
+  response.writeHead(status, { "content-type": type, "cache-control": "no-store" });
   response.end(body);
 }
 
@@ -860,6 +874,18 @@ function waitingBoard(site: string, url: URL, response: ServerResponse): boolean
 
 /** The company's own site (#34): invented, at its own host name. */
 const COMPANY_HOST = "example-co.test";
+/**
+ * Invented companies whose site fails on its first visit to the home page
+ * (503) and answers like Example Co's after that: a read that fails, then
+ * works on Try again. One per e2e project (they share a stack), and one to
+ * show by hand.
+ */
+const FLAKY_HOSTS: ReadonlySet<string> = new Set([
+  "flaky-desktop.test",
+  "flaky-phone.test",
+  "flaky-demo.test",
+]);
+const flakyFailed = new Set<string>();
 
 const COMPANY_PAGES: Record<string, string> = {
   "/": `<html><head><title>Example Co</title></head><body><h1>Example Co</h1>
@@ -1120,6 +1146,17 @@ const server = createServer((request, response) => {
   const site = (request.headers.host ?? "").split(":", 1)[0] ?? "";
   if (method === "GET" && site === COMPANY_HOST && companySite(url, response)) {
     return;
+  }
+  if (method === "GET" && FLAKY_HOSTS.has(site)) {
+    if (url.pathname === "/" && !flakyFailed.has(site)) {
+      flakyFailed.add(site);
+      console.log(`fake-jobs: ${site} failed its first visit`);
+      text(response, "text/plain", "Try again later.", 503);
+      return;
+    }
+    if (companySite(url, response)) {
+      return;
+    }
   }
   if (method === "GET" && site.endsWith(".test") && waitingBoard(site, url, response)) {
     return;

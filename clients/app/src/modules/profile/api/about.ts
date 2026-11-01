@@ -127,6 +127,24 @@ export function useEmployerSite() {
   });
 }
 
+/**
+ * Reads one past employer's website again after it couldn't be read: one model call, counted
+ * against the day's limit. The portrait is not touched.
+ */
+export function useEmployerRetry() {
+  const store = useStore();
+  return useMutation({
+    mutationFn: async (position: number): Promise<AboutView> =>
+      unwrap(
+        await api.POST("/api/v1/profile/about/employers/{position}/retry", {
+          params: { path: { position } },
+          headers: CSRF_HEADERS,
+        }),
+      ),
+    onSuccess: store,
+  });
+}
+
 /** "Anything else": one model call turns the text into proposed changes. */
 export function useSubmitExtra(language: string) {
   const store = useStore();

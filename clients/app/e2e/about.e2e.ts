@@ -181,12 +181,20 @@ test("someone reads what Applicamp knows and assumes about them, settles two ass
   await expect(page.getByTestId("about-q-updated")).toContainText("Goes to: Example Co · role.");
   await expect(page.getByTestId("about-q-progress")).toContainText("Question 2 of about");
   await expect(page.getByTestId("about-q-tag")).toHaveText("I don’t know");
-  await expect(page.getByTestId("about-q-why-text")).toContainText("none with a number");
+  // The results question is in plain words, with outcomes to pick from.
+  await expect(page.getByTestId("about-q-why-text")).toContainText(
+    "not what changed because of it",
+  );
+  await expect(page.getByTestId("about-q-question")).not.toContainText(/how do you know/i);
+  await expect(page.getByTestId("about-q-question")).toContainText("What got better");
+  await expect(page.getByTestId("about-q-choice-0")).toBeVisible();
+  await expect(page.getByTestId("about-q-choice-2")).toBeVisible();
+  await expect(page.getByTestId("about-q-number-hint")).toContainText("skip it if you don’t know");
   await expectNoSidewaysScroll(page);
-  // "I don't know" is answered with a number.
-  await page.getByTestId("about-q-answer").fill("Invoice runs went from 6 hours to 40 minutes.");
+  // Picking an outcome is enough: no words and no number needed.
+  await page.getByTestId("about-q-choice-0").click();
   await page.getByTestId("about-q-send").click();
-  await expect(page.getByTestId("about-q-updated")).toContainText("6 hours to 40 minutes");
+  await expect(page.getByTestId("about-q-updated")).toContainText("Fewer manual steps");
   // The third question is skipped.
   await expect(page.getByTestId("about-q-progress")).toContainText("Question 3 of about");
   await page.getByTestId("about-q-skip").click();
@@ -208,9 +216,7 @@ test("someone reads what Applicamp knows and assumes about them, settles two ass
   await expect(page.getByTestId("about-group-position-0")).toContainText(
     "Worked on bookings, payments",
   );
-  await expect(page.getByTestId("about-group-position-0")).toContainText(
-    "Invoice runs went from 6 hours to 40 minutes",
-  );
+  await expect(page.getByTestId("about-group-position-0")).toContainText("Fewer manual steps");
   await expect(page.getByTestId("about-group-summary")).toContainText("You told me");
   await expect(page.getByTestId("about-left-out")).toBeVisible();
   await expectNoSidewaysScroll(page);
@@ -243,7 +249,7 @@ test("someone reads what Applicamp knows and assumes about them, settles two ass
   expect(confirmed?.text).toBe("Led a small team at Example Co (3 to 6 people)");
   // What the questions' answers proposed is saved with the rest, once the person saves.
   expect(facts.map((fact) => fact.text)).toContain("Worked on bookings, payments");
-  expect(facts.map((fact) => fact.text)).toContain("Invoice runs went from 6 hours to 40 minutes");
+  expect(facts.map((fact) => fact.text)).toContain("Fewer manual steps");
   await expect(page.getByTestId("basics-summary")).toContainText("I ran events");
   await expect(page.getByTestId("basics-background")).toContainText("6 years");
   await expect(page.getByTestId("role-facts-list-0")).toContainText(
@@ -262,4 +268,39 @@ test("the retired Improve, Skills and Grill me addresses lead to Tell me about y
     await expect(page).toHaveURL(/\/profile\/about$/);
     await expect(page.getByTestId("about")).toBeVisible();
   }
+});
+
+test("an employer whose website can't be read doesn't stop the portrait, says so, and Try again reads only it", async ({
+  page,
+}, testInfo) => {
+  const phone = testInfo.project.name === "phone";
+  await signIn(page);
+  const flaky = phone ? "flaky-phone.test" : "flaky-desktop.test";
+  const month = (phone ? 8 : 9) + testInfo.retry;
+  const flakyProfile = profile(`2022-${String(month).padStart(2, "0")}`);
+  const work = flakyProfile.work[0];
+  if (work !== undefined) {
+    work.name = phone ? "Flaky Phone Co" : "Flaky Desktop Co";
+  }
+  expect(await callApi(page, "PUT", "/api/v1/profile", flakyProfile)).toBe(200);
+  expect(
+    await callApi(page, "PUT", "/api/v1/profile/about/employers/0/site", {
+      url: `http://${flaky}:9020/`,
+    }),
+  ).toBe(200);
+
+  // The first visit to its website fails; the portrait is made all the same.
+  await page.goto("/profile/about");
+  await expect(page.getByTestId("about-portrait")).toBeVisible({ timeout: 45_000 });
+  const failed = page.getByTestId("about-employer-failed-0");
+  await expect(failed).toContainText("Couldn’t read its website this time.");
+  await expect(failed).toContainText("didn’t answer");
+  await expectNoSidewaysScroll(page);
+  await expectAccessible(page);
+
+  // Try again reads only that employer; the second visit works.
+  await page.getByTestId("about-employer-retry-0").click();
+  await expect(page.getByTestId("about-employer-failed-0")).toHaveCount(0);
+  await expect(page.getByTestId("about-employers")).toContainText("Read its website");
+  await expectNoSidewaysScroll(page);
 });

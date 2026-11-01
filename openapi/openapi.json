@@ -3598,6 +3598,96 @@
         ]
       }
     },
+    "/api/v1/profile/about/employers/{position}/retry": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Read one past employer's website again, after it could not be read.",
+        "description": "Only that employer: **one model call**, counted toward the day's limit\nlike any other. Whatever comes of it is shown on that employer's row, and\nthe portrait is not touched; *Update the portrait* uses what was found. A\nread that fails is never retried by itself: only this does it.",
+        "operationId": "profile.about_employer_retry",
+        "parameters": [
+          {
+            "name": "position",
+            "in": "path",
+            "description": "A position of the profile's `work` list.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The wizard's state, with that employer's new state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AboutView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such employer",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`portrait_needed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`about_daily_cap`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`research_unavailable`; `ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/v1/profile/about/employers/{position}/site": {
       "put": {
         "tags": [

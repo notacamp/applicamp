@@ -538,13 +538,24 @@
         "read_other": "Li o site: {{count}} factos encontrados",
         "unread": "Site conhecido: {{site}}. Vou lê-lo quando atualizar o retrato.",
         "no_site": "Site desconhecido, por isso não li nada.",
-        "failed": "Não foi possível lê-lo ({{error}})."
+        "failed": "Desta vez não foi possível ler o site."
       },
       "siteLabel": "Site de {{company}}",
       "sitePlaceholder": "https://exemplo.com",
       "add": "Adicionar site",
       "update": "Atualizar o retrato",
-      "updateCost": "1 pequena chamada de IA por site lido · cerca de 0,002 €"
+      "updateCost": "1 pequena chamada de IA por site lido · cerca de 0,002 €",
+      "retry": "Tentar de novo",
+      "retryCost": "1 pequena chamada de IA · cerca de 0,002 €",
+      "reason": {
+        "generic": "Algo correu mal ao lê-lo.",
+        "robots_disallows": "O site pede aos robôs que não o leiam.",
+        "site_unreachable": "O site não respondeu.",
+        "no_pages_readable": "Nenhuma das páginas tinha texto para ler.",
+        "research_timeout": "Demorou demasiado.",
+        "ai_failed": "O modelo de IA não conseguiu lê-lo agora.",
+        "about_daily_cap": "Atingiu o limite de hoje."
+      }
     },
     "accuracy": {
       "title": "Isto está certo?",
@@ -668,7 +679,9 @@
       "asking": "A pensar na pergunta seguinte…",
       "reading": "A ler a sua resposta…",
       "peek": "Ver o que sei sobre si agora",
-      "toReview": "Ir para a revisão"
+      "toReview": "Ir para a revisão",
+      "numberHint": "Um número aproximado ajuda, mas deixe-o de fora se não souber.",
+      "answerLabelChoices": "Outra coisa? Diga-o por palavras suas"
     }
   }
 }

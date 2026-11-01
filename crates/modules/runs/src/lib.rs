@@ -262,11 +262,46 @@ pub async fn start(
         return Ok(None);
     };
     if let Err(e) = orchestrator.runtime().prepare(&deps.kinds).await {
-        // The gateway may come up later; runs fail until it does.
+        // The gateway may come up later (it checks this server's OIDC issuer
+        // before it listens, so after a reboot it waits for us): runs fail
+        // until it does, and the templates are made as soon as it takes them.
         tracing::error!(error = %e, "the sandbox runtime could not be prepared");
+        tokio::spawn(prepare_until_ready(
+            orchestrator.runtime().clone(),
+            deps.kinds.clone(),
+            shutdown.clone(),
+        ));
     }
     orchestrator.startup().await;
     Ok(Some(tokio::spawn(orchestrator.run(shutdown))))
+}
+
+/// How long a failed preparation waits before the next try.
+const PREPARE_RETRY: Duration = Duration::from_secs(30);
+
+/// Prepares `runtime` for `kinds` again every [`PREPARE_RETRY`] until it
+/// works or the server shuts down.
+async fn prepare_until_ready(
+    runtime: Arc<dyn runtime::SandboxRuntime>,
+    kinds: Arc<Kinds>,
+    mut shutdown: watch::Receiver<bool>,
+) {
+    loop {
+        tokio::select! {
+            () = tokio::time::sleep(PREPARE_RETRY) => {}
+            _ = shutdown.changed() => return,
+        }
+        if *shutdown.borrow() {
+            return;
+        }
+        match runtime.prepare(&kinds).await {
+            Ok(()) => {
+                tracing::info!("the sandbox runtime is prepared");
+                return;
+            }
+            Err(e) => tracing::warn!(error = %e, "the sandbox runtime is still not prepared"),
+        }
+    }
 }
 
 /// The outcome an agent may finish with itself.

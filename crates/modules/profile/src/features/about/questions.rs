@@ -7,7 +7,10 @@
 //!   only that gap's context: the position, its facts and the assumption it
 //!   concerns, never the whole profile and never contact details. It must
 //!   say in `why` what was assumed or what is not known, and never ask what
-//!   it knows or what the employer's own website covers.
+//!   it knows or what the employer's own website covers. It also sees the
+//!   facts already kept about that employer (what it sells, to whom), and
+//!   words the question in plain everyday terms, with concrete example
+//!   answers to pick from for a "what changed" question.
 //! - **Answer** reads the person's words into proposed changes (1 call) with
 //!   the same structure and checks as "Anything else": a quote that is theirs
 //!   and a value that says only what they said; what fails is **flagged,
@@ -478,10 +481,26 @@ pub async fn next(
         .id
         .strip_prefix("assumed:")
         .and_then(|id| row.portrait.0.iter().find(|s| s.id == id));
+    // What the employer's own site said, already kept: never read now.
+    let company = top
+        .position
+        .and_then(|p| usize::try_from(p).ok())
+        .and_then(|p| seen.profile.work.get(p))
+        .and_then(|w| w.name.as_deref())
+        .map(str::trim)
+        .filter(|c| !c.is_empty());
+    let company_facts = match (research.0.as_deref(), company) {
+        (Some(port), Some(company)) => port
+            .known_facts(&state.db, account, company)
+            .await
+            .unwrap_or_default(),
+        _ => Vec::new(),
+    };
     let message = prompt::question_message(
         &seen.profile,
         top,
         assumption,
+        &company_facts,
         language(query.locale.as_deref()).as_deref(),
         &now.date_naive().to_string(),
     );

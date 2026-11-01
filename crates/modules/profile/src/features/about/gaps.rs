@@ -162,6 +162,21 @@ fn describe(work: &Work) -> String {
     }
 }
 
+/// Why the results are asked about, in plain words: it is the fallback `why`
+/// when the model gives none.
+pub fn results_basis(work: &Work, has_results: bool) -> String {
+    let role = match (work.name.as_deref(), work.position.as_deref()) {
+        (Some(company), _) => format!("Your role at {company}"),
+        (None, Some(title)) => format!("Your role as {title}"),
+        (None, None) => "Your role".to_owned(),
+    };
+    if has_results {
+        format!("{role} says what you did, but not what changed because of it.")
+    } else {
+        format!("{role} doesn't say what changed because of your work.")
+    }
+}
+
 /// Whether `change` is a fact about `work` (the position at `index`).
 fn about_role(change: &Change, work: &Work, index: usize) -> bool {
     change.field == Field::RoleFact
@@ -246,7 +261,7 @@ fn area_phrase(area: Area) -> &'static str {
         Area::Context => "what the company sells and to whom",
         Area::YourPart => "what they did themselves, as against the team",
         Area::StackScale => "the tools, data size or traffic",
-        Area::Results => "results, with numbers",
+        Area::Results => "what changed because of their work",
         Area::HardProblems => "the hardest problem and what they did about it",
         Area::People => "leading, mentoring or hiring",
         Area::Stories => "a story they would tell in an interview",
@@ -333,11 +348,7 @@ pub fn gaps(i: &Inputs<'_>) -> Vec<Gap> {
         if !numbered {
             let has_results = work.highlights.iter().any(|h| !h.trim().is_empty())
                 || work.facts.iter().any(|f| f.area == Area::Results);
-            let basis = if has_results {
-                format!("{what} states results, but none with a number.")
-            } else {
-                format!("{what} states no results.")
-            };
+            let basis = results_basis(work, has_results);
             let rank = if index == 0 { 100 } else { 130 + index as u32 };
             out.push((
                 rank,

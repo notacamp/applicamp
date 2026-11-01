@@ -19,6 +19,23 @@ const ERROR_CODES = [
   "not_found",
 ] as const;
 
+/** Why an employer's website couldn't be read (`about.employers.reason.<code>`). */
+const REASON_CODES = [
+  "robots_disallows",
+  "site_unreachable",
+  "no_pages_readable",
+  "research_timeout",
+  "ai_failed",
+  "about_daily_cap",
+] as const;
+
+/** The reason's code if the messages know it, else `generic`. */
+export function reasonCode(
+  code: string | null | undefined,
+): (typeof REASON_CODES)[number] | "generic" {
+  return REASON_CODES.find((known) => known === code) ?? "generic";
+}
+
 export type AboutErrorCode = (typeof ERROR_CODES)[number] | "generic";
 
 /** The problem's code if the messages know it, else `generic`. */

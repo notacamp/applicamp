@@ -259,7 +259,14 @@ Company: Example Co
     });
     expect(results.tag).toBe("unknown");
     expect(results.why).toContain("states no results");
-    expect(results.choices).toEqual([]);
+    // Plain words and outcomes to pick from, never a number asked for.
+    expect(results.question.toLowerCase()).not.toContain("how do you know");
+    expect(results.question).not.toContain("with a number");
+    expect(results.choices).toEqual([
+      "Fewer manual steps",
+      "Faster month-end close",
+      "More shops onboarded",
+    ]);
     const team = await ask({ kind: "team_size", area: "people", basis: "x" });
     expect(team.why).toContain("Your title was Lead Engineer");
     expect(team.choices).toHaveLength(4);
@@ -284,6 +291,12 @@ Company: Example Co
         quote: "Invoice runs went from 6 hours to 40 minutes.",
         sentence: "You told me: Invoice runs went from 6 hours to 40 minutes.",
       },
+    ]);
+    // Picking outcomes without typing is an answer: one fact per pick, no number added.
+    const picked = await answer("results", "Fewer manual steps\nMore shops onboarded");
+    expect(picked.changes.map((change) => change.value)).toEqual([
+      "Fewer manual steps",
+      "More shops onboarded",
     ]);
     const team = await answer("people", "about 4 people\n3 to 6");
     expect(team.changes[0]?.value).toBe("Led about 4 people at Example Co");

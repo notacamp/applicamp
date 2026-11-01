@@ -1,0 +1,11 @@
+# Tasks
+- [x] 1 The facts call: at most 10 short facts in the prompt and the schema, 16 000 characters of page text, the retry gets half the text; tests
+- [x] 2 Best-effort employer research: 3 at a time, a timeout each and a window for all; a failure is that employer's alone; failed reads count and are not retried by themselves
+- [x] 3 The portrait answers within about 40 seconds
+- [x] 4 Try again: `POST /about/employers/{position}/retry`; a new website forgets the failure
+- [x] 5 The question gets the employer's kept facts (`known_facts`); the prompt in plain words with example outcomes; plain fallback reason; picks alone are an answer
+- [x] 6 Rust tests: schema caps, half the text, a failed employer, no auto-retry, Try again and its cost, the prompt holds the facts and no contact details, the plain fallback why, picks alone make facts
+- [x] 7 Client: the failed employer row with Try again, the results hint, multi-select for results; component tests
+- [x] 8 Fake model and sites: a results question with choices and plain why, picks as answers, sites that fail their first visit; e2e for the question and for Try again
+- [x] 9 OpenAPI regenerated, client types regenerated, changelog entry file
+- [ ] 10 Gates green in CI, recording (UI at 375px and desktop, by the lead)

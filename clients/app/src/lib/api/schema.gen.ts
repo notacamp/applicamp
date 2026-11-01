@@ -980,6 +980,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/profile/about/employers/{position}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Read one past employer's website again, after it could not be read.
+         * @description Only that employer: **one model call**, counted toward the day's limit
+         *     like any other. Whatever comes of it is shown on that employer's row, and
+         *     the portrait is not touched; *Update the portrait* uses what was found. A
+         *     read that fails is never retried by itself: only this does it.
+         */
+        post: operations["profile.about_employer_retry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/profile/about/employers/{position}/site": {
         parameters: {
             query?: never;
@@ -7421,6 +7444,74 @@ export interface operations {
             };
             /** @description `not_found` */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.about_employer_retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A position of the profile's `work` list. */
+                position: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The wizard's state, with that employer's new state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AboutView"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: no such employer */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `portrait_needed` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `about_daily_cap` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `research_unavailable`; `ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached` */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -6,7 +6,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
 };
 
-use applicamp_kernel::{AppState, BoxFuture, Result};
+use applicamp_kernel::{AppState, BoxFuture, Error, Result};
 use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
 use sqlx::PgPool;
@@ -97,7 +97,12 @@ fn find<'a>(view: &'a Value, text: &str) -> &'a Value {
 struct Fake {
     site: Option<&'static str>,
     facts: Vec<ProposedFact>,
+    /// Reads that worked.
     runs: AtomicUsize,
+    /// Reads tried, whatever came of them.
+    attempts: AtomicUsize,
+    /// How many of the next reads fail (the site is unreachable).
+    fail: AtomicUsize,
 }
 
 impl EmployerResearch for Fake {
@@ -125,6 +130,21 @@ impl EmployerResearch for Fake {
         Box::pin(async move { Ok(url.to_owned()) })
     }
 
+    fn known_facts<'a>(
+        &'a self,
+        _: &'a PgPool,
+        _: Uuid,
+        company: &'a str,
+    ) -> BoxFuture<'a, Result<Vec<String>>> {
+        Box::pin(async move {
+            Ok(if company == "Example Org" {
+                self.facts.iter().map(|f| f.claim.clone()).collect()
+            } else {
+                Vec::new()
+            })
+        })
+    }
+
     fn run<'a>(
         &'a self,
         _: &'a AppState,
@@ -134,6 +154,14 @@ impl EmployerResearch for Fake {
     ) -> BoxFuture<'a, Result<Research>> {
         Box::pin(async move {
             assert_eq!(company, "Example Org", "only a known site is read");
+            self.attempts.fetch_add(1, Ordering::SeqCst);
+            if self
+                .fail
+                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1))
+                .is_ok()
+            {
+                return Err(Error::Unavailable("site_unreachable"));
+            }
             self.runs.fetch_add(1, Ordering::SeqCst);
             Ok(Research {
                 site: self.site.map(str::to_owned),
@@ -149,6 +177,8 @@ fn research(facts: Vec<ProposedFact>) -> (Researcher, Arc<Fake>) {
         site: Some("https://example-org.test/"),
         facts,
         runs: AtomicUsize::new(0),
+        attempts: AtomicUsize::new(0),
+        fail: AtomicUsize::new(0),
     });
     (Researcher(Some(fake.clone())), fake)
 }
@@ -285,6 +315,75 @@ async fn only_sourced_facts_become_citable_sources_and_only_a_known_site_is_read
     assert!(!body.contains("900 employees") && !body.contains("probably a startup"));
     // The portrait and the read are counted against the wizard's daily cap.
     assert_eq!(h.count("SELECT count(*) FROM profile.about_calls").await, 2);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn one_employer_that_cannot_be_read_does_not_stop_the_portrait_and_try_again_reads_only_it(
+    db: PgPool,
+) {
+    let server = scripted_model(vec![portrait_reply()]).await;
+    let (port, fake) = research(vec![sourced(
+        "Builds invented ledgers",
+        "builds invented ledgers",
+    )]);
+    fake.fail.store(1, Ordering::SeqCst);
+    let h = Harness::with_research(db, Some(gateway(&server, None)), port);
+    saved(&h, &profile()).await;
+
+    // The read fails; the portrait is made all the same, from the profile.
+    let (status, view) = h.post("/api/v1/profile/about/portrait").await;
+    assert_eq!(status, 200, "{view}");
+    assert_eq!(view["built"], true);
+    assert_eq!(sentences(&view).len(), 6);
+    assert_eq!(view["employers"][0]["state"], "failed");
+    assert_eq!(view["employers"][0]["error"], "site_unreachable");
+    assert_eq!(calls(&server).await, 1, "no model call for the failed read");
+    // It was tried, and charged to the day's limit, with the portrait.
+    assert_eq!(h.count("SELECT count(*) FROM profile.about_calls").await, 2);
+    assert!(
+        !String::from_utf8(server.received_requests().await.unwrap()[0].body.clone())
+            .unwrap()
+            .contains("Builds invented ledgers")
+    );
+
+    // Making the portrait again does not read the failed one by itself.
+    let (_, again) = h.post("/api/v1/profile/about/portrait?again=true").await;
+    assert_eq!(again["employers"][0]["state"], "failed");
+    assert_eq!(fake.attempts.load(Ordering::SeqCst), 1);
+
+    // Try again reads that employer, and only it; the portrait is untouched.
+    let (status, retried) = h.post("/api/v1/profile/about/employers/0/retry").await;
+    assert_eq!(status, 200, "{retried}");
+    assert_eq!(retried["employers"][0]["state"], "read");
+    assert_eq!(retried["employers"][0]["facts"], 1);
+    assert_eq!(retried["employers"][0]["error"], Value::Null);
+    assert_eq!(fake.attempts.load(Ordering::SeqCst), 2);
+    assert_eq!(retried["employers"][1]["state"], "no_site");
+    // The retry counts against the cap like any read: the failed read, two
+    // portraits and the retry.
+    assert_eq!(h.count("SELECT count(*) FROM profile.about_calls").await, 4);
+
+    // A position with no site, or none at all, is not found.
+    let (status, _) = h.post("/api/v1/profile/about/employers/1/retry").await;
+    assert_eq!(status, 404);
+    let (status, _) = h.post("/api/v1/profile/about/employers/9/retry").await;
+    assert_eq!(status, 404);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_retry_that_fails_again_says_so_on_that_employer_and_still_counts(db: PgPool) {
+    let server = scripted_model(vec![portrait_reply()]).await;
+    let (port, fake) = research(Vec::new());
+    fake.fail.store(2, Ordering::SeqCst);
+    let h = Harness::with_research(db, Some(gateway(&server, None)), port);
+    saved(&h, &profile()).await;
+    h.post("/api/v1/profile/about/portrait").await;
+
+    let (status, view) = h.post("/api/v1/profile/about/employers/0/retry").await;
+    assert_eq!(status, 200, "{view}");
+    assert_eq!(view["employers"][0]["state"], "failed");
+    assert_eq!(view["employers"][0]["error"], "site_unreachable");
+    assert_eq!(h.count("SELECT count(*) FROM profile.about_calls").await, 3);
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -986,6 +1085,45 @@ fn the_result_of_a_question_is_worth_points_of_strength_only_where_the_score_cou
 }
 
 #[test]
+fn the_fallback_reason_for_a_results_question_is_plain() {
+    let profile: crate::schema::Profile = serde_json::from_value(profile()).unwrap();
+    let work = &profile.work[0];
+    let said = gaps::results_basis(work, true);
+    assert_eq!(
+        said,
+        "Your role at Example Org says what you did, but not what changed because of it."
+    );
+    let none = gaps::results_basis(work, false);
+    assert!(none.starts_with("Your role at Example Org"), "{none}");
+    for basis in [&said, &none] {
+        assert!(
+            !basis.contains("number") && !basis.contains("states"),
+            "{basis}"
+        );
+    }
+    // The question that has no reason of its own is asked with this one.
+    let gap = Gap {
+        id: "results:0".into(),
+        kind: GapKind::Results,
+        position: Some(0),
+        area: Some(crate::schema::Area::Results),
+        basis: said.clone(),
+        names: Vec::new(),
+    };
+    let asked = questions::judge_question(
+        questions::RawQuestion {
+            question: "What got better because of your work?".into(),
+            why: String::new(),
+            tag: String::new(),
+            choices: Vec::new(),
+        },
+        &gap,
+    )
+    .unwrap();
+    assert_eq!(asked.why, said);
+}
+
+#[test]
 fn a_question_always_says_why_and_an_assumption_is_tagged_as_one() {
     let gap = Gap {
         id: "assumed:s1".into(),
@@ -1058,7 +1196,16 @@ fn the_prompt_holds_the_gaps_context_and_no_contact_details() {
         basis: "Engineer at Sample Labs states no results.".into(),
         names: Vec::new(),
     };
-    let message = prompt::question_message(&profile, &gap, None, Some("en"), "2026-10-31");
+    let message = prompt::question_message(
+        &profile,
+        &gap,
+        None,
+        &["Sells door-access systems to property managers".to_owned()],
+        Some("en"),
+        "2026-10-31",
+    );
+    // What is known about the employer is shown, so it is never asked.
+    assert!(message.contains("door-access systems"), "{message}");
     // This position's words and nothing of the other one's, nor of the person.
     assert!(message.contains("Built the data pipeline."), "{message}");
     assert!(!message.contains("Runs the billing platform"), "{message}");
@@ -1072,8 +1219,18 @@ fn the_prompt_holds_the_gaps_context_and_no_contact_details() {
         assert!(!message.contains(private), "{private}");
     }
     // The model is told never to ask what it knows or can look up.
-    assert!(prompt::QUESTION_INSTRUCTIONS.contains("Never ask for anything you know"));
+    assert!(prompt::QUESTION_INSTRUCTIONS.contains("Never ask what the context already answers"));
     assert!(prompt::QUESTION_INSTRUCTIONS.contains("what a company sells"));
+    // Plain words, with outcomes to pick from for the results question.
+    for needle in [
+        "friendly recruiter",
+        "Never say \"result\"",
+        "never write \"how do you know it\"",
+        "2 to 4 concrete",
+        "Never add a \"Something else\" choice",
+    ] {
+        assert!(prompt::QUESTION_INSTRUCTIONS.contains(needle), "{needle}");
+    }
     let answer = prompt::answer_message(
         &profile,
         &crate::goals::Goals::default(),
@@ -1291,6 +1448,51 @@ async fn an_answer_becomes_changes_flagged_and_never_dropped_and_the_portrait_ga
         "Led the pipeline work at Acme"
     );
     assert_eq!(now["profile"]["work"][1]["facts"][0]["area"], "your_part");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn picking_outcomes_without_typing_anything_is_an_answer_and_makes_facts_in_their_pick(
+    db: PgPool,
+) {
+    let (h, server, id) = at_the_questions(
+        db,
+        vec![
+            question_reply(
+                "At Example Org you were an engineer on a billing platform. What got better \
+                 because of your work?",
+                "Your Example Org role says what you did, but not what changed because of it.",
+                "assumed",
+                &["Fewer failed payments", "Faster invoicing"],
+            ),
+            answer_reply(json!([
+                { "field": "role_fact", "value": "Fewer failed payments", "position": null,
+                  "area": "results", "quote": "Fewer failed payments",
+                  "sentence": "You cut failed payments." },
+            ])),
+        ],
+    )
+    .await;
+    let (_, asked) = h.post(NEXT).await;
+    assert_eq!(
+        asked["questions"]["current"]["choices"],
+        json!(["Fewer failed payments", "Faster invoicing"])
+    );
+    let gap = format!("assumed:{id}");
+    let (status, view) = h
+        .json(
+            "POST",
+            &format!("/api/v1/profile/about/questions/{gap}/answer"),
+            &json!({ "text": "", "choices": ["Fewer failed payments"] }),
+        )
+        .await;
+    assert_eq!(status, 200, "{view}");
+    let changes = view["changes"].as_array().unwrap();
+    assert_eq!(changes.len(), 1, "{view}");
+    assert_eq!(changes[0]["value"], "Fewer failed payments");
+    assert!(changes[0]["flags"].as_array().unwrap().is_empty(), "{view}");
+    assert_eq!(view["questions"]["answered"], 1);
+    // The pick, and only the pick, reached the model as their words.
+    assert!(body_of(&server, 2).await.contains("Fewer failed payments"));
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

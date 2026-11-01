@@ -50,6 +50,21 @@ pub async fn site_of(db: &PgPool, account: Uuid, name: &str) -> Result<Option<St
         .and_then(|company| company.site))
 }
 
+/// The facts kept about the company named `name`, as texts: what is already
+/// on record, never a fetch and never a model call.
+pub async fn known_facts(db: &PgPool, account: Uuid, name: &str) -> Result<Vec<String>> {
+    Ok(sqlx::query_scalar(
+        "SELECT f.text FROM pipeline.company_facts f
+          JOIN pipeline.companies c ON c.id = f.company_id
+         WHERE c.account_id = $1 AND c.key = $2 AND NOT f.removed
+         ORDER BY f.created_at, f.id",
+    )
+    .bind(account)
+    .bind(companies::key_of(name))
+    .fetch_all(db)
+    .await?)
+}
+
 /// Record `raw` (an address) as `name`'s own site, typed by the person.
 pub async fn set_site(
     deps: &PipelineDeps,

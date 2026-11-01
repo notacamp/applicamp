@@ -208,6 +208,37 @@ describe("Tell me about you", () => {
     expect(await screen.findByTestId("about-update")).toBeVisible();
   });
 
+  it("says an employer couldn’t be read, with the reason, and Try again reads only that one", async () => {
+    const user = userEvent.setup();
+    const failed = {
+      position: 0,
+      company: "Example Org",
+      site: "https://example-org.test/",
+      state: "failed",
+      facts: 0,
+      error: "robots_disallows",
+    };
+    let retried = 0;
+    renderPage({
+      "GET /api/v1/profile/about": () => ({ body: view({ employers: [failed] }) }),
+      "POST /api/v1/profile/about/employers/0/retry": () => {
+        retried += 1;
+        return {
+          body: view({ employers: [{ ...failed, state: "read", facts: 2, error: null }] }),
+        };
+      },
+    });
+    const note = await screen.findByTestId("about-employer-failed-0");
+    expect(note).toHaveTextContent("Couldn’t read its website this time.");
+    expect(note).toHaveTextContent("Its website asks robots not to read it.");
+    await user.click(screen.getByTestId("about-employer-retry-0"));
+    await waitFor(() => {
+      expect(screen.queryByTestId("about-employer-failed-0")).not.toBeInTheDocument();
+    });
+    expect(retried).toBe(1);
+    expect(screen.getByTestId("about-employers")).toHaveTextContent("Read its website: 2 facts");
+  });
+
   it("turns what they wrote into changes, flags a claim that isn’t theirs, and lets them use their own words", async () => {
     const user = userEvent.setup();
     let sent: unknown;
@@ -478,6 +509,47 @@ describe("Tell me about you", () => {
       expect(screen.getByTestId("about-q-tag")).toHaveTextContent("I don’t know");
       expect(screen.getByTestId("about-q-progress")).toHaveTextContent("Question 2 of about 3");
       expect(screen.queryByTestId("about-q-choice-0")).toBeNull();
+    });
+
+    it("answers a results question by picking outcomes, with no words and no number", async () => {
+      const user = userEvent.setup();
+      const wizard = questionsState();
+      let sent: unknown;
+      const results = {
+        ...ASKED,
+        id: "results:0",
+        kind: "results",
+        area: "results",
+        question:
+          "At Example Org you were a senior engineer on a billing platform. What got better because of your work?",
+        why: "Your Example Org role says what you did, but not what changed because of it.",
+        tag: "unknown",
+        choices: ["Fewer failed payments", "Faster invoicing"],
+      };
+      renderPage({
+        "GET /api/v1/profile/about": wizard.get,
+        "POST /api/v1/profile/about/questions/next": () =>
+          wizard.set({ questions: questionsOf({ current: results }) }),
+        "POST /api/v1/profile/about/questions/results%3A0/answer": async (request) => {
+          sent = await bodyOf(request);
+          return wizard.set({ questions: questionsOf({ answered: 1 }) });
+        },
+      });
+      await user.click(await screen.findByTestId("about-continue"));
+      expect(await screen.findByTestId("about-q-question")).not.toHaveTextContent(
+        /how do you know/i,
+      );
+      expect(screen.getByTestId("about-q-number-hint")).toHaveTextContent(
+        "A rough number helps, but skip it if you don’t know.",
+      );
+      // Nothing to send until something is picked or written.
+      expect(screen.getByTestId("about-q-send")).toBeDisabled();
+      await user.click(screen.getByTestId("about-q-choice-0"));
+      await user.click(screen.getByTestId("about-q-choice-1"));
+      await user.click(screen.getByTestId("about-q-send"));
+      await waitFor(() => {
+        expect(sent).toEqual({ text: "", choices: ["Fewer failed payments", "Faster invoicing"] });
+      });
     });
 
     it("skips without a call of its own, and ends with “That’s enough for now” on the review", async () => {

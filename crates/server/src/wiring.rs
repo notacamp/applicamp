@@ -67,6 +67,17 @@ impl applicamp_profile::ports::EmployerResearch for ResearchWiring {
         ))
     }
 
+    fn known_facts<'a>(
+        &'a self,
+        db: &'a PgPool,
+        account: Uuid,
+        company: &'a str,
+    ) -> BoxFuture<'a, Result<Vec<String>>> {
+        Box::pin(applicamp_pipeline::features::brief::employer::known_facts(
+            db, account, company,
+        ))
+    }
+
     fn run<'a>(
         &'a self,
         state: &'a AppState,

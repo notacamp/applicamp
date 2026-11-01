@@ -101,6 +101,7 @@ pub fn module(deps: ProfileDeps) -> Module {
         .routes(routes!(about::choose))
         .routes(routes!(about::accuracy))
         .routes(routes!(about::employer_site))
+        .routes(routes!(about::employer_retry))
         .routes(routes!(about::extra))
         .routes(routes!(about::change, about::remove_change))
         .routes(routes!(about::review))

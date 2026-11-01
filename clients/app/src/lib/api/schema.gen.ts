@@ -2905,7 +2905,7 @@ export interface components {
          * @description What a change is about.
          * @enum {string}
          */
-        Field: "summary" | "headline" | "skill" | "background" | "goal_role" | "goal_avoid" | "goal_must_have" | "goal_location" | "role_fact";
+        Field: "summary" | "headline" | "skill" | "background" | "goal_role" | "goal_avoid" | "goal_must_have" | "goal_location" | "role_fact" | "language" | "education";
         /** @description The agent's end. */
         Finish: {
             outcome: components["schemas"]["AgentOutcome"];
@@ -2927,7 +2927,7 @@ export interface components {
          * @description What a gap is about.
          * @enum {string}
          */
-        GapKind: "assumed" | "results" | "team_size" | "area" | "skills" | "skills_found" | "claim" | "summary" | "headline" | "background" | "goals";
+        GapKind: "assumed" | "results" | "team_size" | "area" | "skills" | "skills_found" | "claim" | "summary" | "headline" | "background" | "goals" | "languages" | "education" | "skills_few";
         /** @description The answers to the goals interview. Nothing is required. */
         Goals: {
             autonomy?: components["schemas"]["Autonomy"] | null;
@@ -3078,7 +3078,7 @@ export interface components {
          * @description Which part of the profile a group of rows changes.
          * @enum {string}
          */
-        GroupKey: "summary" | "headline" | "skills" | "position" | "background" | "goals";
+        GroupKey: "summary" | "headline" | "skills" | "position" | "background" | "goals" | "languages" | "education";
         /** @description The instance's health. */
         Health: {
             /** @description `ok`. */

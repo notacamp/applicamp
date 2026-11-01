@@ -293,6 +293,11 @@ pub enum Field {
     GoalLocation,
     /// A fact about a named position.
     RoleFact,
+    /// One language they speak, with how well (`Portuguese (native)`).
+    Language,
+    /// One school, course or degree (`BSc in Computer Science, University of
+    /// Lisbon`), or that they taught themselves.
+    Education,
 }
 
 impl Field {

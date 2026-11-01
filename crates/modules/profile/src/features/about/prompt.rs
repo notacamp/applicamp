@@ -110,7 +110,10 @@ sentence}`:\n\
 short title; at most one), `skill` (ONE skill per change, in the order they matter; use the \
 usual spelling of the name), `background` (domains and earlier careers; at most one), \
 `goal_role` (a role they want next), `goal_avoid` (what they will not work on), \
-`goal_must_have` (what the job must have), `goal_location` (where they can work from) or \
+`goal_must_have` (what the job must have), `goal_location` (where they can work from), \
+`language` (ONE language they speak per change, with how well in brackets when they say: \
+\"Portuguese (native)\"), `education` (ONE degree, course or bootcamp per change, the course then \
+the school after a comma: \"BSc in Computer Science, University of Lisbon\"; or \"Self-taught\") or \
 `role_fact` (something they did in one named position, with its `position` index; else null).\n\
 - `quote`: their exact words from <text>, copied letter for letter, that support the change.\n\
 - `value`: the new text, saying only what <text> says. Never add a number, name, tool or claim \
@@ -142,7 +145,8 @@ pub fn extra_schema() -> Value {
                     "properties": {
                         "field": { "type": "string", "enum": [
                             "summary", "headline", "skill", "background", "goal_role",
-                            "goal_avoid", "goal_must_have", "goal_location", "role_fact"] },
+                            "goal_avoid", "goal_must_have", "goal_location", "role_fact",
+                            "language", "education"] },
                         "value": { "type": "string" },
                         "position": { "type": ["integer", "null"] },
                         "area": { "type": "string", "enum": areas },
@@ -334,6 +338,12 @@ fn held_of(profile: &Profile, goals: &Goals) -> Value {
         "summary": profile.basics.summary.as_deref().map(|s| cut(s, 800)),
         "background": profile.basics.background.as_deref().map(|s| cut(s, 800)),
         "skills": profile.skills.iter().map(|s| s.name.as_str()).take(60).collect::<Vec<_>>(),
+        "languages": profile.languages.iter().take(12)
+            .map(|l| json!({ "language": l.language, "fluency": l.fluency }))
+            .collect::<Vec<_>>(),
+        "education": profile.education.iter().take(8)
+            .map(|e| json!({ "school": e.institution, "course": e.study_type, "field": e.area }))
+            .collect::<Vec<_>>(),
         "goals": { "roles": goals.roles, "avoid": goals.avoid, "must_have": goals.must_have,
                    "locations": goals.locations },
         "positions": roles_of(profile),
@@ -473,7 +483,10 @@ sentence}`:\n\
 - `field`: `role_fact` (something they did in the position of <about>, with its `position` \
 index) for most answers; `skill` (ONE skill per change, the usual spelling of its name), \
 `summary`, `headline`, `background`, `goal_role`, `goal_avoid`, `goal_must_have` or \
-`goal_location` when the question was about those.\n\
+`goal_location` when the question was about those; `language` (ONE language per change, with how \
+well in brackets when they say: \"English (fluent)\") and `education` (ONE degree, course or \
+bootcamp per change, the course then the school after a comma: \"BSc in Computer Science, \
+University of Lisbon\"; or \"Self-taught\") when it was about languages or education.\n\
 - `quote`: their exact words from <text>, copied letter for letter, that support the change.\n\
 - `value`: the new text, saying only what <text> says. Never add a number, name, tool, company or \
 claim they did not write (the position and the company are already known: leave the company \

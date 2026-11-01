@@ -9,13 +9,16 @@
 //!
 //! 1. assumptions the person chose "Ask me later" for (with "Not really" on
 //!    "Is this accurate?", the ones they marked wrong too);
-//! 2. the most recent role's results without a number;
-//! 3. empty skills;
-//! 4. a lead or manager title without a team size, results without a number
-//!    on the other recent roles, technologies the roles name that are not
-//!    skills, a claim from "Anything else" no role backs, an empty summary,
-//!    headline or background, goals not answered, and each area of each
-//!    recent role nothing has been kept about.
+//! 2. the most recent role: what they did there first when the profile says
+//!    nothing of it (a number about a role nobody has described is the
+//!    wrong first question), then what changed because of their work;
+//! 3. empty skills, then no languages;
+//! 4. a lead or manager title without a team size, the other recent roles
+//!    the same way as the first, technologies the roles name that are not
+//!    skills, a short skills list, a claim from "Anything else" no role
+//!    backs, an empty summary, headline or background, no education, goals
+//!    not answered, and each area of each recent role nothing has been kept
+//!    about.
 //!
 //! Context (what the company sells, to whom) is never a gap: it comes from
 //! the employer's own website or from an assumption to confirm, and what can
@@ -35,7 +38,7 @@ use super::{
 use crate::{
     features::grill,
     goals::Goals,
-    schema::{Area, FactStatus, Profile, ProfileFact, Skill, Work},
+    schema::{Area, Education, FactStatus, Language, Profile, ProfileFact, Skill, Work},
     strength,
 };
 
@@ -59,6 +62,8 @@ const AREAS: [Area; 4] = [
 ];
 /// Most technologies one "your roles mention…" gap names.
 const MAX_FOUND: usize = 5;
+/// Fewer skills than this, with nothing more named in the roles, is a gap.
+pub const FEW_SKILLS: usize = 6;
 
 /// What a gap is about.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -86,6 +91,12 @@ pub enum GapKind {
     Background,
     /// The roles they want next are not answered.
     Goals,
+    /// The profile lists no languages.
+    Languages,
+    /// The profile lists no education (a degree, a course or self-taught).
+    Education,
+    /// The skills list is short, and the roles name nothing more.
+    SkillsFew,
 }
 
 /// One thing Applicamp does not know, or assumes and is not sure of.
@@ -340,6 +351,13 @@ pub fn gaps(i: &Inputs<'_>) -> Vec<Gap> {
             work.facts.iter().any(|f| f.area == area) || told.iter().any(|c| c.area == area)
         };
         let what = describe(work);
+        // Nothing written about the role at all: ask what they did there
+        // before asking what changed because of it.
+        let undescribed = work.summary.as_deref().is_none_or(|s| s.trim().len() < 40)
+            && work.highlights.iter().all(|h| h.trim().is_empty())
+            && work.facts.is_empty()
+            && told.is_empty();
+        let results_rank = if index == 0 { 100 } else { 130 + index as u32 };
 
         let numbered = strength::has_numbered_result(work)
             || told
@@ -349,9 +367,8 @@ pub fn gaps(i: &Inputs<'_>) -> Vec<Gap> {
             let has_results = work.highlights.iter().any(|h| !h.trim().is_empty())
                 || work.facts.iter().any(|f| f.area == Area::Results);
             let basis = results_basis(work, has_results);
-            let rank = if index == 0 { 100 } else { 130 + index as u32 };
             out.push((
-                rank,
+                results_rank,
                 gap(
                     format!("results:{index}"),
                     GapKind::Results,
@@ -388,8 +405,13 @@ pub fn gaps(i: &Inputs<'_>) -> Vec<Gap> {
             if (area == Area::People && team) || kept_or_told(area) {
                 continue;
             }
+            let rank = if undescribed && area == Area::YourPart {
+                results_rank - 1
+            } else {
+                200 + 10 * index as u32 + n as u32
+            };
             out.push((
-                200 + 10 * index as u32 + n as u32,
+                rank,
                 gap(
                     format!("area:{index}:{}", area.as_str()),
                     GapKind::Area,
@@ -434,6 +456,80 @@ pub fn gaps(i: &Inputs<'_>) -> Vec<Gap> {
                     list.join(", ")
                 ),
                 list,
+            ),
+        ));
+    }
+
+    // A short skills list the roles say nothing more about.
+    if !i.profile.skills.is_empty()
+        && i.profile.skills.len() < FEW_SKILLS
+        && !told_skills
+        && !out.iter().any(|(_, g)| g.kind == GapKind::SkillsFound)
+    {
+        let names: Vec<String> = i.profile.skills.iter().map(|s| s.name.clone()).collect();
+        let latest = i
+            .profile
+            .work
+            .first()
+            .map_or_else(|| "their roles".to_owned(), describe);
+        out.push((
+            145,
+            gap(
+                "skills_few".to_owned(),
+                GapKind::SkillsFew,
+                None,
+                None,
+                format!(
+                    "The profile lists only {} skills ({}). Work like {latest} usually takes more \
+                     (databases, cloud, testing, tools), but the roles do not say which.",
+                    names.len(),
+                    names.join(", ")
+                ),
+                names,
+            ),
+        ));
+    }
+
+    // Languages: what a posting's language needs are checked against.
+    let told_language = i.changes.iter().any(|c| c.field == Field::Language);
+    if i.profile.languages.is_empty() && !told_language {
+        let basis = if i.goals.languages_for_work.is_empty() {
+            "The profile lists no languages, and the person has not said which they work in."
+                .to_owned()
+        } else {
+            format!(
+                "The profile lists no languages. The goals say they want to work in {}, but not \
+                 how well they speak them or which others they speak.",
+                i.goals.languages_for_work.join(", ")
+            )
+        };
+        out.push((
+            112,
+            gap(
+                "languages".to_owned(),
+                GapKind::Languages,
+                None,
+                None,
+                basis,
+                i.goals.languages_for_work.clone(),
+            ),
+        ));
+    }
+
+    // Education.
+    let told_education = i.changes.iter().any(|c| c.field == Field::Education);
+    if i.profile.education.is_empty() && !told_education {
+        out.push((
+            165,
+            gap(
+                "education".to_owned(),
+                GapKind::Education,
+                None,
+                None,
+                "The profile lists no education: no degree, course or bootcamp, and nothing \
+                 saying they taught themselves."
+                    .to_owned(),
+                Vec::new(),
             ),
         ));
     }
@@ -552,7 +648,7 @@ pub fn gain(gap: &Gap, profile: &Profile, goals: &Goals, now: DateTime<Utc>) -> 
             }
         }
         // A first answer names a few skills.
-        GapKind::Skills => {
+        GapKind::Skills | GapKind::SkillsFew => {
             for n in 0..3 {
                 after.skills.push(Skill {
                     name: format!("skill {n}"),
@@ -563,6 +659,14 @@ pub fn gain(gap: &Gap, profile: &Profile, goals: &Goals, now: DateTime<Utc>) -> 
         GapKind::Summary => after.basics.summary = Some("x".to_owned()),
         GapKind::Headline => after.basics.label = Some("x".to_owned()),
         GapKind::Goals => goals_after.roles.push("x".to_owned()),
+        GapKind::Languages => after.languages.push(Language {
+            language: "x".to_owned(),
+            fluency: None,
+        }),
+        GapKind::Education => after.education.push(Education {
+            institution: "x".to_owned(),
+            ..Education::default()
+        }),
         _ => {}
     }
     strength::compute(&after, &goals_after)

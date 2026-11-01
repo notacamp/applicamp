@@ -582,7 +582,9 @@
       "goal_avoid": "À éviter",
       "goal_must_have": "Indispensable",
       "goal_location": "Lieu",
-      "role_fact": "Au travail"
+      "role_fact": "Au travail",
+      "language": "Langue",
+      "education": "Formation"
     },
     "added": {
       "title": "Ajouté d’après ce que vous avez écrit",
@@ -619,7 +621,9 @@
       "skills": "Compétences",
       "position": "Poste",
       "background": "Parcours",
-      "goals": "Objectifs"
+      "goals": "Objectifs",
+      "languages": "Langues",
+      "education": "Formation"
     },
     "review": {
       "lead": "Voici ce que j’enregistrerai dans votre profil. Chaque ligne vient de votre profil, de quelque chose que vous m’avez dit ou d’une hypothèse que vous avez confirmée. Rien de ce que vous n’avez pas confirmé n’est enregistré.",

@@ -8,6 +8,10 @@ import {
   signIn,
 } from "./helpers";
 
+// Filmed: CI keeps this spec's videos (the `e2e-recordings` artifact), the
+// recording of Tell me about you at desktop width and at 375px.
+test.use({ video: "on" });
+
 /** An invented profile (nobody real): two roles, one with a fact the person kept. */
 function profile(start: string) {
   return {
@@ -195,17 +199,37 @@ test("someone reads what Applicamp knows and assumes about them, settles two ass
   await page.getByTestId("about-q-choice-0").click();
   await page.getByTestId("about-q-send").click();
   await expect(page.getByTestId("about-q-updated")).toContainText("Fewer manual steps");
-  // The third question is skipped.
+  // The third asks which languages they speak (the profile lists none), with choices.
   await expect(page.getByTestId("about-q-progress")).toContainText("Question 3 of about");
-  await page.getByTestId("about-q-skip").click();
+  await expect(page.getByTestId("about-q-why-text")).toContainText("no languages");
+  await page.getByTestId("about-q-choice-0").click();
+  await page.getByTestId("about-q-choice-1").click();
+  await page.getByTestId("about-q-send").click();
+  await expect(page.getByTestId("about-q-updated")).toContainText("Portuguese (native)");
+  await expect(page.getByTestId("about-q-updated")).toContainText("Goes to: Languages");
+  // Sample Labs says only one line: what they did there comes before what changed. Both skipped.
   await expect(page.getByTestId("about-q-progress")).toContainText("Question 4 of about");
+  await expect(page.getByTestId("about-q-question")).toContainText("Sample Labs");
+  await page.getByTestId("about-q-skip").click();
+  await expect(page.getByTestId("about-q-progress")).toContainText("Question 5 of about");
+  await expect(page.getByTestId("about-q-question")).toContainText("What got better");
+  await page.getByTestId("about-q-skip").click();
+  await expect(page.getByTestId("about-q-progress")).toContainText("Question 6 of about");
   await expect(page.getByTestId("about-q-tag")).toHaveText("You told me");
   await expectNoSidewaysScroll(page);
 
   // Review: every line, grouped, each marked; then Save.
   await page.getByTestId("about-q-enough").click();
   await expect(page.getByTestId("about-review-step")).toBeVisible();
-  for (const group of ["summary", "headline", "skills", "position-0", "background", "goals"]) {
+  for (const group of [
+    "summary",
+    "headline",
+    "skills",
+    "position-0",
+    "languages",
+    "background",
+    "goals",
+  ]) {
     await expect(page.getByTestId(`about-group-${group}`)).toBeVisible();
   }
   await expect(page.getByTestId("about-group-position-0")).toContainText("Confirmed");
@@ -218,6 +242,7 @@ test("someone reads what Applicamp knows and assumes about them, settles two ass
   );
   await expect(page.getByTestId("about-group-position-0")).toContainText("Fewer manual steps");
   await expect(page.getByTestId("about-group-summary")).toContainText("You told me");
+  await expect(page.getByTestId("about-group-languages")).toContainText("Portuguese (native)");
   await expect(page.getByTestId("about-left-out")).toBeVisible();
   await expectNoSidewaysScroll(page);
   await expectAccessible(page);
@@ -233,6 +258,7 @@ test("someone reads what Applicamp knows and assumes about them, settles two ass
       profile: {
         basics: { summary?: string; label?: string; background?: string };
         skills: { name: string }[];
+        languages: { language: string; fluency?: string }[];
         work: { facts?: { text: string; status?: string }[] }[];
       };
     };
@@ -241,6 +267,11 @@ test("someone reads what Applicamp knows and assumes about them, settles two ass
   expect(saved.basics.summary).toBe(EXTRA);
   expect(saved.basics.label).toBe("Senior Rails engineer");
   expect(saved.basics.background).toBe("I ran events and a restaurant for 6 years");
+  // Each language picked, with how well.
+  expect(saved.languages).toEqual([
+    { language: "English", fluency: "fluent" },
+    { language: "Portuguese", fluency: "native" },
+  ]);
   // Postgres is PostgreSQL: not a second skill.
   expect(saved.skills.map((skill) => skill.name)).toEqual(["PostgreSQL", "Rails", "Elixir"]);
   const facts = saved.work[0]?.facts ?? [];

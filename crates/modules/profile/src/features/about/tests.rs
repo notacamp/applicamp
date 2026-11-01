@@ -1956,3 +1956,46 @@ fn site_facts_are_kept_only_with_their_quote_on_their_page() {
     assert_eq!(sources[0].id, "site0");
     assert_eq!(sources[0].url.as_deref(), Some("https://a.example/"));
 }
+
+#[test]
+fn the_site_call_never_sees_how_to_reach_the_person() {
+    let text = "Contact: inbox@example.com or (+351) 912 345 678. Rails since 2017 - 2021, \
+                at Example Co from 2019-2023.";
+    let shown = prompt::without_contact(text);
+    assert!(
+        !shown.contains("inbox@example.com") && !shown.contains("912 345 678"),
+        "{shown}"
+    );
+    assert!(
+        shown.contains("[email]") && shown.contains("[phone]"),
+        "{shown}"
+    );
+    assert!(
+        shown.contains("2017 - 2021") && shown.contains("2019-2023"),
+        "dates stay: {shown}"
+    );
+    let pages = vec![crate::ports::OwnPage {
+        url: "https://a.example/".to_owned(),
+        text: text.to_owned(),
+    }];
+    let message = prompt::site_message(&pages);
+    assert!(!message.contains("inbox@example.com") && !message.contains("912 345 678"));
+    // A fact that names a way to reach them is never kept.
+    let kept = prompt::judge_site(
+        vec![
+            prompt::RawSiteFact {
+                claim: "Reachable at inbox@example.com".to_owned(),
+                quote: "Contact: [email]".to_owned(),
+                url: "https://a.example/".to_owned(),
+            },
+            prompt::RawSiteFact {
+                claim: "Worked with Rails from 2017 to 2021".to_owned(),
+                quote: "Rails since 2017 - 2021".to_owned(),
+                url: "https://a.example/".to_owned(),
+            },
+        ],
+        &pages,
+    );
+    assert_eq!(kept.len(), 1, "{kept:?}");
+    assert_eq!(kept[0].claim, "Worked with Rails from 2017 to 2021");
+}

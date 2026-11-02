@@ -86,11 +86,14 @@ function ParagraphRow({
         <Tagged testId={`letter-tags-${paragraph.id}`}>
           <Cluster>
             {flagged.length > 0 ? <Label hue="red">{t("letter.flag.label")}</Label> : null}
-            {paragraph.tags.map((tag) => (
-              <Label key={tag} hue={TAG_HUES[tag]}>
-                {t(`letter.tags.${tag}`)}
-              </Label>
-            ))}
+            {paragraph.tags
+              // A flagged line says what it claims; "No claims" beside it would contradict it.
+              .filter((tag) => flagged.length === 0 || tag !== "no_claims")
+              .map((tag) => (
+                <Label key={tag} hue={TAG_HUES[tag]}>
+                  {t(`letter.tags.${tag}`)}
+                </Label>
+              ))}
             {edited ? <Label hue="yellow">{t("letter.tags.edited")}</Label> : null}
           </Cluster>
         </Tagged>

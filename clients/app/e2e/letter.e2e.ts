@@ -151,7 +151,10 @@ test("someone writes the cover letter after approving the CV, fixes what can't b
   );
   await expect(page.getByTestId("letter-status")).toContainText("Draft");
   const paragraphs = page.getByTestId(/^letter-paragraph-p\d+$/);
-  const opening = paragraphs.filter({ hasText: "Builds ledgers for small shops" });
+  // The opening paragraph: the first one, which cites the company fact and the profile. (Other
+  // paragraphs can mention the fact too, in their "Where this came from".)
+  const opening = paragraphs.first();
+  await expect(opening).toContainText("Builds ledgers for small shops");
   await expect(opening.getByTestId(/^letter-tags-/)).toContainText("Company fact");
   await expect(opening.getByTestId(/^letter-tags-/)).toContainText("From your profile");
   await expect(

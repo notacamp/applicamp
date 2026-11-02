@@ -32,7 +32,10 @@
 //!
 //! Employers are read through the [`crate::ports::EmployerResearch`] port: the
 //! latest five, only where a site is known, cached 30 days, no loop and no
-//! open-web search. Every call counts toward [`DAILY_CAP`] and the AI budget;
+//! open-web search. The person's own website (the profile's link) is read
+//! through the same port alongside them (its host only, where robots.txt
+//! allows), and what it says about their work reaches the portrait only as
+//! assumptions to confirm, each with its quote checked on its page. Every call counts toward [`DAILY_CAP`] and the AI budget;
 //! nothing runs in the background.
 
 pub mod gaps;
@@ -74,7 +77,7 @@ use crate::{
     },
     goals::Goals,
     ports::{FactBasis, ProposedFact, Research, Researcher},
-    schema::{Area, FactStatus, Profile, ProfileFact, Skill},
+    schema::{Area, Education, FactStatus, Language, Profile, ProfileFact, Skill},
     strength,
 };
 
@@ -502,6 +505,79 @@ async fn read_one(
         .unwrap_or_else(|_| Err(Error::Unavailable("research_timeout")))
 }
 
+/// What the person's own website (the profile's link) says about their
+/// work, best effort: its pages read through the port (same host, robots.txt
+/// allowed), then **one model call** for facts whose quotes are on the
+/// pages, all within [`RESEARCH_WINDOW`]. Nothing at all when there is no
+/// link, no port, the site cannot be read, the daily cap is near, or the call
+/// fails: the portrait is made without it.
+async fn own_site_facts(
+    state: &AppState,
+    gateway: &Gateway,
+    research: &Researcher,
+    account: Uuid,
+    profile: &Profile,
+    now: DateTime<Utc>,
+) -> Vec<prompt::SiteFact> {
+    let (Some(port), Some(url)) = (
+        research.0.as_deref(),
+        profile
+            .basics
+            .url
+            .as_deref()
+            .filter(|u| !u.trim().is_empty()),
+    ) else {
+        return Vec::new();
+    };
+    let read = async {
+        // The cap keeps room for the employers' reads and the portrait.
+        if over_cap(calls_today(&state.db, account, now).await?, 2) {
+            return Ok::<_, Error>(Vec::new());
+        }
+        let site = port.own_site(url, now).await;
+        if let Some(error) = site.error {
+            tracing::info!(error, "the person's own website could not be read");
+            return Ok(Vec::new());
+        }
+        if site.pages.is_empty() {
+            return Ok(Vec::new());
+        }
+        let raw: prompt::RawSiteFacts = ask(
+            gateway,
+            &state.db,
+            account,
+            now,
+            "profile_about_site",
+            &prompt::site_schema(),
+            prompt::SITE_INSTRUCTIONS,
+            &prompt::site_message(&site.pages),
+        )
+        .await?;
+        record_call(&state.db, account, "research", now).await?;
+        let offered = raw.facts.len();
+        let facts = prompt::judge_site(raw.facts, &site.pages);
+        // Counts only: never the site, its pages or the facts.
+        tracing::info!(
+            pages = site.pages.len(),
+            offered,
+            kept = facts.len(),
+            "the person's own website was read"
+        );
+        Ok(facts)
+    };
+    match tokio::time::timeout(RESEARCH_WINDOW, read).await {
+        Ok(Ok(facts)) => facts,
+        Ok(Err(e)) => {
+            tracing::info!(error = e.code(), "the person's own website was not used");
+            Vec::new()
+        }
+        Err(_) => {
+            tracing::info!("reading the person's own website took too long");
+            Vec::new()
+        }
+    }
+}
+
 /// Research the employers, best effort: at most [`PARALLEL_READS`] at a time,
 /// each within [`EMPLOYER_TIMEOUT`], all within [`RESEARCH_WINDOW`]. A read
 /// that fails is recorded on that employer only, and the portrait goes on
@@ -899,9 +975,16 @@ pub async fn portrait(
         .as_ref()
         .map_or_else(Vec::new, |r| r.employers.0.clone());
     let mut employers = employers_of(&state, &research, account, &seen.profile, &stored).await?;
-    let found = research_employers(&state, &research, account, &mut employers, now).await?;
+    // The person's own website alongside the employers, within the same
+    // window: one that cannot be read never holds the portrait up.
+    let (found, site) = tokio::join!(
+        research_employers(&state, &research, account, &mut employers, now),
+        own_site_facts(&state, gateway, &research, account, &seen.profile, now),
+    );
+    let found = found?;
 
-    let sources = prompt::sources_of(&seen.profile, &seen.goals, &found, now.year());
+    let mut sources = prompt::sources_of(&seen.profile, &seen.goals, &found, now.year());
+    sources.extend(prompt::site_sources(&site));
     let role_keys: Vec<String> = seen.profile.work.iter().map(grill::role_key).collect();
     let message = prompt::portrait_message(
         &sources,
@@ -1423,6 +1506,8 @@ pub enum GroupKey {
     Position,
     Background,
     Goals,
+    Languages,
+    Education,
 }
 
 /// Where a row comes from.
@@ -1516,6 +1601,8 @@ fn review_of(profile: &Profile, row: &Row) -> AboutReview {
             Field::Headline => (GroupKey::Headline, None),
             Field::Skill => (GroupKey::Skills, None),
             Field::Background => (GroupKey::Background, None),
+            Field::Language => (GroupKey::Languages, None),
+            Field::Education => (GroupKey::Education, None),
             Field::RoleFact => match place_of(profile, change.role_key.as_deref()) {
                 Some(p) => (GroupKey::Position, Some(p)),
                 None => continue,
@@ -1565,14 +1652,17 @@ fn review_of(profile: &Profile, row: &Row) -> AboutReview {
     for (at, entry) in rows {
         groups[at].rows.push(entry);
     }
-    // Summary, headline, skills, positions (newest first), background, goals.
+    // Summary, headline, skills, positions (newest first), languages,
+    // education, background, goals.
     let order = |g: &ReviewGroup| match g.key {
         GroupKey::Summary => 0,
         GroupKey::Headline => 1,
         GroupKey::Skills => 2,
         GroupKey::Position => 3,
-        GroupKey::Background => 4,
-        GroupKey::Goals => 5,
+        GroupKey::Languages => 4,
+        GroupKey::Education => 5,
+        GroupKey::Background => 6,
+        GroupKey::Goals => 7,
     };
     groups.sort_by_key(|g| (order(g), g.position));
     let open_flags = row.changes.0.iter().filter(|c| c.open()).count();
@@ -1629,6 +1719,45 @@ pub struct Saved {
     pub skipped: u32,
 }
 
+/// A language as an answer gives it, `Portuguese (native)`: the name, and
+/// how well in brackets when it says.
+fn language_of(value: &str) -> Language {
+    let value = value.trim();
+    match value.split_once('(') {
+        Some((name, rest)) if !name.trim().is_empty() => {
+            let fluency = rest.trim_end_matches(')').trim();
+            Language {
+                language: name.trim().to_owned(),
+                fluency: (!fluency.is_empty()).then(|| fluency.to_owned()),
+            }
+        }
+        _ => Language {
+            language: value.to_owned(),
+            fluency: None,
+        },
+    }
+}
+
+/// Education as an answer gives it, `BSc in Computer Science, University of
+/// Lisbon`: the school after the last comma, the course before it; without a
+/// comma, all of it is the school.
+fn education_of(value: &str) -> Education {
+    let value = value.trim();
+    match value.rsplit_once(',') {
+        Some((course, school)) if !course.trim().is_empty() && !school.trim().is_empty() => {
+            Education {
+                institution: school.trim().to_owned(),
+                study_type: Some(course.trim().to_owned()),
+                ..Education::default()
+            }
+        }
+        _ => Education {
+            institution: value.to_owned(),
+            ..Education::default()
+        },
+    }
+}
+
 /// Apply `row` to `profile` and `goals`: the number written and the number
 /// that no longer fit.
 fn apply(
@@ -1682,6 +1811,27 @@ fn apply(
                 } else {
                     false
                 }
+            }
+            Field::Language => {
+                let language = language_of(&value);
+                if !profile
+                    .languages
+                    .iter()
+                    .any(|l| judge::same(Field::Language, &l.language, &language.language))
+                {
+                    profile.languages.push(language);
+                }
+                true
+            }
+            Field::Education => {
+                let education = education_of(&value);
+                if !profile.education.iter().any(|e| {
+                    judge::same(Field::Education, &e.institution, &education.institution)
+                        && e.study_type == education.study_type
+                }) {
+                    profile.education.push(education);
+                }
+                true
             }
             Field::RoleFact => place_of(profile, change.role_key.as_deref())
                 .and_then(|at| profile.work.get_mut(at))

@@ -237,6 +237,7 @@ an employer SHALL forget that its last read failed.
 #### Scenario: A slow read
 - **WHEN** an employer is still being read when the portrait's time for reading runs out
 - **THEN** the portrait is made without it and its row says it took too long
+
 ### Requirement: Is this accurate, and anything else
 The page SHALL ask "Is this accurate?" (yes mostly, some of it's wrong, not
 really) and store the answer. It SHALL ask "Anything else I should know about
@@ -307,7 +308,7 @@ The portrait SHALL make one model call per profile version, each employer read o
 - **THEN** the same question is shown and no model is called
 
 ### Requirement: Tell me about you asks about the gaps, one at a time
-After "Anything else", Tell me about you SHALL ask questions about what the app does not know or only assumes, one at a time, each skippable, and the person SHALL be able to stop at any point with "That's enough for now". What is asked SHALL be decided in code from the profile, the kept facts, the confirmed and wrong assumptions, the goals and the wizard's state, and never by a model. The gaps SHALL be ranked: assumptions the person left for later (and, after "Not really", those they called wrong), then the most recent role's results without a number, then empty skills, then the rest: a lead or manager title without a team size, results without a number on the other recent roles, technologies the roles name that are not skills, a skill the person told that none of their roles mention, an empty summary, headline or background, goals not answered, and each area of each recent role nothing has been kept about. What the person has told so far SHALL close the gap it answers. The company's context SHALL never be asked. Questions SHALL stop when no gap is left, after 12 (8 after "Yes, mostly", 16 after "Not really"), or when the person says so. A skipped question SHALL not come back for the same profile version. Each question SHALL show how many have been asked of about how many, and the profile's strength with "→ N% if you answer", computed from the gap's weight in the strength.
+After "Anything else", Tell me about you SHALL ask questions about what the app does not know or only assumes, one at a time, each skippable, and the person SHALL be able to stop at any point with "That's enough for now". What is asked SHALL be decided in code from the profile, the kept facts, the confirmed and wrong assumptions, the goals and the wizard's state, and never by a model. The gaps SHALL be ranked: assumptions the person left for later (and, after "Not really", those they called wrong), then the most recent role (what the person did there first, when the profile says nothing of that role, then its results without a number), then empty skills, then no languages, then the rest: a lead or manager title without a team size, the other recent roles the same way as the first, technologies the roles name that are not skills, a short skills list (fewer than six) that the roles name nothing more about, a skill the person told that none of their roles mention, an empty summary, headline or background, no education, goals not answered, and each area of each recent role nothing has been kept about. An answer about languages SHALL be saved as one language per change with its fluency when given, and an answer about education as one degree, course or bootcamp per change (or "Self-taught"). What the person has told so far SHALL close the gap it answers. The company's context SHALL never be asked. Questions SHALL stop when no gap is left, after 12 (8 after "Yes, mostly", 16 after "Not really"), or when the person says so. A skipped question SHALL not come back for the same profile version. Each question SHALL show how many have been asked of about how many, and the profile's strength with "→ N% if you answer", computed from the gap's weight in the strength.
 
 #### Scenario: An assumption left for later is asked first
 - **WHEN** the person chose Ask me later on "I assume you shipped pipelines" and continues
@@ -345,6 +346,22 @@ After "Anything else", Tell me about you SHALL ask questions about what the app 
 - **WHEN** the person answered "Not really" to "Is this accurate?"
 - **THEN** up to 16 questions are asked, and the assumptions they marked wrong are asked about too
 
+#### Scenario: A role nobody described
+- **WHEN** the most recent role has only a title and dates
+- **THEN** the first question asks what the person did there, and the question about what changed because of their work comes after it
+
+#### Scenario: No languages
+- **WHEN** the profile lists no languages and the goals say they work in English and Portuguese
+- **THEN** a question asks which languages they speak and how well, its reason naming English and Portuguese, and the answer "Portuguese (native)" becomes the language Portuguese with fluency native
+
+#### Scenario: No education
+- **WHEN** the profile lists no education
+- **THEN** after the summary and headline, a question asks about a degree, course or bootcamp, and "Self-taught" is an answer
+
+#### Scenario: A short skills list
+- **WHEN** the profile lists four skills and the roles name no other technology
+- **THEN** a question names the four and asks what else the person works with
+
 ### Requirement: Every question says why it is asked
 A question SHALL carry a reason that says what Applicamp assumed or does not know about the person, a tag (I assumed, I don't know, You told me), and, only for a closed question, choices. A question SHALL never come without a reason (the gap's own basis stands in when the model leaves it out). The model SHALL be shown only the top gap and its context (that position's entry and facts, and the related assumption), never the whole profile and never a name, email, phone, address or link; it SHALL also be shown the facts already kept about that position's employer (what it sells, to whom), and SHALL be told never to ask for anything the context already answers, and to state what it knows as an assumption to confirm. A question SHALL be one short sentence in plain everyday words, the way a friendly recruiter talks: it SHALL begin from what is known or assumed, SHALL never use jargon, never say "result" or "achieve" on its own, and never ask how the person knows. The reason SHALL be one or two plain sentences saying what is assumed or missing and why it helps. For a results gap the question SHALL ask what changed because of the person's work and offer two to four concrete example outcomes that fit that company and role as choices, with a hint that a rough number helps but may be skipped; the person can always write their own answer instead. The reason the gap itself gives when the model gives none SHALL be plain too ("Your role at Example Org says what you did, but not what changed because of it.").
 
@@ -363,6 +380,7 @@ A question SHALL carry a reason that says what Applicamp assumed or does not kno
 #### Scenario: What the employer's site already says
 - **WHEN** the employer's own site was read and says what the company sells
 - **THEN** the model is shown those facts and the question does not ask what the company sells
+
 ### Requirement: An answer becomes changes, flagged and never dropped
 An answer, in the person's words and the choices they picked (which SHALL be among those offered), SHALL be read with one model call (picking choices without writing anything SHALL be a valid answer) into proposed changes with the same structure and checks as "Anything else": each quotes their words, a quote that is not theirs and any claim the value adds that their words do not say SHALL be a flag, shown and never dropped, settled with It's true, Fix or Use my own words. A fact SHALL belong to the position the question was about. The changes SHALL join the pending changes (a newer summary, headline or background replaces an older one; a skill already there is not added twice), the portrait SHALL gain a told sentence for each, marked as new, and the screen SHALL say where each change goes. A new "Anything else" SHALL replace only the changes it made. Nothing SHALL be saved until Save.
 
@@ -385,6 +403,7 @@ An answer, in the person's words and the choices they picked (which SHALL be amo
 #### Scenario: A number they typed
 - **WHEN** the person also types "from 40 a week to 10"
 - **THEN** the number is kept as they wrote it
+
 ### Requirement: Improve my profile, Skills and Grill me are retired into Tell me about you
 The routes `/profile/improve`, `/profile/skills` and `/profile/grill` (and `/profile/grill/{position}`) SHALL lead to Tell me about you. Every entry point to them SHALL lead there instead: the Grill me button, the per-role "Grill me about this role" links, Today's nudge and the strength checklist's Add and Improve buttons for results, skills and questions (a part with a place on the profile, such as the headline or a link, is still added in place). The facts the person kept SHALL stay on the profile under "What you told Applicamp about each role", and the skills SHALL be reordered from the profile's own skills list. Skills the roles name that the skills lack SHALL be a question, not a page.
 
@@ -422,6 +441,33 @@ The app SHALL show how strong the profile is and what is missing, and lead the p
 #### Scenario: The way in
 - **WHEN** the person opens Profile & goals, or follows Today's profile card, or chooses a part of the checklist that needs more from them
 - **THEN** they arrive at Tell me about you
+
+### Requirement: The person's own website is read, as assumptions to confirm
+When the portrait is made and the profile holds the person's own link, Tell me about you SHALL
+read that site alongside the past employers, within the same time window: its home page and up to
+five pages it links to about the person, on the same host only and only where its robots.txt
+allows, through the same reader and host guard, never by searching. Email addresses and phone numbers SHALL be removed from the pages before
+the model reads them, and a fact naming one SHALL never be kept. One model call SHALL pick out
+at most eight facts about the person's work, each with the page's exact words, and a fact SHALL be
+kept only when its quote is on the page it names. Those facts SHALL reach the portrait only as
+assumptions to confirm, linking their page. A site that cannot be read, or a call that fails,
+SHALL leave the portrait without it, and the read SHALL count toward the daily cap.
+
+#### Scenario: The site says what the person built
+- **WHEN** the profile links to the person's site, whose projects page says "I built Ledgerly, an open-source billing toolkit"
+- **THEN** the portrait holds "I assume, from your website, that you built an open-source billing toolkit", linking that page, to confirm
+
+#### Scenario: A quote the page does not hold
+- **WHEN** the model offers a fact whose quote is not on the page it names, or names a page that was not read
+- **THEN** the fact never reaches the portrait
+
+#### Scenario: The site cannot be read
+- **WHEN** the site's robots.txt forbids it, or it does not answer
+- **THEN** the portrait is made without it, with no extra model call
+
+#### Scenario: The site shows how to reach the person
+- **WHEN** the person's site shows their email address and phone number, and dates such as "2017 - 2021"
+- **THEN** the model reads the pages with the email and phone number removed and the dates kept, and no fact names either
 
 ### Requirement: The retired Improve, draft, suggested-skills and Grill me interview endpoints are gone
 The API SHALL NOT offer the AI profile review and its questions

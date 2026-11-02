@@ -1670,3 +1670,332 @@ fn merging_answers_gives_each_change_an_id_of_its_own_and_a_newer_summary_replac
     let values: Vec<&str> = pending.iter().map(|c| c.value.as_str()).collect();
     assert_eq!(values, ["Rust", "New summary", "Elixir"]);
 }
+
+#[test]
+fn a_role_nobody_described_is_asked_about_before_its_results() {
+    use std::collections::BTreeMap;
+    let profile: crate::schema::Profile = serde_json::from_value(json!({
+        "basics": {},
+        "work": [
+            { "name": "Example Org", "position": "Full Stack Developer", "startDate": "2023-07" },
+            { "name": "Sample Labs", "position": "Full Stack Developer", "startDate": "2021-01",
+              "endDate": "2023-06" },
+        ],
+        "skills": [{ "name": "Ruby" }, { "name": "TypeScript" }],
+    }))
+    .unwrap();
+    let goals = crate::goals::Goals {
+        languages_for_work: vec!["en".to_owned(), "pt-PT".to_owned()],
+        ..crate::goals::Goals::default()
+    };
+    let choices = BTreeMap::new();
+    let inputs = Inputs {
+        profile: &profile,
+        goals: &goals,
+        portrait: &[],
+        choices: &choices,
+        changes: &[],
+        accuracy: None,
+        dismissed: &[],
+    };
+    let list = gaps::gaps(&inputs);
+    let order = ids(&list);
+    let at = |id: &str| {
+        order
+            .iter()
+            .position(|o| *o == id)
+            .unwrap_or_else(|| panic!("{id} in {order:?}"))
+    };
+    // What they did there first, then what changed, for each recent role.
+    assert_eq!(&order[..2], ["area:0:your_part", "results:0"], "{order:?}");
+    assert!(at("area:1:your_part") < at("results:1"));
+    // Languages early (searches check a posting's languages), naming what the
+    // goals say they work in; a short skills list; education after the basics.
+    assert!(at("results:0") < at("languages") && at("languages") < at("results:1"));
+    let languages = list.iter().find(|g| g.id == "languages").unwrap();
+    assert_eq!(languages.kind, GapKind::Languages);
+    assert!(languages.basis.contains("en, pt-PT"), "{}", languages.basis);
+    let few = list.iter().find(|g| g.id == "skills_few").unwrap();
+    assert_eq!(few.names, ["Ruby", "TypeScript"]);
+    assert!(few.basis.contains("only 2 skills"), "{}", few.basis);
+    assert!(at("headline") < at("education"));
+    // Context is still never asked, and nothing asks twice.
+    assert!(!order.iter().any(|o| o.ends_with(":context")));
+    let mut unique = order.clone();
+    unique.sort_unstable();
+    unique.dedup();
+    assert_eq!(unique.len(), order.len());
+}
+
+#[test]
+fn languages_education_and_enough_skills_close_their_gaps() {
+    use std::collections::BTreeMap;
+    let skills: Vec<Value> = ["Ruby", "Rails", "TypeScript", "React", "Postgres", "Redis"]
+        .iter()
+        .map(|n| json!({ "name": n }))
+        .collect();
+    let profile: crate::schema::Profile = serde_json::from_value(json!({
+        "basics": {},
+        "work": [{ "name": "Example Org", "position": "Engineer", "startDate": "2023-07",
+                   "summary": "Builds the billing platform, its API and its admin screens." }],
+        "skills": skills,
+        "languages": [{ "language": "Portuguese", "fluency": "Native" }],
+        "education": [{ "institution": "University of Lisbon" }],
+    }))
+    .unwrap();
+    let goals = crate::goals::Goals::default();
+    let choices = BTreeMap::new();
+    let list = gaps::gaps(&Inputs {
+        profile: &profile,
+        goals: &goals,
+        portrait: &[],
+        choices: &choices,
+        changes: &[],
+        accuracy: None,
+        dismissed: &[],
+    });
+    let order = ids(&list);
+    for gone in ["languages", "education", "skills_few"] {
+        assert!(!order.contains(&gone), "{gone} in {order:?}");
+    }
+    // A described role is asked about its results first, as before; what
+    // they did there keeps its place among the areas.
+    assert_eq!(order[0], "results:0", "{order:?}");
+    let at = |id: &str| order.iter().position(|o| *o == id).unwrap();
+    assert!(at("summary") < at("area:0:your_part"), "{order:?}");
+}
+
+#[test]
+fn a_language_or_education_answer_is_saved_in_its_own_shape() {
+    let language = super::language_of("Portuguese (native)");
+    assert_eq!(language.language, "Portuguese");
+    assert_eq!(language.fluency.as_deref(), Some("native"));
+    let plain = super::language_of("English");
+    assert_eq!((plain.language.as_str(), plain.fluency), ("English", None));
+    let degree = super::education_of("BSc in Computer Science, University of Lisbon");
+    assert_eq!(degree.institution, "University of Lisbon");
+    assert_eq!(
+        degree.study_type.as_deref(),
+        Some("BSc in Computer Science")
+    );
+    let alone = super::education_of("Self-taught");
+    assert_eq!(
+        (alone.institution.as_str(), alone.study_type),
+        ("Self-taught", None)
+    );
+}
+
+/// A research port that knows no employer's site, and reads the person's
+/// own site as `site` (or fails with `error`).
+struct OwnSiteFake {
+    site: crate::ports::OwnSite,
+    asked: std::sync::Mutex<Vec<String>>,
+}
+
+impl EmployerResearch for OwnSiteFake {
+    fn known_site<'a>(
+        &'a self,
+        _: &'a PgPool,
+        _: Uuid,
+        _: &'a str,
+    ) -> BoxFuture<'a, Result<Option<String>>> {
+        Box::pin(async { Ok(None) })
+    }
+
+    fn set_site<'a>(
+        &'a self,
+        _: &'a AppState,
+        _: Uuid,
+        _: &'a str,
+        url: &'a str,
+    ) -> BoxFuture<'a, Result<String>> {
+        Box::pin(async move { Ok(url.to_owned()) })
+    }
+
+    fn run<'a>(
+        &'a self,
+        _: &'a AppState,
+        _: Uuid,
+        _: &'a str,
+        _: DateTime<Utc>,
+    ) -> BoxFuture<'a, Result<Research>> {
+        Box::pin(async { panic!("no employer has a known site") })
+    }
+
+    fn own_site<'a>(
+        &'a self,
+        url: &'a str,
+        _: DateTime<Utc>,
+    ) -> BoxFuture<'a, crate::ports::OwnSite> {
+        Box::pin(async move {
+            if let Ok(mut asked) = self.asked.lock() {
+                asked.push(url.to_owned());
+            }
+            self.site.clone()
+        })
+    }
+}
+
+fn own_site_port(site: crate::ports::OwnSite) -> (Researcher, Arc<OwnSiteFake>) {
+    let fake = Arc::new(OwnSiteFake {
+        site,
+        asked: std::sync::Mutex::new(Vec::new()),
+    });
+    (Researcher(Some(fake.clone())), fake)
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_persons_own_website_is_read_and_only_quoted_facts_reach_the_portrait(db: PgPool) {
+    let page = "https://alex.example.com/projects";
+    let site_reply = reply(&json!({ "facts": [
+        { "claim": "Built an open-source billing toolkit", "url": page,
+          "quote": "I built   Ledgerly, an open-source billing toolkit" },
+        // Not on the page: never passed on.
+        { "claim": "Spoke at a large conference", "url": page,
+          "quote": "keynote speaker at a large conference" },
+        // A page that was not read: never passed on.
+        { "claim": "Wrote a book", "url": "https://elsewhere.example/book",
+          "quote": "I wrote a book about billing" },
+    ]}));
+    let portrait = reply(&json!({ "sentences": [
+        sentence("You run the billing platform in Rust on PostgreSQL.", "known", &["w0"], "", None),
+        sentence("I assume, from your website, that you built an open-source billing toolkit.",
+                 "assumed", &["site0"], "Your website says so; it may be old.", None),
+    ]}));
+    let server = scripted_model(vec![site_reply, portrait]).await;
+    let (port, fake) = own_site_port(crate::ports::OwnSite {
+        pages: vec![crate::ports::OwnPage {
+            url: page.to_owned(),
+            text: "Projects. I built Ledgerly, an open-source billing toolkit used by small shops."
+                .to_owned(),
+        }],
+        error: None,
+    });
+    let h = Harness::with_research(db, Some(gateway(&server, None)), port);
+    saved(&h, &profile()).await;
+
+    let (status, view) = h.post("/api/v1/profile/about/portrait").await;
+    assert_eq!(status, 200, "{view}");
+    assert_eq!(
+        *fake.asked.lock().unwrap(),
+        ["https://alex.example.com"],
+        "the profile's own link, nothing else"
+    );
+    let sent = server.received_requests().await.unwrap();
+    assert_eq!(sent.len(), 2, "the site's facts, then the portrait");
+    let site_call = String::from_utf8(sent[0].body.clone()).unwrap();
+    assert!(site_call.contains("Ledgerly") && site_call.contains("<pages>"));
+    let portrait_call = String::from_utf8(sent[1].body.clone()).unwrap();
+    assert!(portrait_call.contains("open-source billing toolkit"));
+    assert!(
+        portrait_call.contains("site0"),
+        "the fact is a citable source"
+    );
+    assert!(!portrait_call.contains("large conference") && !portrait_call.contains("a book"));
+    // An assumption to confirm, linking the page; nothing is saved yet.
+    let assumed = find(
+        &view,
+        "I assume, from your website, that you built an open-source billing toolkit.",
+    );
+    assert_eq!(assumed["kind"], "assumed");
+    assert!(assumed.to_string().contains(page), "{assumed}");
+    // The read counts toward the daily cap, like an employer's.
+    assert_eq!(
+        h.count("SELECT count(*) FROM profile.about_calls WHERE kind = 'research'")
+            .await,
+        1
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_website_that_cannot_be_read_leaves_the_portrait_without_it(db: PgPool) {
+    let server = scripted_model(vec![portrait_reply()]).await;
+    let (port, _) = own_site_port(crate::ports::OwnSite {
+        pages: Vec::new(),
+        error: Some("robots_disallows"),
+    });
+    let h = Harness::with_research(db, Some(gateway(&server, None)), port);
+    saved(&h, &profile()).await;
+    let (status, view) = h.post("/api/v1/profile/about/portrait").await;
+    assert_eq!(status, 200, "{view}");
+    assert_eq!(calls(&server).await, 1, "only the portrait's call");
+}
+
+#[test]
+fn site_facts_are_kept_only_with_their_quote_on_their_page() {
+    let pages = vec![crate::ports::OwnPage {
+        url: "https://a.example/".to_owned(),
+        text: "Hi. I build Rails apps for clinics and teach Ruby.".to_owned(),
+    }];
+    let raw = |claim: &str, quote: &str, url: &str| prompt::RawSiteFact {
+        claim: claim.to_owned(),
+        quote: quote.to_owned(),
+        url: url.to_owned(),
+    };
+    let kept = prompt::judge_site(
+        vec![
+            raw(
+                "Builds Rails apps for clinics",
+                "I BUILD rails apps for clinics",
+                "https://a.example/",
+            ),
+            raw(
+                "Builds Rails apps for clinics",
+                "build Rails apps for clinics",
+                "https://a.example/",
+            ),
+            raw("Teaches Go", "teach Go", "https://a.example/"),
+            raw("Teaches Ruby", "teach Ruby", "https://b.example/"),
+            raw("", "and teach Ruby", "https://a.example/"),
+        ],
+        &pages,
+    );
+    assert_eq!(kept.len(), 1, "{kept:?}");
+    assert_eq!(kept[0].claim, "Builds Rails apps for clinics");
+    let sources = prompt::site_sources(&kept);
+    assert_eq!(sources[0].id, "site0");
+    assert_eq!(sources[0].url.as_deref(), Some("https://a.example/"));
+}
+
+#[test]
+fn the_site_call_never_sees_how_to_reach_the_person() {
+    let text = "Contact: inbox@example.com or (+351) 912 345 678. Rails since 2017 - 2021, \
+                at Example Co from 2019-2023.";
+    let shown = prompt::without_contact(text);
+    assert!(
+        !shown.contains("inbox@example.com") && !shown.contains("912 345 678"),
+        "{shown}"
+    );
+    assert!(
+        shown.contains("[email]") && shown.contains("[phone]"),
+        "{shown}"
+    );
+    assert!(
+        shown.contains("2017 - 2021") && shown.contains("2019-2023"),
+        "dates stay: {shown}"
+    );
+    let pages = vec![crate::ports::OwnPage {
+        url: "https://a.example/".to_owned(),
+        text: text.to_owned(),
+    }];
+    let message = prompt::site_message(&pages);
+    assert!(!message.contains("inbox@example.com") && !message.contains("912 345 678"));
+    // A fact that names a way to reach them is never kept.
+    let kept = prompt::judge_site(
+        vec![
+            prompt::RawSiteFact {
+                claim: "Reachable at inbox@example.com".to_owned(),
+                quote: "Contact: [email]".to_owned(),
+                url: "https://a.example/".to_owned(),
+            },
+            prompt::RawSiteFact {
+                claim: "Worked with Rails from 2017 to 2021".to_owned(),
+                quote: "Rails since 2017 - 2021".to_owned(),
+                url: "https://a.example/".to_owned(),
+            },
+        ],
+        &pages,
+    );
+    assert_eq!(kept.len(), 1, "{kept:?}");
+    assert_eq!(kept[0].claim, "Worked with Rails from 2017 to 2021");
+}

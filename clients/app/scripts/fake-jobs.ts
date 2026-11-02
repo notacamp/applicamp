@@ -331,6 +331,9 @@ function aboutChanges(userContent: string) {
 /** The outcomes the fake offers for a "what changed" question (all invented). */
 const RESULT_CHOICES = ["Fewer manual steps", "Faster month-end close", "More shops onboarded"];
 
+/** The languages the fake offers, as a `language` change writes them. */
+const LANGUAGE_CHOICES = ["English (fluent)", "Portuguese (native)", "Spanish (conversational)"];
+
 /** The choices the fake offers: what a picked one looks like in an answer. */
 const QUESTION_CHOICES: ReadonlySet<string> = new Set([
   "Bookings",
@@ -342,6 +345,7 @@ const QUESTION_CHOICES: ReadonlySet<string> = new Set([
   "7 to 15",
   "More than 15",
   ...RESULT_CHOICES,
+  ...LANGUAGE_CHOICES,
 ]);
 
 /** The gap a question is about (`<gap>` of the prompt). */
@@ -420,6 +424,14 @@ function aboutQuestion(userContent: string) {
         [...names, "None of these"],
       );
     }
+    case "languages": {
+      return ask(
+        "Which languages do you speak, and how well?",
+        `${basis} Postings say which languages the work needs.`,
+        "unknown",
+        LANGUAGE_CHOICES,
+      );
+    }
     case "claim": {
       return ask(
         `Where did you use ${names[0] ?? "it"}?`,
@@ -469,6 +481,17 @@ function aboutAnswer(userContent: string) {
     quote,
     sentence,
   });
+  // A languages question: each picked language is a `language` change.
+  const languages = choices.filter((pick) => LANGUAGE_CHOICES.includes(pick));
+  if (languages.length > 0) {
+    return {
+      changes: languages.map((pick) => ({
+        ...change(pick, pick, "context", `You speak ${pick}.`),
+        field: "language",
+        position: null,
+      })),
+    };
+  }
   if (about.area === "people") {
     return {
       changes: [

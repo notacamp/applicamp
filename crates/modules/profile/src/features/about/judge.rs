@@ -55,6 +55,9 @@ pub enum SourceKind {
     Told,
     /// A fact read on an employer's own site.
     Research,
+    /// A fact read on the person's own website: their words, but public and
+    /// perhaps old, so only ever an assumption to confirm.
+    Site,
 }
 
 /// One thing the model may cite.
@@ -221,7 +224,7 @@ pub fn judge_portrait(raw: RawPortrait, sources: &[Source], role_keys: &[String]
         if kind != SentenceKind::Assumed {
             let allowed = |s: &&Source| match kind {
                 SentenceKind::Told => s.kind == SourceKind::Told,
-                _ => s.kind != SourceKind::Research,
+                _ => !matches!(s.kind, SourceKind::Research | SourceKind::Site),
             };
             let usable: Vec<&Source> = cited.iter().copied().filter(allowed).collect();
             let supported = !usable.is_empty()
@@ -293,6 +296,11 @@ pub enum Field {
     GoalLocation,
     /// A fact about a named position.
     RoleFact,
+    /// One language they speak, with how well (`Portuguese (native)`).
+    Language,
+    /// One school, course or degree (`BSc in Computer Science, University of
+    /// Lisbon`), or that they taught themselves.
+    Education,
 }
 
 impl Field {

@@ -19,12 +19,16 @@ import {
 } from "~/lib/ui";
 
 import { cvPdfUrl, useCvs, type CvListItem } from "../../api/cv";
+import { letterPdfUrl } from "../../api/letter";
 import { formatShortDate } from "../../api/labels";
 
-type Filter = "all" | "approved" | "drafts";
+type Filter = "all" | "cvs" | "letters" | "drafts";
+
+const FILTERS = ["all", "cvs", "letters", "drafts"] as const satisfies readonly Filter[];
 
 /** What a row opens in the viewer. */
 interface Viewing {
+  document: CvListItem["document"];
   opportunity: string;
   version: number;
   company: string;
@@ -32,8 +36,10 @@ interface Viewing {
 }
 
 export interface CvsPageProps {
-  /** Review a draft (`/pipeline/$id/cv`). */
+  /** Review a draft CV (`/pipeline/$id/cv`). */
   onReview: (opportunity: string) => void;
+  /** Review a draft cover letter (`/pipeline/$id/letter`). */
+  onReviewLetter: (opportunity: string) => void;
   /** Open the job in the pipeline. */
   onOpportunity: (opportunity: string) => void;
   /** Go to the pipeline, to make a first CV. */
@@ -41,22 +47,45 @@ export interface CvsPageProps {
 }
 
 const keyOf = (item: CvListItem) =>
-  `${item.opportunity_id}:${item.kind}:${String(item.version ?? item.draft)}`;
+  `${item.document}:${item.opportunity_id}:${item.kind}:${String(item.version ?? item.draft)}`;
 
-/** Whether `item` shows under `filter`: approved ones are the PDFs, drafts the ones in review. */
+/** Whether `item` shows under `filter`: CVs or letters, or the drafts in review. */
 function shown(item: CvListItem, filter: Filter): boolean {
-  if (filter === "all") {
-    return true;
+  switch (filter) {
+    case "all": {
+      return true;
+    }
+    case "cvs": {
+      return item.document === "cv";
+    }
+    case "letters": {
+      return item.document === "letter";
+    }
+    case "drafts": {
+      return item.kind === "draft";
+    }
   }
-  return filter === "approved" ? item.kind === "version" : item.kind === "draft";
+}
+
+/** Where a row's PDF is. */
+function pdfUrl(
+  document: CvListItem["document"],
+  opportunity: string,
+  version: number,
+  download = false,
+) {
+  return document === "letter"
+    ? letterPdfUrl(opportunity, version, download)
+    : cvPdfUrl(opportunity, version, download);
 }
 
 /**
  * `/cvs`: every CV across the opportunities, newest first: the PDFs that were
  * made (open one in the viewer, download it) and the drafts being reviewed
- * (go on reviewing). Filtered to all, approved or drafts.
+ * (go on reviewing), cover letters next to the CVs. Filtered to all, CVs,
+ * letters or drafts.
  */
-export function CvsPage({ onReview, onOpportunity, onPipeline }: CvsPageProps) {
+export function CvsPage({ onReview, onReviewLetter, onOpportunity, onPipeline }: CvsPageProps) {
   const { t, i18n } = useTranslation("pipeline");
   const list = useCvs();
   const [filter, setFilter] = useState<Filter>("all");
@@ -125,6 +154,7 @@ export function CvsPage({ onReview, onOpportunity, onPipeline }: CvsPageProps) {
           const version = item.version ?? undefined;
           const pdf = item.kind === "version" && version !== undefined;
           const template = item.template ?? undefined;
+          const letter = item.document === "letter";
           return (
             <RowItem
               key={keyOf(item)}
@@ -133,8 +163,16 @@ export function CvsPage({ onReview, onOpportunity, onPipeline }: CvsPageProps) {
               title={
                 <Cluster>
                   <span data-testid="cvs-row-title">
-                    {t("cvs.title", { role: item.title, company: item.company })}
+                    {t(letter ? "cvs.letterTitle" : "cvs.title", {
+                      role: item.title,
+                      company: item.company,
+                    })}
                   </span>
+                  <Tagged testId="cvs-row-document">
+                    <Label hue={letter ? "purple" : "gray"}>
+                      {t(letter ? "cvs.letterLabel" : "cvs.cvLabel")}
+                    </Label>
+                  </Tagged>
                   <Tagged testId="cvs-row-status">
                     <Label hue={item.status === "approved" ? "green" : "blue"}>
                       {t(item.status === "approved" ? "cvs.approved" : "cvs.draft")}
@@ -158,15 +196,20 @@ export function CvsPage({ onReview, onOpportunity, onPipeline }: CvsPageProps) {
                 </Tagged>
               }
               meta={
-                pdf && template !== undefined ? (
+                pdf && (letter || template !== undefined) ? (
                   <>
                     <Tagged testId="cvs-row-facts">
                       <span>
-                        {t("cvs.facts", {
-                          template: t(`cv.layout.templates.${template}`),
-                          count: item.pages ?? 1,
-                          size: formatSize(item.size_bytes ?? 0, i18n.language),
-                        })}
+                        {template === undefined
+                          ? t("cvs.letterFacts", {
+                              count: item.pages ?? 1,
+                              size: formatSize(item.size_bytes ?? 0, i18n.language),
+                            })
+                          : t("cvs.facts", {
+                              template: t(`cv.layout.templates.${template}`),
+                              count: item.pages ?? 1,
+                              size: formatSize(item.size_bytes ?? 0, i18n.language),
+                            })}
                       </span>
                     </Tagged>
                     <span>
@@ -188,6 +231,7 @@ export function CvsPage({ onReview, onOpportunity, onPipeline }: CvsPageProps) {
                         data-testid="cvs-view"
                         onClick={() => {
                           setViewing({
+                            document: item.document,
                             opportunity: item.opportunity_id,
                             version,
                             company: item.company,
@@ -200,7 +244,7 @@ export function CvsPage({ onReview, onOpportunity, onPipeline }: CvsPageProps) {
                       <ButtonLink
                         variant="secondary"
                         icon="download"
-                        href={cvPdfUrl(item.opportunity_id, version, true)}
+                        href={pdfUrl(item.document, item.opportunity_id, version, true)}
                         data-testid="cvs-download"
                       >
                         {t("cvs.download")}
@@ -211,7 +255,7 @@ export function CvsPage({ onReview, onOpportunity, onPipeline }: CvsPageProps) {
                       variant="secondary"
                       data-testid="cvs-review"
                       onClick={() => {
-                        onReview(item.opportunity_id);
+                        (letter ? onReviewLetter : onReview)(item.opportunity_id);
                       }}
                     >
                       {t("cvs.review")}
@@ -243,7 +287,7 @@ export function CvsPage({ onReview, onOpportunity, onPipeline }: CvsPageProps) {
         <Tagged testId="cvs-filter">
           <ViewSwitch
             label={t("cvs.filter.label")}
-            options={(["all", "approved", "drafts"] as const).map((value) => ({
+            options={FILTERS.map((value) => ({
               value,
               label: t(`cvs.filter.${value}`),
               testId: `cvs-filter-${value}`,
@@ -259,21 +303,32 @@ export function CvsPage({ onReview, onOpportunity, onPipeline }: CvsPageProps) {
         onClose={() => {
           setViewing(null);
         }}
-        url={cvPdfUrl(viewing?.opportunity ?? "", viewing?.version ?? 0)}
-        downloadUrl={cvPdfUrl(viewing?.opportunity ?? "", viewing?.version ?? 0, true)}
-        title={t("cvs.viewer.title", {
+        url={pdfUrl(viewing?.document ?? "cv", viewing?.opportunity ?? "", viewing?.version ?? 0)}
+        downloadUrl={pdfUrl(
+          viewing?.document ?? "cv",
+          viewing?.opportunity ?? "",
+          viewing?.version ?? 0,
+          true,
+        )}
+        title={t(viewing?.document === "letter" ? "cvs.letterViewer.title" : "cvs.viewer.title", {
           company: viewing?.company ?? "",
           version: viewing?.version ?? 0,
         })}
         subtitle={
-          detail?.template === undefined || detail.template === null
+          detail === undefined
             ? undefined
-            : t("cv.viewer.subtitle", {
-                date: formatShortDate(detail.created_at, i18n.language),
-                template: t(`cv.layout.templates.${detail.template}`),
-                pages: t("cv.layout.pages", { count: detail.pages ?? 1 }),
-                size: formatSize(detail.size_bytes ?? 0, i18n.language),
-              })
+            : detail.template === undefined || detail.template === null
+              ? t("letter.viewer.subtitle", {
+                  date: formatShortDate(detail.created_at, i18n.language),
+                  pages: t("cv.layout.pages", { count: detail.pages ?? 1 }),
+                  size: formatSize(detail.size_bytes ?? 0, i18n.language),
+                })
+              : t("cv.viewer.subtitle", {
+                  date: formatShortDate(detail.created_at, i18n.language),
+                  template: t(`cv.layout.templates.${detail.template}`),
+                  pages: t("cv.layout.pages", { count: detail.pages ?? 1 }),
+                  size: formatSize(detail.size_bytes ?? 0, i18n.language),
+                })
         }
         labels={{
           close: t("cv.viewer.close"),

@@ -4,7 +4,14 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Schema } from "~/lib/api";
 
-import { cv, cvDraft, cvLine, opportunity } from "../../../../../test/pipeline";
+import {
+  cv,
+  cvDraft,
+  cvLine,
+  letter,
+  letterDraft,
+  opportunity,
+} from "../../../../../test/pipeline";
 import { renderWithProviders, stubApi, type Stub } from "../../../../../test/render";
 
 import { ReviewPage } from "./ReviewPage";
@@ -22,15 +29,17 @@ function renderReview(routes: Record<string, Stub>) {
   });
   const onBack = vi.fn();
   const onPipeline = vi.fn();
+  const onLetter = vi.fn();
   const view = renderWithProviders(
     <ReviewPage
       id={ID}
       onBack={onBack}
       onPipeline={onPipeline}
+      onLetter={onLetter}
       spend={<p data-testid="month-spend">AI this month</p>}
     />,
   );
-  return { requests, onBack, onPipeline, ...view };
+  return { requests, onBack, onPipeline, onLetter, ...view };
 }
 
 /** The draft with the bad number fixed, and so the skill. */
@@ -211,6 +220,53 @@ describe("Review the CV", () => {
     expect(screen.getByTestId("cv-banner-approved")).toBeVisible();
     expect(screen.queryByTestId("cv-approve")).toBeNull();
     expect(screen.queryByTestId("cv-edit-l4")).toBeNull();
+  });
+
+  it("offers the cover letter once the CV is approved, and opens it after writing", async () => {
+    const approved = cv({
+      draft: { ...fixedDraft(), status: "approved", version: 1, can_approve: false },
+      versions: [
+        {
+          n: 1,
+          version: 1,
+          language: "en",
+          approved_at: "2026-10-31T11:00:00Z",
+          created_at: "2026-10-31T11:00:00Z",
+          template: "clean",
+          length: 1,
+          pages: 1,
+          size_bytes: 30_000,
+          current: true,
+          checks: {
+            sections: { expected: ["Summary"], missing: [] },
+            keywords: { total: 1, found: 1, missing: [] },
+            lines: { total: 3, missing: [] },
+            text_layer: true,
+            contact: { name: true, email: true, links: true },
+            size: { pages: 1, length: 1, bytes: 30_000 },
+          },
+        },
+      ],
+    });
+    const { onLetter } = renderReview({
+      [CV]: { body: approved },
+      [`GET /api/v1/opportunities/${ID}/letter`]: { body: letter() },
+      [`POST /api/v1/opportunities/${ID}/letter/drafts`]: {
+        body: letter({ draft: letterDraft() }),
+      },
+    });
+    const write = await screen.findByTestId("cv-letter-write");
+    expect(write).toHaveTextContent("Write the cover letter · about €0.002");
+    await userEvent.setup().click(write);
+    await waitFor(() => {
+      expect(onLetter).toHaveBeenCalledWith(ID);
+    });
+  });
+
+  it("has no cover letter before the CV is approved", async () => {
+    renderReview({ [CV]: { body: fixed() } });
+    expect(await screen.findByTestId("cv-approve")).toBeVisible();
+    expect(screen.queryByTestId("cv-letter")).toBeNull();
   });
 
   it("puts back what was left out, as the profile has it", async () => {

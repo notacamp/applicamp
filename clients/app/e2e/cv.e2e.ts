@@ -240,7 +240,7 @@ test("someone drafts a CV, sees the lines that can't be traced to their profile,
   // The CVs page lists both and opens a PDF.
   await page.goto("/cvs");
   await expect(page.getByTestId("cvs")).toBeVisible();
-  await page.getByTestId("cvs-filter-approved").click();
+  await page.getByTestId("cvs-filter-cvs").click();
   const mine = page.getByTestId("cvs-row").filter({ hasText: `Example Co ${tag}` });
   await expect(mine).toHaveCount(2);
   await expect(mine.first().getByTestId("cvs-row-version")).toContainText("v2");

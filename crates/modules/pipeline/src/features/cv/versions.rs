@@ -311,7 +311,7 @@ pub async fn create(
 }
 
 /// `name` as a file name: no path or quoting characters, one line.
-fn file_stem(name: &str) -> String {
+pub(super) fn file_stem(name: &str) -> String {
     name.chars()
         .map(|c| {
             if c.is_control()
@@ -388,7 +388,7 @@ fn percent_encode(text: &str) -> String {
 
 /// The `Content-Disposition` of a PDF named `stem`: the ASCII fallback and
 /// the real name.
-fn disposition(kind: &str, stem: &str) -> String {
+pub(super) fn disposition(kind: &str, stem: &str) -> String {
     let file = format!("{stem}.pdf");
     let fallback = ascii_fold(&file).replace('"', "_");
     format!(
@@ -526,9 +526,21 @@ pub enum CvKind {
     Draft,
 }
 
+/// Which document a row of the CVs page is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CvDocument {
+    /// A tailored CV.
+    Cv,
+    /// A cover letter.
+    Letter,
+}
+
 /// One row of the CVs page.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct CvListItem {
+    /// A CV or a cover letter.
+    pub document: CvDocument,
     pub kind: CvKind,
     pub opportunity_id: Uuid,
     /// The role.
@@ -553,8 +565,8 @@ pub struct CvListItem {
 /// Every CV of the account.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct CvList {
-    /// Newest first: every PDF version and every draft being reviewed, across
-    /// the opportunities (at most 200).
+    /// Newest first: every PDF version and every draft being reviewed, of CVs
+    /// and of cover letters, across the opportunities (at most 200).
     pub items: Vec<CvListItem>,
 }
 
@@ -629,9 +641,10 @@ pub async fn list_all(
     .bind(MAX_LISTED)
     .fetch_all(&state.db)
     .await?;
-    let items = rows
+    let items: Vec<CvListItem> = rows
         .into_iter()
         .map(|row| CvListItem {
+            document: CvDocument::Cv,
             kind: if row.kind == "version" {
                 CvKind::Version
             } else {
@@ -652,7 +665,75 @@ pub async fn list_all(
             current: row.current,
         })
         .collect();
+    let mut items: Vec<CvListItem> = items;
+    items.extend(letter_items(&state.db, account, now).await?);
+    items.sort_by(|a, b| {
+        b.created_at
+            .cmp(&a.created_at)
+            .then(a.opportunity_id.cmp(&b.opportunity_id))
+            .then(b.version.cmp(&a.version))
+    });
+    items.truncate(usize::try_from(MAX_LISTED).unwrap_or(200));
     Ok(Json(CvList { items }))
+}
+
+/// The cover letters' rows of the CVs page: the PDF versions and the drafts
+/// being reviewed.
+async fn letter_items(db: &PgPool, account: Uuid, now: DateTime<Utc>) -> Result<Vec<CvListItem>> {
+    let rows: Vec<ListRow> = sqlx::query_as(
+        "SELECT * FROM (
+            SELECT 'version' AS kind, o.id AS opportunity_id, o.title, o.company,
+                   v.version, d.n AS draft, 'approved' AS status, NULL::text AS template,
+                   v.pages, v.size_bytes, v.language, v.created_at, v.downloaded_at,
+                   v.version = (SELECT max(x.version) FROM pipeline.letter_versions x
+                                 WHERE x.opportunity_id = v.opportunity_id) AS current
+              FROM pipeline.letter_versions v
+              JOIN pipeline.opportunities o ON o.id = v.opportunity_id
+              JOIN pipeline.letter_drafts d ON d.id = v.draft_id
+             WHERE v.account_id = $1
+            UNION ALL
+            SELECT 'draft', o.id, o.title, o.company, d.version, d.n, d.status,
+                   NULL::text, NULL::smallint, NULL::integer, d.language, d.created_at,
+                   NULL::timestamptz, false
+              FROM pipeline.letter_drafts d
+              JOIN pipeline.opportunities o ON o.id = d.opportunity_id
+             WHERE d.account_id = $1
+               AND ((d.status = 'draft' AND d.expires_at > $2)
+                    OR (d.status = 'approved' AND NOT EXISTS (
+                        SELECT 1 FROM pipeline.letter_versions x WHERE x.draft_id = d.id)))
+         ) all_letters
+         ORDER BY created_at DESC, opportunity_id, version DESC NULLS LAST
+         LIMIT $3",
+    )
+    .bind(account)
+    .bind(now)
+    .bind(MAX_LISTED)
+    .fetch_all(db)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|row| CvListItem {
+            document: CvDocument::Letter,
+            kind: if row.kind == "version" {
+                CvKind::Version
+            } else {
+                CvKind::Draft
+            },
+            opportunity_id: row.opportunity_id,
+            title: row.title,
+            company: row.company,
+            version: row.version.map(|v| counted(i64::from(v))),
+            draft: counted(i64::from(row.draft)),
+            status: DraftStatus::parse(&row.status),
+            template: None,
+            pages: row.pages.map(|p| counted(i64::from(p))),
+            size_bytes: row.size_bytes.map(|b| u64::try_from(b).unwrap_or(0)),
+            language: row.language,
+            created_at: row.created_at,
+            downloaded_at: row.downloaded_at,
+            current: row.current,
+        })
+        .collect())
 }
 
 #[cfg(test)]

@@ -248,3 +248,168 @@ export function cv(overrides: Partial<Cv> = {}): Cv {
     ...overrides,
   };
 }
+
+type Letter = Schema<"Letter">;
+type LetterDraft = Schema<"LetterDraftView">;
+
+const COMPANY_SOURCE = {
+  id: "cab12cd34",
+  kind: "company",
+  text: "Builds ledgers for small shops",
+  url: "https://example-co.test/about",
+} as const;
+
+const PROFILE_SOURCE = {
+  id: "w0.h1",
+  kind: "highlight",
+  text: "Rebuilt the billing pipeline in Rust, cutting invoice runs from 6 hours to 40 minutes",
+  position: 0,
+  role: "Senior Engineer · Example Org",
+} as const;
+
+/**
+ * A draft of the cover letter with two things open: a sentence praising the
+ * person in words nobody wrote, one that cites only a company fact yet says
+ * what the person did, and a question the profile can't answer.
+ */
+export function letterDraft(overrides: Partial<LetterDraft> = {}): LetterDraft {
+  return {
+    n: 1,
+    status: "draft",
+    version: null,
+    language: "en",
+    size: "short",
+    cv_version: 1,
+    created_at: "2026-11-01T09:00:00Z",
+    approved_at: null,
+    expires_at: "2026-11-08T09:00:00Z",
+    contact: {
+      name: "Alex Demo",
+      email: "alex@example.com",
+      location: "Porto, Portugal",
+      links: [],
+    },
+    greeting: "Dear hiring team at Example Co,",
+    closing: "Sincerely,",
+    paragraphs: [
+      {
+        id: "p2",
+        tags: ["company_fact", "from_profile"],
+        sources: [COMPANY_SOURCE, PROFILE_SOURCE],
+        sentences: [
+          {
+            id: "s1",
+            text: "Example Co builds ledgers for small shops, and I have spent years on billing in Rust.",
+            edited: false,
+            sources: [COMPANY_SOURCE, PROFILE_SOURCE],
+            flags: [],
+            claims: ["Rust"],
+          },
+          {
+            id: "s3",
+            text: "I cut invoice runs from 6 hours to 40 minutes.",
+            edited: false,
+            sources: [PROFILE_SOURCE],
+            flags: [],
+            claims: ["6", "40"],
+          },
+        ],
+      },
+      {
+        id: "p5",
+        tags: ["no_claims"],
+        sources: [],
+        sentences: [
+          {
+            id: "s4",
+            text: "I'm the go-to person for the hardest billing problems.",
+            edited: false,
+            sources: [],
+            flags: [{ kind: "superlative", word: "go-to" }],
+            claims: [],
+          },
+        ],
+      },
+      {
+        id: "p7",
+        tags: ["company_fact"],
+        sources: [COMPANY_SOURCE],
+        sentences: [
+          {
+            id: "s6",
+            text: "I led our migration, as Example Co did for its shops.",
+            edited: false,
+            sources: [COMPANY_SOURCE],
+            flags: [{ kind: "company_only_about_you", cites: ["cab12cd34"] }],
+            claims: [],
+          },
+        ],
+      },
+      {
+        id: "p9",
+        tags: ["no_claims"],
+        sources: [],
+        sentences: [
+          {
+            id: "s8",
+            text: "I'd like to bring that experience to your team.",
+            edited: false,
+            sources: [],
+            flags: [],
+            claims: [],
+          },
+        ],
+      },
+    ],
+    answers: [
+      {
+        id: "q10",
+        question: "Why do you want to work at Example Co?",
+        text: "Because you build ledgers for small shops, which is what I have built in Rust.",
+        own: false,
+        tags: ["company_fact", "from_profile"],
+        sources: [COMPANY_SOURCE, PROFILE_SOURCE],
+        flags: [],
+      },
+      {
+        id: "q11",
+        question: "What's your notice period?",
+        text: "",
+        own: false,
+        tags: [],
+        sources: [],
+        flags: [{ kind: "not_in_profile" }],
+      },
+    ],
+    words: 62,
+    company_facts: [COMPANY_SOURCE],
+    flagged: 3,
+    first_flagged: "s4",
+    can_approve: false,
+    ...overrides,
+  };
+}
+
+/** The cover letter of an opportunity, with no draft unless `draft` is given. */
+export function letter(overrides: Partial<Letter> = {}): Letter {
+  return {
+    opportunity_id: "0190a1b2-0000-7000-8000-000000000001",
+    draft: null,
+    versions: [],
+    can_write: { allowed: true },
+    caps: {
+      drafts_here: 0,
+      drafts_here_cap: 10,
+      drafts_today: 0,
+      drafts_today_cap: 20,
+      today_eur: 0.04,
+      day_limit_eur: 0.3,
+      month_eur: 0.42,
+      month_limit_eur: 5,
+    },
+    draft_eur: 0.002,
+    cv_version: 1,
+    questions: ["Why do you want to work at Example Co?", "What's your notice period?"],
+    ...overrides,
+  };
+}

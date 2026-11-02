@@ -1,0 +1,12 @@
+# Tasks
+- [x] 1 Migration `letter_drafts` and `letter_versions`
+- [x] 2 Letter model, prompt (no contact details), judge, the posting's questions parser
+- [x] 3 Fact check: claims, company-fact-only, superlatives, unanswered questions
+- [x] 4 Letter template, data document, one-page read-back, version storage
+- [x] 5 Endpoints: letter, draft, sentence edit/confirm, answers, approve, discard, PDF; caps counted apart from the CV's
+- [x] 6 `GET /api/v1/cvs` lists letters (`document`), expiry sweep covers letter drafts
+- [x] 7 Fakes: the fake model's letter and the fake posting's application questions
+- [x] 8 Client: `/pipeline/$id/letter`, Write the cover letter on the CV review, the peek's line, CVs filters, four languages
+- [x] 9 Tests: server (check, questions, caps, privacy, PDF read-back, injection, flow), client, e2e
+- [x] 10 OpenAPI regenerated, client types regenerated, changelog entry file
+- [ ] 11 Gates green in CI, recording (by the lead)

@@ -98,6 +98,14 @@ pub fn module(deps: PipelineDeps) -> Module {
         .routes(routes!(cv::versions::pdf_file))
         .routes(routes!(cv::versions::list_all))
         .routes(routes!(cv::discard))
+        .routes(routes!(cv::letter::get))
+        .routes(routes!(cv::letter::create))
+        .routes(routes!(cv::letter::change_sentence))
+        .routes(routes!(cv::letter::confirm_sentence))
+        .routes(routes!(cv::letter::change_answer))
+        .routes(routes!(cv::letter::approve))
+        .routes(routes!(cv::letter::discard))
+        .routes(routes!(cv::letter::pdf_file))
         .routes(routes!(today::get))
         .layer(Extension(deps));
     Module {

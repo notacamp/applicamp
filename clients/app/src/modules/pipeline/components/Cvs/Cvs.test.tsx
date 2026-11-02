@@ -15,6 +15,7 @@ type Item = Schema<"CvListItem">;
 
 function version(n: number, overrides: Partial<Item> = {}): Item {
   return {
+    document: "cv",
     kind: "version",
     opportunity_id: OPP,
     title: "Staff Engineer",
@@ -34,6 +35,7 @@ function version(n: number, overrides: Partial<Item> = {}): Item {
 }
 
 const draft: Item = {
+  document: "cv",
   kind: "draft",
   opportunity_id: OTHER,
   title: "Backend Engineer",
@@ -52,7 +54,12 @@ const draft: Item = {
 
 function render(items: Item[]) {
   stubApi({ "GET /api/v1/cvs": { body: { items } } });
-  const handlers = { onReview: vi.fn(), onOpportunity: vi.fn(), onPipeline: vi.fn() };
+  const handlers = {
+    onReview: vi.fn(),
+    onReviewLetter: vi.fn(),
+    onOpportunity: vi.fn(),
+    onPipeline: vi.fn(),
+  };
   renderWithProviders(<CvsPage {...handlers} />);
   return handlers;
 }
@@ -77,8 +84,60 @@ describe("The CVs page", () => {
     expect(handlers.onReview).toHaveBeenCalledWith(OTHER);
     await user.click(screen.getByTestId("cvs-opportunity"));
     expect(handlers.onOpportunity).toHaveBeenCalledWith(OTHER);
-    await user.click(screen.getByTestId("cvs-filter-approved"));
-    expect(screen.getAllByTestId("cvs-row")).toHaveLength(2);
+    await user.click(screen.getByTestId("cvs-filter-cvs"));
+    expect(screen.getAllByTestId("cvs-row")).toHaveLength(3);
+    await user.click(screen.getByTestId("cvs-filter-letters"));
+    expect(screen.getByTestId("cvs-no-results")).toBeVisible();
+  });
+
+  it("lists the cover letters next to the CVs, under their own filter, with their own PDF and review", async () => {
+    const letter = (overrides: Partial<Item> = {}): Item => ({
+      ...version(1),
+      document: "letter",
+      template: null,
+      downloaded_at: null,
+      current: true,
+      created_at: "2026-11-01T09:00:00Z",
+      ...overrides,
+    });
+    const letterDraft: Item = {
+      ...draft,
+      document: "letter",
+      created_at: "2026-11-01T10:00:00Z",
+    };
+    const handlers = render([letterDraft, letter(), version(1)]);
+    expect(await screen.findAllByTestId("cvs-row")).toHaveLength(3);
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("cvs-filter-letters"));
+    const rows = screen.getAllByTestId("cvs-row");
+    expect(rows).toHaveLength(2);
+    expect(within(rows.at(1) ?? document.body).getByTestId("cvs-row-title")).toHaveTextContent(
+      "Cover letter · Staff Engineer · Example Co",
+    );
+    expect(within(rows.at(1) ?? document.body).getByTestId("cvs-row-document")).toHaveTextContent(
+      "Cover letter",
+    );
+    expect(within(rows.at(1) ?? document.body).getByTestId("cvs-row-facts")).toHaveTextContent(
+      "1 page",
+    );
+    expect(within(rows.at(1) ?? document.body).getByTestId("cvs-download")).toHaveAttribute(
+      "href",
+      `/api/v1/opportunities/${OPP}/letter/versions/1/pdf?download=1`,
+    );
+    await user.click(within(rows.at(0) ?? document.body).getByTestId("cvs-review"));
+    expect(handlers.onReviewLetter).toHaveBeenCalledWith(OTHER);
+    expect(handlers.onReview).not.toHaveBeenCalled();
+    await user.click(within(rows.at(1) ?? document.body).getByTestId("cvs-view"));
+    expect(await screen.findByTestId("pdf-viewer")).toBeVisible();
+    expect(screen.getByTestId("pdf-viewer-download")).toHaveAttribute(
+      "href",
+      `/api/v1/opportunities/${OPP}/letter/versions/1/pdf?download=1`,
+    );
+    await user.click(screen.getByTestId("pdf-viewer-close"));
+    await user.click(screen.getByTestId("cvs-filter-cvs"));
+    expect(screen.getAllByTestId("cvs-row")).toHaveLength(1);
+    await user.click(screen.getByTestId("cvs-filter-drafts"));
+    expect(screen.getAllByTestId("cvs-row")).toHaveLength(1);
   });
 
   it("says how to make the first one", async () => {

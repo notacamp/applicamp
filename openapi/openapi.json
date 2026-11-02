@@ -3282,6 +3282,749 @@
         ]
       }
     },
+    "/api/v1/opportunities/{id}/letter": {
+      "get": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "The cover letter of an opportunity.",
+        "description": "The latest draft with each paragraph's tags and sources and each\nsentence's reasons, the job's own questions and their answers, the PDF\nversions, the caps and the spend. **Never calls the model.** Another\naccount's opportunity is not found.",
+        "operationId": "pipeline.letter",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The letter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Letter"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/letter/drafts": {
+      "post": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Write the cover letter for this job.",
+        "description": "**One model call.** From the posting, what the job wants, the company\nfacts not removed, the profile, the approved CV's words and the job's own\nquestions; each sentence cites the sources it comes from, and the server\nthen checks that it says nothing they do not. The model never sees a name\nor contact details. Needs the CV of this job approved. At most 10 letter\ndrafts per opportunity and 20 per account per UTC day, counted apart from\nCV drafts; nothing retries past a limit. A new draft puts the earlier\nunapproved one away.",
+        "operationId": "pipeline.letter_draft",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LetterDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The letter, with the new draft.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Letter"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_request`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`stage_too_early`; `no_approved_cv`; `profile_needed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`letter_drafts_per_opportunity_cap`; `letter_drafts_daily_cap`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/letter/drafts/{n}/answers/{answer_id}": {
+      "patch": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Write your own answer to one of the job's questions, or leave it out.",
+        "description": "The answer is the person's own words, so it is not checked against the\nprofile; it is text to copy into the application, not part of the PDF.",
+        "operationId": "pipeline.letter_answer",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "n",
+            "in": "path",
+            "description": "The draft.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "answer_id",
+            "in": "path",
+            "description": "The answer.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnswerChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The letter, after the change.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Letter"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_change`; `invalid_text`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`draft_frozen`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/letter/drafts/{n}/approve": {
+      "post": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Approve the letter and make its PDF.",
+        "description": "Checked again now: refused while anything is flagged or a job question is\nstill open (`letter_flagged`). The letter is then rendered on one page with\nthe CV's template stack, read back (every paragraph, the name and the email\nmust come out of the PDF as text), and kept as the next version in the\nsame transaction that approves; if any step fails nothing is approved.\n**No model call.** The answers to the job's questions are not in the PDF.",
+        "operationId": "pipeline.letter_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "n",
+            "in": "path",
+            "description": "The draft.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The letter, with the version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Letter"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`letter_flagged`; `letter_empty`; `draft_frozen`; `letter_doesnt_fit`; `letter_pdf_check_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`letter_pdf_unavailable`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/letter/drafts/{n}/discard": {
+      "post": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Put a draft away.",
+        "operationId": "pipeline.letter_discard",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "n",
+            "in": "path",
+            "description": "The draft.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The letter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Letter"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`draft_frozen`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/letter/drafts/{n}/sentences/{sentence_id}": {
+      "patch": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Change or remove one sentence.",
+        "description": "The new text is checked against the sentence's sources again; removing it\ntakes it out of the letter. Only a draft can change.",
+        "operationId": "pipeline.letter_sentence",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "n",
+            "in": "path",
+            "description": "The draft.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "sentence_id",
+            "in": "path",
+            "description": "The sentence.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SentenceChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The letter, after the change.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Letter"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_change`; `invalid_text`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such opportunity, draft or sentence",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`draft_frozen`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/letter/drafts/{n}/sentences/{sentence_id}/confirm": {
+      "post": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "\"It's true\": keep the person's own words as a fact on their profile and\ncite it from the sentence.",
+        "description": "The words (up to 300 characters) become a fact kept on the position the\nsentence is about (else the most recent), a source the sentence cites, and\nthe sentence is checked again with it. The profile keeps them for every\nlater letter and CV.",
+        "operationId": "pipeline.letter_confirm",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "n",
+            "in": "path",
+            "description": "The draft.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "sentence_id",
+            "in": "path",
+            "description": "The sentence.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The letter, after the sentence was checked again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Letter"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_fact`; `invalid_area`; `no_position`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`draft_frozen`; `profile_changed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/letter/versions/{version}/pdf": {
+      "get": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "The PDF of a letter version.",
+        "description": "`Content-Type: application/pdf`, shown inline, named\n`<Name> Cover letter - <Company>.pdf`. `?download=1` serves it as an\nattachment and sets the version's `downloaded_at`. Never cached, never\nsniffed. Another account's version is not found.",
+        "operationId": "pipeline.letter_pdf",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "description": "The version.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "download",
+            "in": "query",
+            "description": "`1` serves it as an attachment and records the download.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The PDF.",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "$ref": "#/components/schemas/PdfFile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/v1/profile": {
       "get": {
         "tags": [
@@ -6398,6 +7141,27 @@
           }
         }
       },
+      "AnswerChange": {
+        "type": "object",
+        "description": "The person's own answer to a job question, or its removal.",
+        "properties": {
+          "remove": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Leave the question out."
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The answer, in the person's words. It is theirs, so it is not checked."
+          }
+        },
+        "additionalProperties": false
+      },
       "AnswerProposal": {
         "type": "object",
         "description": "A fact taken from an answer, waiting for Keep, Fix or Drop.",
@@ -7559,6 +8323,28 @@
           }
         }
       },
+      "CanWrite": {
+        "type": "object",
+        "description": "Whether \"Write the cover letter\" is on.",
+        "required": [
+          "allowed"
+        ],
+        "properties": {
+          "allowed": {
+            "type": "boolean"
+          },
+          "reason": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LetterBlocked"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
       "CashFloor": {
         "type": "object",
         "description": "The least they would take, before tax.",
@@ -8194,6 +8980,14 @@
           }
         }
       },
+      "CvDocument": {
+        "type": "string",
+        "description": "Which document a row of the CVs page is.",
+        "enum": [
+          "cv",
+          "letter"
+        ]
+      },
       "CvDraftRequest": {
         "type": "object",
         "description": "What to make a draft of.",
@@ -8364,7 +9158,7 @@
             "items": {
               "$ref": "#/components/schemas/CvListItem"
             },
-            "description": "Newest first: every PDF version and every draft being reviewed, across\nthe opportunities (at most 200)."
+            "description": "Newest first: every PDF version and every draft being reviewed, of CVs\nand of cover letters, across the opportunities (at most 200)."
           }
         }
       },
@@ -8372,6 +9166,7 @@
         "type": "object",
         "description": "One row of the CVs page.",
         "required": [
+          "document",
           "kind",
           "opportunity_id",
           "title",
@@ -8393,6 +9188,10 @@
           "current": {
             "type": "boolean",
             "description": "The newest version of its opportunity."
+          },
+          "document": {
+            "$ref": "#/components/schemas/CvDocument",
+            "description": "A CV or a cover letter."
           },
           "downloaded_at": {
             "type": [
@@ -9744,6 +10543,601 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "Letter": {
+        "type": "object",
+        "description": "The cover letter of an opportunity.",
+        "required": [
+          "opportunity_id",
+          "versions",
+          "can_write",
+          "caps",
+          "draft_eur",
+          "questions"
+        ],
+        "properties": {
+          "can_write": {
+            "$ref": "#/components/schemas/CanWrite"
+          },
+          "caps": {
+            "$ref": "#/components/schemas/LetterCaps"
+          },
+          "cv_version": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The version of the approved CV a new letter would sit next to.",
+            "minimum": 0
+          },
+          "draft": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LetterDraftView",
+                "description": "The latest draft that was not discarded (approved or not); none before\nthe first."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "draft_eur": {
+            "type": "number",
+            "format": "double",
+            "description": "About what one draft costs, in euros."
+          },
+          "opportunity_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The job's own questions, read from its posting."
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LetterVersion"
+            },
+            "description": "The PDF versions, newest first."
+          }
+        }
+      },
+      "LetterAnswerView": {
+        "type": "object",
+        "description": "An answer to one of the job's questions.",
+        "required": [
+          "id",
+          "question",
+          "text",
+          "own",
+          "tags",
+          "sources",
+          "flags"
+        ],
+        "properties": {
+          "flags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LetterReason"
+            }
+          },
+          "id": {
+            "type": "string"
+          },
+          "own": {
+            "type": "boolean",
+            "description": "The person wrote it."
+          },
+          "question": {
+            "type": "string"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceView"
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LetterTag"
+            }
+          },
+          "text": {
+            "type": "string",
+            "description": "Empty when the profile can't support one."
+          }
+        }
+      },
+      "LetterBlocked": {
+        "type": "string",
+        "description": "Why a letter cannot be drafted now.",
+        "enum": [
+          "stage_too_early",
+          "no_approved_cv",
+          "per_opportunity_cap",
+          "daily_cap",
+          "ai_unavailable"
+        ]
+      },
+      "LetterCaps": {
+        "type": "object",
+        "description": "The caps and the spend.",
+        "required": [
+          "drafts_here",
+          "drafts_here_cap",
+          "drafts_today",
+          "drafts_today_cap",
+          "today_eur",
+          "month_eur"
+        ],
+        "properties": {
+          "day_limit_eur": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "drafts_here": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Letter drafts this opportunity has had.",
+            "minimum": 0
+          },
+          "drafts_here_cap": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "drafts_today": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Letter drafts the account started today (UTC).",
+            "minimum": 0
+          },
+          "drafts_today_cap": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "month_eur": {
+            "type": "number",
+            "format": "double"
+          },
+          "month_limit_eur": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "today_eur": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "LetterDraftRequest": {
+        "type": "object",
+        "description": "What to make a draft of.",
+        "properties": {
+          "language": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A language tag such as `pt-PT`; the posting's when it says, else\nEnglish."
+          },
+          "size": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LetterSize",
+                "description": "`short` (about 180 words, the default) or `standard` (about 300)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "LetterDraftView": {
+        "type": "object",
+        "description": "A draft, as the review page shows it.",
+        "required": [
+          "n",
+          "status",
+          "language",
+          "size",
+          "created_at",
+          "contact",
+          "greeting",
+          "closing",
+          "paragraphs",
+          "answers",
+          "words",
+          "company_facts",
+          "flagged",
+          "can_approve"
+        ],
+        "properties": {
+          "answers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LetterAnswerView"
+            },
+            "description": "The job's own questions and their answers; not in the PDF."
+          },
+          "approved_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "can_approve": {
+            "type": "boolean",
+            "description": "Approve is on: nothing is open and it is still a draft."
+          },
+          "closing": {
+            "type": "string",
+            "description": "The line above the name, from the server."
+          },
+          "company_facts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceView"
+            },
+            "description": "The facts from the company's site the letter cites."
+          },
+          "contact": {
+            "$ref": "#/components/schemas/ContactView"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cv_version": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The version of the approved CV it was written next to.",
+            "minimum": 0
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it is deleted if nobody approves it."
+          },
+          "first_flagged": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The first of them, as the page shows them."
+          },
+          "flagged": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many sentences and answers need the person.",
+            "minimum": 0
+          },
+          "greeting": {
+            "type": "string",
+            "description": "The line above the letter, from the server."
+          },
+          "language": {
+            "type": "string"
+          },
+          "n": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Its number for this opportunity, from 1.",
+            "minimum": 0
+          },
+          "paragraphs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LetterParagraphView"
+            }
+          },
+          "size": {
+            "$ref": "#/components/schemas/LetterSize"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DraftStatus"
+          },
+          "version": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Once approved: the version, from 1.",
+            "minimum": 0
+          },
+          "words": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Words in the paragraphs.",
+            "minimum": 0
+          }
+        }
+      },
+      "LetterParagraphView": {
+        "type": "object",
+        "description": "A paragraph of the letter.",
+        "required": [
+          "id",
+          "tags",
+          "sources",
+          "sentences"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sentences": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LetterSentenceView"
+            }
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceView"
+            },
+            "description": "\"Where this came from\": every source its sentences cite, once."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LetterTag"
+            }
+          }
+        }
+      },
+      "LetterReason": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "It says something (`claim`: a number, a tool, a name) that the sources\nit cites do not.",
+            "required": [
+              "claim",
+              "cites",
+              "kind"
+            ],
+            "properties": {
+              "cites": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "claim": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "claim_not_in_sources"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "It claims something and cites no source the profile has.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "no_source"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "It cites only facts about the company yet says something about the\nperson.",
+            "required": [
+              "cites",
+              "kind"
+            ],
+            "properties": {
+              "cites": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "company_only_about_you"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "It praises (\"go-to\", \"best\") in words no cited source says.",
+            "required": [
+              "word",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "superlative"
+                ]
+              },
+              "word": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The profile and goals do not say: the person answers it.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "not_in_profile"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Why a sentence or an answer can't be traced to the person's profile."
+      },
+      "LetterSentenceView": {
+        "type": "object",
+        "description": "A sentence of the letter.",
+        "required": [
+          "id",
+          "text",
+          "edited",
+          "sources",
+          "flags",
+          "claims"
+        ],
+        "properties": {
+          "claims": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The words of the sentence the check looks for in its sources."
+          },
+          "edited": {
+            "type": "boolean",
+            "description": "The person wrote it."
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LetterReason"
+            },
+            "description": "Why it cannot be traced; empty when it can."
+          },
+          "id": {
+            "type": "string"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceView"
+            },
+            "description": "The sources it cites that the frame has."
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "LetterSize": {
+        "type": "string",
+        "description": "How long a letter is meant to be.",
+        "enum": [
+          "short",
+          "standard"
+        ]
+      },
+      "LetterTag": {
+        "type": "string",
+        "description": "What a paragraph or an answer rests on.",
+        "enum": [
+          "company_fact",
+          "from_profile",
+          "no_claims"
+        ]
+      },
+      "LetterVersion": {
+        "type": "object",
+        "description": "An approved version: the approved letter as a PDF.",
+        "required": [
+          "n",
+          "version",
+          "language",
+          "approved_at",
+          "pages",
+          "size_bytes",
+          "created_at",
+          "current",
+          "checks"
+        ],
+        "properties": {
+          "approved_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "checks": {
+            "$ref": "#/components/schemas/PdfChecks",
+            "description": "What the read-back found."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "current": {
+            "type": "boolean",
+            "description": "The newest version of the opportunity."
+          },
+          "downloaded_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "language": {
+            "type": "string"
+          },
+          "n": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The draft it renders.",
+            "minimum": 0
+          },
+          "pages": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The pages it takes (always 1).",
+            "minimum": 0
+          },
+          "size_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
           }
         }
       },
@@ -11865,6 +13259,27 @@
           "director",
           "founding"
         ]
+      },
+      "SentenceChange": {
+        "type": "object",
+        "description": "A change to one sentence: its new text, or its removal.",
+        "properties": {
+          "remove": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Remove the sentence."
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The new text. It is checked against the same sources."
+          }
+        },
+        "additionalProperties": false
       },
       "SentenceKind": {
         "type": "string",

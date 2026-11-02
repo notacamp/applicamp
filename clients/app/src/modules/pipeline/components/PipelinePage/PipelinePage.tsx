@@ -46,6 +46,8 @@ export interface PipelinePageProps {
   onPrepare?: ((id: string) => void) | undefined;
   /** Open the review of an opportunity's tailored CV. */
   onReview?: ((id: string) => void) | undefined;
+  /** Open the review of an opportunity's cover letter. */
+  onLetter?: ((id: string) => void) | undefined;
 }
 
 /**
@@ -64,6 +66,7 @@ export function PipelinePage({
   progress,
   onPrepare,
   onReview,
+  onLetter,
 }: PipelinePageProps) {
   const { t } = useTranslation("pipeline");
   const narrow = useNarrowScreen();
@@ -284,6 +287,7 @@ export function PipelinePage({
         }}
         onPrepare={onPrepare}
         onReview={onReview}
+        onLetter={onLetter}
       />
       <NewOpportunityDialog
         open={adding}

@@ -120,6 +120,18 @@
       "review": "Rever o CV",
       "viewPdf": "Ver PDF",
       "download": "Descarregar"
+    },
+    "letter": {
+      "title": "Carta de apresentação",
+      "none": "Ainda sem carta de apresentação.",
+      "approved": "v{{version}} aprovada.",
+      "needsYou_one": "Rascunho {{n}}: {{count}} coisa precisa de si.",
+      "needsYou_other": "Rascunho {{n}}: {{count}} coisas precisam de si.",
+      "clean": "Rascunho {{n}}: todas as frases têm origem no seu perfil.",
+      "write": "Escrever a carta de apresentação",
+      "review": "Rever a carta",
+      "viewPdf": "Ver PDF",
+      "download": "Descarregar"
     }
   },
   "hidden": {
@@ -450,8 +462,9 @@
     "filter": {
       "label": "Mostrar",
       "all": "Todos",
-      "approved": "Aprovados",
-      "drafts": "Rascunhos"
+      "drafts": "Rascunhos",
+      "cvs": "CVs",
+      "letters": "Cartas"
     },
     "title": "{{role}} · {{company}}",
     "version": "v{{version}}",
@@ -483,6 +496,163 @@
     "loadFailed": "Não foi possível carregar os seus CVs.",
     "viewer": {
       "title": "{{company}} · v{{version}}"
+    },
+    "cvLabel": "CV",
+    "letterLabel": "Carta de apresentação",
+    "letterTitle": "Carta de apresentação · {{role}} · {{company}}",
+    "letterFacts_one": "{{count}} página · {{size}}",
+    "letterFacts_other": "{{count}} páginas · {{size}}",
+    "letterViewer": {
+      "title": "Carta de apresentação · {{company}} · v{{version}}"
+    }
+  },
+  "letter": {
+    "title": "Carta de apresentação",
+    "eyebrow": "Carta de apresentação",
+    "heading": "A sua carta de apresentação para {{company}}",
+    "lead": "Escrita ao lado do seu CV aprovado, a partir do seu perfil e dos factos lidos no site da própria empresa. Cada parágrafo mostra de onde veio. As frases que não se conseguem rastrear ficam bloqueadas até as corrigir.",
+    "back": "Voltar ao CV",
+    "loading": "A carregar a carta de apresentação…",
+    "loadFailed": "Não foi possível carregar a carta de apresentação.",
+    "viewerCompany": "Carta de apresentação · {{company}} · v{{version}}",
+    "empty": {
+      "body": "Ainda sem carta de apresentação. É escrita ao lado do seu CV aprovado."
+    },
+    "fromCv": {
+      "title": "A seguir: a carta de apresentação",
+      "body": "O seu CV está aprovado. Escreva a carta que o acompanha, a partir do mesmo perfil e dos mesmos factos."
+    },
+    "slot": {
+      "write": "Escrever a carta de apresentação · cerca de {{cost}}",
+      "writing": "A escrever…",
+      "review": "Rever a carta de apresentação",
+      "hint": "Uma chamada de IA. Depois, cada frase é verificada contra o seu perfil, sem IA.",
+      "blocked": {
+        "stage_too_early": "Selecione primeiro esta vaga: a carta escreve-se para as vagas a que se candidata.",
+        "no_approved_cv": "Aprove primeiro o seu CV para esta vaga: a carta é escrita ao lado dele.",
+        "per_opportunity_cap": "Já escreveu 10 rascunhos de carta para esta vaga. Reveja um deles.",
+        "daily_cap": "Já escreveu 20 rascunhos de carta hoje. Pode continuar amanhã.",
+        "ai_unavailable": "A IA não está configurada neste servidor, por isso não é possível escrever nada."
+      }
+    },
+    "toolbar": {
+      "draft": "Rascunho {{n}}",
+      "draftPill": "Rascunho",
+      "approvedPill": "Aprovada · v{{version}}",
+      "language": "Escrita em {{language}}",
+      "languageLabel": "Idioma",
+      "length": "Extensão",
+      "sizes": {
+        "short": "Curta · cerca de 180 palavras",
+        "standard": "Normal · cerca de 300"
+      },
+      "note": "Outra extensão ou outro idioma é um novo rascunho: Refazer.",
+      "makeAgain": "Refazer · cerca de {{cost}}",
+      "making": "A escrever…",
+      "approve": "Aprovar",
+      "approving": "A aprovar…",
+      "approveWhy": "Aprovar fica disponível quando todas as frases e perguntas bloqueadas forem corrigidas, removidas ou respondidas."
+    },
+    "sheet": {
+      "label": "A sua carta de apresentação"
+    },
+    "tags": {
+      "company_fact": "Facto da empresa",
+      "from_profile": "Do seu perfil",
+      "no_claims": "Sem afirmações",
+      "edited": "Editada por si"
+    },
+    "from": {
+      "show": "De onde veio",
+      "companyPage": "(lido em {{page}})",
+      "none": "Não diz nada sobre si que precise de fonte."
+    },
+    "flag": {
+      "label": "Não está no seu perfil",
+      "claim": "“{{claim}}” não está nas fontes que esta frase cita.",
+      "noSource": "Esta frase diz algo sobre si, mas não cita nada do seu perfil.",
+      "companyOnly": "Esta frase cita apenas um facto sobre a empresa, mas diz algo sobre si. Os factos da empresa não podem ser as suas conquistas.",
+      "superlative": "“{{word}}” não está no seu perfil. É verdade?",
+      "notInProfile": "O seu perfil e os seus objetivos não dizem. Responda você."
+    },
+    "actions": {
+      "itsTrue": "É verdade: acrescentar ao meu perfil",
+      "edit": "Editar",
+      "remove": "Remover a frase",
+      "editLabel": "Editar a frase",
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "confirmLabel": "Diga-o com as suas palavras",
+      "confirmHint": "Isto guarda as suas palavras em {{where}} e depois volta a verificar a frase.",
+      "confirmSave": "Guardar no meu perfil e verificar de novo",
+      "whereProfile": "o seu perfil"
+    },
+    "questions": {
+      "title": "As perguntas da própria vaga",
+      "lead": "A candidatura faz estas perguntas. Cada resposta passa pela mesma verificação e pode copiá-la para o formulário. Não fazem parte do PDF.",
+      "copy": "Copiar",
+      "copied": "Copiado",
+      "yourAnswer": "A sua resposta",
+      "useMine": "Usar a minha resposta",
+      "write": "Escrever a minha resposta",
+      "leaveOut": "Deixar de fora",
+      "own": "A sua resposta"
+    },
+    "aside": {
+      "flagged_one": "{{count}} coisa precisa de si",
+      "flagged_other": "{{count}} coisas precisam de si",
+      "flaggedBody": "Aprovar fica disponível quando cada uma for corrigida, removida ou respondida.",
+      "goFirst": "Ir à primeira",
+      "clean": "Todas as linhas têm origem",
+      "cleanBody": "Aprovar faz o PDF ao lado do seu CV.",
+      "approvedTitle": "Aprovada · v{{version}}",
+      "approvedBody": "O texto já não pode mudar e o PDF é feito a partir dele. Refaça a carta para outro rascunho.",
+      "toPipeline": "Voltar ao pipeline",
+      "glance": "Num relance",
+      "words_one": "{{count}} palavra · 1 página",
+      "words_other": "{{count}} palavras · 1 página",
+      "wordsCv_one": "{{count}} palavra · 1 página · coincide com o CV v{{cv}}",
+      "wordsCv_other": "{{count}} palavras · 1 página · coincide com o CV v{{cv}}",
+      "facts_one": "{{count}} facto do site da empresa: {{list}}",
+      "facts_other": "{{count}} factos do site da empresa: {{list}}",
+      "noFacts": "Nenhum facto do site da empresa foi usado."
+    },
+    "pdf": {
+      "open": "Abrir o PDF",
+      "download": "Descarregar",
+      "size_one": "{{count}} página · {{size}}. O texto foi lido de volta do PDF e encontrado por inteiro.",
+      "size_other": "{{count}} páginas · {{size}}. O texto foi lido de volta do PDF e encontrado por inteiro."
+    },
+    "spend": {
+      "drafts": "Rascunhos de carta hoje: {{n}} de {{cap}}",
+      "day": "Este rascunho custa cerca de {{cost}} · IA de hoje: {{spent}} de {{limit}}",
+      "dayNoLimit": "Este rascunho custa cerca de {{cost}} · IA de hoje: {{spent}}"
+    },
+    "viewer": {
+      "title": "Carta de apresentação · v{{version}}",
+      "subtitle": "{{date}} · {{pages}} · {{size}}"
+    },
+    "errors": {
+      "stage_too_early": "Selecione primeiro esta vaga: a carta escreve-se para as vagas a que se candidata.",
+      "no_approved_cv": "Aprove primeiro o seu CV para esta vaga: a carta é escrita ao lado dele.",
+      "profile_needed": "Acrescente primeiro uma posição ao seu perfil: a carta é feita a partir dela.",
+      "letter_drafts_per_opportunity_cap": "Já escreveu 10 rascunhos de carta para esta vaga. Reveja um deles.",
+      "letter_drafts_daily_cap": "Já escreveu 20 rascunhos de carta hoje. Pode continuar amanhã.",
+      "ai_unavailable": "A IA não está configurada neste servidor, por isso não é possível escrever nada.",
+      "ai_daily_limit_reached": "Atingiu o limite diário de IA. Continua amanhã.",
+      "ai_budget_reached": "Atingiu o seu limite de gastos de IA. Continua quando o limite for reposto.",
+      "ai_failed": "A IA não conseguiu responder desta vez. Nada se perdeu; tente outra vez.",
+      "invalid_text": "Escreva entre 1 e 1200 caracteres.",
+      "invalid_fact": "Escreva entre 1 e 300 caracteres.",
+      "profile_changed": "Essa posição mudou no seu perfil desde que este rascunho foi feito. Escreva a carta de novo.",
+      "draft_frozen": "Este rascunho foi aprovado ou posto de lado, por isso já não pode mudar. Escreva a carta de novo.",
+      "letter_flagged": "Algumas frases não se conseguem rastrear até ao seu perfil, ou há uma pergunta à espera da sua resposta. Corrija ou remova-as primeiro.",
+      "letter_empty": "A carta ficou sem parágrafos. Escreva-a de novo.",
+      "letter_doesnt_fit": "Não cabe em 1 página: remova algumas frases ou escreva uma carta mais curta.",
+      "letter_pdf_check_failed": "O PDF não passou a verificação, por isso nada foi aprovado. Tente outra vez.",
+      "letter_pdf_unavailable": "Não foi possível fazer o PDF agora. Nada foi aprovado; tente outra vez.",
+      "not_found": "Esta carta de apresentação não foi encontrada.",
+      "generic": "Algo correu mal. Tente outra vez."
     }
   }
 }

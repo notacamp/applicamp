@@ -24,13 +24,15 @@ export interface PipelineProps {
   onPrepare: (id: string) => void;
   /** Open the review of an opportunity's tailored CV (its peek). */
   onReview: (id: string) => void;
+  /** Open the review of an opportunity's cover letter (its peek). */
+  onLetter: (id: string) => void;
 }
 
 /**
  * `/pipeline`: every opportunity, from first match to offer, with Search now
  * and its progress (the sources module) beside them.
  */
-export function Pipeline({ newOnly, run, onSearch, onPrepare, onReview }: PipelineProps) {
+export function Pipeline({ newOnly, run, onSearch, onPrepare, onReview, onLetter }: PipelineProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const keep = newOnly ? { new: true } : {};
@@ -43,6 +45,7 @@ export function Pipeline({ newOnly, run, onSearch, onPrepare, onReview }: Pipeli
         }}
         onPrepare={onPrepare}
         onReview={onReview}
+        onLetter={onLetter}
         adding={run === "add"}
         onAdding={(open) => {
           onSearch(open ? { ...keep, run: "add" } : keep);

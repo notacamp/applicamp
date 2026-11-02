@@ -125,7 +125,7 @@ fn period(start: Option<&str>, end: Option<&str>, lang: &str) -> String {
 }
 
 /// A web address as text: no scheme, no trailing slash.
-fn shown(url: &str) -> String {
+pub(crate) fn shown(url: &str) -> String {
     let rest = url
         .strip_prefix("https://")
         .or_else(|| url.strip_prefix("http://"))
@@ -134,7 +134,7 @@ fn shown(url: &str) -> String {
 }
 
 /// `url` when it is a web address the PDF may link to.
-fn web(url: &str) -> Option<String> {
+pub(crate) fn web(url: &str) -> Option<String> {
     let url = clean(url);
     let lower = url.to_lowercase();
     ((lower.starts_with("https://") || lower.starts_with("http://")) && !url.contains(' '))

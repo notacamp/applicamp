@@ -890,6 +890,187 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/opportunities/{id}/letter": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The cover letter of an opportunity.
+         * @description The latest draft with each paragraph's tags and sources and each
+         *     sentence's reasons, the job's own questions and their answers, the PDF
+         *     versions, the caps and the spend. **Never calls the model.** Another
+         *     account's opportunity is not found.
+         */
+        get: operations["pipeline.letter"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/letter/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Write the cover letter for this job.
+         * @description **One model call.** From the posting, what the job wants, the company
+         *     facts not removed, the profile, the approved CV's words and the job's own
+         *     questions; each sentence cites the sources it comes from, and the server
+         *     then checks that it says nothing they do not. The model never sees a name
+         *     or contact details. Needs the CV of this job approved. At most 10 letter
+         *     drafts per opportunity and 20 per account per UTC day, counted apart from
+         *     CV drafts; nothing retries past a limit. A new draft puts the earlier
+         *     unapproved one away.
+         */
+        post: operations["pipeline.letter_draft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/letter/drafts/{n}/answers/{answer_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Write your own answer to one of the job's questions, or leave it out.
+         * @description The answer is the person's own words, so it is not checked against the
+         *     profile; it is text to copy into the application, not part of the PDF.
+         */
+        patch: operations["pipeline.letter_answer"];
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/letter/drafts/{n}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve the letter and make its PDF.
+         * @description Checked again now: refused while anything is flagged or a job question is
+         *     still open (`letter_flagged`). The letter is then rendered on one page with
+         *     the CV's template stack, read back (every paragraph, the name and the email
+         *     must come out of the PDF as text), and kept as the next version in the
+         *     same transaction that approves; if any step fails nothing is approved.
+         *     **No model call.** The answers to the job's questions are not in the PDF.
+         */
+        post: operations["pipeline.letter_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/letter/drafts/{n}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Put a draft away. */
+        post: operations["pipeline.letter_discard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/letter/drafts/{n}/sentences/{sentence_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change or remove one sentence.
+         * @description The new text is checked against the sentence's sources again; removing it
+         *     takes it out of the letter. Only a draft can change.
+         */
+        patch: operations["pipeline.letter_sentence"];
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/letter/drafts/{n}/sentences/{sentence_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * "It's true": keep the person's own words as a fact on their profile and
+         *     cite it from the sentence.
+         * @description The words (up to 300 characters) become a fact kept on the position the
+         *     sentence is about (else the most recent), a source the sentence cites, and
+         *     the sentence is checked again with it. The profile keeps them for every
+         *     later letter and CV.
+         */
+        post: operations["pipeline.letter_confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/letter/versions/{version}/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The PDF of a letter version.
+         * @description `Content-Type: application/pdf`, shown inline, named
+         *     `<Name> Cover letter - <Company>.pdf`. `?download=1` serves it as an
+         *     attachment and sets the version's `downloaded_at`. Never cached, never
+         *     sniffed. Another account's version is not found.
+         */
+        get: operations["pipeline.letter_pdf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/profile": {
         parameters: {
             query?: never;
@@ -1959,6 +2140,13 @@ export interface components {
             /** @description The JSON schema its arguments match. */
             schema: unknown;
         };
+        /** @description The person's own answer to a job question, or its removal. */
+        AnswerChange: {
+            /** @description Leave the question out. */
+            remove?: boolean | null;
+            /** @description The answer, in the person's words. It is theirs, so it is not checked. */
+            text?: string | null;
+        };
         /** @description A fact taken from an answer, waiting for Keep, Fix or Drop. */
         AnswerProposal: {
             /** @description What it is about (Grill me's areas). */
@@ -2410,6 +2598,11 @@ export interface components {
             allowed: boolean;
             reason?: components["schemas"]["Blocked"] | null;
         };
+        /** @description Whether "Write the cover letter" is on. */
+        CanWrite: {
+            allowed: boolean;
+            reason?: components["schemas"]["LetterBlocked"] | null;
+        };
         /** @description The least they would take, before tax. */
         CashFloor: {
             /**
@@ -2639,6 +2832,11 @@ export interface components {
             /** Format: double */
             today_eur: number;
         };
+        /**
+         * @description Which document a row of the CVs page is.
+         * @enum {string}
+         */
+        CvDocument: "cv" | "letter";
         /** @description What to make a draft of. */
         CvDraftRequest: {
             /**
@@ -2699,8 +2897,8 @@ export interface components {
         /** @description Every CV of the account. */
         CvList: {
             /**
-             * @description Newest first: every PDF version and every draft being reviewed, across
-             *     the opportunities (at most 200).
+             * @description Newest first: every PDF version and every draft being reviewed, of CVs
+             *     and of cover letters, across the opportunities (at most 200).
              */
             items: components["schemas"]["CvListItem"][];
         };
@@ -2711,6 +2909,8 @@ export interface components {
             created_at: string;
             /** @description The newest version of its opportunity. */
             current: boolean;
+            /** @description A CV or a cover letter. */
+            document: components["schemas"]["CvDocument"];
             /** Format: date-time */
             downloaded_at?: string | null;
             /**
@@ -3275,6 +3475,213 @@ export interface components {
             position: number;
             start_date?: string | null;
             title?: string | null;
+        };
+        /** @description The cover letter of an opportunity. */
+        Letter: {
+            can_write: components["schemas"]["CanWrite"];
+            caps: components["schemas"]["LetterCaps"];
+            /**
+             * Format: int32
+             * @description The version of the approved CV a new letter would sit next to.
+             */
+            cv_version?: number | null;
+            draft?: components["schemas"]["LetterDraftView"] | null;
+            /**
+             * Format: double
+             * @description About what one draft costs, in euros.
+             */
+            draft_eur: number;
+            /** Format: uuid */
+            opportunity_id: string;
+            /** @description The job's own questions, read from its posting. */
+            questions: string[];
+            /** @description The PDF versions, newest first. */
+            versions: components["schemas"]["LetterVersion"][];
+        };
+        /** @description An answer to one of the job's questions. */
+        LetterAnswerView: {
+            flags: components["schemas"]["LetterReason"][];
+            id: string;
+            /** @description The person wrote it. */
+            own: boolean;
+            question: string;
+            sources: components["schemas"]["SourceView"][];
+            tags: components["schemas"]["LetterTag"][];
+            /** @description Empty when the profile can't support one. */
+            text: string;
+        };
+        /**
+         * @description Why a letter cannot be drafted now.
+         * @enum {string}
+         */
+        LetterBlocked: "stage_too_early" | "no_approved_cv" | "per_opportunity_cap" | "daily_cap" | "ai_unavailable";
+        /** @description The caps and the spend. */
+        LetterCaps: {
+            /** Format: double */
+            day_limit_eur?: number | null;
+            /**
+             * Format: int32
+             * @description Letter drafts this opportunity has had.
+             */
+            drafts_here: number;
+            /** Format: int32 */
+            drafts_here_cap: number;
+            /**
+             * Format: int32
+             * @description Letter drafts the account started today (UTC).
+             */
+            drafts_today: number;
+            /** Format: int32 */
+            drafts_today_cap: number;
+            /** Format: double */
+            month_eur: number;
+            /** Format: double */
+            month_limit_eur?: number | null;
+            /** Format: double */
+            today_eur: number;
+        };
+        /** @description What to make a draft of. */
+        LetterDraftRequest: {
+            /**
+             * @description A language tag such as `pt-PT`; the posting's when it says, else
+             *     English.
+             */
+            language?: string | null;
+            size?: components["schemas"]["LetterSize"] | null;
+        };
+        /** @description A draft, as the review page shows it. */
+        LetterDraftView: {
+            /** @description The job's own questions and their answers; not in the PDF. */
+            answers: components["schemas"]["LetterAnswerView"][];
+            /** Format: date-time */
+            approved_at?: string | null;
+            /** @description Approve is on: nothing is open and it is still a draft. */
+            can_approve: boolean;
+            /** @description The line above the name, from the server. */
+            closing: string;
+            /** @description The facts from the company's site the letter cites. */
+            company_facts: components["schemas"]["SourceView"][];
+            contact: components["schemas"]["ContactView"];
+            /** Format: date-time */
+            created_at: string;
+            /**
+             * Format: int32
+             * @description The version of the approved CV it was written next to.
+             */
+            cv_version?: number | null;
+            /**
+             * Format: date-time
+             * @description When it is deleted if nobody approves it.
+             */
+            expires_at?: string | null;
+            /** @description The first of them, as the page shows them. */
+            first_flagged?: string | null;
+            /**
+             * Format: int32
+             * @description How many sentences and answers need the person.
+             */
+            flagged: number;
+            /** @description The line above the letter, from the server. */
+            greeting: string;
+            language: string;
+            /**
+             * Format: int32
+             * @description Its number for this opportunity, from 1.
+             */
+            n: number;
+            paragraphs: components["schemas"]["LetterParagraphView"][];
+            size: components["schemas"]["LetterSize"];
+            status: components["schemas"]["DraftStatus"];
+            /**
+             * Format: int32
+             * @description Once approved: the version, from 1.
+             */
+            version?: number | null;
+            /**
+             * Format: int32
+             * @description Words in the paragraphs.
+             */
+            words: number;
+        };
+        /** @description A paragraph of the letter. */
+        LetterParagraphView: {
+            id: string;
+            sentences: components["schemas"]["LetterSentenceView"][];
+            /** @description "Where this came from": every source its sentences cite, once. */
+            sources: components["schemas"]["SourceView"][];
+            tags: components["schemas"]["LetterTag"][];
+        };
+        /** @description Why a sentence or an answer can't be traced to the person's profile. */
+        LetterReason: {
+            cites: string[];
+            claim: string;
+            /** @enum {string} */
+            kind: "claim_not_in_sources";
+        } | {
+            /** @enum {string} */
+            kind: "no_source";
+        } | {
+            cites: string[];
+            /** @enum {string} */
+            kind: "company_only_about_you";
+        } | {
+            /** @enum {string} */
+            kind: "superlative";
+            word: string;
+        } | {
+            /** @enum {string} */
+            kind: "not_in_profile";
+        };
+        /** @description A sentence of the letter. */
+        LetterSentenceView: {
+            /** @description The words of the sentence the check looks for in its sources. */
+            claims: string[];
+            /** @description The person wrote it. */
+            edited: boolean;
+            /** @description Why it cannot be traced; empty when it can. */
+            flags: components["schemas"]["LetterReason"][];
+            id: string;
+            /** @description The sources it cites that the frame has. */
+            sources: components["schemas"]["SourceView"][];
+            text: string;
+        };
+        /**
+         * @description How long a letter is meant to be.
+         * @enum {string}
+         */
+        LetterSize: "short" | "standard";
+        /**
+         * @description What a paragraph or an answer rests on.
+         * @enum {string}
+         */
+        LetterTag: "company_fact" | "from_profile" | "no_claims";
+        /** @description An approved version: the approved letter as a PDF. */
+        LetterVersion: {
+            /** Format: date-time */
+            approved_at: string;
+            /** @description What the read-back found. */
+            checks: components["schemas"]["PdfChecks"];
+            /** Format: date-time */
+            created_at: string;
+            /** @description The newest version of the opportunity. */
+            current: boolean;
+            /** Format: date-time */
+            downloaded_at?: string | null;
+            language: string;
+            /**
+             * Format: int32
+             * @description The draft it renders.
+             */
+            n: number;
+            /**
+             * Format: int32
+             * @description The pages it takes (always 1).
+             */
+            pages: number;
+            /** Format: int64 */
+            size_bytes: number;
+            /** Format: int32 */
+            version: number;
         };
         /**
          * @description What kind of line an event is.
@@ -4107,6 +4514,13 @@ export interface components {
          * @enum {string}
          */
         Seniority: "junior" | "mid" | "senior" | "staff" | "principal" | "lead" | "manager" | "director" | "founding";
+        /** @description A change to one sentence: its new text, or its removal. */
+        SentenceChange: {
+            /** @description Remove the sentence. */
+            remove?: boolean | null;
+            /** @description The new text. It is checked against the same sources. */
+            text?: string | null;
+        };
         /**
          * @description Where a sentence comes from.
          * @enum {string}
@@ -6691,6 +7105,488 @@ export interface operations {
         };
     };
     "pipeline.cv_pdf": {
+        parameters: {
+            query?: {
+                /** @description `1` serves it as an attachment and records the download. */
+                download?: string;
+            };
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+                /** @description The version. */
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The PDF. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": components["schemas"]["PdfFile"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.letter": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The letter. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Letter"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.letter_draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LetterDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description The letter, with the new draft. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Letter"];
+                };
+            };
+            /** @description `invalid_request` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `stage_too_early`; `no_approved_cv`; `profile_needed` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `letter_drafts_per_opportunity_cap`; `letter_drafts_daily_cap` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.letter_answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+                /** @description The draft. */
+                n: number;
+                /** @description The answer. */
+                answer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnswerChange"];
+            };
+        };
+        responses: {
+            /** @description The letter, after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Letter"];
+                };
+            };
+            /** @description `invalid_change`; `invalid_text` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `draft_frozen` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.letter_approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+                /** @description The draft. */
+                n: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The letter, with the version. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Letter"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `letter_flagged`; `letter_empty`; `draft_frozen`; `letter_doesnt_fit`; `letter_pdf_check_failed` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `letter_pdf_unavailable` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.letter_discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+                /** @description The draft. */
+                n: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The letter. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Letter"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `draft_frozen` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.letter_sentence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+                /** @description The draft. */
+                n: number;
+                /** @description The sentence. */
+                sentence_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SentenceChange"];
+            };
+        };
+        responses: {
+            /** @description The letter, after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Letter"];
+                };
+            };
+            /** @description `invalid_change`; `invalid_text` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: no such opportunity, draft or sentence */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `draft_frozen` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.letter_confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+                /** @description The draft. */
+                n: number;
+                /** @description The sentence. */
+                sentence_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description The letter, after the sentence was checked again. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Letter"];
+                };
+            };
+            /** @description `invalid_fact`; `invalid_area`; `no_position` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `draft_frozen`; `profile_changed` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.letter_pdf": {
         parameters: {
             query?: {
                 /** @description `1` serves it as an attachment and records the download. */

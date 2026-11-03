@@ -7,7 +7,8 @@ context: |
   you about your goals, runs agents in throwaway sandboxes to find jobs on
   public job boards, tailor CVs (PDF) and prepare applications, drafts
   recruiter replies through Campbooks, and keeps a pipeline of opportunities.
-  Every outward action (submit, send) waits for the user's approval.
+  Every outward action (submit, send) waits for the user's approval. The app
+  does every step it can by itself and asks only for approval (ADR 0010).
   Stack: Rust modular monolith (axum, sqlx/Postgres, utoipa OpenAPI), React
   client on @notacamp/ui, NVIDIA OpenShell sandboxes, OpenRouter models by
   role, Campbooks for mail, calendar and SSO.
@@ -19,6 +20,7 @@ rules:
   proposal:
     - Name the module(s) touched and the tracking issue URL.
     - Include a Non-goals section.
+    - "Say what the app now does without the person and what still waits on them (ADR 0010: the app does the work first; approvals and control stay)."
   design:
     - Say which module's schema owns the data and which events are published or consumed.
     - For any endpoint, state the scope it requires.

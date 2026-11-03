@@ -39,9 +39,10 @@
 ## Finding the website (`brief/site.rs`, no model)
 1. Person → board → apply host, as today.
 2. The posting's text: `https?://` links and `@domain` addresses; drop job boards, tracking
-   systems, the boards the posting was seen on, webmail and link shorteners. Keep a domain whose
-   registrable name contains the company's core name (its name without Inc, Ltd, GmbH, Software,
-   Technologies, Labs, Group…); else the only one left; else none.
+   systems, the boards the posting was seen on, webmail, link shorteners and sites that host pages
+   for others. Keep the first domain one of whose labels is the company's core name (its name
+   without Inc, Ltd, GmbH, Software, Technologies, Labs, Group…), or holds it for a name of six
+   letters or more. No fetch. The others are tried in 3.
 3. Asked, at most 3 home pages: the posting's other domains, then `<core>.com`, `<full>.com`,
    `<core>.io` (letters and digits only, deduplicated); kept when the page names the company in
    words, or as one word for a name of six letters or more. Only the read step (and the Read

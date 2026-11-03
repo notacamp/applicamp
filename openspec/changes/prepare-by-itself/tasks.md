@@ -1,7 +1,7 @@
 # Tasks
 - [x] 1 Migration `pipeline.preparations`; new `SiteSource` values
-- [x] 2 Website finder: posting links and email domains, name guesses through `names_company`; unit tests (Perry Street-shaped posting, webmail, a tracker link, two candidate domains)
-- [x] 3 `Neighbours::autonomy` and `names_company`, implemented in the server
+- [x] 2 Website finder: posting links and email domains, name guesses checked against their home page; unit tests (Perry Street-shaped posting, webmail, a tracker link, two candidate domains)
+- [x] 3 `Neighbours::autonomy`, `home_page` and `facts_waiting`, implemented in the server
 - [x] 4 The `pipeline.prepare` job: read → stop on open questions → draft; letter after approval; guard row; caps and budget stop it with a reason; tests (shortlist → draft; questions wait; Find only does nothing; Stop; back to Found; cap)
 - [x] 5 Triggers: stage PATCH, opening the brief, keeping the last answer, approving a CV
 - [x] 6 "Draft the CV" reads the company first when it can

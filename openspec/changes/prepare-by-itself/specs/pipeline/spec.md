@@ -67,7 +67,7 @@ draft exists, and say why drafting is off when it is. "Draft the CV" on a job
 whose company was never read SHALL read it first when it can, and say so when it
 cannot.
 
-#### Scenario: Opening it with "Find only"
+#### Scenario: Opening it
 - **WHEN** someone whose goal is "Find only" opens "Prepare: company and job" on a Shortlisted opportunity
 - **THEN** they see the company's site, a Read button with what it costs, a Draft the CV button with what it costs, and nothing has been fetched or asked of the model
 
@@ -104,9 +104,9 @@ address's host is kept.
 - **WHEN** the posting names no domain, and `examplesoft.com`'s home page names "ExampleSoft Software" and its robots.txt allows it
 - **THEN** that is the company's site, and the page says it was found from the company's name
 
-#### Scenario: A guess that does not name the company
-- **WHEN** the domain made from the name answers but its home page does not name the company
-- **THEN** it is not used, and after three guesses the page asks for the company's website
+#### Scenario: Only a tracking system's link
+- **WHEN** an opportunity's only link is a Greenhouse, Lever or Ashby posting, the board gave no website, the posting names no domain of the company's, and no domain made from the name has a home page that names the company
+- **THEN** none of those guesses is used, the page asks for the company's website, and keeps what is typed for every job at that company
 
 #### Scenario: Webmail is not a website
 - **WHEN** the posting's only address is at a webmail domain

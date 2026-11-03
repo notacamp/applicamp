@@ -6,6 +6,7 @@ import {
   expectAccessible,
   expectNoSidewaysScroll,
   expectPageFillsTheScreen,
+  setAutonomy,
   signIn,
 } from "./helpers";
 
@@ -121,6 +122,7 @@ test("someone writes the cover letter after approving the CV, fixes what can't b
 }, testInfo) => {
   const phone = testInfo.project.name === "phone";
   await signIn(page);
+  await setAutonomy(page, "find_only");
   const tag = `${testInfo.project.name}-${String(testInfo.retry)}-${Date.now().toString(36)}`;
   expect(await callApi(page, "PUT", "/api/v1/profile", profile(tag))).toBe(200);
   const id = await addJob(page, tag);

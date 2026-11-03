@@ -6,6 +6,7 @@ import {
   expectAccessible,
   expectNoSidewaysScroll,
   expectPageFillsTheScreen,
+  setAutonomy,
   signIn,
 } from "./helpers";
 
@@ -99,6 +100,7 @@ test("someone drafts a CV, sees the lines that can't be traced to their profile,
 }, testInfo) => {
   const phone = testInfo.project.name === "phone";
   await signIn(page);
+  await setAutonomy(page, "find_only");
   const tag = `${testInfo.project.name}-${String(testInfo.retry)}-${Date.now().toString(36)}`;
   expect(await callApi(page, "PUT", "/api/v1/profile", profile(tag))).toBe(200);
   const id = await addJob(page, tag, "shortlisted");
@@ -272,6 +274,7 @@ test("Draft the CV is off, with its reason, until the job is shortlisted", async
   page,
 }, testInfo) => {
   await signIn(page);
+  await setAutonomy(page, "find_only");
   const tag = `${testInfo.project.name}-${String(testInfo.retry)}-${Date.now().toString(36)}`;
   const id = await addJob(page, tag, "found");
   await page.goto(`/pipeline/${id}/prepare`);

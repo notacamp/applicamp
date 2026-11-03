@@ -65,6 +65,17 @@ export async function signIn(page: Page) {
 }
 
 /**
+ * How much the app does by itself for the shared demo person (ADR 0010):
+ * the click-by-click specs keep "find_only", the spec about preparing by
+ * itself "prepare". Specs run one at a time (`workers: 1`).
+ */
+export async function setAutonomy(page: Page, autonomy: "find_only" | "prepare") {
+  expect(await callApi(page, "PUT", "/api/v1/goals", { roles: ["Staff engineer"], autonomy })).toBe(
+    200,
+  );
+}
+
+/**
  * Calls the API from the signed-in page (the session cookie and the CSRF
  * header, as the app sends them); the answer's status.
  */

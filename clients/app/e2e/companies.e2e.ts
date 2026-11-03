@@ -40,7 +40,9 @@ function profile(project: string) {
     projects: [],
   };
 }
-const GOALS = { roles: ["Staff engineer"], work_mode: ["remote"] };
+// "Find only": a job shortlisted here is not prepared by itself (that is
+// prepare-by-itself.e2e.ts), so nothing reads a found company's site.
+const GOALS = { roles: ["Staff engineer"], work_mode: ["remote"], autonomy: "find_only" };
 
 /** The status of search `id`, as the latest-search answer says it (`null` when it is another). */
 function statusOf(page: Page, id: string) {

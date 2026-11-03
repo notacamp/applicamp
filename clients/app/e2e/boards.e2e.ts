@@ -22,7 +22,9 @@ const PROFILE = {
   certificates: [],
   projects: [],
 };
-const GOALS = { roles: ["Staff engineer"], work_mode: ["remote"] };
+// "Find only": a job shortlisted here is not prepared by itself (that is
+// prepare-by-itself.e2e.ts), so nothing reads a found company's site.
+const GOALS = { roles: ["Staff engineer"], work_mode: ["remote"], autonomy: "find_only" };
 
 test("the boards searches read are ranked by salary, a candidate waits with its check, the Scanned view shows a search, and a match credits its board", async ({
   page,

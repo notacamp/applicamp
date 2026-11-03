@@ -12,9 +12,9 @@ is collected and never read. ADR 0010: the app does the work first; approvals an
 
 ## What changes
 - **The website is found, then asked.** After the person's, the board's and the apply link's:
-  a link or email address in the posting whose domain is the company's, then up to three
-  domains made from the company's name, each kept only when its robots.txt allows its home page
-  and that page names the company. No model call. The page says where the site came from, and
+  a link or email address in the posting whose domain is the company's name, then at most three
+  home pages asked (the posting's other domains, then domains made from the company's name), each
+  kept only when its robots.txt allows its home page and that page names the company. No model call. The page says where the site came from, and
   the person can change it (their address always wins and re-reads). Asked only when none fits.
 - **Shortlisting starts a chain** when the Autonomy goal is "Prepare" (or not answered):
   read the company and compare the job → stop while a question is open → draft the CV. Approving

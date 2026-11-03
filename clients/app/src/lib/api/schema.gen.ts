@@ -614,7 +614,9 @@ export interface paths {
          * Change an opportunity.
          * @description Its stage, next step, notes, "Not for me" (`dismissed`), or that it was
          *     opened (no longer new). Title, company and place can be typed only for
-         *     one added by a link to a site that is not a job board.
+         *     one added by a link to a site that is not a job board. Shortlisting a job
+         *     starts its preparation when the person's Autonomy goal lets the app
+         *     prepare by itself; moving it back to Found or "Not for me" stops it.
          */
         patch: operations["pipeline.update"];
         trace?: never;
@@ -631,8 +633,11 @@ export interface paths {
          * @description What a tailored CV for it would be based on, as it is now: the company's
          *     site (or that the person has to type it), the facts read on it, what the
          *     job wants most, the questions where the profile is thin, what each step
-         *     costs and what was spent. **Never calls the model and never fetches.**
-         *     Another account's opportunity is not found.
+         *     costs and what was spent, and what the app does by itself for it. **Never
+         *     calls the model and never fetches**; opening it may start the preparation
+         *     of a shortlisted job that was never prepared, or its next step once what it
+         *     waited on is done (it runs in the background). Another account's
+         *     opportunity is not found.
          */
         get: operations["pipeline.brief"];
         put?: never;
@@ -831,9 +836,12 @@ export interface paths {
          *     facts not removed and the profile; each line cites the profile sources it
          *     comes from, and the server then checks that it says nothing they do not.
          *     The model never sees a name or contact details. Needs the opportunity at
-         *     Shortlisted or later. At most 10 drafts per opportunity and 20 per account
-         *     per UTC day; nothing retries past a limit. A new draft puts the earlier
-         *     unapproved one away.
+         *     Shortlisted or later. When the job was never compared, the company is read
+         *     and the job compared first (up to two more calls, as Read does), so the
+         *     draft knows what the job wants; a company that cannot be read does not stop
+         *     the draft. At most 10 drafts per opportunity and 20 per account per UTC
+         *     day; nothing retries past a limit. A new draft puts the earlier unapproved
+         *     one away.
          */
         post: operations["pipeline.cv_draft"];
         delete?: never;
@@ -1182,6 +1190,51 @@ export interface paths {
         get: operations["pipeline.letter_pdf"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/prepare/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Prepare this job by itself, again.
+         * @description Queues the preparation from its first step (each step that is already done
+         *     is skipped without a model call): after Stop, after a cap or a limit
+         *     stopped it, or after a step failed (Try again). Needs the job at
+         *     Shortlisted or later, a model, and an Autonomy goal other than "Find
+         *     only". Runs in the background; the brief says where it is.
+         */
+        post: operations["pipeline.prepare_start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/prepare/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop preparing this job by itself.
+         * @description What is still to run does not run; what was made stays (a draft is still
+         *     there to approve or discard). "Prepare by itself" starts it again.
+         */
+        post: operations["pipeline.prepare_stop"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2628,6 +2681,12 @@ export interface components {
             latest_role?: components["schemas"]["RoleRef"] | null;
             /** Format: uuid */
             opportunity_id: string;
+            preparation?: components["schemas"]["Preparation"] | null;
+            /**
+             * @description The app prepares shortlisted jobs by itself: the person's Autonomy goal
+             *     is "Prepare" (or not answered) and a model is set up.
+             */
+            prepares_by_itself: boolean;
             /** @description The questions, in the order they are asked. */
             questions: components["schemas"]["BriefQuestion"][];
             read?: components["schemas"]["CompanyRead"] | null;
@@ -4171,6 +4230,53 @@ export interface components {
          * @enum {string}
          */
         Period: "year" | "month";
+        /** @description What the app does by itself for a job. */
+        Preparation: {
+            /** @description The steps done by itself, oldest first. */
+            done: components["schemas"]["PreparedStep"][];
+            /**
+             * @description Why it stopped or failed: a problem code (`cv_drafts_daily_cap`,
+             *     `ai_budget_reached`, `find_only`, `stopped`, `not_shortlisted`…).
+             */
+            reason?: string | null;
+            /**
+             * Format: double
+             * @description About what they cost, in euros.
+             */
+            spent_eur: number;
+            state: components["schemas"]["PreparationState"];
+            /** @description The step to run next, or the one that stopped or failed. */
+            step: components["schemas"]["PreparationStep"];
+            /** Format: date-time */
+            updated_at: string;
+            waiting_on?: components["schemas"]["WaitingOn"] | null;
+        };
+        /**
+         * @description Where a job's preparation is.
+         * @enum {string}
+         */
+        PreparationState: "queued" | "running" | "waiting" | "done" | "stopped" | "failed";
+        /**
+         * @description A step of the preparation.
+         * @enum {string}
+         */
+        PreparationStep: "read" | "draft" | "letter";
+        /** @description A step done by itself. */
+        PreparedStep: {
+            /** Format: date-time */
+            at: string;
+            /**
+             * Format: double
+             * @description About what it cost, in euros.
+             */
+            eur: number;
+            /**
+             * @description `site` (found the company's website, no model), `read` (read the
+             *     company), `compare` (compared the job), `draft` (drafted the CV) or
+             *     `letter` (wrote the letter).
+             */
+            step: string;
+        };
         /**
          * @description RFC 9457 problem details.
          * @example {
@@ -4774,7 +4880,7 @@ export interface components {
          * @description Where the company's site came from.
          * @enum {string}
          */
-        SiteOrigin: "board" | "apply_host" | "person";
+        SiteOrigin: "board" | "apply_host" | "person" | "posting_link" | "posting_email" | "name_guess";
         /** @description An employer's own website, typed. */
         SiteRequest: {
             /** @description An http or https address; only its host (and port) is kept. */
@@ -4965,6 +5071,8 @@ export interface components {
              * @description How strong the profile is, 0 to 100 (80 or more is strong).
              */
             profile_strength: number;
+            /** @description Jobs prepared by the app that wait on the person, oldest first. */
+            waiting_on_you: components["schemas"]["TodayWaiting"][];
         };
         /** @description The goals, on Today. */
         TodayGoals: {
@@ -5009,6 +5117,20 @@ export interface components {
             stopped?: components["schemas"]["SearchStop"] | null;
             trigger: components["schemas"]["SearchTrigger"];
         };
+        /** @description A job the app prepared as far as it could: it waits on the person. */
+        TodayWaiting: {
+            company: string;
+            /** Format: uuid */
+            opportunity_id: string;
+            /**
+             * Format: date-time
+             * @description Since when.
+             */
+            since: string;
+            title: string;
+            /** @description What it waits on. */
+            waiting_on: components["schemas"]["WaitingOn"];
+        };
         /** @description One tool call. */
         ToolCall: {
             /** @description The arguments, matching the tool's schema. */
@@ -5023,6 +5145,11 @@ export interface components {
         ToolResult: {
             result: unknown;
         };
+        /**
+         * @description What a preparation waits on.
+         * @enum {string}
+         */
+        WaitingOn: "site" | "answers" | "cv_approval" | "letter_approval";
         /**
          * @description What a company's jobs are read from.
          * @enum {string}
@@ -6580,7 +6707,10 @@ export interface operations {
     };
     "pipeline.update": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description A language tag such as `pt-PT`; English when left out. */
+                locale?: string;
+            };
             header?: never;
             path: {
                 /** @description The opportunity. */
@@ -6643,7 +6773,10 @@ export interface operations {
     };
     "pipeline.brief": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description A language tag such as `pt-PT`; English when left out. */
+                locale?: string;
+            };
             header?: never;
             path: {
                 /** @description The opportunity. */
@@ -8129,6 +8262,109 @@ export interface operations {
                 };
                 content: {
                     "application/pdf": components["schemas"]["PdfFile"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.prepare_start": {
+        parameters: {
+            query?: {
+                /** @description A language tag such as `pt-PT`; English when left out. */
+                locale?: string;
+            };
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The brief, with the preparation queued. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Brief"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `stage_too_early`; `find_only` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `ai_unavailable` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.prepare_stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The brief, with the preparation stopped. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Brief"];
                 };
             };
             /** @description `session_required` */

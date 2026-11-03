@@ -748,18 +748,29 @@ fn checked(text: Option<&str>, most: usize, name: &str) -> Result<Option<String>
     Ok(tidy(text, most))
 }
 
+/// The language the person uses, for the questions of a preparation that
+/// shortlisting starts.
+#[derive(Debug, Default, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct UpdateQuery {
+    /// A language tag such as `pt-PT`; English when left out.
+    locale: Option<String>,
+}
+
 /// Change an opportunity.
 ///
 /// Its stage, next step, notes, "Not for me" (`dismissed`), or that it was
 /// opened (no longer new). Title, company and place can be typed only for
-/// one added by a link to a site that is not a job board.
+/// one added by a link to a site that is not a job board. Shortlisting a job
+/// starts its preparation when the person's Autonomy goal lets the app
+/// prepare by itself; moving it back to Found or "Not for me" stops it.
 #[utoipa::path(
     patch,
     path = "/api/v1/opportunities/{id}",
     tag = "pipeline",
     operation_id = "pipeline.update",
     security(("session" = [])),
-    params(("id" = Uuid, Path, description = "The opportunity.")),
+    params(("id" = Uuid, Path, description = "The opportunity."), UpdateQuery),
     request_body = OpportunityChanges,
     responses(
         (status = 200, description = "The opportunity, changed.", body = Opportunity),
@@ -776,7 +787,9 @@ fn checked(text: Option<&str>, most: usize, name: &str) -> Result<Option<String>
 pub async fn update(
     State(state): State<AppState>,
     SignedIn(principal): SignedIn,
+    Extension(deps): Extension<PipelineDeps>,
     Path(id): Path<Uuid>,
+    Query(query): Query<UpdateQuery>,
     body: std::result::Result<Json<OpportunityChanges>, JsonRejection>,
 ) -> Result<Json<Opportunity>> {
     let Json(changes) =
@@ -829,6 +842,7 @@ pub async fn update(
         Some(true) => row.opened_at.or(Some(now)),
         _ => row.opened_at,
     };
+    let (previous_stage, previous_dismissed) = (row.stage.clone(), row.dismissed);
     let changed = stage != row.stage
         || dismissed != row.dismissed
         || next_step != row.next_step
@@ -858,7 +872,16 @@ pub async fn update(
     .bind(updated_at)
     .fetch_one(&mut *tx)
     .await?;
+    let was_on = previous_stage != "found" && !previous_dismissed;
+    let is_on = stage != "found" && !dismissed;
+    if was_on && !is_on {
+        crate::features::prepare::cancel(&mut tx, id, "not_shortlisted", now).await?;
+    }
     tx.commit().await?;
+    if !was_on && is_on {
+        let locale = query.locale.as_deref();
+        crate::features::prepare::begin(&deps, &state.db, account, id, locale, now).await;
+    }
     if changed {
         tracing::info!(opportunity = %id, stage = %stage, dismissed, "opportunity changed");
     }

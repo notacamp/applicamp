@@ -31,6 +31,11 @@
 //!   version (`/api/v1/opportunities/{id}/cv/versions/{n}/pdf`); a new template
 //!   or length is a new version, with no AI call; `/api/v1/cvs` lists them all.
 //!
+//! - **Prepare by itself** (#70, ADR 0010): shortlisting a job starts a
+//!   background job that finds the company's site, reads it, compares the job
+//!   and drafts the CV, then the letter once the CV is approved, waiting on
+//!   the person for answers and approvals (`/api/v1/opportunities/{id}/prepare…`).
+//!
 //! Publishes `pipeline.opportunity_added` (ids only).
 
 #![forbid(unsafe_code)]
@@ -76,7 +81,7 @@ impl std::fmt::Debug for PipelineDeps {
 
 /// The pipeline module, composed with `deps`.
 pub fn module(deps: PipelineDeps) -> Module {
-    use features::{brief, cv, opportunities, today};
+    use features::{brief, cv, opportunities, prepare, today};
     let router = OpenApiRouter::new()
         .routes(routes!(opportunities::list, opportunities::add))
         .routes(routes!(opportunities::get, opportunities::update))
@@ -106,13 +111,16 @@ pub fn module(deps: PipelineDeps) -> Module {
         .routes(routes!(cv::letter::approve))
         .routes(routes!(cv::letter::discard))
         .routes(routes!(cv::letter::pdf_file))
+        .routes(routes!(prepare::start))
+        .routes(routes!(prepare::stop))
         .routes(routes!(today::get))
-        .layer(Extension(deps));
+        .layer(Extension(deps.clone()));
     Module {
         name: NAME,
         router,
         background: Background::new()
             .job::<cv::ExpireCvDrafts>()
+            .job_with::<prepare::Prepare, _>(deps)
             .publishes::<events::OpportunityAdded>(),
         kinds: Vec::new(),
     }

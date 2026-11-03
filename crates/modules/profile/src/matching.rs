@@ -185,6 +185,14 @@ async fn goals_of(db: &PgPool, account: Uuid) -> Result<Option<(Goals, i32)>> {
     Ok(row.map(|(goals, version)| (goals.0, version)))
 }
 
+/// `account`'s Autonomy goal: how much agents may do alone. None while it
+/// is not answered.
+pub async fn autonomy(db: &PgPool, account: Uuid) -> Result<Option<crate::goals::Autonomy>> {
+    Ok(goals_of(db, account)
+        .await?
+        .and_then(|(goals, _)| goals.autonomy))
+}
+
 /// Where a weak profile should go next: the heaviest part that is missing.
 fn next_action(strength: &Strength) -> Option<ProfileAction> {
     if strength.is_strong() {

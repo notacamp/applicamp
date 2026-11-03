@@ -246,6 +246,27 @@ async fn read_site_on(
     Ok(read)
 }
 
+/// The text of `site`'s home page, where its robots.txt allows: one page and
+/// its robots.txt, never another host (a redirect to one is unreachable).
+/// Used to check that a site found for a company names it.
+pub async fn home_text(reader: &Reader, site: &Url) -> Result<String, Failure> {
+    let mut rules = Rules::new(reader);
+    match rules.allows(site).await {
+        Ok(true) => {}
+        Ok(false) => return Err(Failure::RobotsDisallows),
+        Err(_) => return Err(Failure::Unreachable),
+    }
+    let home = match reader.page(site, MAX_PAGE).await {
+        Ok(Some(page)) if same_site(&page.url, site) => page,
+        Ok(_) | Err(_) => return Err(Failure::Unreachable),
+    };
+    let text = html_to_text(&String::from_utf8_lossy(&home.body));
+    if text.trim().is_empty() {
+        return Err(Failure::NothingReadable);
+    }
+    Ok(text)
+}
+
 fn push(read: &mut SiteRead, url: Url, body: &[u8], kind: Kind, now: DateTime<Utc>) {
     let text = html_to_text(&String::from_utf8_lossy(body));
     if text.trim().is_empty() {

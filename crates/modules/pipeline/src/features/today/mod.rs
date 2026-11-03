@@ -14,6 +14,7 @@ use uuid::Uuid;
 
 use crate::{
     PipelineDeps,
+    features::prepare::WaitingOn,
     ports::{ProfileStatus, SearchLine},
 };
 
@@ -181,6 +182,18 @@ pub enum NextStep {
     None,
 }
 
+/// A job the app prepared as far as it could: it waits on the person.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct TodayWaiting {
+    pub opportunity_id: Uuid,
+    pub title: String,
+    pub company: String,
+    /// What it waits on.
+    pub waiting_on: WaitingOn,
+    /// Since when.
+    pub since: DateTime<Utc>,
+}
+
 /// Where the person is.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct Today {
@@ -197,6 +210,8 @@ pub struct Today {
     pub new_matches: u32,
     /// The latest search, if any.
     pub latest_search: Option<TodaySearch>,
+    /// Jobs prepared by the app that wait on the person, oldest first.
+    pub waiting_on_you: Vec<TodayWaiting>,
     pub next_step: NextStep,
 }
 
@@ -253,7 +268,32 @@ pub async fn get(
     .fetch_one(&state.db)
     .await?;
     let new_matches = u32::try_from(new_matches).unwrap_or(u32::MAX);
+    let waiting: Vec<(Uuid, String, String, String, DateTime<Utc>)> = sqlx::query_as(
+        "SELECT o.id, o.title, o.company, p.waiting_on, p.updated_at
+           FROM pipeline.preparations p
+           JOIN pipeline.opportunities o ON o.id = p.opportunity_id
+          WHERE p.account_id = $1 AND o.account_id = $1 AND p.state = 'waiting'
+            AND p.waiting_on IS NOT NULL AND NOT o.dismissed AND o.stage <> 'found'
+          ORDER BY p.updated_at, o.id
+          LIMIT 20",
+    )
+    .bind(account)
+    .fetch_all(&state.db)
+    .await?;
+    let waiting_on_you = waiting
+        .into_iter()
+        .filter_map(|(id, title, company, on, since)| {
+            Some(TodayWaiting {
+                opportunity_id: id,
+                title,
+                company,
+                waiting_on: WaitingOn::parse(&on)?,
+                since,
+            })
+        })
+        .collect();
     Ok(Json(Today {
+        waiting_on_you,
         next_step: next_step(&status, latest.is_some(), new_matches),
         profile: TodayProfile {
             done: status.profile_done,

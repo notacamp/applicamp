@@ -116,7 +116,7 @@ pub async fn facts(
     if !fresh {
         fetch_and_store(
             deps,
-            state,
+            db,
             account,
             name,
             &site,

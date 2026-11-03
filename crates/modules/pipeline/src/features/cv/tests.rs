@@ -14,11 +14,11 @@ use crate::{
     testkit::{Fake, Harness, Model},
 };
 
-pub(super) const FACT_ID: &str = "aaaa1111-0000-4000-8000-000000000001";
-pub(super) const COMPANY_FACT: &str = "Builds ledgers for small shops";
-pub(super) const CV: &str = "You write a one-page CV";
+pub(crate) const FACT_ID: &str = "aaaa1111-0000-4000-8000-000000000001";
+pub(crate) const COMPANY_FACT: &str = "Builds ledgers for small shops";
+pub(crate) const CV: &str = "You write a one-page CV";
 
-pub(super) fn profile() -> CvProfile {
+pub(crate) fn profile() -> CvProfile {
     CvProfile {
         contact: CvContact {
             name: Some("Alex Demo".into()),
@@ -84,7 +84,7 @@ pub(super) fn profile() -> CvProfile {
 /// What the fake model answers: a reworded bullet citing a kept fact, a
 /// highlight unchanged, a number nobody wrote, a company fact as an
 /// achievement, a skill off the profile, and a role left out (the third).
-pub(super) fn answer() -> Value {
+pub(crate) fn answer() -> Value {
     json!({
         "headline": { "text": "Backend engineer who ships billing systems", "sources": ["hl"] },
         "summary": {
@@ -113,7 +113,7 @@ struct Stack {
     opp: String,
 }
 
-pub(super) async fn add(h: &Harness, stage: &str) -> String {
+pub(crate) async fn add(h: &Harness, stage: &str) -> String {
     let (status, body) = h
         .json(
             "POST",
@@ -148,7 +148,7 @@ pub(super) async fn add(h: &Harness, stage: &str) -> String {
 
 /// A company fact on the opportunity's company, so the model can cite it
 /// (its source id is `cab12cd34`).
-pub(super) async fn company_fact(h: &Harness) {
+pub(crate) async fn company_fact(h: &Harness) {
     let company = Uuid::now_v7();
     sqlx::query(
         "INSERT INTO pipeline.companies (id, account_id, key, name, created_at, updated_at)

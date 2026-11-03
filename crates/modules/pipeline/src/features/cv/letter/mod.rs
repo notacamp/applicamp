@@ -550,6 +550,32 @@ pub async fn create(
     let account = principal.account_id;
     let now = state.clock.now();
     let db = &state.db;
+    write(
+        &deps,
+        db,
+        account,
+        id,
+        request.language.as_deref(),
+        request.size.unwrap_or_default(),
+        now,
+    )
+    .await?;
+    let opp = load(db, account, id).await?;
+    Ok(Json(build(&deps, db, account, &opp, now).await?))
+}
+
+/// Write a draft of `id`'s cover letter (**one model call**), with the same
+/// checks and caps as "Write the cover letter": the endpoint's and the
+/// preparation's one way in.
+pub(crate) async fn write(
+    deps: &PipelineDeps,
+    db: &PgPool,
+    account: Uuid,
+    id: Uuid,
+    language: Option<&str>,
+    size: LetterSize,
+    now: DateTime<Utc>,
+) -> Result<()> {
     let opp = load(db, account, id).await?;
     if opp.stage == "found" {
         return Err(Error::Conflict(
@@ -568,7 +594,7 @@ pub async fn create(
         Some(gateway) if gateway.is_configured(Role::Complete) => gateway,
         _ => return Err(Error::Unavailable(applicamp_ai::AI_UNAVAILABLE)),
     };
-    let neighbours = neighbours(&deps)?;
+    let neighbours = neighbours(deps)?;
     if drafts_here(db, opp.id).await? >= CAP_PER_OPPORTUNITY {
         return Err(Error::TooManyRequests(
             "letter_drafts_per_opportunity_cap",
@@ -612,8 +638,7 @@ pub async fn create(
         None => Vec::new(),
     };
     let frame = Frame::build(&profile, &opp.company, &facts);
-    let language = language_of(request.language.as_deref(), &opp);
-    let size = request.size.unwrap_or_default();
+    let language = language_of(language, &opp);
     let posting = opp.description.clone().unwrap_or_default();
     let questions = questions::parse(&posting);
     let cv_words = cv_words(&cv.content.0);
@@ -689,7 +714,7 @@ pub async fn create(
         flagged = checks.len(),
         "a cover letter drafted"
     );
-    Ok(Json(build(&deps, db, account, &opp, now).await?))
+    Ok(())
 }
 
 /// The words of the approved CV the letter is written next to: its headline,
@@ -1126,6 +1151,7 @@ pub async fn approve(
     .await?;
     tx.commit().await?;
     tracing::info!(version, pages = made.pages, "a cover letter approved");
+    crate::features::prepare::nudge(&deps, &state.db, account, opp.id, now).await;
     Ok(Json(build(&deps, &state.db, account, &opp, now).await?))
 }
 

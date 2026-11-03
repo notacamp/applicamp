@@ -18,8 +18,9 @@
 //!   what was left out as the profile has it. Approve freezes the draft as a
 //!   version; part B (#38) renders it as a PDF.
 //!
-//! Every model call starts with a click; nothing runs in the background but
-//! the sweep of drafts nobody approved. At most [`CAP_PER_OPPORTUNITY`]
+//! Every model call starts with a click, or with the preparation of a job the
+//! person shortlisted ([`crate::features::prepare`]); nothing runs on a timer
+//! but the sweep of drafts nobody approved. At most [`CAP_PER_OPPORTUNITY`]
 //! drafts per opportunity and [`CAP_PER_DAY`] per account per UTC day, all
 //! through the AI budget.
 
@@ -30,7 +31,7 @@ pub mod model;
 pub mod pdf;
 pub mod prompt;
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 pub mod versions;
 pub mod view;
 
@@ -645,9 +646,12 @@ pub async fn get(
 /// facts not removed and the profile; each line cites the profile sources it
 /// comes from, and the server then checks that it says nothing they do not.
 /// The model never sees a name or contact details. Needs the opportunity at
-/// Shortlisted or later. At most 10 drafts per opportunity and 20 per account
-/// per UTC day; nothing retries past a limit. A new draft puts the earlier
-/// unapproved one away.
+/// Shortlisted or later. When the job was never compared, the company is read
+/// and the job compared first (up to two more calls, as Read does), so the
+/// draft knows what the job wants; a company that cannot be read does not stop
+/// the draft. At most 10 drafts per opportunity and 20 per account per UTC
+/// day; nothing retries past a limit. A new draft puts the earlier unapproved
+/// one away.
 #[utoipa::path(
     post,
     path = "/api/v1/opportunities/{id}/cv/drafts",
@@ -685,6 +689,38 @@ pub async fn create(
     let now = state.clock.now();
     let db = &state.db;
     let opp = load(db, account, id).await?;
+    if opp.stage != "found" && !brief::was_compared(db, opp.id).await? {
+        // Read first, so the draft knows what the job wants (#70). A read that
+        // cannot happen leaves the draft to go on without it.
+        let language = request.language.as_deref();
+        if let Err(e) =
+            brief::read_and_compare(&deps, db, account, opp.id, language, true, now).await
+        {
+            if matches!(
+                e.code(),
+                "ai_daily_limit_reached" | "ai_budget_reached" | "ai_unavailable"
+            ) {
+                return Err(e);
+            }
+            tracing::info!(error = e.code(), "a CV is drafted without reading first");
+        }
+    }
+    draft(&deps, db, account, opp.id, request.language.as_deref(), now).await?;
+    let opp = load(db, account, id).await?;
+    Ok(Json(build(&deps, db, account, &opp, now).await?))
+}
+
+/// Make a draft of `id`'s CV (**one model call**), with the same checks and
+/// caps as "Draft the CV": the endpoint's and the preparation's one way in.
+pub(crate) async fn draft(
+    deps: &PipelineDeps,
+    db: &PgPool,
+    account: Uuid,
+    id: Uuid,
+    language: Option<&str>,
+    now: DateTime<Utc>,
+) -> Result<()> {
+    let opp = load(db, account, id).await?;
     if opp.stage == "found" {
         return Err(Error::Conflict(
             "stage_too_early",
@@ -695,7 +731,7 @@ pub async fn create(
         Some(gateway) if gateway.is_configured(Role::Complete) => gateway,
         _ => return Err(Error::Unavailable(applicamp_ai::AI_UNAVAILABLE)),
     };
-    let neighbours = neighbours(&deps)?;
+    let neighbours = neighbours(deps)?;
     if drafts_here(db, opp.id).await? >= CAP_PER_OPPORTUNITY {
         return Err(Error::TooManyRequests(
             "cv_drafts_per_opportunity_cap",
@@ -737,7 +773,7 @@ pub async fn create(
         None => Vec::new(),
     };
     let frame = Frame::build(&profile, &opp.company, &facts);
-    let language = language_of(request.language.as_deref(), &opp);
+    let language = language_of(language, &opp);
     let user = prompt::message(
         &opp.title,
         &opp.company,
@@ -804,7 +840,7 @@ pub async fn create(
         flagged = checks.len(),
         "a CV drafted"
     );
-    Ok(Json(build(&deps, db, account, &opp, now).await?))
+    Ok(())
 }
 
 /// Change one line of a draft.
@@ -1275,6 +1311,7 @@ pub async fn approve(
     .await?;
     tx.commit().await?;
     tracing::info!(version, pages = made.pages, "a CV approved");
+    crate::features::prepare::nudge(&deps, &state.db, account, opp.id, now).await;
     Ok(Json(build(&deps, &state.db, account, &opp, now).await?))
 }
 

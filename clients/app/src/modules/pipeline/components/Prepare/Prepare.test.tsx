@@ -141,7 +141,7 @@ describe("Prepare: what the app did by itself", () => {
     expect(done).toHaveTextContent("drafted the CV");
     expect(done).toHaveTextContent("about €0.006 in all");
     const user = userEvent.setup();
-    await user.click(screen.getByTestId("prepare-review"));
+    await user.click(screen.getByTestId("prepare-by-itself-review"));
     expect(onReview).toHaveBeenCalledOnce();
 
     await user.click(screen.getByTestId("prepare-stop"));

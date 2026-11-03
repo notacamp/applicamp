@@ -76,7 +76,7 @@ export function PreparationPanel({ id, brief, onReview }: PreparationPanelProps)
           company={company}
           stopButton={stopButton}
           review={
-            <Button variant="primary" data-testid="prepare-review" onClick={onReview}>
+            <Button variant="primary" data-testid="prepare-by-itself-review" onClick={onReview}>
               {t("prepare.byItself.review")}
             </Button>
           }

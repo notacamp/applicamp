@@ -117,13 +117,13 @@ pub enum Failure {
 }
 
 /// The robots rules of each host asked in one reading.
-struct Rules<'a> {
+pub(crate) struct Rules<'a> {
     reader: &'a Reader,
     by_host: HashMap<String, Vec<RobotsRule>>,
 }
 
 impl<'a> Rules<'a> {
-    fn new(reader: &'a Reader) -> Self {
+    pub(crate) fn new(reader: &'a Reader) -> Self {
         Self {
             reader,
             by_host: HashMap::new(),
@@ -132,7 +132,7 @@ impl<'a> Rules<'a> {
 
     /// Whether we may read `url`. A missing robots.txt allows everything; one
     /// that cannot be fetched at all means we do not know, so we do not read.
-    async fn allows(&mut self, url: &Url) -> Result<bool, FetchError> {
+    pub(crate) async fn allows(&mut self, url: &Url) -> Result<bool, FetchError> {
         let key = format!(
             "{}:{}",
             url.host_str().unwrap_or_default().to_ascii_lowercase(),

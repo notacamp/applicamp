@@ -583,6 +583,82 @@ pub async fn set_reasons(
     Ok(done.rows_affected() == 1)
 }
 
+/// The slug under which a watched company's own job board is credited on an
+/// opportunity (`opportunity_sources.board`); the sources module adds it.
+pub const OWN_BOARD: &str = "company-board";
+
+/// A match of a person's, for the company watchers.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct MatchRow {
+    pub id: Uuid,
+    pub company: String,
+    pub site: Option<String>,
+    pub title: String,
+    pub url: String,
+    pub apply_url: Option<String>,
+    pub match_score: i32,
+    pub shortlisted: bool,
+    pub created_at: DateTime<Utc>,
+    pub work_mode: Option<String>,
+    pub location: Option<String>,
+    pub region_note: Option<String>,
+    pub salary_text: Option<String>,
+    pub description: String,
+}
+
+/// `account`'s matches found since `since`: found by a search, not hidden by
+/// a requirement and not dismissed; with the company's site when it is on
+/// record. Oldest first.
+pub async fn matches_since(
+    db: &PgPool,
+    account: Uuid,
+    since: DateTime<Utc>,
+) -> Result<Vec<MatchRow>> {
+    Ok(sqlx::query_as(
+        "SELECT o.id, o.company, c.site, o.title, o.url, o.apply_url,
+                o.match_score, o.stage IN ('shortlisted', 'applying', 'applied', 'talking',
+                                           'interview', 'offer') AS shortlisted,
+                o.created_at, o.work_mode, o.location, o.region_note, o.salary_text,
+                left(coalesce(o.description, ''), 4000) AS description
+           FROM pipeline.opportunities o
+           LEFT JOIN pipeline.companies c
+             ON c.account_id = o.account_id
+            AND c.key = lower(regexp_replace(btrim(o.company), '[[:space:]]+', ' ', 'g'))
+          WHERE o.account_id = $1 AND o.created_at >= $2 AND o.match_score IS NOT NULL
+            AND o.source <> 'link' AND NOT o.dismissed AND o.hidden_reason IS NULL
+          ORDER BY o.created_at, o.id",
+    )
+    .bind(account)
+    .bind(since)
+    .fetch_all(db)
+    .await?)
+}
+
+/// A fact read on a company's site, with the company.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct FactRow {
+    pub id: Uuid,
+    pub company: String,
+    pub text: String,
+}
+
+/// The facts read on the companies named `names` for `account`, not
+/// removed, oldest first.
+pub async fn company_facts(db: &PgPool, account: Uuid, names: &[String]) -> Result<Vec<FactRow>> {
+    let keys: Vec<String> = names.iter().map(|n| companies::key_of(n)).collect();
+    Ok(sqlx::query_as(
+        "SELECT f.id, c.name AS company, f.text
+           FROM pipeline.company_facts f
+           JOIN pipeline.companies c ON c.id = f.company_id
+          WHERE f.account_id = $1 AND NOT f.removed AND c.key = ANY($2)
+          ORDER BY f.created_at, f.id",
+    )
+    .bind(account)
+    .bind(&keys)
+    .fetch_all(db)
+    .await?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

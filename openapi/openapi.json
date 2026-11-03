@@ -1278,6 +1278,374 @@
         ]
       }
     },
+    "/api/v1/companies": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "The companies.",
+        "description": "The companies whose jobs keep fitting the signed-in person (at least two\nmatches, or one they shortlisted, in the last eight weeks), each with\nreasons traced to the postings they come from, and the companies they\nwatch, with their job board, open jobs and last check. Suggestions are\nworked out from the person's matches, with no model.",
+        "operationId": "sources.companies",
+        "responses": {
+          "200": {
+            "description": "The suggestions and the watched companies.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Watch a company yourself.",
+        "description": "Paste the company's careers page (or a link to its Greenhouse, Lever or\nAshby board): the company is added as one you watch, and its job board is\nlooked for the same way as for a suggestion. The page is read only where\nits robots.txt allows. 409 `watch_limit_reached` past 20.",
+        "operationId": "sources.add_company",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CareersPage"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Watching; its board is being looked for.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_url`: a public https address",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`watch_limit_reached`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{id}/careers": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Give a watched company a careers page.",
+        "description": "For a watch whose job board could not be found: the page is looked at the\nsame way (a Greenhouse, Lever or Ashby board, or schema.org `JobPosting`\ndata), where its robots.txt allows.",
+        "operationId": "sources.company_careers",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The company.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CareersPage"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Looking at the page.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_url`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{id}/not-interested": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Not interested in a company.",
+        "description": "Hides it for good: it is never suggested again.",
+        "operationId": "sources.dismiss_company",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The company.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{id}/stop": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Stop watching a company.",
+        "description": "Its job board is not read any more. It is not suggested again; watch it\nagain by pasting its careers page.",
+        "operationId": "sources.stop_watching_company",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The company.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stopped.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{id}/watch": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Watch a suggested company.",
+        "description": "Moves it to the watched companies and looks for its job board in the\nbackground: the board a posting came from, else the careers page on its\nown site (robots.txt respected). At most 20 watched companies (409\n`watch_limit_reached`).",
+        "operationId": "sources.watch_company",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The company.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Watching; its board is being looked for.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`watch_limit_reached`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/v1/cvs": {
       "get": {
         "tags": [
@@ -8345,6 +8713,19 @@
           }
         }
       },
+      "CareersPage": {
+        "type": "object",
+        "description": "A careers page (or a link to a job board) someone pasted.",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Its address."
+          }
+        }
+      },
       "CashFloor": {
         "type": "object",
         "description": "The least they would take, before tax.",
@@ -8561,6 +8942,92 @@
           }
         },
         "additionalProperties": false
+      },
+      "CompanyHit": {
+        "type": "object",
+        "description": "A job that fits, found on the own job board of a company the person\nwatches, not opened yet.",
+        "required": [
+          "id",
+          "company",
+          "title",
+          "found_at"
+        ],
+        "properties": {
+          "company": {
+            "type": "string"
+          },
+          "found_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was found."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The opportunity."
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "match_score": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "How well it fits, 0 to 100.",
+            "minimum": 0
+          },
+          "salary_text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pay, as the posting writes it."
+          },
+          "title": {
+            "type": "string"
+          },
+          "work_mode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`remote`, `hybrid` or `onsite`, when the posting says."
+          }
+        }
+      },
+      "CompanyList": {
+        "type": "object",
+        "description": "The suggestions and the watched companies.",
+        "required": [
+          "suggested",
+          "watching",
+          "limit"
+        ],
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Companies one person may watch at once.",
+            "minimum": 0
+          },
+          "suggested": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Suggestion"
+            }
+          },
+          "watching": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Watching"
+            }
+          }
+        }
       },
       "CompanyRead": {
         "type": "object",
@@ -12304,6 +12771,51 @@
         ],
         "description": "Why a line cannot be traced to the profile."
       },
+      "ReasonKind": {
+        "type": "string",
+        "description": "What a reason says.",
+        "enum": [
+          "shortlisted",
+          "matches",
+          "stack",
+          "remote",
+          "region",
+          "pay",
+          "fact"
+        ]
+      },
+      "ReasonSource": {
+        "type": "object",
+        "description": "Where a reason comes from.",
+        "required": [
+          "kind",
+          "id",
+          "label"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The opportunity, or the fact."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SourceKind"
+          },
+          "label": {
+            "type": "string",
+            "description": "The posting's role, or the company."
+          },
+          "score": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "How well the posting fits, 0 to 100.",
+            "minimum": 0
+          }
+        }
+      },
       "Recorded": {
         "type": "object",
         "description": "What was recorded.",
@@ -13726,6 +14238,39 @@
           }
         }
       },
+      "Suggestion": {
+        "type": "object",
+        "description": "A company worth watching.",
+        "required": [
+          "id",
+          "name",
+          "reasons"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The company."
+          },
+          "name": {
+            "type": "string"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Reason"
+            },
+            "description": "Why, each traced to a posting (or a fact read on its site)."
+          },
+          "website": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its own site."
+          }
+        }
+      },
       "Template": {
         "type": "string",
         "description": "How the CV looks.",
@@ -13742,9 +14287,17 @@
           "goals",
           "profile_strength",
           "new_matches",
+          "company_hits",
           "next_step"
         ],
         "properties": {
+          "company_hits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompanyHit"
+            },
+            "description": "Jobs that fit, found in the last days on the own job board of a\ncompany they watch, still Found and unopened; newest first."
+          },
           "goals": {
             "$ref": "#/components/schemas/TodayGoals"
           },
@@ -13935,6 +14488,94 @@
         ],
         "properties": {
           "result": {}
+        }
+      },
+      "WatchBoardKind": {
+        "type": "string",
+        "description": "What a company's jobs are read from.",
+        "enum": [
+          "greenhouse",
+          "lever",
+          "ashby",
+          "jsonld",
+          "none"
+        ]
+      },
+      "Watching": {
+        "type": "object",
+        "description": "A company the person watches.",
+        "required": [
+          "id",
+          "name",
+          "board",
+          "finding",
+          "needs_board"
+        ],
+        "properties": {
+          "board": {
+            "$ref": "#/components/schemas/WatchBoardKind",
+            "description": "How its jobs are read; `none` when no board was found."
+          },
+          "careers_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The page that lists its jobs."
+          },
+          "finding": {
+            "type": "boolean",
+            "description": "A board is being looked for."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The company."
+          },
+          "last_checked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When its board was last read (or looked for)."
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the last check failed (`http_503`, `unreachable`, `no_board`…)."
+          },
+          "name": {
+            "type": "string"
+          },
+          "needs_board": {
+            "type": "boolean",
+            "description": "No board was found: the person can paste the careers page."
+          },
+          "open_jobs": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Jobs open on the board when it was last read.",
+            "minimum": 0
+          },
+          "watching_since": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "website": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
         }
       },
       "Work": {

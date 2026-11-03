@@ -170,7 +170,15 @@
       "save": "Save the website",
       "cancel": "Cancel",
       "is": "{{company}}’s website: {{site}}",
-      "change": "Change"
+      "change": "Change",
+      "from": {
+        "board": "Given by the job board.",
+        "apply_host": "From the apply link.",
+        "person": "You typed it.",
+        "posting_link": "Found in a link in the posting.",
+        "posting_email": "Found in the posting’s email address.",
+        "name_guess": "Found from the company’s name: its home page names it."
+      }
     },
     "readLead": "Reads the posting and the company’s own website (that site only, where robots.txt allows) and makes the facts: one AI call, reused for 30 days. Then one more compares the job with your profile.",
     "read": "Read about {{company}} · about {{cost}}",
@@ -229,7 +237,7 @@
       "title": "Draft the CV",
       "lead": "The CV is drafted from these facts and your profile, and every line is checked against what your profile says."
     },
-    "costLine": "Reading a company: one AI call, about {{read}}, reused for 30 days. Comparing the job: one call, about {{analysis}}. Each answer: one small call, about {{answer}}. Nothing runs in the background.",
+    "costLine": "Reading a company: one AI call, about {{read}}, reused for 30 days. Comparing the job: one call, about {{analysis}}. Each answer: one small call, about {{answer}}. A shortlisted job is prepared by itself only when your goals say so, within the same limits.",
     "spend": {
       "reads": "Company reads today: {{n}} of {{cap}}."
     },
@@ -251,7 +259,56 @@
       "profile_needed": "Add a position to your profile first: the answer needs one to go on.",
       "no_skill": "This question isn’t about a skill.",
       "not_found": "This opportunity wasn’t found.",
-      "generic": "Something went wrong. Try again."
+      "generic": "Something went wrong. Try again.",
+      "find_only": "Your goals say the app only finds jobs. Change that in your goals first.",
+      "stage_too_early": "Shortlist this job first."
+    },
+    "byItself": {
+      "off": "Each step here starts with a click: your goals say the app only finds jobs. Choose “Prepare applications” in your goals to have shortlisted jobs prepared for you.",
+      "stop": "Stop",
+      "start": "Prepare by itself",
+      "tryAgain": "Try again",
+      "review": "Review",
+      "done": "Ready: your CV and cover letter for this job are approved.",
+      "workingLead": "Nothing goes out in your name: what it makes waits for your approval.",
+      "stoppedLead": "What was already made stays. Every step is still here as a button.",
+      "failedLead": "It isn’t retried by itself. Every step is still here as a button.",
+      "did": "Done by itself: {{steps}} · about {{cost}} in all.",
+      "working": {
+        "read": "Getting {{company}} ready: finding its website, reading it and comparing the job…",
+        "draft": "Drafting your CV for this job…",
+        "letter": "Writing your cover letter and answers for this job…"
+      },
+      "waiting": {
+        "site": "Waiting for you: {{company}}’s website wasn’t found. Type it below and the rest follows.",
+        "answers": "Waiting for your answers below: the CV is drafted once you answer or skip them, and keep or drop their facts.",
+        "cv_approval": "Your CV for this job is drafted and waits for your review.",
+        "letter_approval": "Your cover letter and answers are written and wait for your review."
+      },
+      "steps": {
+        "site": "found the website ({{date}})",
+        "read": "read the company ({{date}})",
+        "compare": "compared the job ({{date}})",
+        "draft": "drafted the CV ({{date}})",
+        "letter": "wrote the letter ({{date}})",
+        "other": "a step ({{date}})"
+      },
+      "reasons": {
+        "stopped": "You stopped preparing this job.",
+        "not_shortlisted": "Stopped: this job isn’t shortlisted any more.",
+        "find_only": "Stopped: your goals say the app only finds jobs.",
+        "company_reads_daily_cap": "Stopped: you’ve read 20 companies today. Continue tomorrow, or click Read.",
+        "cv_drafts_daily_cap": "Stopped: you’ve made 20 CV drafts today. Continue tomorrow.",
+        "cv_drafts_per_opportunity_cap": "Stopped: this job has had 10 CV drafts. Review one of them.",
+        "letter_drafts_daily_cap": "Stopped: you’ve written 20 letters today. Continue tomorrow.",
+        "letter_drafts_per_opportunity_cap": "Stopped: this job has had 10 letter drafts. Review one of them.",
+        "ai_daily_limit_reached": "Stopped: you’ve reached today’s AI limit. It continues tomorrow.",
+        "ai_budget_reached": "Stopped: you’ve reached your AI spending limit.",
+        "ai_unavailable": "Stopped: the AI isn’t set up on this server.",
+        "ai_failed": "The AI couldn’t answer this time.",
+        "profile_needed": "Stopped: add a position to your profile first.",
+        "generic": "Something went wrong while preparing this job."
+      }
     }
   },
   "cv": {

@@ -117,6 +117,37 @@ describe("Today", () => {
     expect(await screen.findByTestId("pipeline-new-only")).toBeInTheDocument();
   });
 
+  it("lists the jobs the app prepared that wait on you, each opening its Prepare page", async () => {
+    const id = "0190a1b2-0000-7000-8000-0000000000aa";
+    signedIn(
+      {
+        body: todayAnswer("none", {
+          latest_search: search(),
+          waiting_on_you: [
+            {
+              opportunity_id: id,
+              title: "Senior Ruby Developer",
+              company: "Example Apps",
+              waiting_on: "cv_approval",
+              since: "2026-11-03T10:00:00Z",
+            },
+          ],
+        }),
+      },
+      { [`GET /api/v1/opportunities/${id}`]: { status: 404, body: { code: "not_found" } } },
+    );
+    const user = userEvent.setup();
+    const { router } = renderApp("/");
+    expect(await screen.findByTestId("today-waiting")).toHaveTextContent("Prepared for you: 1");
+    expect(screen.getByTestId(`today-waiting-${id}`)).toHaveTextContent(
+      "Senior Ruby Developer · Example Apps: review your CV",
+    );
+    await user.click(screen.getByTestId(`today-waiting-open-${id}`));
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe(`/pipeline/${id}/prepare`);
+    });
+  });
+
   it("says nothing needs you only when that is true", async () => {
     signedIn({ body: todayAnswer("none", { latest_search: search() }) });
     renderApp("/");

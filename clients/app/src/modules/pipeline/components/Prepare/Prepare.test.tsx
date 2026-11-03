@@ -38,6 +38,28 @@ function brief(overrides: Partial<Brief> = {}): Brief {
     latest_role: LATEST,
     estimates: ESTIMATES,
     spend: SPEND,
+    preparation: null,
+    prepares_by_itself: false,
+    ...overrides,
+  };
+}
+
+const AT = "2026-11-03T10:00:00Z";
+
+function preparation(overrides: Partial<Schema<"Preparation">> = {}): Schema<"Preparation"> {
+  return {
+    state: "waiting",
+    step: "draft",
+    waiting_on: "cv_approval",
+    reason: null,
+    done: [
+      { step: "site", at: AT, eur: 0 },
+      { step: "read", at: AT, eur: 0.002 },
+      { step: "compare", at: AT, eur: 0.002 },
+      { step: "draft", at: AT, eur: 0.002 },
+    ],
+    spent_eur: 0.006,
+    updated_at: AT,
     ...overrides,
   };
 }
@@ -74,7 +96,7 @@ const question = (
   ...overrides,
 });
 
-function renderPage(routes: Record<string, Stub>) {
+function renderPage(routes: Record<string, Stub>, onReview = vi.fn()) {
   const requests = stubApi({
     [`GET /api/v1/opportunities/${ID}`]: { body: opportunity({ id: ID, stage: "shortlisted" }) },
     [`GET /api/v1/opportunities/${ID}/cv`]: { body: cv({ opportunity_id: ID }) },
@@ -84,7 +106,7 @@ function renderPage(routes: Record<string, Stub>) {
     <PreparePage
       id={ID}
       onBack={vi.fn()}
-      onReview={vi.fn()}
+      onReview={onReview}
       renderFacts={(answer) => <p data-testid="facts-slot">{answer.proposals.length} facts</p>}
       spend={<p data-testid="month-spend">AI this month</p>}
     />,
@@ -93,6 +115,85 @@ function renderPage(routes: Record<string, Stub>) {
 }
 
 const BRIEF = `GET /api/v1/opportunities/${ID}/brief`;
+
+describe("Prepare: what the app did by itself", () => {
+  it("says what it did and what waits on you, opens the review, and stops when asked", async () => {
+    const onReview = vi.fn();
+    let state = brief({ prepares_by_itself: true, preparation: preparation() });
+    renderPage(
+      {
+        [BRIEF]: () => ({ body: state }),
+        [`POST /api/v1/opportunities/${ID}/prepare/stop`]: () => {
+          state = brief({
+            prepares_by_itself: true,
+            preparation: preparation({ state: "stopped", waiting_on: null, reason: "stopped" }),
+          });
+          return { body: state };
+        },
+      },
+      onReview,
+    );
+    expect(await screen.findByTestId("prepare-state-waiting")).toHaveTextContent(
+      "Your CV for this job is drafted and waits for your review.",
+    );
+    const done = screen.getByTestId("prepare-done");
+    expect(done).toHaveTextContent("found the website");
+    expect(done).toHaveTextContent("drafted the CV");
+    expect(done).toHaveTextContent("about €0.006 in all");
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("prepare-review"));
+    expect(onReview).toHaveBeenCalledOnce();
+
+    await user.click(screen.getByTestId("prepare-stop"));
+    expect(await screen.findByTestId("prepare-state-stopped")).toHaveTextContent(
+      "You stopped preparing this job.",
+    );
+    expect(screen.getByTestId("prepare-start")).toHaveTextContent("Prepare by itself");
+  });
+
+  it("offers Try again after a failure, which starts it again", async () => {
+    let state = brief({
+      prepares_by_itself: true,
+      preparation: preparation({
+        state: "failed",
+        step: "read",
+        waiting_on: null,
+        reason: "ai_failed",
+        done: [],
+        spent_eur: 0,
+      }),
+    });
+    const { requests } = renderPage({
+      [BRIEF]: () => ({ body: state }),
+      [`POST /api/v1/opportunities/${ID}/prepare/start`]: () => {
+        state = brief({
+          prepares_by_itself: true,
+          preparation: preparation({ state: "queued", step: "read", waiting_on: null, done: [] }),
+        });
+        return { body: state };
+      },
+    });
+    expect(await screen.findByTestId("prepare-state-failed")).toHaveTextContent(
+      "The AI couldn’t answer this time.",
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("prepare-start"));
+    expect(await screen.findByTestId("prepare-state-queued")).toHaveTextContent(
+      "Getting Example Co ready",
+    );
+    expect(requests.map((r) => r.route)).toContain(
+      `POST /api/v1/opportunities/${ID}/prepare/start`,
+    );
+  });
+
+  it("says where the website came from, and that steps are clicks when the goals say find only", async () => {
+    renderPage({ [BRIEF]: { body: brief({ site_source: "posting_email" }) } });
+    expect(await screen.findByTestId("prepare-site-from")).toHaveTextContent(
+      "Found in the posting’s email address.",
+    );
+    expect(screen.getByTestId("prepare-by-click")).toHaveTextContent("only finds jobs");
+  });
+});
 
 describe("Prepare: company and job", () => {
   it("offers Read with its cost, asks nothing of the model on opening, and leaves a spot for the draft", async () => {

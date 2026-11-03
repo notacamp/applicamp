@@ -127,8 +127,11 @@ export function useAddOpportunity() {
   });
 }
 
-/** Changes an opportunity (`PATCH /api/v1/opportunities/{id}`): its stage, notes, "Not for me". */
-export function useUpdateOpportunity() {
+/**
+ * Changes an opportunity (`PATCH /api/v1/opportunities/{id}`): its stage, notes, "Not for me".
+ * Shortlisting may start its preparation; `language` is the one its questions are asked in.
+ */
+export function useUpdateOpportunity(language?: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -140,7 +143,7 @@ export function useUpdateOpportunity() {
     }): Promise<Opportunity> =>
       unwrap(
         await api.PATCH("/api/v1/opportunities/{id}", {
-          params: { path: { id } },
+          params: { path: { id }, query: language === undefined ? {} : { locale: language } },
           headers: CSRF_HEADERS,
           body: changes,
         }),

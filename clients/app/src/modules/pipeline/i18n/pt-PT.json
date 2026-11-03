@@ -170,7 +170,15 @@
       "save": "Guardar o site",
       "cancel": "Cancelar",
       "is": "Site de {{company}}: {{site}}",
-      "change": "Alterar"
+      "change": "Alterar",
+      "from": {
+        "board": "Indicado pelo portal de emprego.",
+        "apply_host": "Do link de candidatura.",
+        "person": "Foi você que o escreveu.",
+        "posting_link": "Encontrado num link do anúncio.",
+        "posting_email": "Encontrado no endereço de email do anúncio.",
+        "name_guess": "Encontrado a partir do nome da empresa: a página inicial nomeia-a."
+      }
     },
     "readLead": "Lê o anúncio e o site da própria empresa (só esse site, onde o robots.txt permite) e cria os factos: uma chamada à IA, reutilizada durante 30 dias. Depois, outra compara a vaga com o seu perfil.",
     "read": "Ler sobre {{company}} · cerca de {{cost}}",
@@ -229,7 +237,7 @@
       "title": "Redigir o CV",
       "lead": "O CV é redigido a partir destes factos e do seu perfil, e cada linha é verificada contra o que o seu perfil diz."
     },
-    "costLine": "Ler uma empresa: uma chamada à IA, cerca de {{read}}, reutilizada durante 30 dias. Comparar a vaga: uma chamada, cerca de {{analysis}}. Cada resposta: uma chamada pequena, cerca de {{answer}}. Nada corre em segundo plano.",
+    "costLine": "Ler uma empresa: uma chamada de IA, cerca de {{read}}, reutilizada durante 30 dias. Comparar a vaga: uma chamada, cerca de {{analysis}}. Cada resposta: uma chamada pequena, cerca de {{answer}}. Uma vaga na lista curta só é preparada sozinha quando os seus objetivos o dizem, dentro dos mesmos limites.",
     "spend": {
       "reads": "Empresas lidas hoje: {{n}} de {{cap}}."
     },
@@ -251,7 +259,56 @@
       "profile_needed": "Acrescente primeiro uma função ao seu perfil: a resposta precisa de uma onde ficar.",
       "no_skill": "Esta pergunta não é sobre uma competência.",
       "not_found": "Esta oportunidade não foi encontrada.",
-      "generic": "Algo correu mal. Tente outra vez."
+      "generic": "Algo correu mal. Tente outra vez.",
+      "find_only": "Os seus objetivos dizem que a app só procura vagas. Mude isso primeiro nos seus objetivos.",
+      "stage_too_early": "Coloque primeiro esta vaga na lista curta."
+    },
+    "byItself": {
+      "off": "Aqui cada passo começa com um clique: os seus objetivos dizem que a app só procura vagas. Escolha “Preparar candidaturas” nos seus objetivos para que as vagas na lista curta sejam preparadas por si.",
+      "stop": "Parar",
+      "start": "Preparar sozinha",
+      "tryAgain": "Tentar de novo",
+      "review": "Rever",
+      "done": "Pronto: o seu CV e a carta de apresentação para esta vaga estão aprovados.",
+      "workingLead": "Nada sai em seu nome: o que for feito espera pela sua aprovação.",
+      "stoppedLead": "O que já foi feito fica. Cada passo continua aqui como um botão.",
+      "failedLead": "Não é repetido sozinho. Cada passo continua aqui como um botão.",
+      "did": "Feito sozinho: {{steps}} · cerca de {{cost}} no total.",
+      "working": {
+        "read": "A preparar {{company}}: a encontrar o site, a lê-lo e a comparar a vaga…",
+        "draft": "A redigir o seu CV para esta vaga…",
+        "letter": "A escrever a carta de apresentação e as respostas para esta vaga…"
+      },
+      "waiting": {
+        "site": "À sua espera: o site de {{company}} não foi encontrado. Escreva-o abaixo e o resto segue.",
+        "answers": "À espera das suas respostas abaixo: o CV é redigido quando responder ou saltar as perguntas, e guardar ou descartar os factos.",
+        "cv_approval": "O seu CV para esta vaga está redigido e espera pela sua revisão.",
+        "letter_approval": "A carta de apresentação e as respostas estão escritas e esperam pela sua revisão."
+      },
+      "steps": {
+        "site": "encontrou o site ({{date}})",
+        "read": "leu a empresa ({{date}})",
+        "compare": "comparou a vaga ({{date}})",
+        "draft": "redigiu o CV ({{date}})",
+        "letter": "escreveu a carta ({{date}})",
+        "other": "um passo ({{date}})"
+      },
+      "reasons": {
+        "stopped": "Parou a preparação desta vaga.",
+        "not_shortlisted": "Parado: esta vaga já não está na lista curta.",
+        "find_only": "Parado: os seus objetivos dizem que a app só procura vagas.",
+        "company_reads_daily_cap": "Parado: já leu 20 empresas hoje. Continue amanhã, ou clique em Ler.",
+        "cv_drafts_daily_cap": "Parado: já fez 20 rascunhos de CV hoje. Continue amanhã.",
+        "cv_drafts_per_opportunity_cap": "Parado: esta vaga já teve 10 rascunhos de CV. Reveja um deles.",
+        "letter_drafts_daily_cap": "Parado: já escreveu 20 cartas hoje. Continue amanhã.",
+        "letter_drafts_per_opportunity_cap": "Parado: esta vaga já teve 10 rascunhos de carta. Reveja um deles.",
+        "ai_daily_limit_reached": "Parado: atingiu o limite de IA de hoje. Continua amanhã.",
+        "ai_budget_reached": "Parado: atingiu o seu limite de gastos com IA.",
+        "ai_unavailable": "Parado: a IA não está configurada neste servidor.",
+        "ai_failed": "A IA não conseguiu responder desta vez.",
+        "profile_needed": "Parado: adicione primeiro uma posição ao seu perfil.",
+        "generic": "Algo correu mal ao preparar esta vaga."
+      }
     }
   },
   "cv": {

@@ -10,6 +10,7 @@ import { useOpportunity } from "../../api/opportunities";
 import { titleOf } from "../PipelinePage/OpportunityViews";
 import { CompanyFacts } from "./CompanyFacts";
 import { DraftSlot } from "../Review/DraftSlot";
+import { PreparationPanel } from "./PreparationPanel";
 import { Questions } from "./Questions";
 
 export interface PreparePageProps {
@@ -32,13 +33,16 @@ export interface PreparePageProps {
  * `/pipeline/$id/prepare`: what a tailored CV for one opportunity is based
  * on, all of it real: facts read on the company's own site (each with its
  * page), what the job wants most (each with the posting's words), and the
- * few questions where the profile is thin. Opening it asks nothing of the
- * model and fetches nothing; every step starts with a click.
+ * few questions where the profile is thin. When the person's goals let it,
+ * the app prepares a shortlisted job by itself (ADR 0010): it finds the site,
+ * reads the company, compares the job and drafts the CV, and this page shows
+ * what it did and what waits on the person, with Stop. Opening the page asks
+ * nothing of the model and fetches nothing itself.
  */
 export function PreparePage({ id, onBack, renderFacts, spend, onReview }: PreparePageProps) {
-  const { t } = useTranslation("pipeline");
+  const { t, i18n } = useTranslation("pipeline");
   const opportunity = useOpportunity(id);
-  const brief = useBrief(id);
+  const brief = useBrief(id, i18n.language);
   const title =
     opportunity.data === undefined ? t("prepare.title") : titleOf(opportunity.data, t("untitled"));
   const company = opportunity.data?.company ?? "";
@@ -132,6 +136,8 @@ function PrepareBody({
   }
   return (
     <Stack gap="lg">
+      <PreparationPanel id={id} brief={brief} onReview={onReview} />
+
       <Section title={t("prepare.companyTitle", { company })} testId="prepare-company">
         <CompanyFacts id={id} brief={brief} />
       </Section>

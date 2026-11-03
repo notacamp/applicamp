@@ -251,5 +251,140 @@
       "error": "{{name}}: couldn’t be read ({{error}})",
       "checked": "{{name}}: checked · {{note}}"
     }
+  },
+  "companies": {
+    "loading": "Loading the companies…",
+    "loadFailed": "The companies couldn’t be loaded.",
+    "retry": "Try again",
+    "tabs": {
+      "label": "Companies view",
+      "suggestedCount": "Suggested · {{n}}",
+      "watchingCount": "Watching · {{n}}",
+      "how": "How it works & cost",
+      "suggested": "Suggested",
+      "watching": "Watching"
+    },
+    "suggested": {
+      "emptyTitle": "No suggestions right now",
+      "emptyBody": "They come from jobs that fit you, so more searches bring more."
+    },
+    "card": {
+      "reasons": "Why {{name}}",
+      "watch": "Watch their job board",
+      "notInterested": "Not interested",
+      "why": "Why?"
+    },
+    "reason": {
+      "shortlisted_one": "You shortlisted one of their jobs",
+      "shortlisted_other": "You shortlisted {{count}} of their jobs",
+      "matches_one": "{{count}} of their jobs fits you in the last {{weeks}} weeks",
+      "matches_other": "{{count}} of their jobs fit you in the last {{weeks}} weeks",
+      "matchesWeek_one": "{{count}} of their jobs fits you this week",
+      "matchesWeek_other": "{{count}} of their jobs fit you this week",
+      "stack": "{{skills}} in their postings",
+      "remoteAll": "Remote in every posting",
+      "remoteSome": "Remote in {{n}} of {{total}} postings",
+      "region": "Open to: {{places}}",
+      "pay": "Pays {{pay}}",
+      "fact": "{{fact}}"
+    },
+    "source": {
+      "posting": "{{title}} (fits {{score}})",
+      "fact": "Read on {{company}}’s own website, for your CV"
+    },
+    "board": {
+      "greenhouse": "Greenhouse",
+      "lever": "Lever",
+      "ashby": "Ashby",
+      "jsonld": "Their careers page (JobPosting)",
+      "none": "No job board"
+    },
+    "watching": {
+      "emptyTitle": "You’re not watching any company yet",
+      "emptyBody": "Watch a suggested company, or paste a careers page below. Its own job board is checked every day.",
+      "finding": "Looking for their job board…",
+      "notFound": "Couldn’t find their job board",
+      "pasteHint": "Paste their careers page and Applicamp will look there.",
+      "lookThere": "Look there",
+      "open_one": "{{count}} open job",
+      "open_other": "{{count}} open jobs",
+      "checkedToday": "Checked today at {{time}}",
+      "checked": "Checked {{date}}",
+      "notYet": "Not checked yet: tonight at 21:00",
+      "failed": "Last check failed: {{reason}}",
+      "stop": "Stop watching"
+    },
+    "failure": {
+      "no_board": "no job board found",
+      "robots_disallows": "their site asks robots not to read it",
+      "unreachable": "their site couldn’t be reached",
+      "rate_limited": "the board asked to slow down",
+      "unexpected_answer": "the board’s answer wasn’t as expected",
+      "too_large": "the board’s answer was too large",
+      "refused_host": "its address can’t be read",
+      "http": "the board answered {{status}}"
+    },
+    "add": {
+      "title": "Watch a company yourself",
+      "body": "Paste the company’s careers page. Applicamp checks it has a job board it can read.",
+      "label": "Careers page",
+      "placeholder": "https://company.example/careers",
+      "go": "Check and watch",
+      "limit": "Up to {{max}} companies. Each is checked once a day, and only new jobs that pass your requirements are scored.",
+      "full": "You’re watching {{max}} companies, the most you can. Stop watching one to add another."
+    },
+    "errors": {
+      "watch_limit_reached": "You can watch up to {{max}} companies. Stop watching one to add another.",
+      "invalid_url": "Paste the company’s careers page, starting with https://.",
+      "generic": "That didn’t work. Try again."
+    },
+    "today": {
+      "title": "{{name}}: watch their job board?",
+      "body": "Applicamp would check it every day and tell you when something that fits you comes up.",
+      "watching": "Watching {{name}}. Looking for their job board…",
+      "see": "See Watching"
+    },
+    "how": {
+      "eyebrow": "How it works",
+      "title": "Suggested from your matches, checked daily without AI",
+      "steps": {
+        "suggest": {
+          "title": "Suggestions (no AI).",
+          "body": "A company is suggested when its jobs keep fitting you: at least 2 matches, or 1 you shortlisted, in the last 8 weeks. Every reason points to the posting it came from, or to the company facts already read for a CV. Nothing is invented. “Not interested” hides it for good."
+        },
+        "find": {
+          "title": "Finding the job board (no AI).",
+          "body": "When you press Watch, Applicamp looks for the company’s careers page on its own site and checks it for a Greenhouse, Lever or Ashby board or schema.org JobPosting data, the same readers the boards use. It respects robots.txt. If nothing is found, you can paste the careers page."
+        },
+        "daily": {
+          "title": "Every day (mostly no AI).",
+          "body": "Each watched board is read once a day and compared with yesterday’s. Only new postings that pass your hard requirements (remote, countries, salary floor) go to the AI for scoring, in the same batch as the nightly search. Most days there’s nothing new, so it costs nothing."
+        },
+        "match": {
+          "title": "A match (score 65 or more)",
+          "body": "lands in Pipeline as Found and shows on Today: “Company posted a job that fits you”."
+        }
+      },
+      "costTitle": "Cost",
+      "cost": {
+        "suggest": {
+          "step": "Suggesting companies",
+          "price": "No AI · €0"
+        },
+        "find": {
+          "step": "Finding a job board",
+          "price": "No AI · €0"
+        },
+        "none": {
+          "step": "Daily check, no new postings",
+          "price": "No AI · €0"
+        },
+        "new": {
+          "step": "New postings that pass your requirements",
+          "price": "Scored with the nightly search · about €0.0003 each"
+        }
+      },
+      "limits": "Up to {{max}} watched companies. It counts against your limits (€0.30 a day, €5 a month), and nothing is retried past a limit."
+    }
   }
 }

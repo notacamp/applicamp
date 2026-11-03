@@ -56,6 +56,10 @@
     "title": "Sites d’emploi",
     "lead": "Les sites d’emploi que lisent les recherches, classés par les salaires qu’ils affichent, les nouveaux qui vous attendent et ce que chaque recherche a analysé."
   },
+  "companies": {
+    "title": "Entreprises",
+    "lead": "Les entreprises dont les offres continuent de vous correspondre. Suivez-en une et Applicamp consulte chaque jour son propre site d’emploi, puis vous prévient dès qu’une offre vous correspond. Rien n’est suivi sans votre accord."
+  },
   "agents": {
     "title": "Agents",
     "lead": "Chaque exécution travaille dans son propre bac à sable, créé pour une tâche et supprimé ensuite."

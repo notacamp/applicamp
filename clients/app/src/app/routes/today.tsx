@@ -15,9 +15,9 @@ import {
   Tagged,
   Text,
 } from "~/lib/ui";
-import { useToday, type Today as TodayState } from "~/modules/pipeline";
+import { CompanyHitCard, useToday, type Today as TodayState } from "~/modules/pipeline";
 import { StrengthNudge, type NudgeAction } from "~/modules/profile";
-import { SearchLine, SearchNowButton } from "~/modules/sources";
+import { SearchLine, SearchNowButton, TodaySuggestion } from "~/modules/sources";
 
 import { useImportLink } from "../links";
 import { NoSkillsLine } from "../NoSkillsLine";
@@ -223,8 +223,24 @@ function TodayBody({ state }: { state: TodayState }) {
 
   return (
     <Stack>
+      {state.company_hits.map((hit) => (
+        <CompanyHitCard
+          key={hit.id}
+          hit={hit}
+          onOpen={(id) => {
+            void navigate({ to: "/pipeline", search: { open: id } });
+          }}
+        />
+      ))}
       {step}
       {state.waiting_on_you.length === 0 ? null : <WaitingOnYou jobs={state.waiting_on_you} />}
+      {state.next_step === "set_up_profile" ? null : (
+        <TodaySuggestion
+          onSeeWatching={() => {
+            void navigate({ to: "/companies", search: { tab: "watching" } });
+          }}
+        />
+      )}
       {nudge === null || state.next_step === "set_up_profile" ? null : (
         <StrengthNudge
           score={state.profile_strength}

@@ -48,6 +48,8 @@ export interface PipelinePageProps {
   onReview?: ((id: string) => void) | undefined;
   /** Open the review of an opportunity's cover letter. */
   onLetter?: ((id: string) => void) | undefined;
+  /** An opportunity whose peek is open as the page is first shown (Today's "Open it"). */
+  initialOpen?: string | undefined;
 }
 
 /**
@@ -67,6 +69,7 @@ export function PipelinePage({
   onPrepare,
   onReview,
   onLetter,
+  initialOpen,
 }: PipelinePageProps) {
   const { t } = useTranslation("pipeline");
   const narrow = useNarrowScreen();
@@ -75,7 +78,7 @@ export function PipelinePage({
   const [query, setQuery] = useState("");
   const q = useDeferredValue(query);
   const [cursor, setCursor] = useState<string | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(initialOpen ?? null);
 
   const hidden = stage === "hidden";
   const list = useOpportunities({

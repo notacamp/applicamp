@@ -12,7 +12,15 @@ export {
   type OpportunityStage,
   type OpportunitySummary,
 } from "./api/opportunities";
-export { todayQuery, useToday, type NextStep, type Today, type TodaySearch } from "./api/today";
+export {
+  todayQuery,
+  useToday,
+  type CompanyHit,
+  type NextStep,
+  type Today,
+  type TodaySearch,
+} from "./api/today";
+export { CompanyHitCard, type CompanyHitCardProps } from "./components/CompanyHit/CompanyHitCard";
 export { CvsPage, type CvsPageProps } from "./components/Cvs/CvsPage";
 export { LetterPage, type LetterPageProps } from "./components/Letter/LetterPage";
 export { PipelinePage, type PipelinePageProps } from "./components/PipelinePage/PipelinePage";

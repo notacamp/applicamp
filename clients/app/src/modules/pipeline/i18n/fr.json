@@ -711,5 +711,14 @@
       "not_found": "Cette lettre de motivation est introuvable.",
       "generic": "Un problème est survenu. Réessayez."
     }
+  },
+  "hit": {
+    "title": "{{company}} a publié une offre qui vous correspond",
+    "foundToday": "Trouvée sur le site d’emploi de l’entreprise aujourd’hui à {{time}}",
+    "foundOn": "Trouvée sur le site d’emploi de l’entreprise le {{date}}",
+    "fits": "correspondance {{score}}",
+    "inPipeline": "dans Opportunités comme Trouvée",
+    "open": "L’ouvrir",
+    "notForMe": "Pas pour moi"
   }
 }

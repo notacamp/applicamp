@@ -5,3 +5,4 @@ pub mod discovery;
 pub mod recheck;
 pub mod reground;
 pub mod search;
+pub mod watch;

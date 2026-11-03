@@ -56,6 +56,10 @@
     "title": "Portais",
     "lead": "Os portais de emprego que as pesquisas leem, ordenados pelos salários que anunciam, os novos à sua espera e o que cada pesquisa analisou."
   },
+  "companies": {
+    "title": "Empresas",
+    "lead": "Empresas cujas vagas continuam a combinar consigo. Vigie uma e o Applicamp consulta todos os dias a bolsa de emprego da própria empresa e avisa quando aparece algo que combina. Nada é vigiado sem o seu consentimento."
+  },
   "agents": {
     "title": "Agentes",
     "lead": "Cada execução trabalha na sua própria sandbox, criada para uma tarefa e apagada no fim."

@@ -22,7 +22,9 @@ use applicamp_sources::{
     SourcesDeps, dedupe,
     job::{BoardJob, Job, Source, SourceLink, WorkMode},
     matching::MatchInput,
-    ports::{Attach, KnownLinks, Scored, Unchecked, Unreasoned},
+    ports::{
+        Attach, CompanyFact, KnownLinks, MatchedPosting, OWN_BOARD, Scored, Unchecked, Unreasoned,
+    },
     requirements::{self, Excluded, Facts, Floor, Per, Reach},
 };
 use chrono::{DateTime, Utc};
@@ -297,10 +299,20 @@ fn link(link: SourceLink) -> pipeline_store::SourceLink {
 
 /// A scored job as the pipeline adds it.
 fn found(scored: Scored) -> Found {
-    let Scored { job, score } = scored;
+    let Scored {
+        job,
+        score,
+        own_board,
+    } = scored;
     let canonical_url = dedupe::job_url(&job);
     let dedupe_key = dedupe::dedupe_key(&job);
     let source = job.source_name().to_owned();
+    // Found on a watched company's own job board: credited as such.
+    let own = own_board.map(|own| pipeline_store::SourceLink {
+        board: OWN_BOARD.to_owned(),
+        name: format!("{} job board", own.company),
+        url: job.url.clone(),
+    });
     let board = job.board;
     Found {
         source,
@@ -310,8 +322,11 @@ fn found(scored: Scored) -> Found {
         dedupe_key,
         company_site: board.as_ref().and_then(|b| b.company_url.clone()),
         sources: board
-            .map(|b| b.links.into_iter().map(link).collect())
-            .unwrap_or_default(),
+            .map(|b| b.links.into_iter().map(link).collect::<Vec<_>>())
+            .unwrap_or_default()
+            .into_iter()
+            .chain(own)
+            .collect(),
         source_ref: job.source_ref,
         title: job.title,
         company: job.company,
@@ -435,6 +450,55 @@ impl applicamp_sources::Neighbours for SourcesWiring {
             eligibility(facts),
             hidden.map(Excluded::as_str),
         ))
+    }
+
+    fn matched_postings<'a>(
+        &'a self,
+        db: &'a PgPool,
+        account: Uuid,
+        since: DateTime<Utc>,
+    ) -> BoxFuture<'a, Result<Vec<MatchedPosting>>> {
+        Box::pin(async move {
+            Ok(pipeline_store::matches_since(db, account, since)
+                .await?
+                .into_iter()
+                .map(|row| MatchedPosting {
+                    opportunity: row.id,
+                    company: row.company,
+                    site: row.site,
+                    title: row.title,
+                    url: row.url,
+                    apply_url: row.apply_url,
+                    match_score: u8::try_from(row.match_score.clamp(0, 100)).unwrap_or(0),
+                    shortlisted: row.shortlisted,
+                    found_at: row.created_at,
+                    work_mode: row.work_mode,
+                    location: row.location,
+                    region_note: row.region_note,
+                    salary_text: row.salary_text,
+                    description: row.description,
+                })
+                .collect())
+        })
+    }
+
+    fn company_facts<'a>(
+        &'a self,
+        db: &'a PgPool,
+        account: Uuid,
+        companies: Vec<String>,
+    ) -> BoxFuture<'a, Result<Vec<CompanyFact>>> {
+        Box::pin(async move {
+            Ok(pipeline_store::company_facts(db, account, &companies)
+                .await?
+                .into_iter()
+                .map(|row| CompanyFact {
+                    id: row.id,
+                    company: row.company,
+                    text: row.text,
+                })
+                .collect())
+        })
     }
 
     fn unreasoned<'a>(
@@ -980,6 +1044,7 @@ mod tests {
                 },
                 ungrounded: false,
             },
+            own_board: None,
         });
         assert_eq!(found.source, "ashby");
         assert!(
@@ -994,5 +1059,45 @@ mod tests {
         assert_eq!(eligibility.remote, "no");
         assert_eq!(eligibility.open_to_candidate, "yes");
         assert_eq!(eligibility.working_languages, ["en"]);
+    }
+
+    #[test]
+    fn a_job_from_a_watched_board_is_credited_to_it() {
+        assert_eq!(
+            OWN_BOARD,
+            pipeline_store::OWN_BOARD,
+            "the sources and the pipeline name the same origin"
+        );
+        let found = found(Scored {
+            job: Job {
+                board: None,
+                source: Source::Greenhouse,
+                source_ref: "northwind:4001".into(),
+                title: "Senior Rails Engineer".into(),
+                company: "Northwind Stays".into(),
+                location: None,
+                work_mode: None,
+                board_remote: None,
+                url: "https://boards.greenhouse.io/northwind/jobs/4001".into(),
+                posted_at: None,
+                salary_text: None,
+                description: String::new(),
+            },
+            score: Score {
+                match_score: 86,
+                why: vec![],
+                gaps: vec![],
+                read: None,
+                facts: Facts::default(),
+                ungrounded: false,
+            },
+            own_board: Some(applicamp_sources::ports::OwnBoard {
+                company: "Northwind Stays".into(),
+            }),
+        });
+        assert_eq!(found.source, "greenhouse");
+        assert_eq!(found.sources.len(), 1);
+        assert_eq!(found.sources[0].board, OWN_BOARD);
+        assert_eq!(found.sources[0].name, "Northwind Stays job board");
     }
 }

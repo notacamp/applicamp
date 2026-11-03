@@ -38,7 +38,9 @@ use crate::{
     job_boards::{self, SeedBoard},
     matching::MatchInput,
     module,
-    ports::{Attach, KnownLinks, Neighbours, Scored, Unchecked, Unreasoned},
+    ports::{
+        Attach, CompanyFact, KnownLinks, MatchedPosting, Neighbours, Scored, Unchecked, Unreasoned,
+    },
     readers::Board,
     requirements::{Excluded, Facts, Reach},
 };
@@ -87,6 +89,10 @@ pub(crate) struct Fake {
     pub(crate) attached: Mutex<Vec<Attach>>,
     /// The signed-in person's address.
     pub(crate) email: Mutex<Option<String>>,
+    /// The person's matches, as the pipeline would give them.
+    pub(crate) matched: Mutex<Vec<MatchedPosting>>,
+    /// Facts read on companies' sites.
+    pub(crate) facts: Mutex<Vec<CompanyFact>>,
 }
 
 impl Fake {
@@ -301,6 +307,34 @@ impl Neighbours for Fake {
             lock(&self.checked).push((opportunity, facts, hidden));
         }
         Box::pin(async move { Ok(set) })
+    }
+
+    fn matched_postings<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        _account: Uuid,
+        since: DateTime<Utc>,
+    ) -> BoxFuture<'a, Result<Vec<MatchedPosting>>> {
+        let matched: Vec<MatchedPosting> = lock(&self.matched)
+            .iter()
+            .filter(|m| m.found_at >= since)
+            .cloned()
+            .collect();
+        Box::pin(async move { Ok(matched) })
+    }
+
+    fn company_facts<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        _account: Uuid,
+        companies: Vec<String>,
+    ) -> BoxFuture<'a, Result<Vec<CompanyFact>>> {
+        let facts: Vec<CompanyFact> = lock(&self.facts)
+            .iter()
+            .filter(|f| companies.iter().any(|c| c.eq_ignore_ascii_case(&f.company)))
+            .cloned()
+            .collect();
+        Box::pin(async move { Ok(facts) })
     }
 
     fn unreasoned<'a>(
@@ -742,6 +776,25 @@ impl Harness {
     pub(crate) async fn post(&self, uri: &str) -> (StatusCode, Value) {
         self.send(Request::post(uri).body(Body::empty()).unwrap())
             .await
+    }
+
+    /// The time, as the module tells it.
+    pub(crate) fn clock_now(&self) -> DateTime<Utc> {
+        use applicamp_kernel::clock::Clock as _;
+        self.clock.now()
+    }
+
+    /// Run the next job that is due, once.
+    pub(crate) async fn work_once(&self) {
+        let registry = Arc::new(
+            Registry::build(vec![(crate::NAME, module(self.deps.clone()).background)]).unwrap(),
+        );
+        let worker = Worker::new(
+            self.db.clone(),
+            Arc::clone(&registry),
+            EventBus::new(registry),
+        );
+        worker.run_once().await.unwrap();
     }
 
     /// Run every job that is due.

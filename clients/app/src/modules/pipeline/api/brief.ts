@@ -35,15 +35,26 @@ const WAITING_MS = 10_000;
  * while it does.
  */
 export function useBrief(id: string, language: string) {
+  const queryClient = useQueryClient();
   return useQuery({
     queryKey: briefKey(id),
-    queryFn: async ({ signal }): Promise<Brief> =>
-      unwrap(
+    queryFn: async ({ signal }): Promise<Brief> => {
+      const before = queryClient.getQueryData<Brief>(briefKey(id))?.preparation?.done.length ?? 0;
+      const brief = unwrap(
         await api.GET("/api/v1/opportunities/{id}/brief", {
           params: { path: { id }, query: { locale: language } },
           signal,
         }),
-      ),
+      );
+      // A step done by itself made a CV or a letter: what showed none reads them again.
+      if ((brief.preparation?.done.length ?? 0) !== before) {
+        for (const part of ["cv", "letter"]) {
+          void queryClient.invalidateQueries({ queryKey: [...PIPELINE_QUERY_KEY, part, id] });
+        }
+        void queryClient.invalidateQueries({ queryKey: opportunityKey(id) });
+      }
+      return brief;
+    },
     refetchInterval: (query) => {
       const preparation = query.state.data?.preparation ?? null;
       if (preparation === null) {

@@ -36,10 +36,11 @@ use uuid::Uuid;
 use crate::{
     SourcesDeps, boards, dedupe,
     events::SearchFinished,
+    features::watch,
     job::{Job, WorkMode},
     job_boards, lisbon,
     matching::{self, MatchInput, TOP},
-    ports::{Attach, Scored},
+    ports::{Attach, OwnBoard, Scored},
     readers::{Outcome, Reader, mapping::BoardRef},
     requirements::{self, Answer, Excluded, Facts, RULES_VERSION, Salary},
     scans::{self, Scan},
@@ -845,17 +846,36 @@ fn tally<'a>(
         .map(|(_, t)| t)
 }
 
-/// Keep what search `row` scanned on each job board.
+/// What a search did with the watched company boards it read.
+#[derive(Debug, Default)]
+struct Watched {
+    /// What the daily check read.
+    reading: watch::check::Reading,
+    /// What the search did with each watch's new postings.
+    tallies: HashMap<Uuid, Tally>,
+}
+
+impl Watched {
+    /// The tally of the watch `job` is a new posting of, if it is one.
+    fn tally(&mut self, job: &Job) -> Option<&mut Tally> {
+        let watch = self.reading.of.get(&job.key())?;
+        Some(self.tallies.entry(*watch).or_default())
+    }
+}
+
+/// Keep what search `row` scanned on each job board, and on each watched
+/// company's own board.
 async fn record_scans(
     deps: &SourcesDeps,
     db: &PgPool,
     row: &SearchRow,
     boards: &[Scanned],
     tallies: &HashMap<String, Tally>,
+    watched: &Watched,
     now: DateTime<Utc>,
 ) -> Result<()> {
     let rate = usd_to_eur(deps);
-    let rows: Vec<Scan> = boards
+    let mut rows: Vec<Scan> = boards
         .iter()
         .map(|scanned| {
             let t = tallies
@@ -873,9 +893,30 @@ async fn record_scans(
                 error_kind: scanned.error.clone(),
                 duration_ms: scanned.duration_ms,
                 note: None,
+                company: None,
             }
         })
         .collect();
+    for read in &watched.reading.reads {
+        let t = watched
+            .tallies
+            .get(&read.watch)
+            .copied()
+            .unwrap_or_default();
+        rows.push(Scan {
+            board: uuid::Uuid::nil(),
+            company: Some(read.company),
+            outcome: read.outcome.as_str(),
+            jobs_read: read.listed,
+            passed_requirements: t.passed,
+            scored_by_ai: t.scored,
+            matched: t.matched,
+            ai_cost_eur: t.cost_usd * rate,
+            error_kind: read.error.clone(),
+            duration_ms: read.duration_ms,
+            note: None,
+        });
+    }
     scans::record(
         db,
         scans::Run::Search {
@@ -949,11 +990,17 @@ pub(crate) async fn run(
         .iter()
         .map(|s| (s.board.slug.clone(), Tally::default()))
         .collect();
-    done.fetched = jobs.len();
+    // The watched companies' own job boards (#20), once a day: only their
+    // new postings go on, with the same limits, in the same batches.
+    let mut watched = Watched::default();
+    if !spent_out(&spend(deps, db, account, now).await?) {
+        watched.reading = watch::check::read_due(deps, reader, db, account, now).await?;
+    }
+    done.fetched = jobs.len() + watched.reading.jobs.len();
     progress(db, id, &done).await?;
-    if jobs.is_empty() && failed > 0 {
+    if jobs.is_empty() && watched.reading.jobs.is_empty() && failed > 0 {
         let now = deps.clock.now();
-        record_scans(deps, db, &row, &scanned, &tallies, now).await?;
+        record_scans(deps, db, &row, &scanned, &tallies, &watched, now).await?;
         return finish(
             db,
             events,
@@ -965,6 +1012,8 @@ pub(crate) async fn run(
         )
         .await;
     }
+
+    jobs.extend(watched.reading.jobs.clone());
 
     // A job already in the pipeline from another board: credit this board
     // on it, and read it no further.
@@ -1006,9 +1055,18 @@ pub(crate) async fn run(
         for t in tally(&mut tallies, job) {
             t.passed += 1;
         }
+        if let Some(t) = watched.tally(job) {
+            t.passed += 1;
+        }
     }
     done.kept = candidates.len();
-    let mut top = matching::pre_rank(candidates, &input, now);
+    // A watched company's new postings are all scored (up to a few), ahead
+    // of the pre-rank's cut.
+    let (mine, others): (Vec<Job>, Vec<Job>) = candidates
+        .into_iter()
+        .partition(|job| watched.reading.of.contains_key(&job.key()));
+    let mut top = matching::pre_rank(others, &input, now);
+    top.extend(mine);
     let cached = cached_scores(db, account, &input).await?;
     for job in top
         .iter_mut()
@@ -1063,6 +1121,9 @@ pub(crate) async fn run(
                     for t in tally(&mut tallies, job) {
                         t.cost_usd += share / boards;
                     }
+                    if let Some(t) = watched.tally(job) {
+                        t.cost_usd += share;
+                    }
                 }
                 for (index, score) in scores {
                     let job = &batch[index];
@@ -1114,7 +1175,19 @@ pub(crate) async fn run(
         for t in tally(&mut tallies, job) {
             t.scored += 1;
         }
+        if let Some(t) = watched.tally(job) {
+            t.scored += 1;
+        }
     }
+    // The watched postings this search is done with (scored, or left out by
+    // a hard limit, or already in the pipeline) are seen; the ones it could
+    // not score (a spending limit) wait for the next search.
+    let scored_keys: HashSet<(String, String)> = scored.iter().map(|(job, _)| job.key()).collect();
+    let waiting: HashSet<(String, String)> = unscored
+        .iter()
+        .map(Job::key)
+        .filter(|key| watched.reading.of.contains_key(key) && !scored_keys.contains(key))
+        .collect();
 
     // Keep the good ones that meet every requirement: the rules decide on
     // the facts, never the score.
@@ -1135,7 +1208,19 @@ pub(crate) async fn run(
             continue;
         };
         score.gaps.extend(verdict.gaps);
-        keep.push(Scored { job, score });
+        let own_board = watched
+            .reading
+            .of
+            .get(&job.key())
+            .and_then(|watch| watched.reading.company_of.get(watch))
+            .map(|(_, company)| OwnBoard {
+                company: company.clone(),
+            });
+        keep.push(Scored {
+            job,
+            score,
+            own_board,
+        });
     }
     keep.sort_by_key(|scored| std::cmp::Reverse(scored.score.match_score));
     keep.truncate(MAX_ADDED);
@@ -1143,11 +1228,30 @@ pub(crate) async fn run(
         for t in tally(&mut tallies, &scored.job) {
             t.matched += 1;
         }
+        if let Some(t) = watched.tally(&scored.job) {
+            t.matched += 1;
+        }
     }
     let now = deps.clock.now();
-    record_scans(deps, db, &row, &scanned, &tallies, now).await?;
+    record_scans(deps, db, &row, &scanned, &tallies, &watched, now).await?;
     let added = neighbours.add_found(db, events, account, keep, now).await?;
-    finish(db, events, &row, &done, added, stopped, now).await
+    let mut seen: HashMap<Uuid, Vec<(String, String)>> = HashMap::new();
+    for (key, watch) in &watched.reading.of {
+        if !waiting.contains(key) {
+            seen.entry(*watch).or_default().push(key.clone());
+        }
+    }
+    for (watch, keys) in seen {
+        watch::check::mark_seen(db, watch, &keys, now).await?;
+    }
+    let finished = finish(db, events, &row, &done, added, stopped, now).await;
+    // New matches may make a company worth watching.
+    if finished.is_ok()
+        && let Err(e) = watch::suggest::refresh(deps, db, account, now).await
+    {
+        tracing::warn!(error = %e, "company suggestions could not be worked out");
+    }
+    finished
 }
 
 /// The nightly search: every evening at 21:00 Lisbon time, for each account
@@ -1198,7 +1302,7 @@ async fn schedule_next_nightly(db: &PgPool, deps: &SourcesDeps) -> Result<bool> 
     Ok(added)
 }
 
-async fn nightly(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
+pub(crate) async fn nightly(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
     let (Some(neighbours), Some(reader)) = (&deps.neighbours, &deps.reader) else {
         return Ok(());
     };
@@ -1242,7 +1346,9 @@ async fn nightly(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
             matching::hard_limit(job, &input, &known, now).is_none()
                 && !cached.contains_key(&job.key())
         });
-        if !unseen {
+        // A watched company's job board is read once a day, with the search.
+        let watch_due = watch::store::any_due(db, account, now - deps.config.watch_every()).await?;
+        if !unseen && !watch_due {
             continue;
         }
         let mut tx = db.begin().await?;

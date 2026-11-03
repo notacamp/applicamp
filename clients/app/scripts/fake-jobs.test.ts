@@ -2,6 +2,7 @@
 // flagging exactly three things, so it is pinned here. It starts the script
 // on a free port and asks it the CV prompt, as the server does.
 import { spawn, type ChildProcess } from "node:child_process";
+import { request } from "node:http";
 import { createServer } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -120,6 +121,28 @@ const questionPrompt = (gap: Record<string, unknown>, assumption: unknown = null
 /** The prompt of an answer about position 0 in `area`. */
 const answerPrompt = (area: string, words: string) =>
   `<language>en</language>\n<profile>\n${JSON.stringify({ positions: [{ index: 0, title: "Lead Engineer", company: "Example Co" }] })}\n</profile>\n<about>\n${JSON.stringify({ index: 0, area })}\n</about>\n<question>\nQ?\n</question>\n<text>\n${words}\n</text>`;
+
+/** A page of the fake as one of its hosts serves it (the host names are aliases on the e2e network). */
+function pageOf(host: string, path: string): Promise<{ status: number; body: string }> {
+  const { port } = new URL(base);
+  return new Promise((resolve, reject) => {
+    const asked = request(
+      { host: "127.0.0.1", port, path, headers: { host: `${host}:9020` } },
+      (response) => {
+        let body = "";
+        response.setEncoding("utf8");
+        response.on("data", (chunk: string) => {
+          body += chunk;
+        });
+        response.on("end", () => {
+          resolve({ status: response.statusCode ?? 0, body });
+        });
+      },
+    );
+    asked.once("error", reject);
+    asked.end();
+  });
+}
 
 describe("the fake CV writer", () => {
   let child: ChildProcess | undefined;
@@ -342,5 +365,73 @@ Company: Example Co
     const built = await answer("your_part", "Bookings\nPayments");
     expect(built.changes[0]?.value).toBe("Worked on bookings, payments");
     expect((await answer("your_part", "None of these")).changes).toEqual([]);
+  });
+
+  it("lists two jobs of a project's Northwind Stays for its skill, with the company's own site", async () => {
+    const found = async (keyword: string) =>
+      (
+        (await (await fetch(`${base}/himalayas/jobs/api/search?q=${keyword}`)).json()) as {
+          jobs: { companyName: string; companyUrl?: string; guid: string }[];
+        }
+      ).jobs;
+    const desktop = await found("Watch-desktop");
+    expect(desktop.map((job) => job.companyName)).toEqual([
+      "Northwind Stays (desktop)",
+      "Northwind Stays (desktop)",
+    ]);
+    expect(desktop[0]?.companyUrl).toBe("http://northwind-desktop.test:9020/");
+    const phone = await found("Watch-phone");
+    expect(phone[0]?.companyUrl).toBe("http://northwind-phone.test:9020/");
+    // Never the same job twice across projects, and never an Example Co one.
+    expect(new Set([...desktop, ...phone].map((job) => job.guid)).size).toBe(4);
+    expect((await found("Rails")).map((job) => job.companyName)).toEqual(["Example Co"]);
+  });
+
+  it("serves a watched board that lists two jobs on its first read and two more after it, one open only to Germany and Austria", async () => {
+    const list = async () =>
+      (
+        (await (await fetch(`${base}/v1/boards/northwind-desktop/jobs`)).json()) as {
+          jobs: { id: number; title: string }[];
+        }
+      ).jobs;
+    expect((await list()).map((job) => job.title)).toEqual([
+      "Senior Rails Engineer",
+      "Office Manager",
+    ]);
+    const later = await list();
+    expect(later.map((job) => job.title)).toEqual([
+      "Senior Rails Engineer",
+      "Office Manager",
+      "Staff Platform Engineer",
+      "Senior Backend Engineer (m/w/d)",
+    ]);
+    expect((await list()).length).toBe(4);
+    const detail = async (id: number) =>
+      (await (await fetch(`${base}/v1/boards/northwind-desktop/jobs/${String(id)}`)).json()) as {
+        title: string;
+        content: string;
+      };
+    const fits = await detail(1003);
+    expect(fits.title).toBe("Staff Platform Engineer");
+    expect(fits.content).not.toContain("Deutschland");
+    expect((await detail(1004)).content).toContain("Deutschland");
+    // Another project's board is its own, and starts from its first read.
+    const phone = (await (await fetch(`${base}/v1/boards/northwind-phone/jobs`)).json()) as {
+      jobs: unknown[];
+    };
+    expect(phone.jobs).toHaveLength(2);
+  });
+
+  it("serves the watched companies' sites: a Greenhouse board linked, JobPosting data, and nothing", async () => {
+    const careers = await pageOf("northwind-desktop.test", "/careers");
+    expect(careers.body).toContain("https://boards.greenhouse.io/northwind-desktop");
+    expect((await pageOf("northwind-desktop.test", "/")).body).toContain('href="/careers"');
+    const contoso = await pageOf("contoso-phone.test", "/careers");
+    expect(contoso.body).toContain("application/ld+json");
+    expect(contoso.body.match(/"@type":"JobPosting"/g)).toHaveLength(2);
+    expect((await pageOf("tailspin-desktop.test", "/")).status).toBe(200);
+    expect((await pageOf("tailspin-desktop.test", "/")).body).not.toContain("/careers");
+    expect((await pageOf("tailspin-desktop.test", "/careers")).status).toBe(404);
+    expect((await pageOf("tailspin-desktop.test", "/robots.txt")).body).toContain("User-agent");
   });
 });

@@ -47,6 +47,10 @@
     "title": "Boards",
     "lead": "The job boards searches read, ranked by the salaries they list, the new ones waiting for you, and what each search scanned."
   },
+  "companies": {
+    "title": "Companies",
+    "lead": "Companies whose jobs keep fitting you. Watch one, and Applicamp checks its own job board every day and tells you when something that fits comes up. Nothing is watched until you say so."
+  },
   "agents": {
     "title": "Agents",
     "lead": "Each run works in its own sandbox, made for one job and deleted after."

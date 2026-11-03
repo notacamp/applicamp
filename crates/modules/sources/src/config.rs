@@ -22,6 +22,7 @@
 //! | `APPLICAMP_SOURCES__MANUAL_PER_DAY` | `3` (`0` for no limit) |
 //! | `APPLICAMP_SOURCES__MANUAL_EVERY_SECS` | `900` (`0` for no spacing) |
 //! | `APPLICAMP_SOURCES__NIGHTLY` | `true` (21:00 Europe/Lisbon) |
+//! | `APPLICAMP_SOURCES__WATCH_EVERY_SECS` | `72000` (a watched company's board is read at most this often; `0` reads it in every search) |
 
 use std::path::PathBuf;
 
@@ -91,6 +92,9 @@ pub struct SourcesConfig {
     /// Search every night for accounts with goals.
     #[serde(default, deserialize_with = "flag")]
     pub nightly: Option<bool>,
+    /// Seconds between two reads of one watched company's job board.
+    #[serde(default, deserialize_with = "number")]
+    pub watch_every_secs: Option<u64>,
 }
 
 impl Default for SourcesConfig {
@@ -114,6 +118,7 @@ impl Default for SourcesConfig {
             manual_per_day: None,
             manual_every_secs: None,
             nightly: None,
+            watch_every_secs: None,
         }
     }
 }
@@ -233,6 +238,16 @@ impl SourcesConfig {
     /// Whether the nightly search runs.
     pub fn nightly(&self) -> bool {
         self.nightly.unwrap_or(true)
+    }
+
+    /// The least time between two reads of one watched company's job board:
+    /// a search (the nightly one, or "Search now") reads a board only when
+    /// this has passed since its last read. Twenty hours by default, so the
+    /// nightly search reads it once a day and a second search the same day
+    /// does not.
+    pub fn watch_every(&self) -> chrono::TimeDelta {
+        let secs = self.watch_every_secs.unwrap_or(20 * 3600);
+        chrono::TimeDelta::seconds(i64::try_from(secs).unwrap_or(i64::MAX))
     }
 }
 

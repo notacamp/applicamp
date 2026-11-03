@@ -17,7 +17,11 @@ pub const KEEP: TimeDelta = TimeDelta::days(90);
 /// What a run scanned on one board.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Scan {
+    /// The job board; ignored when `company` is set.
     pub board: Uuid,
+    /// The watched company whose own job board this is (#20), instead of a
+    /// job board of the registry.
+    pub company: Option<Uuid>,
     /// `read`, `skipped_poll_limit`, `error` or `checked`.
     pub outcome: &'static str,
     pub jobs_read: u32,
@@ -55,14 +59,14 @@ pub async fn record(db: &PgPool, run: Run, scans: &[Scan], at: DateTime<Utc>) ->
             "INSERT INTO sources.board_scans
                 (id, account_id, search_id, discovery_run_id, board_id, at, outcome, jobs_read,
                  passed_requirements, scored_by_ai, matched, ai_cost_eur, error_kind, duration_ms,
-                 note)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)",
+                 note, company_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)",
         )
         .bind(Uuid::now_v7())
         .bind(account)
         .bind(search)
         .bind(discovery)
-        .bind(scan.board)
+        .bind(scan.company.is_none().then_some(scan.board))
         .bind(at)
         .bind(scan.outcome)
         .bind(int(scan.jobs_read))
@@ -77,6 +81,7 @@ pub async fn record(db: &PgPool, run: Run, scans: &[Scan], at: DateTime<Utc>) ->
                 .as_deref()
                 .map(|n| n.chars().take(300).collect::<String>()),
         )
+        .bind(scan.company)
         .execute(db)
         .await?;
     }
@@ -115,7 +120,7 @@ pub async fn totals(
                 coalesce(sum(matched), 0)::bigint,
                 coalesce(sum(ai_cost_eur), 0)::float8
            FROM sources.board_scans
-          WHERE account_id = $1 AND at >= $2
+          WHERE account_id = $1 AND at >= $2 AND board_id IS NOT NULL
           GROUP BY board_id",
     )
     .bind(account)
@@ -162,7 +167,9 @@ pub struct RunRow {
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct ScanRow {
     pub run_id: Uuid,
+    /// The job board's id, or the watched company's.
     pub board_id: Uuid,
+    /// The job board's slug; `watch` for a watched company's own board.
     pub board_slug: String,
     pub board_name: String,
     pub outcome: String,
@@ -192,7 +199,8 @@ pub async fn runs(
               FROM sources.searches s
              WHERE s.account_id = $1
                AND EXISTS (SELECT 1 FROM sources.board_scans b
-                            WHERE b.search_id = s.id AND ($2::uuid IS NULL OR b.board_id = $2))
+                            WHERE b.search_id = s.id
+                              AND ($2::uuid IS NULL OR coalesce(b.board_id, b.company_id) = $2))
             UNION ALL
             SELECT 'discovery' AS kind, d.id, d.started_at AS at, 'weekly' AS trigger,
                    0::float8 AS cost_usd
@@ -214,16 +222,19 @@ pub async fn runs(
     .await?;
     let ids: Vec<Uuid> = runs.iter().map(|r| r.id).collect();
     let rows: Vec<ScanRow> = sqlx::query_as(
-        "SELECT coalesce(b.search_id, b.discovery_run_id) AS run_id, b.board_id,
-                j.slug AS board_slug, j.name AS board_name, b.outcome, b.jobs_read,
+        "SELECT coalesce(b.search_id, b.discovery_run_id) AS run_id,
+                coalesce(b.board_id, b.company_id) AS board_id,
+                coalesce(j.slug, 'watch') AS board_slug, coalesce(j.name, c.name) AS board_name,
+                b.outcome, b.jobs_read,
                 b.passed_requirements, b.scored_by_ai, b.matched, b.ai_cost_eur, b.error_kind,
                 b.duration_ms, b.note
            FROM sources.board_scans b
-           JOIN sources.job_boards j ON j.id = b.board_id
+           LEFT JOIN sources.job_boards j ON j.id = b.board_id
+           LEFT JOIN sources.companies c ON c.id = b.company_id
           WHERE coalesce(b.search_id, b.discovery_run_id) = ANY($1)
-            AND ($2::uuid IS NULL OR b.board_id = $2)
+            AND ($2::uuid IS NULL OR coalesce(b.board_id, b.company_id) = $2)
             AND (b.account_id = $3 OR b.account_id IS NULL)
-          ORDER BY b.matched DESC, b.jobs_read DESC, j.name",
+          ORDER BY b.matched DESC, b.jobs_read DESC, coalesce(j.name, c.name)",
     )
     .bind(&ids)
     .bind(board)

@@ -1,6 +1,7 @@
 //! `GET /api/v1/today`: where the signed-in person is, and their next step:
 //! set up the profile, answer the goals, run a first search, or review new
-//! matches.
+//! matches; and the jobs that fit them found on the own job board of a
+//! company they watch.
 
 #[cfg(test)]
 mod tests;
@@ -181,6 +182,42 @@ pub enum NextStep {
     None,
 }
 
+/// A job that fits, found on the own job board of a company the person
+/// watches, not opened yet.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct CompanyHit {
+    /// The opportunity.
+    pub id: Uuid,
+    pub company: String,
+    pub title: String,
+    pub location: Option<String>,
+    /// `remote`, `hybrid` or `onsite`, when the posting says.
+    pub work_mode: Option<String>,
+    /// Pay, as the posting writes it.
+    pub salary_text: Option<String>,
+    /// How well it fits, 0 to 100.
+    pub match_score: Option<u8>,
+    /// When it was found.
+    pub found_at: DateTime<Utc>,
+}
+
+/// How long a job found on a watched company's board stays on Today.
+const HIT_DAYS: i64 = 3;
+/// Most such jobs shown.
+const MOST_HITS: i64 = 5;
+
+#[derive(sqlx::FromRow)]
+struct HitRow {
+    id: Uuid,
+    company: String,
+    title: String,
+    location: Option<String>,
+    work_mode: Option<String>,
+    salary_text: Option<String>,
+    match_score: Option<i32>,
+    created_at: DateTime<Utc>,
+}
+
 /// Where the person is.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct Today {
@@ -197,6 +234,9 @@ pub struct Today {
     pub new_matches: u32,
     /// The latest search, if any.
     pub latest_search: Option<TodaySearch>,
+    /// Jobs that fit, found in the last days on the own job board of a
+    /// company they watch, still Found and unopened; newest first.
+    pub company_hits: Vec<CompanyHit>,
     pub next_step: NextStep,
 }
 
@@ -253,6 +293,26 @@ pub async fn get(
     .fetch_one(&state.db)
     .await?;
     let new_matches = u32::try_from(new_matches).unwrap_or(u32::MAX);
+    let now = state.clock.now();
+    let hits: Vec<HitRow> = sqlx::query_as(
+        "SELECT o.id, o.company, o.title, o.location, o.work_mode, o.salary_text, o.match_score,
+                o.created_at
+           FROM pipeline.opportunities o
+          WHERE o.account_id = $1 AND o.stage = 'found' AND o.opened_at IS NULL
+            AND NOT o.dismissed AND o.hidden_reason IS NULL
+            AND o.created_at >= $2 AND (o.expires_at IS NULL OR o.expires_at >= $3)
+            AND EXISTS (SELECT 1 FROM pipeline.opportunity_sources s
+                         WHERE s.opportunity_id = o.id AND s.board = $4)
+          ORDER BY o.created_at DESC, o.id
+          LIMIT $5",
+    )
+    .bind(account)
+    .bind(now - chrono::TimeDelta::days(HIT_DAYS))
+    .bind(now)
+    .bind(crate::store::OWN_BOARD)
+    .bind(MOST_HITS)
+    .fetch_all(&state.db)
+    .await?;
     Ok(Json(Today {
         next_step: next_step(&status, latest.is_some(), new_matches),
         profile: TodayProfile {
@@ -272,5 +332,18 @@ pub async fn get(
         profile_questions: status.questions_left,
         new_matches,
         latest_search: latest.map(TodaySearch::of),
+        company_hits: hits
+            .into_iter()
+            .map(|row| CompanyHit {
+                id: row.id,
+                company: row.company,
+                title: row.title,
+                location: row.location,
+                work_mode: row.work_mode,
+                salary_text: row.salary_text,
+                match_score: row.match_score.and_then(|n| u8::try_from(n).ok()),
+                found_at: row.created_at,
+            })
+            .collect(),
     }))
 }

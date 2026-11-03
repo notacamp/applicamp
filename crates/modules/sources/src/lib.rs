@@ -28,6 +28,13 @@
 //!   ([`requirements`]) deciding pass or fail on those facts, and the good
 //!   matches that pass added to the pipeline as Found. "Search now" and a
 //!   nightly search, both within the spending limits of `applicamp-ai`.
+//! - **Company watchers** ([`features::watch`], #20): companies whose jobs
+//!   keep fitting the person are suggested from their matches (no model),
+//!   the person says Watch, the company's own job board is found (a posting's
+//!   own link, else its site, robots.txt respected), and every day, inside
+//!   the search, it is read and only the new postings that pass their hard
+//!   limits are scored; a match lands in the pipeline as Found, credited to
+//!   the company's own board.
 //! - **The recheck** ([`features::recheck`]): at start, Found and
 //!   Shortlisted opportunities found before the rules get their facts once,
 //!   and the ones that fail are hidden (never deleted).
@@ -172,7 +179,7 @@ impl SourcesDeps {
 
 /// The sources module, composed with `deps`.
 pub fn module(deps: SourcesDeps) -> Module {
-    use features::{boards as board, discovery, recheck, reground, search};
+    use features::{boards as board, discovery, recheck, reground, search, watch};
     let router = OpenApiRouter::new()
         .routes(routes!(search::start))
         .routes(routes!(search::latest))
@@ -187,6 +194,11 @@ pub fn module(deps: SourcesDeps) -> Module {
         .routes(routes!(board::check))
         .routes(routes!(board::set_key, board::forget_key))
         .routes(routes!(board::suggest))
+        .routes(routes!(watch::list, watch::add))
+        .routes(routes!(watch::watch))
+        .routes(routes!(watch::not_interested))
+        .routes(routes!(watch::stop))
+        .routes(routes!(watch::careers))
         .layer(Extension(deps.clone()));
     Module {
         name: NAME,
@@ -198,7 +210,8 @@ pub fn module(deps: SourcesDeps) -> Module {
             .job_with::<reground::Reground, _>(deps.clone())
             .job_with::<discovery::Discover, _>(deps.clone())
             .job_with::<discovery::CheckBoard, _>(deps.clone())
-            .job_with::<discovery::CheckSeeded, _>(deps)
+            .job_with::<discovery::CheckSeeded, _>(deps.clone())
+            .job_with::<watch::FindBoard, _>(deps)
             .publishes::<events::SearchFinished>(),
         kinds: Vec::new(),
     }
@@ -267,6 +280,7 @@ mod tests {
                 "sources.check_board",
                 "sources.check_seeded_boards",
                 "sources.discover_boards",
+                "sources.find_board",
                 "sources.nightly",
                 "sources.recheck_requirements",
                 "sources.reground_reasons",

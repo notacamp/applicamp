@@ -8,6 +8,8 @@ import { TODAY_QUERY_KEY } from "./opportunities";
 export type Today = Schema<"Today">;
 export type NextStep = Schema<"NextStep">;
 export type TodaySearch = Schema<"TodaySearch">;
+/** A job that fits, found on the own job board of a company the person watches. */
+export type CompanyHit = Schema<"CompanyHit">;
 
 /** `GET /api/v1/today`. */
 export const todayQuery = queryOptions({

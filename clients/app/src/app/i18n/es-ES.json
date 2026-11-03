@@ -47,6 +47,10 @@
     "title": "Portales",
     "lead": "Los portales de empleo que leen las búsquedas, ordenados por los salarios que publican, los nuevos que te esperan y lo que analizó cada búsqueda."
   },
+  "companies": {
+    "title": "Empresas",
+    "lead": "Empresas cuyas ofertas siguen encajando contigo. Vigila una y Applicamp revisa cada día su propio portal de empleo y te avisa cuando aparece algo que encaja. No se vigila nada hasta que lo digas."
+  },
   "agents": {
     "title": "Agentes",
     "lead": "Cada ejecución trabaja en su propio sandbox, creado para una tarea y eliminado al terminar."

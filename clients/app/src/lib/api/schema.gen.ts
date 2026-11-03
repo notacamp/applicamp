@@ -372,6 +372,123 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The companies.
+         * @description The companies whose jobs keep fitting the signed-in person (at least two
+         *     matches, or one they shortlisted, in the last eight weeks), each with
+         *     reasons traced to the postings they come from, and the companies they
+         *     watch, with their job board, open jobs and last check. Suggestions are
+         *     worked out from the person's matches, with no model.
+         */
+        get: operations["sources.companies"];
+        put?: never;
+        /**
+         * Watch a company yourself.
+         * @description Paste the company's careers page (or a link to its Greenhouse, Lever or
+         *     Ashby board): the company is added as one you watch, and its job board is
+         *     looked for the same way as for a suggestion. The page is read only where
+         *     its robots.txt allows. 409 `watch_limit_reached` past 20.
+         */
+        post: operations["sources.add_company"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{id}/careers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Give a watched company a careers page.
+         * @description For a watch whose job board could not be found: the page is looked at the
+         *     same way (a Greenhouse, Lever or Ashby board, or schema.org `JobPosting`
+         *     data), where its robots.txt allows.
+         */
+        post: operations["sources.company_careers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{id}/not-interested": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Not interested in a company.
+         * @description Hides it for good: it is never suggested again.
+         */
+        post: operations["sources.dismiss_company"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop watching a company.
+         * @description Its job board is not read any more. It is not suggested again; watch it
+         *     again by pasting its careers page.
+         */
+        post: operations["sources.stop_watching_company"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{id}/watch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Watch a suggested company.
+         * @description Moves it to the watched companies and looks for its job board in the
+         *     background: the board a posting came from, else the careers page on its
+         *     own site (robots.txt respected). At most 20 watched companies (409
+         *     `watch_limit_reached`).
+         */
+        post: operations["sources.watch_company"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cvs": {
         parameters: {
             query?: never;
@@ -2603,6 +2720,11 @@ export interface components {
             allowed: boolean;
             reason?: components["schemas"]["LetterBlocked"] | null;
         };
+        /** @description A careers page (or a link to a job board) someone pasted. */
+        CareersPage: {
+            /** @description Its address. */
+            url: string;
+        };
         /** @description The least they would take, before tax. */
         CashFloor: {
             /**
@@ -2680,6 +2802,44 @@ export interface components {
         ChoiceRequest: {
             choice?: components["schemas"]["Choice"] | null;
         };
+        /**
+         * @description A job that fits, found on the own job board of a company the person
+         *     watches, not opened yet.
+         */
+        CompanyHit: {
+            company: string;
+            /**
+             * Format: date-time
+             * @description When it was found.
+             */
+            found_at: string;
+            /**
+             * Format: uuid
+             * @description The opportunity.
+             */
+            id: string;
+            location?: string | null;
+            /**
+             * Format: int32
+             * @description How well it fits, 0 to 100.
+             */
+            match_score?: number | null;
+            /** @description Pay, as the posting writes it. */
+            salary_text?: string | null;
+            title: string;
+            /** @description `remote`, `hybrid` or `onsite`, when the posting says. */
+            work_mode?: string | null;
+        };
+        /** @description The suggestions and the watched companies. */
+        CompanyList: {
+            /**
+             * Format: int32
+             * @description Companies one person may watch at once.
+             */
+            limit: number;
+            suggested: components["schemas"]["CompanySuggestion"][];
+            watching: components["schemas"]["WatchedCompany"][];
+        };
         /** @description The last read of the company's pages. */
         CompanyRead: {
             /**
@@ -2705,11 +2865,62 @@ export interface components {
              */
             read_at: string;
         };
+        /** @description One reason a company is suggested. */
+        CompanyReason: {
+            /** Format: int32 */
+            count: number;
+            kind: components["schemas"]["CompanyReasonKind"];
+            sources: components["schemas"]["CompanyReasonSource"][];
+            /** Format: int32 */
+            total: number;
+            values: string[];
+            /** Format: int32 */
+            weeks: number;
+        };
+        /**
+         * @description What a reason says.
+         * @enum {string}
+         */
+        CompanyReasonKind: "shortlisted" | "matches" | "stack" | "remote" | "region" | "pay" | "fact";
+        /** @description Where a reason comes from. */
+        CompanyReasonSource: {
+            /**
+             * Format: uuid
+             * @description The opportunity, or the fact.
+             */
+            id: string;
+            kind: components["schemas"]["CompanyReasonSourceKind"];
+            /** @description The posting's role, or the company. */
+            label: string;
+            /**
+             * Format: int32
+             * @description How well the posting fits, 0 to 100.
+             */
+            score?: number | null;
+        };
+        /**
+         * @description What a reason is traced to.
+         * @enum {string}
+         */
+        CompanyReasonSourceKind: "posting" | "fact";
         /**
          * @description What kind of company.
          * @enum {string}
          */
         CompanyStage: "early" | "growth" | "established" | "public" | "nonprofit";
+        /** @description A company worth watching. */
+        CompanySuggestion: {
+            /**
+             * Format: uuid
+             * @description The company.
+             */
+            id: string;
+            name: string;
+            /** @description Why, each traced to a posting (or a fact read on its site). */
+            reasons: components["schemas"]["CompanyReason"][];
+            /** @description Its own site. */
+            website?: string | null;
+        };
         /** @description One completion. */
         Completion: {
             /**
@@ -4729,6 +4940,11 @@ export interface components {
         Template: "clean" | "compact";
         /** @description Where the person is. */
         Today: {
+            /**
+             * @description Jobs that fit, found in the last days on the own job board of a
+             *     company they watch, still Found and unopened; newest first.
+             */
+            company_hits: components["schemas"]["CompanyHit"][];
             goals: components["schemas"]["TodayGoals"];
             latest_search?: components["schemas"]["TodaySearch"] | null;
             /**
@@ -4806,6 +5022,43 @@ export interface components {
         /** @description What a tool answered. */
         ToolResult: {
             result: unknown;
+        };
+        /**
+         * @description What a company's jobs are read from.
+         * @enum {string}
+         */
+        WatchBoardKind: "greenhouse" | "lever" | "ashby" | "jsonld" | "none";
+        /** @description A company the person watches. */
+        WatchedCompany: {
+            /** @description How its jobs are read; `none` when no board was found. */
+            board: components["schemas"]["WatchBoardKind"];
+            /** @description The page that lists its jobs. */
+            careers_url?: string | null;
+            /** @description A board is being looked for. */
+            finding: boolean;
+            /**
+             * Format: uuid
+             * @description The company.
+             */
+            id: string;
+            /**
+             * Format: date-time
+             * @description When its board was last read (or looked for).
+             */
+            last_checked_at?: string | null;
+            /** @description Why the last check failed (`http_503`, `unreachable`, `no_board`…). */
+            last_error?: string | null;
+            name: string;
+            /** @description No board was found: the person can paste the careers page. */
+            needs_board: boolean;
+            /**
+             * Format: int32
+             * @description Jobs open on the board when it was last read.
+             */
+            open_jobs?: number | null;
+            /** Format: date-time */
+            watching_since?: string | null;
+            website?: string | null;
         };
         /** @description A position. */
         Work: {
@@ -5778,6 +6031,272 @@ export interface operations {
                 };
             };
             /** @description `not_approved` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "sources.companies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The suggestions and the watched companies. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyList"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "sources.add_company": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CareersPage"];
+            };
+        };
+        responses: {
+            /** @description Watching; its board is being looked for. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyList"];
+                };
+            };
+            /** @description `invalid_url`: a public https address */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `watch_limit_reached` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "sources.company_careers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The company. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CareersPage"];
+            };
+        };
+        responses: {
+            /** @description Looking at the page. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyList"];
+                };
+            };
+            /** @description `invalid_url` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "sources.dismiss_company": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The company. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Hidden. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyList"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "sources.stop_watching_company": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The company. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stopped. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyList"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "sources.watch_company": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The company. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Watching; its board is being looked for. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyList"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `watch_limit_reached` */
             409: {
                 headers: {
                     [name: string]: unknown;

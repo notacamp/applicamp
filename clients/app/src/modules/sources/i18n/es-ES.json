@@ -251,5 +251,140 @@
       "error": "{{name}}: no se pudo leer ({{error}})",
       "checked": "{{name}}: revisado · {{note}}"
     }
+  },
+  "companies": {
+    "loading": "Cargando las empresas…",
+    "loadFailed": "No se pudieron cargar las empresas.",
+    "retry": "Reintentar",
+    "tabs": {
+      "label": "Vista de las empresas",
+      "suggestedCount": "Sugeridas · {{n}}",
+      "watchingCount": "En vigilancia · {{n}}",
+      "how": "Cómo funciona y coste",
+      "suggested": "Sugeridas",
+      "watching": "En vigilancia"
+    },
+    "suggested": {
+      "emptyTitle": "Ahora mismo no hay sugerencias",
+      "emptyBody": "Salen de las ofertas que encajan contigo, así que más búsquedas traen más sugerencias."
+    },
+    "card": {
+      "reasons": "Por qué {{name}}",
+      "watch": "Vigilar su portal de empleo",
+      "notInterested": "No me interesa",
+      "why": "¿Por qué?"
+    },
+    "reason": {
+      "shortlisted_one": "Preseleccionaste una de sus ofertas",
+      "shortlisted_other": "Preseleccionaste {{count}} de sus ofertas",
+      "matches_one": "{{count}} de sus ofertas encaja contigo en las últimas {{weeks}} semanas",
+      "matches_other": "{{count}} de sus ofertas encajan contigo en las últimas {{weeks}} semanas",
+      "matchesWeek_one": "{{count}} de sus ofertas encaja contigo esta semana",
+      "matchesWeek_other": "{{count}} de sus ofertas encajan contigo esta semana",
+      "stack": "{{skills}} en sus ofertas",
+      "remoteAll": "En remoto en todas las ofertas",
+      "remoteSome": "En remoto en {{n}} de {{total}} ofertas",
+      "region": "Abierta a: {{places}}",
+      "pay": "Paga {{pay}}",
+      "fact": "{{fact}}"
+    },
+    "source": {
+      "posting": "{{title}} (encaje {{score}})",
+      "fact": "Leído en el sitio web de {{company}}, para tu CV"
+    },
+    "board": {
+      "greenhouse": "Greenhouse",
+      "lever": "Lever",
+      "ashby": "Ashby",
+      "jsonld": "Su página de empleo (JobPosting)",
+      "none": "Sin portal de empleo"
+    },
+    "watching": {
+      "emptyTitle": "Todavía no vigilas ninguna empresa",
+      "emptyBody": "Vigila una empresa sugerida o pega abajo una página de empleo. Su propio portal de empleo se revisa cada día.",
+      "finding": "Buscando su portal de empleo…",
+      "notFound": "No se pudo encontrar su portal de empleo",
+      "pasteHint": "Pega su página de empleo y Applicamp buscará ahí.",
+      "lookThere": "Buscar ahí",
+      "open_one": "{{count}} oferta abierta",
+      "open_other": "{{count}} ofertas abiertas",
+      "checkedToday": "Revisado hoy a las {{time}}",
+      "checked": "Revisado {{date}}",
+      "notYet": "Aún sin revisar: esta noche a las 21:00",
+      "failed": "La última revisión falló: {{reason}}",
+      "stop": "Dejar de vigilar"
+    },
+    "failure": {
+      "no_board": "no se encontró ningún portal de empleo",
+      "robots_disallows": "su sitio pide a los robots que no lo lean",
+      "unreachable": "no se pudo acceder a su sitio",
+      "rate_limited": "el portal pidió ir más despacio",
+      "unexpected_answer": "la respuesta del portal no era la esperada",
+      "too_large": "la respuesta del portal era demasiado grande",
+      "refused_host": "no se puede leer su dirección",
+      "http": "el portal respondió {{status}}"
+    },
+    "add": {
+      "title": "Vigila una empresa tú mismo",
+      "body": "Pega la página de empleo de la empresa. Applicamp comprueba que tenga un portal de empleo que pueda leer.",
+      "label": "Página de empleo",
+      "placeholder": "https://empresa.ejemplo/empleo",
+      "go": "Comprobar y vigilar",
+      "limit": "Hasta {{max}} empresas. Cada una se revisa una vez al día, y solo se puntúan las ofertas nuevas que cumplen tus requisitos.",
+      "full": "Vigilas {{max}} empresas, el máximo posible. Deja de vigilar una para añadir otra."
+    },
+    "errors": {
+      "watch_limit_reached": "Puedes vigilar hasta {{max}} empresas. Deja de vigilar una para añadir otra.",
+      "invalid_url": "Pega la página de empleo de la empresa, empezando por https://.",
+      "generic": "No ha funcionado. Inténtalo de nuevo."
+    },
+    "today": {
+      "title": "{{name}}: ¿vigilar su portal de empleo?",
+      "body": "Applicamp lo revisaría cada día y te avisaría cuando aparezca algo que encaje contigo.",
+      "watching": "Vigilando {{name}}. Buscando su portal de empleo…",
+      "see": "Ver en vigilancia"
+    },
+    "how": {
+      "eyebrow": "Cómo funciona",
+      "title": "Sugeridas a partir de tus coincidencias, revisadas cada día sin IA",
+      "steps": {
+        "suggest": {
+          "title": "Sugerencias (sin IA).",
+          "body": "Se sugiere una empresa cuando sus ofertas siguen encajando contigo: al menos 2 coincidencias, o 1 que preseleccionaste, en las últimas 8 semanas. Cada razón apunta a la oferta de la que sale, o a los datos de la empresa ya leídos para un CV. No se inventa nada. «No me interesa» la oculta para siempre."
+        },
+        "find": {
+          "title": "Encontrar el portal de empleo (sin IA).",
+          "body": "Cuando pulsas Vigilar, Applicamp busca la página de empleo de la empresa en su propio sitio y comprueba si tiene un portal Greenhouse, Lever o Ashby o datos JobPosting de schema.org, con los mismos lectores de los portales. Respeta el robots.txt. Si no encuentra nada, puedes pegar la página de empleo."
+        },
+        "daily": {
+          "title": "Cada día (casi sin IA).",
+          "body": "Cada portal vigilado se lee una vez al día y se compara con el de ayer. Solo las ofertas nuevas que cumplen tus requisitos obligatorios (remoto, países, salario mínimo) pasan a la IA para puntuarlas, en el mismo lote de la búsqueda nocturna. La mayoría de los días no hay nada nuevo, así que no cuesta nada."
+        },
+        "match": {
+          "title": "Una coincidencia (puntuación de 65 o más)",
+          "body": "llega a Oportunidades como Encontrada y aparece en Hoy: «La empresa publicó una oferta que encaja contigo»."
+        }
+      },
+      "costTitle": "Coste",
+      "cost": {
+        "suggest": {
+          "step": "Sugerir empresas",
+          "price": "Sin IA · 0 €"
+        },
+        "find": {
+          "step": "Encontrar un portal de empleo",
+          "price": "Sin IA · 0 €"
+        },
+        "none": {
+          "step": "Revisión diaria, sin ofertas nuevas",
+          "price": "Sin IA · 0 €"
+        },
+        "new": {
+          "step": "Ofertas nuevas que cumplen tus requisitos",
+          "price": "Puntuadas con la búsqueda nocturna · unos 0,0003 € cada una"
+        }
+      },
+      "limits": "Hasta {{max}} empresas vigiladas. Cuenta para tus límites (0,30 € al día, 5 € al mes), y nada se reintenta pasado un límite."
+    }
   }
 }

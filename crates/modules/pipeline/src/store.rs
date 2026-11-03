@@ -583,6 +583,82 @@ pub async fn set_reasons(
     Ok(done.rows_affected() == 1)
 }
 
+/// The slug under which a watched company's own job board is credited on an
+/// opportunity (`opportunity_sources.board`); the sources module adds it.
+pub const OWN_BOARD: &str = "company-board";
+
+/// A match of a person's, for the company watchers.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct MatchRow {
+    pub id: Uuid,
+    pub company: String,
+    pub site: Option<String>,
+    pub title: String,
+    pub url: String,
+    pub apply_url: Option<String>,
+    pub match_score: i32,
+    pub shortlisted: bool,
+    pub created_at: DateTime<Utc>,
+    pub work_mode: Option<String>,
+    pub location: Option<String>,
+    pub region_note: Option<String>,
+    pub salary_text: Option<String>,
+    pub description: String,
+}
+
+/// `account`'s matches found since `since`: found by a search, not hidden by
+/// a requirement and not dismissed; with the company's site when it is on
+/// record. Oldest first.
+pub async fn matches_since(
+    db: &PgPool,
+    account: Uuid,
+    since: DateTime<Utc>,
+) -> Result<Vec<MatchRow>> {
+    Ok(sqlx::query_as(
+        "SELECT o.id, o.company, c.site, o.title, o.url, o.apply_url,
+                o.match_score, o.stage IN ('shortlisted', 'applying', 'applied', 'talking',
+                                           'interview', 'offer') AS shortlisted,
+                o.created_at, o.work_mode, o.location, o.region_note, o.salary_text,
+                left(coalesce(o.description, ''), 4000) AS description
+           FROM pipeline.opportunities o
+           LEFT JOIN pipeline.companies c
+             ON c.account_id = o.account_id
+            AND c.key = lower(regexp_replace(btrim(o.company), '[[:space:]]+', ' ', 'g'))
+          WHERE o.account_id = $1 AND o.created_at >= $2 AND o.match_score IS NOT NULL
+            AND o.source <> 'link' AND NOT o.dismissed AND o.hidden_reason IS NULL
+          ORDER BY o.created_at, o.id",
+    )
+    .bind(account)
+    .bind(since)
+    .fetch_all(db)
+    .await?)
+}
+
+/// A fact read on a company's site, with the company.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct FactRow {
+    pub id: Uuid,
+    pub company: String,
+    pub text: String,
+}
+
+/// The facts read on the companies named `names` for `account`, not
+/// removed, oldest first.
+pub async fn company_facts(db: &PgPool, account: Uuid, names: &[String]) -> Result<Vec<FactRow>> {
+    let keys: Vec<String> = names.iter().map(|n| companies::key_of(n)).collect();
+    Ok(sqlx::query_as(
+        "SELECT f.id, c.name AS company, f.text
+           FROM pipeline.company_facts f
+           JOIN pipeline.companies c ON c.id = f.company_id
+          WHERE f.account_id = $1 AND NOT f.removed AND c.key = ANY($2)
+          ORDER BY f.created_at, f.id",
+    )
+    .bind(account)
+    .bind(&keys)
+    .fetch_all(db)
+    .await?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -600,6 +676,113 @@ mod tests {
             work_mode: Some("anywhere".into()),
             ..Found::default()
         }
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn matches_come_with_their_companys_site_and_leave_out_what_is_not_one(db: PgPool) {
+        let account = Uuid::now_v7();
+        let events = EventBus::default();
+        let now = Utc::now();
+        let found = |source_ref: &str, company: &str, score: u8| Found {
+            source: "greenhouse".into(),
+            source_ref: source_ref.into(),
+            title: "Staff Engineer".into(),
+            company: company.into(),
+            url: format!("https://example.com/jobs/{source_ref}"),
+            match_score: score,
+            company_site: Some("https://northwind.example/about".into()),
+            ..Found::default()
+        };
+        add_found(
+            &db,
+            &events,
+            account,
+            vec![
+                found("1", "Northwind Stays", 80),
+                found("2", " Northwind   Stays ", 70),
+                found("3", "Other Co", 60),
+            ],
+            now,
+        )
+        .await
+        .unwrap();
+        sqlx::query("UPDATE pipeline.opportunities SET dismissed = true WHERE source_ref = '3'")
+            .execute(&db)
+            .await
+            .unwrap();
+        sqlx::query(
+            "UPDATE pipeline.opportunities SET stage = 'shortlisted' WHERE source_ref = '1'",
+        )
+        .execute(&db)
+        .await
+        .unwrap();
+        let rows = matches_since(&db, account, now - TimeDelta::days(1))
+            .await
+            .unwrap();
+        assert_eq!(rows.len(), 2, "the dismissed one is not a match");
+        assert!(
+            rows.iter()
+                .all(|row| row.site.as_deref() == Some("https://northwind.example/")),
+            "the company's site, however its name is spaced"
+        );
+        assert_eq!(
+            rows.iter().filter(|row| row.shortlisted).count(),
+            1,
+            "one was shortlisted"
+        );
+        assert!(
+            matches_since(&db, account, now + TimeDelta::days(1))
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            matches_since(&db, Uuid::now_v7(), now - TimeDelta::days(1))
+                .await
+                .unwrap()
+                .is_empty(),
+            "only the account's own"
+        );
+
+        // The facts read on the company's site, not the removed ones.
+        let company: Uuid = sqlx::query_scalar(
+            "SELECT id FROM pipeline.companies WHERE account_id = $1 AND key = 'northwind stays'",
+        )
+        .bind(account)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        for (text, removed) in [
+            ("Builds booking software", false),
+            ("Has 900 employees", true),
+        ] {
+            sqlx::query(
+                "INSERT INTO pipeline.company_facts
+                    (id, company_id, account_id, text, quote, url, text_key, removed, created_at)
+                 VALUES ($1, $2, $3, $4, $4, 'https://northwind.example/about', $4, $5, $6)",
+            )
+            .bind(Uuid::now_v7())
+            .bind(company)
+            .bind(account)
+            .bind(text)
+            .bind(removed)
+            .bind(now)
+            .execute(&db)
+            .await
+            .unwrap();
+        }
+        let facts = company_facts(&db, account, &["NORTHWIND stays".to_owned()])
+            .await
+            .unwrap();
+        assert_eq!(facts.len(), 1);
+        assert_eq!(facts[0].text, "Builds booking software");
+        assert_eq!(facts[0].company, "Northwind Stays");
+        assert!(
+            company_facts(&db, account, &["Other Co".to_owned()])
+                .await
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]

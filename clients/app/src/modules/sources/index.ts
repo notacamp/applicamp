@@ -23,3 +23,22 @@ export {
   type BoardsPageProps,
   type BoardsTab,
 } from "./components/BoardsPage/BoardsPage";
+// Company watchers (#20): companies whose jobs keep fitting you, suggested
+// from your matches, whose own job board is read every day; Today's
+// compact suggestion.
+export {
+  COMPANIES_QUERY_KEY,
+  useCompanies,
+  type CompanyList,
+  type CompanySuggestion,
+  type WatchedCompany,
+} from "./api/companies";
+export {
+  CompaniesPage,
+  type CompaniesPageProps,
+  type CompaniesTab,
+} from "./components/CompaniesPage/CompaniesPage";
+export {
+  TodaySuggestion,
+  type TodaySuggestionProps,
+} from "./components/TodaySuggestion/TodaySuggestion";

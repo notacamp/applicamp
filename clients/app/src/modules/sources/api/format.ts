@@ -27,3 +27,15 @@ export function formatWhen(
 export function withinADay(iso: string, now: Date = new Date()): boolean {
   return now.getTime() - new Date(iso).getTime() < 24 * 60 * 60 * 1000;
 }
+
+/** A site's host without `www.` (`https://www.example.com/a` is `example.com`); none for a bad link. */
+export function hostOf(url: string | null | undefined): string | null {
+  if (url === null || url === undefined) {
+    return null;
+  }
+  try {
+    return new URL(url).host.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}

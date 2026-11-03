@@ -678,6 +678,113 @@ mod tests {
         }
     }
 
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn matches_come_with_their_companys_site_and_leave_out_what_is_not_one(db: PgPool) {
+        let account = Uuid::now_v7();
+        let events = EventBus::default();
+        let now = Utc::now();
+        let found = |source_ref: &str, company: &str, score: u8| Found {
+            source: "greenhouse".into(),
+            source_ref: source_ref.into(),
+            title: "Staff Engineer".into(),
+            company: company.into(),
+            url: format!("https://example.com/jobs/{source_ref}"),
+            match_score: score,
+            company_site: Some("https://northwind.example/about".into()),
+            ..Found::default()
+        };
+        add_found(
+            &db,
+            &events,
+            account,
+            vec![
+                found("1", "Northwind Stays", 80),
+                found("2", " Northwind   Stays ", 70),
+                found("3", "Other Co", 60),
+            ],
+            now,
+        )
+        .await
+        .unwrap();
+        sqlx::query("UPDATE pipeline.opportunities SET dismissed = true WHERE source_ref = '3'")
+            .execute(&db)
+            .await
+            .unwrap();
+        sqlx::query(
+            "UPDATE pipeline.opportunities SET stage = 'shortlisted' WHERE source_ref = '1'",
+        )
+        .execute(&db)
+        .await
+        .unwrap();
+        let rows = matches_since(&db, account, now - TimeDelta::days(1))
+            .await
+            .unwrap();
+        assert_eq!(rows.len(), 2, "the dismissed one is not a match");
+        assert!(
+            rows.iter()
+                .all(|row| row.site.as_deref() == Some("https://northwind.example/")),
+            "the company's site, however its name is spaced"
+        );
+        assert_eq!(
+            rows.iter().filter(|row| row.shortlisted).count(),
+            1,
+            "one was shortlisted"
+        );
+        assert!(
+            matches_since(&db, account, now + TimeDelta::days(1))
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            matches_since(&db, Uuid::now_v7(), now - TimeDelta::days(1))
+                .await
+                .unwrap()
+                .is_empty(),
+            "only the account's own"
+        );
+
+        // The facts read on the company's site, not the removed ones.
+        let company: Uuid = sqlx::query_scalar(
+            "SELECT id FROM pipeline.companies WHERE account_id = $1 AND key = 'northwind stays'",
+        )
+        .bind(account)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        for (text, removed) in [
+            ("Builds booking software", false),
+            ("Has 900 employees", true),
+        ] {
+            sqlx::query(
+                "INSERT INTO pipeline.company_facts
+                    (id, company_id, account_id, text, quote, url, text_key, removed, created_at)
+                 VALUES ($1, $2, $3, $4, $4, 'https://northwind.example/about', $4, $5, $6)",
+            )
+            .bind(Uuid::now_v7())
+            .bind(company)
+            .bind(account)
+            .bind(text)
+            .bind(removed)
+            .bind(now)
+            .execute(&db)
+            .await
+            .unwrap();
+        }
+        let facts = company_facts(&db, account, &["NORTHWIND stays".to_owned()])
+            .await
+            .unwrap();
+        assert_eq!(facts.len(), 1);
+        assert_eq!(facts[0].text, "Builds booking software");
+        assert_eq!(facts[0].company, "Northwind Stays");
+        assert!(
+            company_facts(&db, account, &["Other Co".to_owned()])
+                .await
+                .unwrap()
+                .is_empty()
+        );
+    }
+
     #[test]
     fn eligibility_is_checked_and_trimmed() {
         let eligibility = Eligibility {

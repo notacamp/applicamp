@@ -130,8 +130,9 @@ test("a company whose jobs keep fitting you is suggested with its reasons, watch
   await hit.getByTestId(/^today-hit-open-/).click();
   await expect(page).toHaveURL(/\/pipeline/);
   await expect(page.getByTestId("peek")).toBeVisible();
+  // Named as the person knows the company (the suggestion's name).
   await expect(page.getByTestId("peek-source-link").first()).toContainText(
-    "Northwind Stays job board",
+    `Northwind Stays (${project}) job board`,
   );
   await expect(page.getByTestId("peek-source-link").first()).toHaveAttribute(
     "href",

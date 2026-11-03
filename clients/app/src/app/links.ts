@@ -9,6 +9,7 @@ export const PLACES = [
   { id: "today", path: "/", icon: "home", shortcut: "nav.today", phone: true },
   { id: "pipeline", path: "/pipeline", icon: "tasks", shortcut: "nav.pipeline", phone: true },
   { id: "boards", path: "/boards", icon: "bullets", shortcut: "nav.boards", phone: true },
+  { id: "companies", path: "/companies", icon: "stay", shortcut: "nav.companies", phone: false },
   { id: "cvs", path: "/cvs", icon: "document", shortcut: "nav.cvs", phone: false },
   { id: "agents", path: "/agents", icon: "hourglass", shortcut: "nav.agents", phone: true },
   { id: "profile", path: "/profile", icon: "people", shortcut: "nav.profile", phone: true },

@@ -2,7 +2,8 @@ import { screen, waitFor } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { estimate, search, todayAnswer } from "../../test/pipeline";
+import { companies, FABRIKAM, suggestion, watching } from "../../test/companies";
+import { estimate, opportunity, search, todayAnswer } from "../../test/pipeline";
 import { DEMO_ME, renderApp, stubApi, type Stub } from "../../test/render";
 
 /** Signed in, with Today's answer and the rest of the app's reads. */
@@ -161,6 +162,125 @@ describe("Today", () => {
     await waitFor(() => {
       expect(router.state.location.search).toEqual({});
     });
+  });
+
+  it("tells that a watched company posted a job that fits, and opens it in the Pipeline", async () => {
+    const hit = "0190a1b2-0000-7000-8000-0000000000e1";
+    signedIn(
+      {
+        body: todayAnswer("review_matches", {
+          company_hits: [
+            {
+              id: hit,
+              company: "Northwind Stays",
+              title: "Senior Rails Engineer",
+              location: "Remote - Europe",
+              work_mode: "remote",
+              salary_text: "EUR 85000–100000 per year",
+              match_score: 86,
+              found_at: new Date().toISOString(),
+            },
+          ],
+        }),
+      },
+      {
+        "GET /api/v1/companies": { body: companies([], []) },
+        [`GET /api/v1/opportunities/${hit}`]: {
+          body: opportunity({
+            id: hit,
+            company: "Northwind Stays",
+            title: "Senior Rails Engineer",
+          }),
+        },
+        [`PATCH /api/v1/opportunities/${hit}`]: {
+          body: opportunity({ id: hit, company: "Northwind Stays", new: false }),
+        },
+      },
+    );
+    const user = userEvent.setup();
+    const { router } = renderApp("/");
+    const card = await screen.findByTestId(`today-hit-${hit}`);
+    expect(card).toHaveTextContent("Northwind Stays posted a job that fits you");
+    expect(card).toHaveTextContent(
+      "Senior Rails Engineer · Remote - Europe · EUR 85000–100000 per year",
+    );
+    const found = screen.getByTestId(`today-hit-found-${hit}`);
+    expect(found).toHaveTextContent("Found on their own job board today at");
+    expect(found).toHaveTextContent("fits 86 · in Pipeline as Found");
+    await user.click(screen.getByTestId(`today-hit-open-${hit}`));
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe("/pipeline");
+    });
+    expect(await screen.findByTestId("peek")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({});
+    });
+  });
+
+  it("sets a job from a watched company aside with Not for me", async () => {
+    const hit = "0190a1b2-0000-7000-8000-0000000000e2";
+    const requests = signedIn(
+      {
+        body: todayAnswer("review_matches", {
+          company_hits: [
+            {
+              id: hit,
+              company: "Northwind Stays",
+              title: "Staff Engineer",
+              found_at: new Date().toISOString(),
+            },
+          ],
+        }),
+      },
+      {
+        "GET /api/v1/companies": { body: companies([], []) },
+        [`PATCH /api/v1/opportunities/${hit}`]: { body: opportunity({ id: hit, dismissed: true }) },
+      },
+    );
+    const user = userEvent.setup();
+    renderApp("/");
+    await user.click(await screen.findByTestId(`today-hit-dismiss-${hit}`));
+    await waitFor(() => {
+      expect(requests.map(({ route }) => route)).toContain(`PATCH /api/v1/opportunities/${hit}`);
+    });
+  });
+
+  it("suggests a company to watch, with why, and watches it on a click", async () => {
+    const requests = signedIn(
+      { body: todayAnswer("none", { latest_search: search() }) },
+      {
+        "GET /api/v1/companies": { body: companies([suggestion()], []) },
+        [`POST /api/v1/companies/${FABRIKAM}/watch`]: {
+          status: 202,
+          body: companies(
+            [],
+            [watching({ id: FABRIKAM, name: "Fabrikam Pay", board: "none", finding: true })],
+          ),
+        },
+      },
+    );
+    const user = userEvent.setup();
+    const { router } = renderApp("/");
+    const card = await screen.findByTestId("today-suggestion");
+    expect(card).toHaveTextContent("Fabrikam Pay: watch their job board?");
+    expect(card).toHaveTextContent("3 of their jobs fit you in the last 6 weeks");
+    expect(screen.queryByTestId("today-suggestion-reasons")).toBeNull();
+    await user.click(screen.getByTestId("today-suggestion-why"));
+    expect(screen.getByTestId("today-suggestion-reasons")).toHaveTextContent(
+      "Remote in every posting",
+    );
+    await user.click(screen.getByTestId("today-suggestion-watch"));
+    expect(await screen.findByTestId("today-suggestion-watching")).toHaveTextContent(
+      "Watching Fabrikam Pay.",
+    );
+    expect(requests.map(({ route }) => route)).toContain(
+      `POST /api/v1/companies/${FABRIKAM}/watch`,
+    );
+    await user.click(screen.getByTestId("today-suggestion-see"));
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe("/companies");
+    });
+    expect(router.state.location.search).toEqual({ tab: "watching" });
   });
 
   it("shows what the AI cost this month on Profile & goals", async () => {

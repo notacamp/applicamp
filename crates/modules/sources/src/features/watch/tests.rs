@@ -649,6 +649,14 @@ async fn no_board_is_found_until_a_careers_page_that_has_one_is_pasted(db: PgPoo
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
     assert_eq!(body["code"], "invalid_url");
+    // Never LinkedIn, Indeed or Glassdoor, whatever the page.
+    let (status, _) = post_json(
+        &h,
+        &format!("/api/v1/companies/{id}/careers"),
+        &json!({ "url": "https://www.linkedin.com/company/acme/jobs" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
 
     let (status, body) = post_json(
         &h,

@@ -654,5 +654,14 @@
       "not_found": "This cover letter wasn’t found.",
       "generic": "Something went wrong. Try again."
     }
+  },
+  "hit": {
+    "title": "{{company}} posted a job that fits you",
+    "foundToday": "Found on their own job board today at {{time}}",
+    "foundOn": "Found on their own job board on {{date}}",
+    "fits": "fits {{score}}",
+    "inPipeline": "in Pipeline as Found",
+    "open": "Open it",
+    "notForMe": "Not for me"
   }
 }

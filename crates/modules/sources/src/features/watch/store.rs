@@ -7,7 +7,7 @@ use chrono::{DateTime, TimeDelta, Utc};
 use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
-use super::{detect::BoardKind, suggest::Reason};
+use super::{detect::BoardKind, suggest::CompanyReason};
 
 /// A watch ending its search for a board is taken as dead after this long.
 pub const FINDING_DEAD: TimeDelta = TimeDelta::minutes(10);
@@ -19,7 +19,7 @@ pub struct Row {
     pub company: Uuid,
     pub account: Uuid,
     pub state: String,
-    pub reasons: sqlx::types::Json<Vec<Reason>>,
+    pub reasons: sqlx::types::Json<Vec<CompanyReason>>,
     pub created_at: DateTime<Utc>,
     pub watching_since: Option<DateTime<Utc>>,
     pub finding_since: Option<DateTime<Utc>>,
@@ -165,7 +165,7 @@ pub async fn suggest(
     conn: &mut PgConnection,
     account: Uuid,
     company: Uuid,
-    reasons: &[Reason],
+    reasons: &[CompanyReason],
     now: DateTime<Utc>,
 ) -> Result<bool> {
     let suggested: Option<String> = sqlx::query_scalar(

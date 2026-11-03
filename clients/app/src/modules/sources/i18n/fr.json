@@ -251,5 +251,140 @@
       "error": "{{name}} : lecture impossible ({{error}})",
       "checked": "{{name}} : vérifié · {{note}}"
     }
+  },
+  "companies": {
+    "loading": "Chargement des entreprises…",
+    "loadFailed": "Impossible de charger les entreprises.",
+    "retry": "Réessayer",
+    "tabs": {
+      "label": "Vue des entreprises",
+      "suggestedCount": "Suggérées · {{n}}",
+      "watchingCount": "Suivies · {{n}}",
+      "how": "Comment ça marche et coût",
+      "suggested": "Suggérées",
+      "watching": "Suivies"
+    },
+    "suggested": {
+      "emptyTitle": "Aucune suggestion pour le moment",
+      "emptyBody": "Elles viennent des offres qui vous correspondent : plus de recherches, plus de suggestions."
+    },
+    "card": {
+      "reasons": "Pourquoi {{name}}",
+      "watch": "Suivre son site d’emploi",
+      "notInterested": "Pas intéressé",
+      "why": "Pourquoi ?"
+    },
+    "reason": {
+      "shortlisted_one": "Vous avez présélectionné l’une de ses offres",
+      "shortlisted_other": "Vous avez présélectionné {{count}} de ses offres",
+      "matches_one": "{{count}} de ses offres vous correspond ces {{weeks}} dernières semaines",
+      "matches_other": "{{count}} de ses offres vous correspondent ces {{weeks}} dernières semaines",
+      "matchesWeek_one": "{{count}} de ses offres vous correspond cette semaine",
+      "matchesWeek_other": "{{count}} de ses offres vous correspondent cette semaine",
+      "stack": "{{skills}} dans ses offres",
+      "remoteAll": "Télétravail dans toutes les offres",
+      "remoteSome": "Télétravail dans {{n}} offres sur {{total}}",
+      "region": "Ouverte à : {{places}}",
+      "pay": "Rémunération : {{pay}}",
+      "fact": "{{fact}}"
+    },
+    "source": {
+      "posting": "{{title}} (correspondance {{score}})",
+      "fact": "Lu sur le site de {{company}}, pour votre CV"
+    },
+    "board": {
+      "greenhouse": "Greenhouse",
+      "lever": "Lever",
+      "ashby": "Ashby",
+      "jsonld": "Sa page carrières (JobPosting)",
+      "none": "Aucun site d’emploi"
+    },
+    "watching": {
+      "emptyTitle": "Vous ne suivez encore aucune entreprise",
+      "emptyBody": "Suivez une entreprise suggérée, ou collez ci-dessous une page carrières. Son propre site d’emploi est consulté chaque jour.",
+      "finding": "Recherche de son site d’emploi…",
+      "notFound": "Site d’emploi introuvable",
+      "pasteHint": "Collez sa page carrières et Applicamp ira y voir.",
+      "lookThere": "Chercher là",
+      "open_one": "{{count}} offre ouverte",
+      "open_other": "{{count}} offres ouvertes",
+      "checkedToday": "Consulté aujourd’hui à {{time}}",
+      "checked": "Consulté {{date}}",
+      "notYet": "Pas encore consulté : ce soir à 21 h 00",
+      "failed": "La dernière consultation a échoué : {{reason}}",
+      "stop": "Ne plus suivre"
+    },
+    "failure": {
+      "no_board": "aucun site d’emploi trouvé",
+      "robots_disallows": "son site demande aux robots de ne pas le lire",
+      "unreachable": "son site est injoignable",
+      "rate_limited": "le site d’emploi a demandé de ralentir",
+      "unexpected_answer": "la réponse du site d’emploi n’était pas celle attendue",
+      "too_large": "la réponse du site d’emploi était trop volumineuse",
+      "refused_host": "son adresse ne peut pas être lue",
+      "http": "le site d’emploi a répondu {{status}}"
+    },
+    "add": {
+      "title": "Suivre une entreprise vous-même",
+      "body": "Collez la page carrières de l’entreprise. Applicamp vérifie qu’elle a un site d’emploi qu’il sait lire.",
+      "label": "Page carrières",
+      "placeholder": "https://entreprise.exemple/carrieres",
+      "go": "Vérifier et suivre",
+      "limit": "Jusqu’à {{max}} entreprises. Chacune est consultée une fois par jour, et seules les nouvelles offres qui respectent vos exigences sont évaluées.",
+      "full": "Vous suivez {{max}} entreprises, le maximum. Ne suivez plus l’une d’elles pour en ajouter une autre."
+    },
+    "errors": {
+      "watch_limit_reached": "Vous pouvez suivre jusqu’à {{max}} entreprises. Ne suivez plus l’une d’elles pour en ajouter une autre.",
+      "invalid_url": "Collez la page carrières de l’entreprise, en commençant par https://.",
+      "generic": "Ça n’a pas marché. Réessayez."
+    },
+    "today": {
+      "title": "{{name}} : suivre son site d’emploi ?",
+      "body": "Applicamp le consulterait chaque jour et vous préviendrait dès qu’une offre qui vous correspond apparaît.",
+      "watching": "Suivi de {{name}} en cours. Recherche de son site d’emploi…",
+      "see": "Voir les entreprises suivies"
+    },
+    "how": {
+      "eyebrow": "Comment ça marche",
+      "title": "Suggérées d’après vos correspondances, consultées chaque jour sans IA",
+      "steps": {
+        "suggest": {
+          "title": "Suggestions (sans IA).",
+          "body": "Une entreprise est suggérée quand ses offres continuent de vous correspondre : au moins 2 correspondances, ou 1 que vous avez présélectionnée, ces 8 dernières semaines. Chaque raison renvoie à l’offre dont elle vient, ou aux faits sur l’entreprise déjà lus pour un CV. Rien n’est inventé. « Pas intéressé » la masque pour de bon."
+        },
+        "find": {
+          "title": "Trouver le site d’emploi (sans IA).",
+          "body": "Quand vous appuyez sur Suivre, Applicamp cherche la page carrières de l’entreprise sur son propre site et y repère un site Greenhouse, Lever ou Ashby ou des données JobPosting de schema.org, avec les mêmes lecteurs que les sites d’emploi. Il respecte le robots.txt. S’il ne trouve rien, vous pouvez coller la page carrières."
+        },
+        "daily": {
+          "title": "Chaque jour (presque sans IA).",
+          "body": "Chaque site suivi est lu une fois par jour et comparé à celui de la veille. Seules les nouvelles offres qui respectent vos exigences impératives (télétravail, pays, salaire minimum) vont à l’IA pour être évaluées, dans le même lot que la recherche de nuit. La plupart des jours, il n’y a rien de nouveau, donc rien à payer."
+        },
+        "match": {
+          "title": "Une correspondance (score de 65 ou plus)",
+          "body": "arrive dans Opportunités comme Trouvée et s’affiche dans Aujourd’hui : « L’entreprise a publié une offre qui vous correspond »."
+        }
+      },
+      "costTitle": "Coût",
+      "cost": {
+        "suggest": {
+          "step": "Suggérer des entreprises",
+          "price": "Sans IA · 0 €"
+        },
+        "find": {
+          "step": "Trouver un site d’emploi",
+          "price": "Sans IA · 0 €"
+        },
+        "none": {
+          "step": "Consultation du jour, sans nouvelle offre",
+          "price": "Sans IA · 0 €"
+        },
+        "new": {
+          "step": "Nouvelles offres qui respectent vos exigences",
+          "price": "Évaluées avec la recherche de nuit · environ 0,0003 € chacune"
+        }
+      },
+      "limits": "Jusqu’à {{max}} entreprises suivies. Cela compte dans vos limites (0,30 € par jour, 5 € par mois), et rien n’est retenté au-delà d’une limite."
+    }
   }
 }

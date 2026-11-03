@@ -355,10 +355,9 @@ pub fn name_of_page(html: &str) -> Option<String> {
     if let Some(caps) = SITE_NAME.captures(html)
         && let Some(name) = caps.get(1)
     {
-        let name = crate::job::decode_entities(name.as_str());
-        let name = name.trim();
+        let name = clean_name(&crate::job::decode_entities(name.as_str()));
         if !name.is_empty() {
-            return Some(name.to_owned());
+            return Some(name);
         }
     }
     let title = TITLE.captures(html)?.get(1)?.as_str();
@@ -370,7 +369,36 @@ pub fn name_of_page(html: &str) -> Option<String> {
         .split(" - ")
         .next()?
         .trim();
-    (!first.is_empty() && first.chars().count() <= 100).then(|| first.to_owned())
+    let first = clean_name(first);
+    (!first.is_empty() && first.chars().count() <= 100).then_some(first)
+}
+
+/// A company's name without what a careers page's title adds to it
+/// ("Careers at Contoso Health", "Contoso Health Jobs").
+fn clean_name(raw: &str) -> String {
+    let mut name = raw.trim();
+    for prefix in ["careers at ", "jobs at ", "work at ", "join "] {
+        if name
+            .get(..prefix.len())
+            .is_some_and(|head| head.eq_ignore_ascii_case(prefix))
+            && let Some(rest) = name.get(prefix.len()..)
+        {
+            name = rest.trim();
+            break;
+        }
+    }
+    for suffix in [" careers", " jobs"] {
+        if let Some(cut) = name.len().checked_sub(suffix.len())
+            && name
+                .get(cut..)
+                .is_some_and(|tail| tail.eq_ignore_ascii_case(suffix))
+            && let Some(rest) = name.get(..cut)
+        {
+            name = rest.trim();
+            break;
+        }
+    }
+    name.to_owned()
 }
 
 /// A name from a site's host (`careers.example-co.com` → `Example Co`).
@@ -640,12 +668,17 @@ async fn act_on(
         }
         Page::Postings => {
             let jobs = jsonld_jobs(html, url, who);
+            // The organisation the postings name is the company's name too.
+            let organisation = jobs
+                .first()
+                .map(|job| job.company.clone())
+                .filter(|company| pasted && !company.is_empty() && *company != who.name);
             (!jobs.is_empty()).then(|| Detected {
                 kind: BoardKind::Jsonld,
                 token: None,
                 eu: false,
                 careers_url: Some(url.clone()),
-                name,
+                name: organisation.or(name),
                 jobs,
             })
         }
@@ -672,15 +705,31 @@ pub async fn read_careers(reader: &Reader, who: &Who, url: &Url) -> Result<Vec<J
     Ok(jobs)
 }
 
-/// Whether `host` is one a company's own site is never: a job board, a
-/// professional network or a hiring platform (ADR 0006), whose pages are not
-/// a company's.
-pub fn is_not_a_company_site(host: &str) -> bool {
-    const HOSTS: [&str; 16] = [
+/// Whether `host` is `domain` or a subdomain of it.
+fn on_domain(host: &str, domain: &str) -> bool {
+    let host = host.trim_end_matches('.').to_ascii_lowercase();
+    host == domain || host.ends_with(&format!(".{domain}"))
+}
+
+/// Whether `host` is a site the app never reads (ADR 0006): LinkedIn, Indeed,
+/// Glassdoor and the other job aggregators and networks whose terms forbid it.
+pub fn is_banned_site(host: &str) -> bool {
+    const HOSTS: [&str; 7] = [
         "linkedin.com",
         "indeed.com",
         "glassdoor.com",
         "glassdoor.co.uk",
+        "ziprecruiter.com",
+        "monster.com",
+        "lnkd.in",
+    ];
+    HOSTS.iter().any(|banned| on_domain(host, banned))
+}
+
+/// Whether `host` is one a company's own site is never: a banned site, or a
+/// hiring platform, whose pages are not a company's.
+pub fn is_not_a_company_site(host: &str) -> bool {
+    const PLATFORMS: [&str; 8] = [
         "greenhouse.io",
         "lever.co",
         "ashbyhq.com",
@@ -688,16 +737,9 @@ pub fn is_not_a_company_site(host: &str) -> bool {
         "smartrecruiters.com",
         "recruitee.com",
         "teamtailor.com",
-        "breezy.hr",
-        "bamboohr.com",
         "myworkdayjobs.com",
-        "ziprecruiter.com",
-        "monster.com",
     ];
-    let host = host.trim_end_matches('.').to_ascii_lowercase();
-    HOSTS
-        .iter()
-        .any(|blocked| host == *blocked || host.ends_with(&format!(".{blocked}")))
+    is_banned_site(host) || PLATFORMS.iter().any(|platform| on_domain(host, platform))
 }
 
 /// The key a company's website is known by: its host without `www.`.
@@ -774,6 +816,14 @@ mod tests {
             Some("Northwind Stays")
         );
         assert_eq!(
+            name_of_page("<title>Careers at Contoso Health</title>").as_deref(),
+            Some("Contoso Health")
+        );
+        assert_eq!(
+            name_of_page("<title>Fabrikam Pay Jobs | Fabrikam</title>").as_deref(),
+            Some("Fabrikam Pay")
+        );
+        assert_eq!(
             name_of_host("careers.northwind-stays.test"),
             "Northwind Stays"
         );
@@ -793,6 +843,7 @@ mod tests {
         }
         assert!(!is_not_a_company_site("northwind.test"));
         assert!(!is_not_a_company_site("notindeed.com"));
+        assert!(is_banned_site("www.linkedin.com") && !is_banned_site("boards.greenhouse.io"));
     }
 
     #[test]

@@ -47,26 +47,26 @@ use crate::{SourcesDeps, net};
 
 pub use detect::BoardKind;
 use detect::{AtsBoard, Start, Who};
-pub use suggest::{Reason, ReasonKind, ReasonSource, SourceKind};
+pub use suggest::{CompanyReason, CompanyReasonKind, CompanyReasonSource, CompanyReasonSourceKind};
 
 /// Companies one person may watch at once.
 pub const MAX_WATCHED: i64 = 20;
 
 /// A company worth watching.
 #[derive(Debug, Clone, Serialize, ToSchema)]
-pub struct Suggestion {
+pub struct CompanySuggestion {
     /// The company.
     pub id: Uuid,
     pub name: String,
     /// Its own site.
     pub website: Option<String>,
     /// Why, each traced to a posting (or a fact read on its site).
-    pub reasons: Vec<Reason>,
+    pub reasons: Vec<CompanyReason>,
 }
 
 /// A company the person watches.
 #[derive(Debug, Clone, Serialize, ToSchema)]
-pub struct Watching {
+pub struct WatchedCompany {
     /// The company.
     pub id: Uuid,
     pub name: String,
@@ -91,8 +91,8 @@ pub struct Watching {
 /// The suggestions and the watched companies.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct CompanyList {
-    pub suggested: Vec<Suggestion>,
-    pub watching: Vec<Watching>,
+    pub suggested: Vec<CompanySuggestion>,
+    pub watching: Vec<WatchedCompany>,
     /// Companies one person may watch at once.
     pub limit: u32,
 }
@@ -109,7 +109,7 @@ async fn list_of(db: &PgPool, account: Uuid, now: DateTime<Utc>) -> Result<Compa
     let mut watching = Vec::new();
     for row in store::shown(db, account).await? {
         if row.state == "suggested" {
-            suggested.push(Suggestion {
+            suggested.push(CompanySuggestion {
                 id: row.company,
                 name: row.name,
                 website: row.website,
@@ -118,7 +118,7 @@ async fn list_of(db: &PgPool, account: Uuid, now: DateTime<Utc>) -> Result<Compa
         } else {
             let finding = row.finding(now);
             let board = row.kind();
-            watching.push(Watching {
+            watching.push(WatchedCompany {
                 id: row.company,
                 name: row.name.clone(),
                 website: row.website.clone(),
@@ -330,6 +330,10 @@ fn parse_pasted(deps: &SourcesDeps, raw: &str) -> Result<Url> {
     };
     let mut url = Url::parse(&with_scheme).map_err(|_| invalid_url())?;
     net::check(&url, deps.config.allow_private_hosts()).map_err(|_| invalid_url())?;
+    // Never LinkedIn, Indeed or Glassdoor (ADR 0006).
+    if url.host_str().is_some_and(detect::is_banned_site) {
+        return Err(invalid_url());
+    }
     url.set_fragment(None);
     Ok(url)
 }

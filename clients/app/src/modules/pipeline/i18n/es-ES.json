@@ -654,5 +654,14 @@
       "not_found": "No se ha encontrado esta carta de presentación.",
       "generic": "Algo ha salido mal. Inténtalo de nuevo."
     }
+  },
+  "hit": {
+    "title": "{{company}} ha publicado una oferta que encaja contigo",
+    "foundToday": "Encontrada en el portal de empleo de la propia empresa hoy a las {{time}}",
+    "foundOn": "Encontrada en el portal de empleo de la propia empresa el {{date}}",
+    "fits": "encaje {{score}}",
+    "inPipeline": "en Oportunidades como Encontrada",
+    "open": "Abrirla",
+    "notForMe": "No es para mí"
   }
 }

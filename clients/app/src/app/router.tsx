@@ -15,6 +15,7 @@ import { QUESTIONS, type Question } from "~/modules/profile";
 
 import { Agents } from "./routes/agents";
 import { Boards } from "./routes/boards";
+import { Companies } from "./routes/companies";
 import { Cvs } from "./routes/cvs";
 import { SignedInFrame } from "./routes/frame";
 import { GoalsInterview } from "./routes/goals-interview";
@@ -79,11 +80,13 @@ const todayRoute = createRoute({ getParentRoute: () => frameRoute, path: "/", co
 
 /**
  * `?new=true` shows only the new matches (Today's "N new matches");
- * `?run=search` starts a search and `?run=add` opens New (⌘K, from anywhere).
+ * `?run=search` starts a search and `?run=add` opens New (⌘K, from anywhere);
+ * `?open=<id>` shows that opportunity's peek (Today's "Open it").
  */
 const pipelineSearch = z.object({
   new: z.boolean().optional(),
   run: z.enum(["search", "add"]).optional(),
+  open: z.uuid().optional(),
 });
 
 const pipelineRoute = createRoute({
@@ -91,9 +94,15 @@ const pipelineRoute = createRoute({
   path: "/pipeline",
   validateSearch: (
     search: Record<string, unknown>,
-  ): { new?: boolean | undefined; run?: "search" | "add" | undefined } => {
+  ): {
+    new?: boolean | undefined;
+    run?: "search" | "add" | undefined;
+    open?: string | undefined;
+  } => {
     const parsed = pipelineSearch.safeParse(search);
-    return parsed.success ? { new: parsed.data.new, run: parsed.data.run } : {};
+    return parsed.success
+      ? { new: parsed.data.new, run: parsed.data.run, open: parsed.data.open }
+      : {};
   },
   component: function PipelineRoute() {
     const search = pipelineRoute.useSearch();
@@ -102,6 +111,7 @@ const pipelineRoute = createRoute({
       <Pipeline
         newOnly={search.new === true}
         run={search.run}
+        open={search.open}
         onSearch={(next) => {
           void navigate({ search: next, replace: true });
         }}
@@ -228,6 +238,29 @@ const boardsRoute = createRoute({
         tab={search.tab ?? "boards"}
         onTab={(tab) => {
           void navigate({ search: tab === "scanned" ? { tab } : {}, replace: true });
+        }}
+      />
+    );
+  },
+});
+/** `?tab=watching` shows the companies watched, `?tab=how` how it works; none, the suggestions. */
+const companiesSearch = z.object({ tab: z.enum(["watching", "how"]) });
+
+const companiesRoute = createRoute({
+  getParentRoute: () => frameRoute,
+  path: "/companies",
+  validateSearch: (search: Record<string, unknown>): { tab?: "watching" | "how" | undefined } => {
+    const parsed = companiesSearch.safeParse(search);
+    return { tab: parsed.success ? parsed.data.tab : undefined };
+  },
+  component: function CompaniesRoute() {
+    const search = companiesRoute.useSearch();
+    const navigate = companiesRoute.useNavigate();
+    return (
+      <Companies
+        tab={search.tab ?? "suggested"}
+        onTab={(tab) => {
+          void navigate({ search: tab === "suggested" ? {} : { tab }, replace: true });
         }}
       />
     );
@@ -402,6 +435,7 @@ const routeTree = rootRoute.addChildren([
     letterRoute,
     cvsRoute,
     boardsRoute,
+    companiesRoute,
     agentsRoute,
     profileRoute,
     profileSkillsRoute,

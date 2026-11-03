@@ -30,6 +30,13 @@ export const APP_SHORTCUTS = [
     label: "shortcuts:nav.boards",
   },
   {
+    id: "nav.companies",
+    keys: "g o",
+    scope: "global",
+    group: "navigation",
+    label: "shortcuts:nav.companies",
+  },
+  {
     id: "nav.agents",
     keys: "g a",
     scope: "global",

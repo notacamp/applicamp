@@ -1,0 +1,14 @@
+# Tasks
+- [x] 1 OpenSpec change: proposal with its cost, design, spec deltas
+- [x] 2 Migration `companies`, `company_watches`, `watch_seen`, `watch_refreshes`; scan rows can name a company
+- [x] 3 Suggestions from the matches (no model): threshold, window, exclusions, traced reasons
+- [x] 4 Finding the job board (no model): a posting's link, the company's site with robots.txt, Greenhouse/Lever/Ashby, JobPosting data, confirm by reading
+- [x] 5 Endpoints: list, watch, not interested, stop, paste a careers page, give a watch a careers page; 20 companies at most
+- [x] 6 The daily check inside the search: read due boards, diff against what was seen, hard limits before scoring, same batches and budget, scan rows, failure keeps the watch, unscored postings wait
+- [x] 7 The nightly job starts a search for a due watch; it still reschedules itself with `enqueue_next_at`
+- [x] 8 Matches credited to the company's own board; Today's `company_hits`
+- [x] 9 Client: Companies page (Suggested, Watching, Watch yourself, How it works & cost), Today's hit and suggestion cards, "Open it" to the Pipeline's peek, nav and shortcut, four languages
+- [x] 10 Fakes: company sites (Greenhouse link, JobPosting data, nothing), a board whose second read adds a job that fits and one that fails a requirement, the remote board's Northwind jobs
+- [x] 11 Tests: server (threshold, window, exclusions, dismissal, detection per kind, robots.txt, daily diff, hard limits before scoring, cap, nightly recurrence, failed board, unscored wait), client, Playwright
+- [x] 12 OpenAPI regenerated, client types regenerated, changelog entry file
+- [ ] 13 Gates green in CI, recording (UI at 375px and desktop; by the lead)

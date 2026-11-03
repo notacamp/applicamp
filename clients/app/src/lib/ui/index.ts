@@ -118,3 +118,12 @@ export {
   ReviewLayout,
   type ReviewLayoutProps,
 } from "./components/Cv/Cv";
+export {
+  CompanyActions,
+  CompanyCard,
+  CompanyStatus,
+  ReasonList,
+  ReasonRow,
+  type CompanyCardProps,
+  type ReasonRowProps,
+} from "./components/CompanyCard/CompanyCard";

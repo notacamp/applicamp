@@ -57,6 +57,18 @@ services:
           - flaky-desktop.test
           - flaky-phone.test
           - flaky-demo.test
+          # Companies watched (#20), one set per Playwright project and one to
+          # show by hand: a careers page that links a Greenhouse board, one with
+          # JobPosting data, and one with no job board.
+          - northwind-desktop.test
+          - northwind-phone.test
+          - northwind-demo.test
+          - contoso-desktop.test
+          - contoso-phone.test
+          - contoso-demo.test
+          - tailspin-desktop.test
+          - tailspin-phone.test
+          - tailspin-demo.test
     environment:
       FAKE_JOBS_HOST: 0.0.0.0
       FAKE_JOBS_PORT: "9020"
@@ -94,6 +106,9 @@ services:
       APPLICAMP_SOURCES__MANUAL_PER_DAY: "0"
       APPLICAMP_SOURCES__MANUAL_EVERY_SECS: "0"
       APPLICAMP_SOURCES__NIGHTLY: "false"
+      # Every search also reads the watched companies' boards (a board is read
+      # once every 20 hours otherwise), so a test needs no wait for the night.
+      APPLICAMP_SOURCES__WATCH_EVERY_SECS: "0"
       APPLICAMP_AI__COMPLETE__BASE_URL: http://fake-jobs:9020/v1
       APPLICAMP_AI__COMPLETE__MODEL: fake/model
       # Agent runs (the Agents page's Run a check): the runner as a child

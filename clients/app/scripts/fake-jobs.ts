@@ -54,6 +54,19 @@
 // can support, and an empty one for a notice period, salary, visa or move
 // (the profile cannot say). The posting lists two application questions.
 //
+// Company watchers (#20): three companies' own sites per Playwright project
+// (desktop, phone) and one to show by hand (demo), each at its own host name:
+//   northwind-<p>.test  a company whose /careers links its Greenhouse board
+//                       `northwind-<p>`. The board's first read lists two jobs;
+//                       every later one adds two: a Platform Engineer that
+//                       fits, and a Senior Backend Engineer that is open only to
+//                       Germany and Austria (dropped for the requirements). Two
+//                       jobs of this company are what the remote board lists for
+//                       the skill `Watch-<p>`, so a profile that lists it has
+//                       matches from Northwind Stays, and its site is known;
+//   contoso-<p>.test    a company whose /careers holds schema.org JobPosting data;
+//   tailspin-<p>.test   a company with no job board anywhere.
+//
 // Every list answers with four new jobs (new ids each time); a board keeps to
 // its polling interval, so a search within it reads the last answer. The
 // fourth is remote only from Germany or Austria, in the words of the posting
@@ -616,16 +629,26 @@ async function complete(request: IncomingMessage, response: ServerResponse) {
   json(response, 200, completion({ jobs }));
 }
 
+/** The company a remote board job is of; its own site, when the board gives it. */
+interface Employer {
+  name: string;
+  slug: string;
+  url?: string;
+}
+
+const EXAMPLE_CO: Employer = { name: "Example Co", slug: "example-co" };
+
 /** A job as Himalayas' API lists it (`/jobs/api`), with the posting's words. */
-function remoteJob(id: number, title: string) {
+function remoteJob(id: number, title: string, employer: Employer = EXAMPLE_CO) {
   const dach = title === ROLES[DACH];
   const slug = `${title.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-")}-${String(id)}`;
   const seconds = Math.floor(Date.now() / 1000);
   return {
     title,
-    excerpt: "Example Co builds invented software for invented customers.",
-    companyName: "Example Co",
-    companySlug: "example-co",
+    excerpt: `${employer.name} builds invented software for invented customers.`,
+    companyName: employer.name,
+    companySlug: employer.slug,
+    ...(employer.url === undefined ? {} : { companyUrl: employer.url }),
     employmentType: "Full Time",
     minSalary: dach ? 70_000 : 110_000,
     maxSalary: dach ? 90_000 : 140_000,
@@ -635,7 +658,7 @@ function remoteJob(id: number, title: string) {
     locationRestrictions: [],
     timezoneRestrictions: [],
     categories: ["Software-Engineer"],
-    description: `<p>Example Co builds invented software for invented customers.</p><ul><li>Work with a small team</li>${
+    description: `<p>${employer.name} builds invented software for invented customers.</p><ul><li>Work with a small team</li>${
       dach
         ? "<li>Standort: Remote-first aus Deutschland oder Österreich</li>"
         : "<li>Remote within Europe</li>"
@@ -709,6 +732,132 @@ function waitingBoard(site: string, url: URL, response: ServerResponse): boolean
     }
     console.log(`fake-jobs: listed the waiting board ${site}`);
     json(response, 200, waitingJobs(site));
+    return true;
+  }
+  return false;
+}
+
+/** The watched companies' own sites (#20): one host per Playwright project, and one for a demo. */
+const WATCHED_HOST = /^(northwind|contoso|tailspin)-(desktop|phone|demo)\.test$/;
+/** The skill whose search on the remote board lists a project's Northwind Stays jobs. */
+const WATCH_KEYWORD = /^Watch-(desktop|phone|demo)$/;
+
+/** What differs between projects, so that two of them never share a job, a company or an id. */
+const PROJECTS: Record<string, { first: number; titles: [string, string]; fit: string }> = {
+  desktop: {
+    first: 1000,
+    titles: ["Senior Rails Engineer", "Backend Engineer"],
+    fit: "Staff Platform Engineer",
+  },
+  phone: {
+    first: 2000,
+    titles: ["Senior Ruby Engineer", "Platform Engineer"],
+    fit: "Principal Platform Engineer",
+  },
+  demo: {
+    first: 3000,
+    titles: ["Staff Rails Engineer", "Product Engineer"],
+    fit: "Staff Product Engineer",
+  },
+};
+
+/** Northwind Stays of a project: the demo's is plain, the tests' say which they are. */
+function northwind(project: string): Employer {
+  return {
+    name: project === "demo" ? "Northwind Stays" : `Northwind Stays (${project})`,
+    slug: `northwind-${project}`,
+    url: `http://northwind-${project}.test:9020/`,
+  };
+}
+
+/** Reads of each Northwind board: the first lists two jobs, every later one two more. */
+const northwindReads = new Map<string, number>();
+
+interface WatchedJob {
+  id: number;
+  title: string;
+  place: string;
+}
+
+function northwindJobs(project: string, reads: number): WatchedJob[] {
+  const first = PROJECTS[project]?.first ?? 0;
+  const fit = PROJECTS[project]?.fit ?? "Staff Platform Engineer";
+  const jobs: WatchedJob[] = [
+    { id: first + 1, title: "Senior Rails Engineer", place: "Remote - Europe" },
+    { id: first + 2, title: "Office Manager", place: "Porto" },
+  ];
+  if (reads >= 2) {
+    jobs.push(
+      { id: first + 3, title: fit, place: "Remote - Europe" },
+      { id: first + 4, title: "Senior Backend Engineer (m/w/d)", place: "Berlin" },
+    );
+  }
+  return jobs;
+}
+
+/** A job of a Northwind board, as Greenhouse lists it. */
+function northwindJob(token: string, job: WatchedJob) {
+  const now = new Date().toISOString();
+  return {
+    id: job.id,
+    title: job.title,
+    updated_at: now,
+    first_published: now,
+    location: { name: job.place },
+    absolute_url: `https://boards.greenhouse.io/${token}/jobs/${String(job.id)}`,
+    company_name: "Northwind Stays",
+  };
+}
+
+/** The pages of the watched companies' sites; whether one answered. */
+function watchedSite(site: string, url: URL, response: ServerResponse): boolean {
+  const match = WATCHED_HOST.exec(site);
+  const kind = match?.[1];
+  const project = match?.[2];
+  if (kind === undefined || project === undefined) {
+    return false;
+  }
+  if (url.pathname === "/robots.txt") {
+    text(response, "text/plain", "User-agent: *\nDisallow: /private\n");
+    return true;
+  }
+  const name = kind === "northwind" ? northwind(project).name : kind;
+  if (url.pathname === "/") {
+    const careers = kind === "tailspin" ? "" : `<nav><a href="/careers">Careers</a></nav>`;
+    text(
+      response,
+      "text/html",
+      `<html><head><title>${name}</title></head><body><h1>${name}</h1><p>Invented software for invented customers.</p>${careers}</body></html>`,
+    );
+    return true;
+  }
+  if (kind === "northwind" && url.pathname === "/careers") {
+    text(
+      response,
+      "text/html",
+      `<html><head><title>Careers at ${name}</title></head><body><h1>Careers</h1><p>Come and build with us.</p><a href="https://boards.greenhouse.io/northwind-${project}">See our open roles</a></body></html>`,
+    );
+    return true;
+  }
+  if (kind === "contoso" && url.pathname === "/careers") {
+    const posting = (slug: string, title: string) => ({
+      "@type": "JobPosting",
+      title,
+      url: `http://${site}:9020/careers/${slug}`,
+      datePosted: new Date().toISOString().slice(0, 10),
+      jobLocationType: "TELECOMMUTE",
+      hiringOrganization: { "@type": "Organization", name: "Contoso Health" },
+      description: `<p>${title} at Contoso Health, an invented company.</p>`,
+    });
+    const graph = [
+      posting("clinical-platform-engineer", "Clinical Platform Engineer"),
+      posting("data-engineer", "Data Engineer"),
+    ];
+    text(
+      response,
+      "text/html",
+      `<html><head><title>Careers at Contoso Health</title><script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@graph": graph })}</script></head><body><h1>Careers</h1></body></html>`,
+    );
     return true;
   }
   return false;
@@ -1063,11 +1212,46 @@ const server = createServer((request, response) => {
       return;
     }
   }
+  if (method === "GET" && WATCHED_HOST.test(site) && watchedSite(site, url, response)) {
+    return;
+  }
   if (method === "GET" && site.endsWith(".test") && waitingBoard(site, url, response)) {
     return;
   }
   const board = /^\/v1\/boards\/([\w-]+)\/jobs\/?$/.exec(url.pathname);
   const posting = /^\/v1\/boards\/([\w-]+)\/jobs\/(\d+)$/.exec(url.pathname);
+  const watchedBoard = /^northwind-(desktop|phone|demo)$/.exec(board?.[1] ?? posting?.[1] ?? "");
+  if (method === "GET" && watchedBoard?.[1] !== undefined) {
+    // A watched company's board (#20): two jobs on the first read, two more after it.
+    const project = watchedBoard[1];
+    const token = `northwind-${project}`;
+    if (board !== null) {
+      const reads = (northwindReads.get(token) ?? 0) + 1;
+      northwindReads.set(token, reads);
+      console.log(`fake-jobs: listed the watched board ${token} (read ${String(reads)})`);
+      const jobs = northwindJobs(project, reads);
+      json(response, 200, {
+        jobs: jobs.map((one) => northwindJob(token, one)),
+        meta: { total: jobs.length },
+      });
+      return;
+    }
+    const wanted = northwindJobs(project, 2).find((one) => one.id === Number(posting?.[2]));
+    if (wanted === undefined) {
+      json(response, 404, { error: "not_found" });
+      return;
+    }
+    const where = wanted.title.includes("(m/w/d)")
+      ? "<li>Standort: Remote-first aus Deutschland oder Österreich</li>"
+      : "<li>Remote within Europe</li>";
+    json(response, 200, {
+      ...northwindJob(token, wanted),
+      content: escaped(
+        `<p>Northwind Stays builds invented booking software for invented guesthouses.</p><ul><li>Ruby on Rails</li>${where}</ul>`,
+      ),
+    });
+    return;
+  }
   if (method === "GET" && board !== null) {
     lists += 1;
     const base = Date.now() * 10 + lists;
@@ -1082,6 +1266,20 @@ const server = createServer((request, response) => {
     // The remote board's keyword search (#28): one job naming the keyword.
     const keyword = url.searchParams.get("q") ?? "";
     console.log(`fake-jobs: searched the remote board for "${keyword}"`);
+    const watched = WATCH_KEYWORD.exec(keyword)?.[1];
+    const project = watched === undefined ? undefined : PROJECTS[watched];
+    if (watched !== undefined && project !== undefined) {
+      // Two matches from one company, whose site the board gives (#20).
+      json(response, 200, {
+        offset: 0,
+        limit: 20,
+        totalCount: 2,
+        jobs: project.titles.map((title, index) =>
+          remoteJob(project.first + 90 + index, title, northwind(watched)),
+        ),
+      });
+      return;
+    }
     json(response, 200, {
       offset: 0,
       limit: 20,

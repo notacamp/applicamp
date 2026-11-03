@@ -31,7 +31,7 @@ export function SignedInFrame() {
 }
 
 /**
- * The app frame: the sidebar (Today, Pipeline, Boards, Agents, Profile & goals, the
+ * The app frame: the sidebar (Today, Pipeline, Boards, Companies, Agents, Profile & goals, the
  * shortcuts and the account), or the phone header and tab bar below 48rem;
  * ⌘K's command menu and the `?` sheet.
  */
@@ -54,6 +54,7 @@ function Frame() {
   useShortcut("nav.today", go("/"));
   useShortcut("nav.pipeline", go("/pipeline"));
   useShortcut("nav.boards", go("/boards"));
+  useShortcut("nav.companies", go("/companies"));
   useShortcut("nav.cvs", go("/cvs"));
   useShortcut("nav.agents", go("/agents"));
   useShortcut("nav.profile", go("/profile"));

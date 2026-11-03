@@ -42,7 +42,7 @@ const MOST_SKILLS: usize = 3;
 /// What a reason says.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum ReasonKind {
+pub enum CompanyReasonKind {
     /// You shortlisted one of their jobs.
     Shortlisted,
     /// `count` of their jobs fit you in `weeks` weeks.
@@ -62,7 +62,7 @@ pub enum ReasonKind {
 /// What a reason is traced to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum SourceKind {
+pub enum CompanyReasonSourceKind {
     /// One of the person's matches (an opportunity).
     Posting,
     /// A fact read on the company's own site.
@@ -71,8 +71,8 @@ pub enum SourceKind {
 
 /// Where a reason comes from.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct ReasonSource {
-    pub kind: SourceKind,
+pub struct CompanyReasonSource {
+    pub kind: CompanyReasonSourceKind,
     /// The opportunity, or the fact.
     pub id: Uuid,
     /// The posting's role, or the company.
@@ -83,13 +83,13 @@ pub struct ReasonSource {
 
 /// One reason a company is suggested.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct Reason {
-    pub kind: ReasonKind,
+pub struct CompanyReason {
+    pub kind: CompanyReasonKind,
     pub count: u32,
     pub total: u32,
     pub weeks: u32,
     pub values: Vec<String>,
-    pub sources: Vec<ReasonSource>,
+    pub sources: Vec<CompanyReasonSource>,
 }
 
 /// A company with enough matches, and what they say.
@@ -162,17 +162,17 @@ fn is_a_banned_name(name: &str) -> bool {
         .any(|banned| name.contains(banned))
 }
 
-fn cite(posting: &MatchedPosting) -> ReasonSource {
-    ReasonSource {
-        kind: SourceKind::Posting,
+fn cite(posting: &MatchedPosting) -> CompanyReasonSource {
+    CompanyReasonSource {
+        kind: CompanyReasonSourceKind::Posting,
         id: posting.opportunity,
         label: posting.title.clone(),
         score: Some(posting.match_score),
     }
 }
 
-fn blank(kind: ReasonKind) -> Reason {
-    Reason {
+fn blank(kind: CompanyReasonKind) -> CompanyReason {
+    CompanyReason {
         kind,
         count: 0,
         total: 0,
@@ -204,21 +204,21 @@ pub fn reasons(
     skills: &[String],
     facts: &[CompanyFact],
     now: DateTime<Utc>,
-) -> Vec<Reason> {
+) -> Vec<CompanyReason> {
     let postings = &candidate.postings;
     let total = u32::try_from(postings.len()).unwrap_or(u32::MAX);
     let mut out = Vec::new();
 
     let shortlisted: Vec<&MatchedPosting> = postings.iter().filter(|p| p.shortlisted).collect();
     if !shortlisted.is_empty() {
-        out.push(Reason {
+        out.push(CompanyReason {
             count: u32::try_from(shortlisted.len()).unwrap_or(u32::MAX),
             sources: shortlisted
                 .iter()
                 .take(MOST_CITED)
                 .map(|p| cite(p))
                 .collect(),
-            ..blank(ReasonKind::Shortlisted)
+            ..blank(CompanyReasonKind::Shortlisted)
         });
     }
 
@@ -228,11 +228,11 @@ pub fn reasons(
         let weeks = u32::try_from((days + 6) / 7)
             .unwrap_or(1)
             .clamp(1, WEEKS as u32);
-        out.push(Reason {
+        out.push(CompanyReason {
             count: total,
             weeks,
             sources: postings.iter().take(MOST_CITED).map(cite).collect(),
-            ..blank(ReasonKind::Matches)
+            ..blank(CompanyReasonKind::Matches)
         });
     }
 
@@ -266,7 +266,7 @@ pub fn reasons(
         let mut cited: Vec<usize> = named.iter().flat_map(|(_, i)| i.iter().copied()).collect();
         cited.sort_unstable();
         cited.dedup();
-        out.push(Reason {
+        out.push(CompanyReason {
             values: named.iter().map(|(s, _)| s.clone()).collect(),
             total,
             count: u32::try_from(cited.len()).unwrap_or(u32::MAX),
@@ -275,7 +275,7 @@ pub fn reasons(
                 .take(MOST_CITED)
                 .filter_map(|i| postings.get(i).map(cite))
                 .collect(),
-            ..blank(ReasonKind::Stack)
+            ..blank(CompanyReasonKind::Stack)
         });
     }
 
@@ -284,18 +284,18 @@ pub fn reasons(
         .filter(|p| p.work_mode.as_deref() == Some("remote"))
         .collect();
     if !remote.is_empty() {
-        out.push(Reason {
+        out.push(CompanyReason {
             count: u32::try_from(remote.len()).unwrap_or(u32::MAX),
             total,
             sources: remote.iter().take(MOST_CITED).map(|p| cite(p)).collect(),
-            ..blank(ReasonKind::Remote)
+            ..blank(CompanyReasonKind::Remote)
         });
     }
 
     let place = |p: &MatchedPosting| p.region_note.clone().or_else(|| p.location.clone());
     let regions = distinct(postings.iter().filter_map(place), 3);
     if !regions.is_empty() {
-        out.push(Reason {
+        out.push(CompanyReason {
             sources: postings
                 .iter()
                 .filter(|p| {
@@ -306,13 +306,13 @@ pub fn reasons(
                 .map(cite)
                 .collect(),
             values: regions,
-            ..blank(ReasonKind::Region)
+            ..blank(CompanyReasonKind::Region)
         });
     }
 
     let pay = distinct(postings.iter().filter_map(|p| p.salary_text.clone()), 2);
     if !pay.is_empty() {
-        out.push(Reason {
+        out.push(CompanyReason {
             sources: postings
                 .iter()
                 .filter(|p| {
@@ -324,20 +324,20 @@ pub fn reasons(
                 .map(cite)
                 .collect(),
             values: pay,
-            ..blank(ReasonKind::Pay)
+            ..blank(CompanyReasonKind::Pay)
         });
     }
 
     for fact in facts.iter().take(2) {
-        out.push(Reason {
+        out.push(CompanyReason {
             values: vec![fact.text.clone()],
-            sources: vec![ReasonSource {
-                kind: SourceKind::Fact,
+            sources: vec![CompanyReasonSource {
+                kind: CompanyReasonSourceKind::Fact,
                 id: fact.id,
                 label: fact.company.clone(),
                 score: None,
             }],
-            ..blank(ReasonKind::Fact)
+            ..blank(CompanyReasonKind::Fact)
         });
     }
     out
@@ -495,8 +495,8 @@ mod tests {
         let found = candidates(vec![one], now());
         assert_eq!(found.len(), 1);
         let reasons = reasons(&found[0], &[], &[], now());
-        assert_eq!(reasons[0].kind, ReasonKind::Shortlisted);
-        assert_eq!(reasons[0].sources[0].kind, SourceKind::Posting);
+        assert_eq!(reasons[0].kind, CompanyReasonKind::Shortlisted);
+        assert_eq!(reasons[0].sources[0].kind, CompanyReasonSourceKind::Posting);
     }
 
     #[test]
@@ -542,16 +542,16 @@ mod tests {
             text: "Builds payments for small shops".into(),
         }];
         let reasons = reasons(&found[0], &skills, &facts, now());
-        let kinds: Vec<ReasonKind> = reasons.iter().map(|r| r.kind).collect();
+        let kinds: Vec<CompanyReasonKind> = reasons.iter().map(|r| r.kind).collect();
         assert_eq!(
             kinds,
             [
-                ReasonKind::Matches,
-                ReasonKind::Stack,
-                ReasonKind::Remote,
-                ReasonKind::Region,
-                ReasonKind::Pay,
-                ReasonKind::Fact,
+                CompanyReasonKind::Matches,
+                CompanyReasonKind::Stack,
+                CompanyReasonKind::Remote,
+                CompanyReasonKind::Region,
+                CompanyReasonKind::Pay,
+                CompanyReasonKind::Fact,
             ]
         );
         assert_eq!(reasons[0].count, 3);
@@ -567,7 +567,7 @@ mod tests {
             assert!(!reason.sources.is_empty());
             assert!(reason.sources.iter().all(|s| ids.contains(&s.id)));
         }
-        assert_eq!(reasons[5].sources[0].kind, SourceKind::Fact);
+        assert_eq!(reasons[5].sources[0].kind, CompanyReasonSourceKind::Fact);
         assert_eq!(reasons[5].sources[0].id, facts[0].id);
     }
 }

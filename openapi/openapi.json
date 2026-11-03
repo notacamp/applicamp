@@ -9018,13 +9018,13 @@
           "suggested": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Suggestion"
+              "$ref": "#/components/schemas/CompanySuggestion"
             }
           },
           "watching": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Watching"
+              "$ref": "#/components/schemas/WatchedCompany"
             }
           }
         }
@@ -9071,6 +9071,103 @@
           }
         }
       },
+      "CompanyReason": {
+        "type": "object",
+        "description": "One reason a company is suggested.",
+        "required": [
+          "kind",
+          "count",
+          "total",
+          "weeks",
+          "values",
+          "sources"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CompanyReasonKind"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompanyReasonSource"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "weeks": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "CompanyReasonKind": {
+        "type": "string",
+        "description": "What a reason says.",
+        "enum": [
+          "shortlisted",
+          "matches",
+          "stack",
+          "remote",
+          "region",
+          "pay",
+          "fact"
+        ]
+      },
+      "CompanyReasonSource": {
+        "type": "object",
+        "description": "Where a reason comes from.",
+        "required": [
+          "kind",
+          "id",
+          "label"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The opportunity, or the fact."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CompanyReasonSourceKind"
+          },
+          "label": {
+            "type": "string",
+            "description": "The posting's role, or the company."
+          },
+          "score": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "How well the posting fits, 0 to 100.",
+            "minimum": 0
+          }
+        }
+      },
+      "CompanyReasonSourceKind": {
+        "type": "string",
+        "description": "What a reason is traced to.",
+        "enum": [
+          "posting",
+          "fact"
+        ]
+      },
       "CompanyStage": {
         "type": "string",
         "description": "What kind of company.",
@@ -9081,6 +9178,39 @@
           "public",
           "nonprofit"
         ]
+      },
+      "CompanySuggestion": {
+        "type": "object",
+        "description": "A company worth watching.",
+        "required": [
+          "id",
+          "name",
+          "reasons"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The company."
+          },
+          "name": {
+            "type": "string"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompanyReason"
+            },
+            "description": "Why, each traced to a posting (or a fact read on its site)."
+          },
+          "website": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its own site."
+          }
+        }
       },
       "Completion": {
         "type": "object",
@@ -12771,51 +12901,6 @@
         ],
         "description": "Why a line cannot be traced to the profile."
       },
-      "ReasonKind": {
-        "type": "string",
-        "description": "What a reason says.",
-        "enum": [
-          "shortlisted",
-          "matches",
-          "stack",
-          "remote",
-          "region",
-          "pay",
-          "fact"
-        ]
-      },
-      "ReasonSource": {
-        "type": "object",
-        "description": "Where a reason comes from.",
-        "required": [
-          "kind",
-          "id",
-          "label"
-        ],
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "description": "The opportunity, or the fact."
-          },
-          "kind": {
-            "$ref": "#/components/schemas/SourceKind"
-          },
-          "label": {
-            "type": "string",
-            "description": "The posting's role, or the company."
-          },
-          "score": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "format": "int32",
-            "description": "How well the posting fits, 0 to 100.",
-            "minimum": 0
-          }
-        }
-      },
       "Recorded": {
         "type": "object",
         "description": "What was recorded.",
@@ -14238,39 +14323,6 @@
           }
         }
       },
-      "Suggestion": {
-        "type": "object",
-        "description": "A company worth watching.",
-        "required": [
-          "id",
-          "name",
-          "reasons"
-        ],
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "description": "The company."
-          },
-          "name": {
-            "type": "string"
-          },
-          "reasons": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Reason"
-            },
-            "description": "Why, each traced to a posting (or a fact read on its site)."
-          },
-          "website": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Its own site."
-          }
-        }
-      },
       "Template": {
         "type": "string",
         "description": "How the CV looks.",
@@ -14501,7 +14553,7 @@
           "none"
         ]
       },
-      "Watching": {
+      "WatchedCompany": {
         "type": "object",
         "description": "A company the person watches.",
         "required": [

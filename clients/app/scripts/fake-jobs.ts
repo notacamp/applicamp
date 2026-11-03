@@ -740,7 +740,7 @@ function waitingBoard(site: string, url: URL, response: ServerResponse): boolean
 /** The watched companies' own sites (#20): one host per Playwright project, and one for a demo. */
 const WATCHED_HOST = /^(northwind|contoso|tailspin)-(desktop|phone|demo)\.test$/;
 /** The skill whose search on the remote board lists a project's Northwind Stays jobs. */
-const WATCH_KEYWORD = /^Watch-(desktop|phone|demo)$/;
+const WATCH_KEYWORD = /^watch-(desktop|phone|demo)$/i;
 
 /** What differs between projects, so that two of them never share a job, a company or an id. */
 const PROJECTS: Record<string, { first: number; titles: [string, string]; fit: string }> = {
@@ -1266,7 +1266,7 @@ const server = createServer((request, response) => {
     // The remote board's keyword search (#28): one job naming the keyword.
     const keyword = url.searchParams.get("q") ?? "";
     console.log(`fake-jobs: searched the remote board for "${keyword}"`);
-    const watched = WATCH_KEYWORD.exec(keyword)?.[1];
+    const watched = WATCH_KEYWORD.exec(keyword)?.[1]?.toLowerCase();
     const project = watched === undefined ? undefined : PROJECTS[watched];
     if (watched !== undefined && project !== undefined) {
       // Two matches from one company, whose site the board gives (#20).

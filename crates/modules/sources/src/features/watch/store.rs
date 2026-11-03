@@ -424,7 +424,8 @@ pub async fn note_seen(
     let refs: Vec<&str> = keys.iter().map(|k| k.1.as_str()).collect();
     sqlx::query(
         "INSERT INTO sources.watch_seen (watch_id, source, source_ref, first_seen_at, last_seen_at)
-         SELECT $1, s, r, $4, $4 FROM unnest($2::text[], $3::text[]) AS t(s, r)
+         SELECT $1::uuid, s, r, $4::timestamptz, $4::timestamptz
+           FROM unnest($2::text[], $3::text[]) AS t(s, r)
          ON CONFLICT (watch_id, source, source_ref) DO UPDATE SET last_seen_at = excluded.last_seen_at",
     )
     .bind(watch)

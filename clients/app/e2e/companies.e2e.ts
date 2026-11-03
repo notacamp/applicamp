@@ -157,7 +157,7 @@ test("a company whose jobs keep fitting you is suggested with its reasons, watch
     "Couldn’t find their job board",
     { timeout: 30_000 },
   );
-  await expect(tailspin.getByTestId(/^watching-careers-/)).toBeVisible();
+  await expect(tailspin.getByTestId(/^watching-careers-[\da-f-]{36}$/)).toBeVisible();
   await expectNoSidewaysScroll(page);
   await expectAccessible(page);
 

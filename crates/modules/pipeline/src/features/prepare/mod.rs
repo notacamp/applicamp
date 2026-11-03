@@ -200,14 +200,13 @@ struct Row {
     step: String,
     waiting_on: Option<String>,
     reason: Option<String>,
-    locale: Option<String>,
     done: sqlx::types::Json<Vec<PreparedStep>>,
     updated_at: DateTime<Utc>,
 }
 
 async fn row_of(db: &PgPool, opp: Uuid) -> Result<Option<Row>> {
     Ok(sqlx::query_as(
-        "SELECT account_id, state, step, waiting_on, reason, locale, done, updated_at
+        "SELECT account_id, state, step, waiting_on, reason, done, updated_at
            FROM pipeline.preparations WHERE opportunity_id = $1",
     )
     .bind(opp)

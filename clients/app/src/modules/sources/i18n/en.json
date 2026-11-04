@@ -468,8 +468,8 @@
     },
     "all": {
       "title": "All boards · {{total}}",
-      "search": "Find a board",
-      "searchHint": "Hotels, nurses, Lisbon",
+      "search": "Find a board or a company",
+      "searchHint": "Hotels, nurses, Lisbon, Greenhouse",
       "emptyTitle": "No board matches",
       "emptyBody": "No board matches these filters. Clear a filter to see more.",
       "emptyNone": "No board is known yet. The app looks for new ones every week.",
@@ -478,13 +478,14 @@
       "showing": "Showing {{shown}} of {{total}}"
     },
     "filters": {
-      "kind": "Kind of board",
-      "status": "Status",
-      "jobs": "Kind of jobs",
-      "anyStatus": "Any status",
-      "allJobs": "All kinds of jobs",
-      "kinds": {
-        "all": "Everything",
+      "show": "Show",
+      "options": {
+        "all": "All boards",
+        "waiting": "Waiting for you",
+        "checking": "Being checked",
+        "reading": "Reading",
+        "notAllowed": "Not allowed",
+        "paused": "Paused",
         "site": "Job sites",
         "company": "Company pages"
       }

@@ -468,8 +468,8 @@
     },
     "all": {
       "title": "Tous les sites · {{total}}",
-      "search": "Chercher un site",
-      "searchHint": "Hôtels, infirmiers, Lisbonne",
+      "search": "Chercher un site ou une entreprise",
+      "searchHint": "Hôtels, infirmiers, Lisbonne, Greenhouse",
       "emptyTitle": "Aucun site ne correspond",
       "emptyBody": "Aucun site ne correspond à ces filtres. Retirez un filtre pour en voir plus.",
       "emptyNone": "Aucun site n’est encore connu. L’app en cherche de nouveaux chaque semaine.",
@@ -478,13 +478,14 @@
       "showing": "{{shown}} affichés sur {{total}}"
     },
     "filters": {
-      "kind": "Type de site",
-      "status": "Statut",
-      "jobs": "Type d’offres",
-      "anyStatus": "Tous les statuts",
-      "allJobs": "Tous les types d’offres",
-      "kinds": {
-        "all": "Tout",
+      "show": "Afficher",
+      "options": {
+        "all": "Tous les sites",
+        "waiting": "En attente de vous",
+        "checking": "En vérification",
+        "reading": "Lus",
+        "notAllowed": "Non autorisés",
+        "paused": "En pause",
         "site": "Sites d’emploi",
         "company": "Pages d’entreprises"
       }

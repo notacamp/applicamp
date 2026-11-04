@@ -468,8 +468,8 @@
     },
     "all": {
       "title": "Todos los portales · {{total}}",
-      "search": "Buscar un portal",
-      "searchHint": "Hoteles, enfermeros, Lisboa",
+      "search": "Buscar un portal o una empresa",
+      "searchHint": "Hoteles, enfermeros, Lisboa, Greenhouse",
       "emptyTitle": "Ningún portal coincide",
       "emptyBody": "Ningún portal coincide con estos filtros. Quita un filtro para ver más.",
       "emptyNone": "Aún no se conoce ningún portal. La app busca nuevos cada semana.",
@@ -478,13 +478,14 @@
       "showing": "Mostrando {{shown}} de {{total}}"
     },
     "filters": {
-      "kind": "Tipo de portal",
-      "status": "Estado",
-      "jobs": "Tipo de ofertas",
-      "anyStatus": "Cualquier estado",
-      "allJobs": "Todos los tipos de ofertas",
-      "kinds": {
-        "all": "Todo",
+      "show": "Mostrar",
+      "options": {
+        "all": "Todos los portales",
+        "waiting": "Esperándote",
+        "checking": "En revisión",
+        "reading": "Leídos",
+        "notAllowed": "No permitidos",
+        "paused": "En pausa",
         "site": "Portales de empleo",
         "company": "Páginas de empresas"
       }

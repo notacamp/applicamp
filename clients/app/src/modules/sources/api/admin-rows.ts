@@ -55,26 +55,32 @@ export function adminRows(boards: readonly BoardSummary[], overview: AdminOvervi
   });
 }
 
+/** What the "Show" select picks: every board, one status, or one kind of board. */
+export type ShowFilter = RowStatus | RowKind | "all";
+
+export const SHOW_OPTIONS: readonly ShowFilter[] = [
+  "all",
+  "waiting",
+  "checking",
+  "reading",
+  "notAllowed",
+  "paused",
+  "site",
+  "company",
+];
+
 export interface AdminFilters {
   search: string;
-  kind: RowKind | "all";
-  status: RowStatus | "all";
-  tag: string | "all";
+  show: ShowFilter;
 }
 
-export const NO_FILTERS: AdminFilters = { search: "", kind: "all", status: "all", tag: "all" };
+export const NO_FILTERS: AdminFilters = { search: "", show: "all" };
 
-/** The rows that match the search and every filter. */
+/** The rows that match the search (name, site, place, kinds of jobs) and what is shown. */
 export function filterRows(rows: readonly AdminRow[], filters: AdminFilters): AdminRow[] {
   const needle = filters.search.trim().toLowerCase();
   return rows.filter((row) => {
-    if (filters.kind !== "all" && row.kind !== filters.kind) {
-      return false;
-    }
-    if (filters.status !== "all" && row.status !== filters.status) {
-      return false;
-    }
-    if (filters.tag !== "all" && !row.tags.includes(filters.tag)) {
+    if (filters.show !== "all" && row.status !== filters.show && row.kind !== filters.show) {
       return false;
     }
     if (needle === "") {
@@ -85,18 +91,4 @@ export function filterRows(rows: readonly AdminRow[], filters: AdminFilters): Ad
       .toLowerCase();
     return haystack.includes(needle);
   });
-}
-
-/** The kinds of jobs boards are tagged with, most common first, at most `limit`. */
-export function topTags(rows: readonly AdminRow[], limit = 6): string[] {
-  const counts = new Map<string, number>();
-  for (const row of rows) {
-    for (const tag of row.tags) {
-      counts.set(tag, (counts.get(tag) ?? 0) + 1);
-    }
-  }
-  return [...counts.entries()]
-    .toSorted((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .slice(0, limit)
-    .map(([tag]) => tag);
 }

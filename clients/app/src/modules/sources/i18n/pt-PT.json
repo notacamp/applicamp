@@ -468,8 +468,8 @@
     },
     "all": {
       "title": "Todos os portais · {{total}}",
-      "search": "Procurar um portal",
-      "searchHint": "Hotéis, enfermeiros, Lisboa",
+      "search": "Procurar um portal ou uma empresa",
+      "searchHint": "Hotéis, enfermeiros, Lisboa, Greenhouse",
       "emptyTitle": "Nenhum portal corresponde",
       "emptyBody": "Nenhum portal corresponde a estes filtros. Limpe um filtro para ver mais.",
       "emptyNone": "Ainda não se conhece nenhum portal. A app procura novos todas as semanas.",
@@ -478,13 +478,14 @@
       "showing": "A mostrar {{shown}} de {{total}}"
     },
     "filters": {
-      "kind": "Tipo de portal",
-      "status": "Estado",
-      "jobs": "Tipo de ofertas",
-      "anyStatus": "Qualquer estado",
-      "allJobs": "Todos os tipos de ofertas",
-      "kinds": {
-        "all": "Tudo",
+      "show": "Mostrar",
+      "options": {
+        "all": "Todos os portais",
+        "waiting": "À sua espera",
+        "checking": "Em verificação",
+        "reading": "A ser lidos",
+        "notAllowed": "Não permitidos",
+        "paused": "Em pausa",
         "site": "Portais de emprego",
         "company": "Páginas de empresas"
       }

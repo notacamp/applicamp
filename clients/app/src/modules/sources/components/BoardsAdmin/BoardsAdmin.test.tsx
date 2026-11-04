@@ -90,14 +90,14 @@ describe("the job boards admin page", () => {
     renderWithProviders(<BoardsAdmin back={null} />);
     const user = userEvent.setup();
     await screen.findByTestId("boards-admin-table");
-    await user.click(screen.getByTestId("boards-admin-filter-reading"));
+    await user.selectOptions(screen.getByTestId("boards-admin-show"), "reading");
     expect(screen.getAllByTestId("boards-admin-row")).toHaveLength(1);
     expect(screen.getByTestId("boards-admin-table")).toHaveTextContent("Himalayas");
-    await user.click(screen.getByTestId("boards-admin-filter-all"));
+    await user.selectOptions(screen.getByTestId("boards-admin-show"), "all");
     await user.type(screen.getByTestId("boards-admin-search"), "landing");
     expect(screen.getAllByTestId("boards-admin-row")).toHaveLength(1);
     await user.clear(screen.getByTestId("boards-admin-search"));
-    await user.click(screen.getByTestId("boards-admin-kind-company"));
+    await user.selectOptions(screen.getByTestId("boards-admin-show"), "company");
     expect(screen.getByTestId("boards-admin-all-empty")).toHaveTextContent(
       "No board matches these filters.",
     );

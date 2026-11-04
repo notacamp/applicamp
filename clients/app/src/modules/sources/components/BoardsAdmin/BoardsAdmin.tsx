@@ -5,8 +5,6 @@ import { useTranslation } from "react-i18next";
 import {
   Banner,
   Button,
-  Chip,
-  ChipRow,
   DataTable,
   Fact,
   FactList,
@@ -14,6 +12,7 @@ import {
   RowItem,
   RowList,
   Section,
+  Select,
   SkeletonList,
   Stack,
   Tagged,
@@ -27,11 +26,9 @@ import {
   adminRows,
   filterRows,
   NO_FILTERS,
-  topTags,
+  SHOW_OPTIONS,
   type AdminFilters,
   type AdminRow,
-  type RowKind,
-  type RowStatus,
 } from "../../api/admin-rows";
 import { useBoards } from "../../api/boards";
 import { shortDate } from "../../api/format";
@@ -247,16 +244,6 @@ function Waiting({ rows, onOpen }: { rows: AdminRow[]; onOpen: (row: AdminRow) =
   );
 }
 
-const KINDS: readonly (RowKind | "all")[] = ["all", "site", "company"];
-const STATUSES: readonly (RowStatus | "all")[] = [
-  "all",
-  "reading",
-  "waiting",
-  "checking",
-  "notAllowed",
-  "paused",
-];
-
 function AllBoards({
   rows,
   selected,
@@ -271,7 +258,6 @@ function AllBoards({
   const [all, setAll] = useState(false);
   const matching = filterRows(rows, filters);
   const shown = all ? matching : matching.slice(0, TABLE_SHOWN);
-  const tags = topTags(rows);
   const set = (change: Partial<AdminFilters>) => {
     setFilters((current) => ({ ...current, ...change }));
   };
@@ -282,6 +268,7 @@ function AllBoards({
         <TextField
           label={t("admin.all.search")}
           type="search"
+          size="lg"
           autoComplete="off"
           placeholder={t("admin.all.searchHint")}
           value={filters.search}
@@ -290,50 +277,19 @@ function AllBoards({
           }}
           data-testid="boards-admin-search"
         />
-        <ChipRow label={t("admin.filters.kind")}>
-          {KINDS.map((kind) => (
-            <Chip
-              key={kind}
-              pressed={filters.kind === kind}
-              data-testid={`boards-admin-kind-${kind}`}
-              onClick={() => {
-                set({ kind });
-              }}
-            >
-              {t(`admin.filters.kinds.${kind}`)}
-            </Chip>
-          ))}
-        </ChipRow>
-        <ChipRow label={t("admin.filters.status")}>
-          {STATUSES.map((status) => (
-            <Chip
-              key={status}
-              pressed={filters.status === status}
-              data-testid={`boards-admin-filter-${status}`}
-              onClick={() => {
-                set({ status });
-              }}
-            >
-              {status === "all" ? t("admin.filters.anyStatus") : t(`admin.status.${status}`)}
-            </Chip>
-          ))}
-        </ChipRow>
-        {tags.length === 0 ? null : (
-          <ChipRow label={t("admin.filters.jobs")}>
-            {["all", ...tags].map((tag) => (
-              <Chip
-                key={tag}
-                pressed={filters.tag === tag}
-                data-testid={`boards-admin-tag-${tag}`}
-                onClick={() => {
-                  set({ tag });
-                }}
-              >
-                {tag === "all" ? t("admin.filters.allJobs") : tag}
-              </Chip>
-            ))}
-          </ChipRow>
-        )}
+        <Select
+          label={t("admin.filters.show")}
+          size="lg"
+          options={SHOW_OPTIONS.map((value) => ({
+            value,
+            label: t(`admin.filters.options.${value}`),
+          }))}
+          value={filters.show}
+          onChange={(show) => {
+            set({ show });
+          }}
+          data-testid="boards-admin-show"
+        />
       </Stack>
       {matching.length === 0 ? (
         <Placeholder

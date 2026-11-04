@@ -37,6 +37,8 @@ export interface LineActions {
   edit: (line: string, text: string) => void;
   remove: (line: string) => void;
   confirm: (line: string, text?: string) => void;
+  /** "Yes, keep it": the fact the app proposed goes on the profile. */
+  keep: (line: string) => void;
 }
 
 /** Why a line is flagged, in words. */
@@ -51,6 +53,9 @@ export function ReasonText({ reason }: { reason: CvReason }) {
     }
     case "company_fact_outside_summary": {
       return <>{t("cv.flag.company")}</>;
+    }
+    case "other_position": {
+      return <>{t("cv.flag.otherPosition")}</>;
     }
     case "skill_not_on_profile": {
       return <>{t("cv.flag.skill", { skill: reason.skill })}</>;

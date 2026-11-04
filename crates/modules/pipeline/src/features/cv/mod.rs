@@ -235,7 +235,6 @@ struct Row {
     frame: sqlx::types::Json<Frame>,
     checks: sqlx::types::Json<Checks>,
     created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
     approved_at: Option<DateTime<Utc>>,
     expires_at: Option<DateTime<Utc>>,
     /// The preview's PDF is there (its bytes are read only to serve it).
@@ -253,7 +252,7 @@ macro_rules! select_draft {
     ($tail:literal) => {
         concat!(
             "SELECT id, n, language, status, version, content, frame, checks, created_at, \
-             updated_at, approved_at, expires_at, preview_pdf IS NOT NULL AS preview_ready, \
+             approved_at, expires_at, preview_pdf IS NOT NULL AS preview_ready, \
              preview_template, preview_length, preview_pages, preview_checks, preview_error, \
              preview_at FROM pipeline.cv_drafts ",
             $tail
@@ -1469,11 +1468,7 @@ pub async fn approve(
     // The PDF first (it takes a moment and needs no lock): the preview's when
     // it is this text in this layout; then, in one transaction, the approval
     // and the version.
-    let kept = if content == row.content.0 {
-        preview::reusable(&state.db, &row, (template, length)).await?
-    } else {
-        None
-    };
+    let kept = preview::reusable(&state.db, &row, &content, (template, length)).await?;
     let made = match kept {
         Some(made) => made,
         None => {
@@ -1497,7 +1492,7 @@ pub async fn approve(
                 expires_at = NULL, content = $4, checks = '{}'::jsonb,
                 preview_pdf = NULL, preview_template = NULL, preview_length = NULL,
                 preview_pages = NULL, preview_checks = NULL, preview_error = NULL,
-                preview_at = NULL
+                preview_at = NULL, preview_of = NULL
           WHERE id = $1 AND status = 'draft'",
     )
     .bind(row.id)

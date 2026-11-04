@@ -315,7 +315,7 @@
     "eyebrow": "CV sur mesure",
     "title": "Relire le CV",
     "heading": "Relisez votre CV pour {{company}}",
-    "lead": "Fait à partir de votre profil pour ce poste. Chaque ligne indique d’où elle vient. Les lignes qu’on ne peut pas rattacher à votre profil sont bloquées tant que vous ne les corrigez pas.",
+    "lead": "Fait à partir de votre profil pour cette offre. L’app a vérifié chaque ligne avec votre profil. Répondez à ce qu’elle demande, puis approuvez. Rien n’est envoyé à personne.",
     "back": "Retour à Préparer",
     "loading": "Chargement du CV…",
     "loadFailed": "Le CV n’a pas pu être chargé.",
@@ -370,7 +370,8 @@
       "claim": "« {{claim}} » n’est pas dans les sources que cette ligne cite.",
       "noSource": "Cette ligne ne cite rien de votre profil.",
       "company": "Les faits sur l’entreprise ne peuvent pas être vos réalisations. Ils ne peuvent figurer que dans le résumé.",
-      "skill": "{{skill}} n’est pas l’une de vos compétences."
+      "skill": "{{skill}} n’est pas l’une de vos compétences.",
+      "otherPosition": "Cette ligne vient d’un autre emploi."
     },
     "actions": {
       "edit": "Modifier",
@@ -461,7 +462,9 @@
       "not_approved": "Approuvez d’abord le CV : le PDF est fait à partir du texte approuvé.",
       "same_layout": "C’est déjà la mise en page de la version la plus récente.",
       "invalid_length": "Choisissez 1 ou 2 pages.",
-      "invalid_layout": "Choisissez un modèle et 1 ou 2 pages."
+      "invalid_layout": "Choisissez un modèle et 1 ou 2 pages.",
+      "cannot_keep": "Cette ligne concerne l’entreprise, pas vous. Modifiez-la ou retirez-la.",
+      "not_flagged": "Cette ligne correspond déjà à votre profil."
     },
     "layout": {
       "template": "Modèle",
@@ -512,6 +515,44 @@
       "loading": "Chargement du PDF…",
       "failed": "Le PDF n’a pas pu s’ouvrir. Vous pouvez encore le télécharger.",
       "page": "Page {{page}} sur {{pages}}"
+    },
+    "preview": {
+      "facts": "{{pages}} · {{language}}",
+      "download": "Télécharger le brouillon",
+      "loading": "Chargement du PDF…",
+      "failed": "Le PDF n’a pas pu être affiché. Vous pouvez quand même le télécharger.",
+      "making": "Création du PDF…",
+      "note": "Certains mots risquent de mal ressortir quand un site d’emploi lit ce PDF.",
+      "doesntFit": "Le CV ne tient pas sur 2 pages. Retirez quelques lignes.",
+      "unavailable": "Le PDF n’a pas pu être créé pour l’instant. Modifiez une ligne ou choisissez une mise en page pour réessayer.",
+      "lines": "Chaque ligne et d’où elle vient"
+    },
+    "waiting": {
+      "title": "À vous de voir · {{count}}",
+      "question": "Est-ce vrai ?",
+      "skillQuestion": "Avez-vous cette compétence ?",
+      "quoted": "« {{text}} »",
+      "where": "Si vous la gardez, elle va dans votre profil sous {{role}}.",
+      "whereNoRole": "Si vous la gardez, elle va dans votre profil.",
+      "skillWhere": "Si vous la gardez, elle est ajoutée à vos compétences.",
+      "cannotKeep": "Ceci concerne l’entreprise, pas vous. Modifiez-la ou retirez-la.",
+      "yes": "Oui, la garder",
+      "change": "Modifier",
+      "remove": "Retirer",
+      "changeLabel": "Modifier la ligne",
+      "save": "Enregistrer",
+      "cancel": "Annuler",
+      "checked": "Chaque ligne vérifiée avec votre profil",
+      "checkedFixed_one": "Chaque ligne vérifiée avec votre profil · {{count}} ligne corrigée",
+      "checkedFixed_other": "Chaque ligne vérifiée avec votre profil · {{count}} lignes corrigées",
+      "ready": "Approuvez quand il vous convient.",
+      "answer_one": "Répondez à la question pour approuver.",
+      "answer_other": "Répondez aux {{count}} questions pour approuver."
+    },
+    "needsVersion": {
+      "title": "Ce CV est approuvé mais n’a pas encore de PDF",
+      "body": "Créez le PDF à partir du texte approuvé. Aucune IA n’est utilisée.",
+      "make": "Créer le PDF"
     }
   },
   "cvs": {

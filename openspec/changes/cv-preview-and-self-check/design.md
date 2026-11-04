@@ -2,7 +2,8 @@
 
 ## Data (schema `pipeline`)
 - `pipeline.cv_drafts` gains the draft's preview: `preview_pdf bytea`, `preview_template`,
-  `preview_length`, `preview_pages`, `preview_checks jsonb` (the read-back), `preview_error` (a short
+  `preview_length`, `preview_pages`, `preview_checks jsonb` (the read-back), `preview_of` (a SHA-256
+  of the text it was made from), `preview_error` (a short
   code: `cv_doesnt_fit`, `cv_pdf_unavailable`), `preview_at`. All nullable; cleared when the draft is
   approved (its version holds the PDF) or put away. Migration
   `20261104100000_pipeline__cv_preview.sql`. No cross-schema reference.
@@ -27,8 +28,9 @@
   (409 `cv_doesnt_fit`, the preview kept as it was). `GET …/drafts/{n}/preview.pdf` serves it inline,
   `?download=1` as `<Name> CV - <Company> (draft).pdf`, `private, no-store`, `nosniff`; another
   account's draft, or a draft with no preview, is 404.
-- Approve keeps the preview's bytes when it was made after the draft's last change, in the layout
-  asked for (the preview's when left out), and its read-back passed; else it renders.
+- Approve keeps the preview's bytes when they were made from the draft's text as it is now (the
+  preview keeps a SHA-256 of that text, `preview_of`), in the layout asked for (the preview's when
+  left out), and its read-back passed; else it renders.
 
 ## The check (`kernel::claims::classified`, `pipeline::cv::check`)
 Each claim has a kind: number, tool, acronym, name. A claim the cited sources do not say is flagged

@@ -59,19 +59,6 @@
   background: var(--surface-sunken);
 }
 
-.page {
-  flex: none;
-  max-width: 100%;
-  background: #fff;
-  box-shadow: var(--shadow-overlay);
-}
-
-.note {
-  margin: var(--space-8) 0;
-  color: var(--text-secondary);
-  text-align: center;
-}
-
 @media (width >= 48rem) {
   .scrim {
     align-items: center;

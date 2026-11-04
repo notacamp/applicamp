@@ -42,7 +42,7 @@ function renderReview(routes: Record<string, Stub>) {
   return { requests, onBack, onPipeline, onLetter, ...view };
 }
 
-/** The draft with the bad number fixed, and so the skill. */
+/** The draft with the bad number fixed, and so the skill: nothing waits. */
 function fixedDraft(): Schema<"CvDraftView"> {
   const draft = cvDraft();
   const role = draft.experience[0];
@@ -51,6 +51,7 @@ function fixedDraft(): Schema<"CvDraftView"> {
     flagged: 0,
     first_flagged: null,
     can_approve: true,
+    waiting: [],
     experience: role === undefined ? [] : [{ ...role, bullets: role.bullets.slice(0, 2) }],
     skills: [{ id: "l6", name: "Rust", flags: [] }],
   };
@@ -60,36 +61,50 @@ function fixed(): CvAnswer {
   return cv({ draft: fixedDraft() });
 }
 
+/** Opens "Every line and where it comes from" under the PDF. */
+async function openLines(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByTestId("cv-lines-toggle"));
+}
+
 describe("Review the CV", () => {
-  it("shows the CV as a page with the contact the server filled in, each line marked, and blocks Approve while a line is flagged", async () => {
+  it("shows the draft as its PDF first, what waits on the person as questions, and keeps Approve off while one is open", async () => {
     renderReview({ [CV]: { body: cv({ draft: cvDraft() }) } });
-    expect(await screen.findByTestId("cv-paper")).toBeVisible();
-    expect(screen.getByTestId("cv-name")).toHaveTextContent("Alex Demo");
-    expect(screen.getByTestId("cv-contact")).toHaveTextContent(
-      "alex@example.com · Porto, Portugal",
+    // The PDF, its length and language, and Download draft.
+    expect(await screen.findByTestId("cv-preview")).toBeVisible();
+    expect(screen.getByTestId("cv-preview-facts")).toHaveTextContent("1 page · English");
+    expect(screen.getByTestId("cv-preview-download")).toHaveAttribute(
+      "href",
+      `/api/v1/opportunities/${ID}/cv/drafts/1/preview.pdf?download=1`,
     );
-    expect(screen.getByTestId("cv-line-mark-l3")).toHaveTextContent("Reworded");
-    expect(screen.getByTestId("cv-line-mark-l4")).toHaveTextContent("As in profile");
-    expect(screen.getByTestId("cv-draft-number")).toHaveTextContent("Draft 1");
-    expect(screen.getByTestId("cv-status")).toHaveTextContent("Draft");
-    // A reworded line opens onto the profile's own words.
-    expect(screen.getByTestId("cv-from-toggle-l3")).toHaveTextContent("From your profile");
-    // The flagged ones say why.
-    expect(screen.getByTestId("cv-flag-l5")).toHaveTextContent(
-      "“20” isn’t in the sources this line cites.",
+    // What the app did, and what waits on the person.
+    expect(screen.getByTestId("cv-checked")).toHaveTextContent(
+      "Checked every line against your profile · fixed 1 line",
     );
-    expect(screen.getByTestId("cv-line-l5")).toHaveAttribute("data-flagged");
-    expect(screen.getByTestId("cv-skill-flag-l7")).toHaveTextContent(
-      "Kubernetes isn’t one of your skills.",
+    expect(screen.getByTestId("cv-needs-you")).toHaveTextContent("Needs you · 2");
+    expect(screen.getByTestId("cv-question-l5")).toHaveTextContent("Is this true?");
+    expect(screen.getByTestId("cv-question-text-l5")).toHaveTextContent(
+      "“Cut invoice runs to 20 minutes”",
     );
-    // Approve is off, and says when it turns on.
+    expect(screen.getByTestId("cv-question-where-l5")).toHaveTextContent(
+      "If you keep it, it goes on your profile under Senior Engineer · Example Org.",
+    );
+    expect(screen.getByTestId("cv-question-yes-l5")).toHaveTextContent("Yes, keep it");
+    expect(screen.getByTestId("cv-question-change-l5")).toHaveTextContent("Change it");
+    expect(screen.getByTestId("cv-question-remove-l5")).toHaveTextContent("Remove it");
+    expect(screen.getByTestId("cv-question-l7")).toHaveTextContent("Do you have this skill?");
+    expect(screen.getByTestId("cv-question-where-l7")).toHaveTextContent(
+      "If you keep it, it is added to your skills.",
+    );
+    expect(screen.queryByTestId("cv-question-change-l7")).toBeNull();
+    // Approve is off, and says what turns it on.
     expect(screen.getByTestId("cv-approve")).toBeDisabled();
     expect(screen.getByTestId("cv-approve")).toHaveTextContent("Approve v1");
-    expect(screen.getByTestId("cv-approve-reason")).toBeVisible();
-    // The aside: the banner, the keywords, what changed and the spend.
-    expect(screen.getByTestId("cv-banner-flagged")).toHaveTextContent(
-      "2 lines can’t be traced to your profile",
+    expect(screen.getByTestId("cv-approve-reason")).toHaveTextContent(
+      "Answer the 2 questions to approve.",
     );
+    expect(screen.getByTestId("cv-draft-number")).toHaveTextContent("Draft 1");
+    expect(screen.getByTestId("cv-status")).toHaveTextContent("Draft");
+    // The keywords, what changed and the spend.
     expect(screen.getByTestId("cv-keywords-count")).toHaveTextContent("1/2");
     expect(screen.getByTestId("cv-keywords-not_in_profile")).toHaveTextContent(
       "Kafka · nice to have",
@@ -97,12 +112,62 @@ describe("Review the CV", () => {
     expect(screen.getByTestId("cv-changes")).toHaveTextContent("2 lines reworded");
     expect(screen.getByTestId("cv-drafts-today")).toHaveTextContent("Drafts today: 0 of 20");
     expect(screen.getByTestId("month-spend")).toBeVisible();
-    // Left out, collapsed, with Put back.
+
+    // Every line and where it comes from, one click away.
+    const user = userEvent.setup();
+    await openLines(user);
+    expect(screen.getByTestId("cv-paper")).toBeVisible();
+    expect(screen.getByTestId("cv-name")).toHaveTextContent("Alex Demo");
+    expect(screen.getByTestId("cv-contact")).toHaveTextContent(
+      "alex@example.com · Porto, Portugal",
+    );
+    expect(screen.getByTestId("cv-line-mark-l3")).toHaveTextContent("Reworded");
+    expect(screen.getByTestId("cv-line-mark-l4")).toHaveTextContent("As in profile");
+    expect(screen.getByTestId("cv-from-toggle-l3")).toHaveTextContent("From your profile");
+    expect(screen.getByTestId("cv-flag-l5")).toHaveTextContent(
+      "“20” isn’t in the sources this line cites.",
+    );
     expect(screen.getByTestId("cv-left-out")).toHaveTextContent("Left out for this job · 1 item");
     expect(screen.getByTestId("cv-put-back-role-2")).toBeInTheDocument();
   });
 
-  it("fixes a flagged line by editing it, and sends the new text", async () => {
+  it("Yes, keep it keeps the fact the app proposed, and Remove it removes a skill", async () => {
+    let kept: unknown;
+    let removed: unknown;
+    renderReview({
+      [CV]: { body: cv({ draft: cvDraft() }) },
+      [`POST ${LINES}/l5/confirm`]: async (request) => {
+        kept = await request.json();
+        return { body: cv({ draft: { ...cvDraft(), waiting: cvDraft().waiting.slice(1) } }) };
+      },
+      [`PATCH ${LINES}/l7`]: async (request) => {
+        removed = await request.json();
+        return { body: fixed() };
+      },
+    });
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("cv-question-yes-l5"));
+    await waitFor(() => {
+      expect(kept).toEqual({ proposal: true });
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId("cv-question-l5")).toBeNull();
+    });
+    await user.click(screen.getByTestId("cv-question-remove-l7"));
+    await waitFor(() => {
+      expect(removed).toEqual({ remove: true });
+    });
+    // Nothing waits: Approve is on.
+    await waitFor(() => {
+      expect(screen.getByTestId("cv-approve")).toBeEnabled();
+    });
+    expect(screen.getByTestId("cv-approve-ready")).toHaveTextContent(
+      "Approve when you’re happy with it.",
+    );
+    expect(screen.queryByTestId("cv-needs-you")).toBeNull();
+  });
+
+  it("Change it opens the line, and sends the new text", async () => {
     let sent: unknown;
     renderReview({
       [CV]: { body: cv({ draft: cvDraft() }) },
@@ -112,33 +177,60 @@ describe("Review the CV", () => {
       },
     });
     const user = userEvent.setup();
-    await user.click(await screen.findByTestId("cv-edit-l5"));
-    const input = screen.getByTestId("cv-edit-input-l5");
+    await user.click(await screen.findByTestId("cv-question-change-l5"));
+    const input = screen.getByTestId("cv-question-input-l5");
     await user.clear(input);
     await user.type(input, "Cut invoice runs from 6 hours to 40 minutes");
-    await user.click(screen.getByTestId("cv-edit-save-l5"));
+    await user.click(screen.getByTestId("cv-question-save-l5"));
     await waitFor(() => {
       expect(sent).toEqual({ text: "Cut invoice runs from 6 hours to 40 minutes" });
     });
   });
 
-  it("saves the person's own words as a fact (It's true) and removes a skill", async () => {
+  it("adds a skill the person has with Yes", async () => {
+    let body: unknown;
+    renderReview({
+      [CV]: { body: cv({ draft: cvDraft() }) },
+      [`POST ${LINES}/l7/confirm`]: async (request) => {
+        body = await request.json();
+        return { body: fixed() };
+      },
+    });
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("cv-question-yes-l7"));
+    await waitFor(() => {
+      expect(body).toEqual({ proposal: true });
+    });
+  });
+
+  it("makes the PDF again in another layout, with no AI", async () => {
+    let asked: unknown;
+    renderReview({
+      [CV]: { body: cv({ draft: cvDraft() }) },
+      [`POST /api/v1/opportunities/${ID}/cv/drafts/1/preview`]: async (request) => {
+        asked = await request.json();
+        return { body: cv({ draft: cvDraft() }) };
+      },
+    });
+    const user = userEvent.setup();
+    await user.click(await screen.findByTestId("cv-template-compact"));
+    await waitFor(() => {
+      expect(asked).toEqual({ template: "compact", length: 1 });
+    });
+  });
+
+  it("still saves the person's own words as a fact from the lines (It's true)", async () => {
     let said: unknown;
-    let removed: unknown;
     renderReview({
       [CV]: { body: cv({ draft: cvDraft() }) },
       [`POST ${LINES}/l5/confirm`]: async (request) => {
         said = await request.json();
         return { body: cv({ draft: cvDraft() }) };
       },
-      [`PATCH ${LINES}/l7`]: async (request) => {
-        removed = await request.json();
-        return { body: fixed() };
-      },
     });
     const user = userEvent.setup();
-    await user.click(await screen.findByTestId("cv-confirm-l5"));
-    expect(screen.getByTestId("cv-confirm-input-l5")).toBeVisible();
+    await openLines(user);
+    await user.click(screen.getByTestId("cv-confirm-l5"));
     expect(screen.getByTestId("cv-confirm-input-l5")).toHaveAccessibleDescription(
       "This saves your words to Senior Engineer · Example Org in your profile, then checks the line again.",
     );
@@ -150,32 +242,35 @@ describe("Review the CV", () => {
     await waitFor(() => {
       expect(said).toEqual({ text: "I cut invoice runs to 20 minutes in 2023" });
     });
-    await user.click(screen.getByTestId("cv-skill-remove-l7"));
-    await waitFor(() => {
-      expect(removed).toEqual({ remove: true });
-    });
-    // The CV now answered with nothing flagged: Approve is on.
-    await waitFor(() => {
-      expect(screen.getByTestId("cv-approve")).toBeEnabled();
-    });
-    expect(screen.getByTestId("cv-banner-clean")).toHaveTextContent(
-      "Every line traces to your profile",
-    );
   });
 
-  it("adds a skill the person has to their profile, with no words to write", async () => {
-    let body: unknown;
+  it("offers to make the PDF of a CV approved without one", async () => {
+    let asked: unknown;
     renderReview({
-      [CV]: { body: cv({ draft: cvDraft() }) },
-      [`POST ${LINES}/l7/confirm`]: async (request) => {
-        body = await request.json();
+      [CV]: {
+        body: cv({
+          draft: {
+            ...fixedDraft(),
+            status: "approved",
+            version: 1,
+            can_approve: false,
+            needs_version: true,
+            preview: null,
+          },
+        }),
+      },
+      [`POST /api/v1/opportunities/${ID}/cv/versions`]: async (request) => {
+        asked = await request.json();
         return { body: fixed() };
       },
     });
     const user = userEvent.setup();
-    await user.click(await screen.findByTestId("cv-skill-confirm-l7"));
+    expect(await screen.findByTestId("cv-needs-version")).toHaveTextContent(
+      "This CV was approved but has no PDF yet",
+    );
+    await user.click(screen.getByTestId("cv-make-pdf"));
     await waitFor(() => {
-      expect(body).toEqual({});
+      expect(asked).toEqual({ template: "clean", length: 1 });
     });
   });
 
@@ -212,7 +307,7 @@ describe("Review the CV", () => {
     const user = userEvent.setup();
     const approve = await screen.findByTestId("cv-approve");
     expect(approve).toBeEnabled();
-    expect(screen.getByTestId("cv-banner-clean")).toBeVisible();
+    expect(screen.getByTestId("cv-checked")).toBeVisible();
     await user.click(approve);
     await waitFor(() => {
       expect(screen.getByTestId("cv-status")).toHaveTextContent("Approved · v1");
@@ -279,7 +374,8 @@ describe("Review the CV", () => {
       },
     });
     const user = userEvent.setup();
-    await user.click(await screen.findByTestId("cv-put-back-role-2"));
+    await openLines(user);
+    await user.click(screen.getByTestId("cv-put-back-role-2"));
     await waitFor(() => {
       expect(body).toEqual({ position: 2 });
     });
@@ -300,7 +396,7 @@ describe("Review the CV", () => {
       },
     });
     const user = userEvent.setup();
-    await user.click(await screen.findByTestId("cv-remove-l5"));
+    await user.click(await screen.findByTestId("cv-question-remove-l5"));
     expect(await screen.findByTestId("cv-error")).toHaveTextContent(
       "This draft was approved or put away, so it can’t change. Make the CV again.",
     );
@@ -312,10 +408,11 @@ describe("Review the CV", () => {
     expect(screen.getByTestId("cv-draft")).toHaveTextContent("Draft the CV · about €0.002");
   });
 
-  it("offers only Edit and Remove for a company fact outside the summary", async () => {
-    const line = cvLine("l9", "Builds ledgers for small shops", {
-      flags: [{ kind: "company_fact_outside_summary", cites: ["cab12cd34"] }],
-    });
+  it("offers only Change it and Remove it for a company fact outside the summary", async () => {
+    const flags: Schema<"Reason">[] = [
+      { kind: "company_fact_outside_summary", cites: ["cab12cd34"] },
+    ];
+    const line = cvLine("l9", "Builds ledgers for small shops", { flags });
     const draft = cvDraft();
     const role = draft.experience[0];
     renderReview({
@@ -324,12 +421,29 @@ describe("Review the CV", () => {
           draft: {
             ...draft,
             experience: role === undefined ? [] : [{ ...role, bullets: [line] }],
+            waiting: [
+              {
+                line_id: "l9",
+                kind: "line",
+                text: "Builds ledgers for small shops",
+                proposal: null,
+                role: "Senior Engineer · Example Org",
+                flags,
+              },
+            ],
           },
         }),
       },
     });
-    expect(await screen.findByTestId("cv-edit-l9")).toBeVisible();
-    expect(screen.getByTestId("cv-remove-l9")).toBeVisible();
+    expect(await screen.findByTestId("cv-question-where-l9")).toHaveTextContent(
+      "This is about the company, not about you. Change it or remove it.",
+    );
+    expect(screen.queryByTestId("cv-question-yes-l9")).toBeNull();
+    expect(screen.getByTestId("cv-question-change-l9")).toBeVisible();
+    expect(screen.getByTestId("cv-question-remove-l9")).toBeVisible();
+    const user = userEvent.setup();
+    await openLines(user);
+    expect(screen.getByTestId("cv-edit-l9")).toBeVisible();
     expect(screen.queryByTestId("cv-confirm-l9")).toBeNull();
     expect(screen.getByTestId("cv-flag-l9")).toHaveTextContent(
       "Company facts can’t be your achievements",

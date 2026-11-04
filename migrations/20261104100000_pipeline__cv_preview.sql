@@ -17,6 +17,9 @@ ALTER TABLE pipeline.cv_drafts
     ADD COLUMN IF NOT EXISTS preview_pages smallint
         CHECK (preview_pages IS NULL OR preview_pages >= 1),
     ADD COLUMN IF NOT EXISTS preview_checks jsonb,
+    -- SHA-256 of the draft's text the PDF was made from: Approve keeps the
+    -- PDF only when it is still that text.
+    ADD COLUMN IF NOT EXISTS preview_of bytea,
     -- `cv_doesnt_fit` or `cv_pdf_unavailable` when the last render failed.
     ADD COLUMN IF NOT EXISTS preview_error text
         CHECK (preview_error IS NULL OR char_length(preview_error) <= 64),

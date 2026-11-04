@@ -315,7 +315,7 @@
     "eyebrow": "CV a medida",
     "title": "Revisar el CV",
     "heading": "Revisa tu CV para {{company}}",
-    "lead": "Hecho a partir de tu perfil para esta oferta. Cada línea indica de dónde viene. Las líneas que no se pueden rastrear hasta tu perfil quedan bloqueadas hasta que las corrijas.",
+    "lead": "Hecho a partir de tu perfil para esta oferta. La app ha comprobado cada línea con tu perfil. Responde a lo que pregunta y luego apruébalo. No se envía nada a nadie.",
     "back": "Volver a Preparar",
     "loading": "Cargando el CV…",
     "loadFailed": "No se ha podido cargar el CV.",
@@ -370,7 +370,8 @@
       "claim": "«{{claim}}» no está en las fuentes que cita esta línea.",
       "noSource": "Esta línea no cita nada de tu perfil.",
       "company": "Los datos de la empresa no pueden ser logros tuyos. Solo pueden aparecer en el resumen.",
-      "skill": "{{skill}} no es una de tus habilidades."
+      "skill": "{{skill}} no es una de tus habilidades.",
+      "otherPosition": "Esta línea es de otro trabajo."
     },
     "actions": {
       "edit": "Editar",
@@ -461,7 +462,9 @@
       "not_approved": "Aprueba primero el CV: el PDF se hace con el texto aprobado.",
       "same_layout": "Ese ya es el diseño de la versión más reciente.",
       "invalid_length": "Elige 1 o 2 páginas.",
-      "invalid_layout": "Elige una plantilla y 1 o 2 páginas."
+      "invalid_layout": "Elige una plantilla y 1 o 2 páginas.",
+      "cannot_keep": "Esta línea trata de la empresa, no de ti. Cámbiala o quítala.",
+      "not_flagged": "Esta línea ya coincide con tu perfil."
     },
     "layout": {
       "template": "Plantilla",
@@ -512,6 +515,44 @@
       "loading": "Cargando el PDF…",
       "failed": "No se ha podido abrir el PDF. Aún puedes descargarlo.",
       "page": "Página {{page}} de {{pages}}"
+    },
+    "preview": {
+      "facts": "{{pages}} · {{language}}",
+      "download": "Descargar borrador",
+      "loading": "Cargando el PDF…",
+      "failed": "No se ha podido mostrar el PDF. Puedes descargarlo igualmente.",
+      "making": "Haciendo el PDF…",
+      "note": "Algunas palabras pueden no salir bien cuando un portal de empleo lea este PDF.",
+      "doesntFit": "El CV no cabe en 2 páginas. Quita algunas líneas.",
+      "unavailable": "No se ha podido hacer el PDF ahora. Cambia una línea o elige un formato para intentarlo de nuevo.",
+      "lines": "Cada línea y de dónde viene"
+    },
+    "waiting": {
+      "title": "Te necesita · {{count}}",
+      "question": "¿Es cierto?",
+      "skillQuestion": "¿Tienes esta habilidad?",
+      "quoted": "«{{text}}»",
+      "where": "Si lo mantienes, se guarda en tu perfil en {{role}}.",
+      "whereNoRole": "Si lo mantienes, se guarda en tu perfil.",
+      "skillWhere": "Si la mantienes, se añade a tus habilidades.",
+      "cannotKeep": "Esto trata de la empresa, no de ti. Cámbialo o quítalo.",
+      "yes": "Sí, mantener",
+      "change": "Cambiar",
+      "remove": "Quitar",
+      "changeLabel": "Cambiar la línea",
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "checked": "Cada línea comprobada con tu perfil",
+      "checkedFixed_one": "Cada línea comprobada con tu perfil · {{count}} línea corregida",
+      "checkedFixed_other": "Cada línea comprobada con tu perfil · {{count}} líneas corregidas",
+      "ready": "Apruébalo cuando estés conforme.",
+      "answer_one": "Responde a la pregunta para aprobar.",
+      "answer_other": "Responde a las {{count}} preguntas para aprobar."
+    },
+    "needsVersion": {
+      "title": "Este CV está aprobado pero aún no tiene PDF",
+      "body": "Haz el PDF a partir del texto aprobado. No se usa IA.",
+      "make": "Hacer el PDF"
     }
   },
   "cvs": {

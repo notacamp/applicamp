@@ -315,7 +315,7 @@
     "eyebrow": "Tailored CV",
     "title": "Review the CV",
     "heading": "Review your CV for {{company}}",
-    "lead": "Built from your profile for this job. Every line points back to where it came from. Lines that can’t be traced to your profile are blocked until you fix them.",
+    "lead": "Made from your profile for this job. The app checked every line against your profile. Answer what it asks, then approve. Nothing is sent to anyone.",
     "back": "Back to Prepare",
     "loading": "Loading the CV…",
     "loadFailed": "The CV couldn’t be loaded.",
@@ -370,7 +370,8 @@
       "claim": "“{{claim}}” isn’t in the sources this line cites.",
       "noSource": "This line cites nothing from your profile.",
       "company": "Company facts can’t be your achievements. They can only appear in the summary.",
-      "skill": "{{skill}} isn’t one of your skills."
+      "skill": "{{skill}} isn’t one of your skills.",
+      "otherPosition": "This line belongs to another job."
     },
     "actions": {
       "edit": "Edit",
@@ -461,7 +462,9 @@
       "not_approved": "Approve the CV first: a PDF is made from the approved text.",
       "same_layout": "That is the layout of the newest version already.",
       "invalid_length": "Choose 1 or 2 pages.",
-      "invalid_layout": "Choose a template and 1 or 2 pages."
+      "invalid_layout": "Choose a template and 1 or 2 pages.",
+      "cannot_keep": "This line is about the company, not about you. Change it or remove it.",
+      "not_flagged": "This line already matches your profile."
     },
     "layout": {
       "template": "Template",
@@ -512,6 +515,44 @@
       "loading": "Loading the PDF…",
       "failed": "The PDF couldn’t be opened. You can still download it.",
       "page": "Page {{page}} of {{pages}}"
+    },
+    "preview": {
+      "facts": "{{pages}} · {{language}}",
+      "download": "Download draft",
+      "loading": "Loading the PDF…",
+      "failed": "The PDF couldn’t be shown. You can still download it.",
+      "making": "Making the PDF…",
+      "note": "Some words may not come out right when a job site reads this PDF.",
+      "doesntFit": "The CV doesn’t fit on 2 pages. Remove a few lines.",
+      "unavailable": "The PDF couldn’t be made just now. Change a line or pick a layout to try again.",
+      "lines": "Every line and where it comes from"
+    },
+    "waiting": {
+      "title": "Needs you · {{count}}",
+      "question": "Is this true?",
+      "skillQuestion": "Do you have this skill?",
+      "quoted": "“{{text}}”",
+      "where": "If you keep it, it goes on your profile under {{role}}.",
+      "whereNoRole": "If you keep it, it goes on your profile.",
+      "skillWhere": "If you keep it, it is added to your skills.",
+      "cannotKeep": "This is about the company, not about you. Change it or remove it.",
+      "yes": "Yes, keep it",
+      "change": "Change it",
+      "remove": "Remove it",
+      "changeLabel": "Change the line",
+      "save": "Save",
+      "cancel": "Cancel",
+      "checked": "Checked every line against your profile",
+      "checkedFixed_one": "Checked every line against your profile · fixed {{count}} line",
+      "checkedFixed_other": "Checked every line against your profile · fixed {{count}} lines",
+      "ready": "Approve when you’re happy with it.",
+      "answer_one": "Answer the question to approve.",
+      "answer_other": "Answer the {{count}} questions to approve."
+    },
+    "needsVersion": {
+      "title": "This CV was approved but has no PDF yet",
+      "body": "Make the PDF from the approved text. No AI is used.",
+      "make": "Make the PDF"
     }
   },
   "cvs": {

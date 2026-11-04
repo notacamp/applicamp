@@ -8,6 +8,7 @@ import {
   Button,
   Cluster,
   Dialog,
+  Disclosure,
   formatSize,
   Label,
   Page,
@@ -25,12 +26,14 @@ import {
   DEFAULT_LAYOUT,
   layoutOf,
   pdfFailureReasons,
+  previewLayout,
   useApprove,
   useChangeLine,
   useConfirmLine,
   useCv,
   useMakeDraft,
   useMakeVersion,
+  usePreview,
   usePutBack,
   type Cv,
   type CvDraft,
@@ -45,6 +48,7 @@ import { DraftSlot } from "./DraftSlot";
 import { cvLanguage, LayoutControls } from "./LayoutControls";
 import type { LineActions } from "./LineRow";
 import { VersionsSection } from "./PdfPanel";
+import { PreviewPane } from "./PreviewPane";
 import { ReviewAside } from "./ReviewAside";
 
 export interface ReviewPageProps {
@@ -70,10 +74,11 @@ export function languageName(tag: string, display: string): string {
 }
 
 /**
- * `/pipeline/$id/cv`: the review of a tailored CV. The CV as a page, every
- * line marked by how it relates to the profile and, when it can't be traced
- * to it, blocked with the reason and what to do; beside it the check, the
- * job's keywords and what changed. Approve is off while any line is blocked.
+ * `/pipeline/$id/cv`: the review of a tailored CV. The draft as the PDF it
+ * will be, made again after every change; beside it the questions the app
+ * could not answer by itself (Yes, keep it / Change it / Remove it), the
+ * job's keywords and what changed. Every line and where it comes from opens
+ * below the PDF. Approve is off while a question waits.
  */
 export function ReviewPage({ id, onBack, onPipeline, spend, onLetter }: ReviewPageProps) {
   const { t } = useTranslation("pipeline");
@@ -177,13 +182,17 @@ function Review({
   const putBack = usePutBack(id, draft.n);
   const approve = useApprove(id, draft.n);
   const makeVersion = useMakeVersion(id);
+  const preview = usePreview(id, draft.n);
   const [language, setLanguage] = useState(() => cvLanguage(draft.language));
   const again = useMakeDraft(id, language);
   const editable = draft.status === "draft";
   const newest = cv.versions[0];
-  // What the PDF is made with: the person's choice before Approve, the newest version's after.
-  const [chosen, setChosen] = useState<CvLayout>(DEFAULT_LAYOUT);
-  const layout = editable ? chosen : newest === undefined ? DEFAULT_LAYOUT : layoutOf(newest);
+  // What the PDF is made with: the preview's before Approve, the newest version's after.
+  const layout = editable
+    ? (previewLayout(draft.preview) ?? DEFAULT_LAYOUT)
+    : newest === undefined
+      ? DEFAULT_LAYOUT
+      : layoutOf(newest);
   // A layout asked for on an approved CV, waiting for the person to confirm.
   const [asked, setAsked] = useState<CvLayout | null>(null);
   const [viewing, setViewing] = useState<number | null>(null);
@@ -193,14 +202,19 @@ function Review({
     putBack.isPending ||
     approve.isPending ||
     makeVersion.isPending ||
+    preview.isPending ||
     again.isPending;
-  const failure = [change, confirm, putBack, approve, makeVersion, again].find(
+  const failure = [change, confirm, putBack, approve, makeVersion, preview, again].find(
     (action) => action.isError,
   )?.error;
-  const failedLength = approve.isError ? layout.length : (asked ?? layout).length;
+  const failedLength = preview.isError
+    ? preview.variables.length
+    : approve.isError
+      ? layout.length
+      : (asked ?? layout).length;
 
   const resetErrors = () => {
-    for (const action of [change, confirm, putBack, approve, makeVersion, again]) {
+    for (const action of [change, confirm, putBack, approve, makeVersion, preview, again]) {
       action.reset();
     }
   };
@@ -220,16 +234,23 @@ function Review({
       resetErrors();
       confirm.mutate(text === undefined ? { line } : { line, text });
     },
+    keep: (line) => {
+      resetErrors();
+      confirm.mutate({ line, proposal: true });
+    },
   };
   const version = draft.version ?? (newest?.version ?? 0) + 1;
-  const goFirst = () => {
-    if (draft.first_flagged === undefined || draft.first_flagged === null) {
-      return;
-    }
-    const target = document.getElementById(`cv-line-${draft.first_flagged}`);
-    target?.scrollIntoView({ behavior: "smooth", block: "center" });
-    target?.querySelector("button")?.focus({ preventScroll: true });
-  };
+  const waiting = draft.waiting.length;
+  const sheet = (
+    <CvSheet
+      draft={draft}
+      actions={actions}
+      onPutBack={(what) => {
+        resetErrors();
+        putBack.mutate(what);
+      }}
+    />
+  );
 
   return (
     <Stack>
@@ -272,7 +293,7 @@ function Review({
               data-testid="cv-approve"
               onClick={() => {
                 resetErrors();
-                approve.mutate(chosen);
+                approve.mutate(layout);
               }}
             >
               {approve.isPending ? t("cv.toolbar.approving") : t("cv.toolbar.approve", { version })}
@@ -280,11 +301,36 @@ function Review({
           ) : null}
         </Cluster>
       </Tagged>
-      {editable && !draft.can_approve ? (
-        <Tagged testId="cv-approve-reason">
+      {editable ? (
+        <Tagged testId={draft.can_approve ? "cv-approve-ready" : "cv-approve-reason"}>
           <Text tone="secondary" size="sm">
-            {t("cv.toolbar.approveWhy")}
+            {draft.can_approve
+              ? t("cv.waiting.ready")
+              : t("cv.waiting.answer", { count: Math.max(waiting, 1) })}
           </Text>
+        </Tagged>
+      ) : null}
+      {draft.needs_version ? (
+        <Tagged testId="cv-needs-version">
+          <Banner
+            icon="warning"
+            title={t("cv.needsVersion.title")}
+            action={
+              <Button
+                variant="primary"
+                disabled={busy}
+                data-testid="cv-make-pdf"
+                onClick={() => {
+                  resetErrors();
+                  makeVersion.mutate(DEFAULT_LAYOUT);
+                }}
+              >
+                {makeVersion.isPending ? t("cv.layout.making") : t("cv.needsVersion.make")}
+              </Button>
+            }
+          >
+            {t("cv.needsVersion.body")}
+          </Banner>
         </Tagged>
       ) : null}
       {!cv.can_draft.allowed &&
@@ -330,7 +376,7 @@ function Review({
         onLayout={(next) => {
           resetErrors();
           if (editable) {
-            setChosen(next);
+            preview.mutate(next);
           } else {
             setAsked(next);
           }
@@ -348,21 +394,36 @@ function Review({
             cv={cv}
             draft={draft}
             spend={spend}
-            onFirst={goFirst}
+            actions={actions}
             onBack={onPipeline}
             onOpenPdf={setViewing}
           />
         }
       >
         <Stack>
-          <CvSheet
-            draft={draft}
-            actions={actions}
-            onPutBack={(what) => {
-              resetErrors();
-              putBack.mutate(what);
-            }}
-          />
+          {editable ? (
+            <>
+              <PreviewPane
+                opportunity={id}
+                n={draft.n}
+                language={draft.language}
+                preview={draft.preview}
+              />
+              <Tagged testId="cv-lines">
+                <Disclosure
+                  summary={
+                    <Tagged testId="cv-lines-toggle">
+                      <span>{t("cv.preview.lines")}</span>
+                    </Tagged>
+                  }
+                >
+                  {sheet}
+                </Disclosure>
+              </Tagged>
+            </>
+          ) : (
+            sheet
+          )}
           <VersionsSection opportunity={id} versions={cv.versions} onOpen={setViewing} />
         </Stack>
       </ReviewLayout>

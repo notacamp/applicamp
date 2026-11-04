@@ -127,8 +127,8 @@ profile. None of these SHALL call a model; each SHALL make the preview again.
 Approving a draft SHALL render its text as a PDF inside the server with the template (Clean or
 Compact) and length (1 or 2 pages) asked for, the preview's when left out, else Clean on 1 page, with
 the standard section headings in the CV's language, real text, real links and embedded fonts. When
-the preview was made after the draft's last change, in that layout, and its read-back passed, its PDF
-SHALL be kept as it is. The person's text SHALL be passed as data and never interpreted as markup. The
+the preview was made from the draft's text as it is now, in that layout, and its read-back passed, its
+PDF SHALL be kept as it is. The person's text SHALL be passed as data and never interpreted as markup. The
 PDF's text SHALL then be read back with no AI and SHALL contain every section heading, every line,
 every job keyword the review showed as on the CV, the name, the email and the links, within the page
 count chosen. If anything fails, nothing SHALL be approved and the reasons SHALL be shown. A draft
@@ -139,7 +139,7 @@ approved without a PDF SHALL offer to make it.
 - **THEN** the draft becomes version n with a PDF, and its read-back results are kept with it
 
 #### Scenario: What they saw
-- **WHEN** someone approves a draft whose preview was made after its last change
+- **WHEN** someone approves a draft whose preview was made from its text as it is now
 - **THEN** the version's PDF is the preview's, byte for byte
 
 #### Scenario: Text that looks like markup

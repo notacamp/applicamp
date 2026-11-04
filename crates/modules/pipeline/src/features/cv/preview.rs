@@ -112,6 +112,12 @@ pub(super) async fn render_draft(
     })
 }
 
+/// What the PDF of `content` is made from, as a fingerprint: Approve keeps
+/// a preview only when the draft still says exactly this.
+fn fingerprint(content: &Content) -> Vec<u8> {
+    applicamp_kernel::crypto::hash(&serde_json::to_string(content).unwrap_or_default())
+}
+
 /// What a render that failed is called on the page.
 const fn error_code(refusal: &Refusal) -> &'static str {
     match refusal {
@@ -120,10 +126,12 @@ const fn error_code(refusal: &Refusal) -> &'static str {
     }
 }
 
-/// Keep `made` as the preview of draft `draft`, made with `layout` at `now`.
+/// Keep `made`, the PDF of `content`, as the preview of draft `draft`, made
+/// with `layout` at `now`.
 async fn store(
     db: &PgPool,
     draft: Uuid,
+    content: &Content,
     made: &Made,
     (template, length): (Template, Length),
     now: DateTime<Utc>,
@@ -131,7 +139,8 @@ async fn store(
     sqlx::query(
         "UPDATE pipeline.cv_drafts
             SET preview_pdf = $2, preview_template = $3, preview_length = $4,
-                preview_pages = $5, preview_checks = $6, preview_error = NULL, preview_at = $7
+                preview_pages = $5, preview_checks = $6, preview_error = NULL, preview_at = $7,
+                preview_of = $8
           WHERE id = $1 AND status = 'draft'",
     )
     .bind(draft)
@@ -141,6 +150,7 @@ async fn store(
     .bind(i16::try_from(made.pages).unwrap_or(i16::MAX))
     .bind(sqlx::types::Json(&made.checks))
     .bind(now)
+    .bind(fingerprint(content))
     .execute(db)
     .await?;
     Ok(())
@@ -158,7 +168,8 @@ async fn store_failure(
     sqlx::query(
         "UPDATE pipeline.cv_drafts
             SET preview_pdf = NULL, preview_template = $3, preview_length = $4,
-                preview_pages = NULL, preview_checks = NULL, preview_error = $2, preview_at = $5
+                preview_pages = NULL, preview_checks = NULL, preview_error = $2, preview_at = $5,
+                preview_of = NULL
           WHERE id = $1 AND status = 'draft'",
     )
     .bind(draft)
@@ -190,7 +201,7 @@ pub(super) async fn refresh(
     for (template, length) in ladder(start) {
         match render_draft(db, opp, content, frame, language, template, length, false).await {
             Ok(Ok(made)) => {
-                if let Err(e) = store(db, draft, &made, (template, length), now).await {
+                if let Err(e) = store(db, draft, content, &made, (template, length), now).await {
                     tracing::warn!(error = e.code(), "a CV preview could not be kept");
                 }
                 return;
@@ -220,17 +231,17 @@ pub(super) async fn refresh(
     }
 }
 
-/// The preview's PDF of draft `draft`, when its layout is `layout`, it was
-/// made after the draft's last change and its read-back passed: what Approve
-/// can keep as it is.
+/// The preview's PDF of draft `row`, when it was made from `content` as it
+/// is now, in `layout`, and its read-back passed: what Approve can keep as it
+/// is.
 pub(super) async fn reusable(
     db: &PgPool,
     row: &Row,
+    content: &Content,
     layout: (Template, Length),
 ) -> Result<Option<Made>> {
     let fresh = row.preview_ready
         && row.preview_error.is_none()
-        && row.preview_at.is_some_and(|at| at >= row.updated_at)
         && layout_of(row) == Some(layout)
         && row.preview_checks.as_ref().is_some_and(|c| c.0.passed());
     let (Some(checks), Some(pages), true) = (
@@ -241,9 +252,11 @@ pub(super) async fn reusable(
         return Ok(None);
     };
     let bytes: Option<Vec<u8>> = sqlx::query_scalar(
-        "SELECT preview_pdf FROM pipeline.cv_drafts WHERE id = $1 AND preview_pdf IS NOT NULL",
+        "SELECT preview_pdf FROM pipeline.cv_drafts
+          WHERE id = $1 AND preview_pdf IS NOT NULL AND preview_of = $2",
     )
     .bind(row.id)
+    .bind(fingerprint(content))
     .fetch_optional(db)
     .await?;
     Ok(bytes.map(|bytes| Made {
@@ -308,7 +321,7 @@ pub async fn make(
     )
     .await?;
     match made {
-        Ok(made) => store(&state.db, row.id, &made, chosen, now).await?,
+        Ok(made) => store(&state.db, row.id, &row.content.0, &made, chosen, now).await?,
         Err(Refusal::DoesntFit { length: 1, .. }) => {
             return Err(Error::Conflict(
                 "cv_doesnt_fit",

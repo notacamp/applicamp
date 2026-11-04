@@ -1133,27 +1133,6 @@ async fn the_preview_follows_every_change_and_another_layout_needs_no_model(db: 
     let cv = draft(&s).await;
     let first = cv["draft"]["preview"]["at"].clone();
 
-    // Another layout: no model call.
-    let (status, cv) =
-        s.h.json(
-            "POST",
-            &url(&s.opp, "/drafts/1/preview"),
-            &json!({ "template": "compact", "length": 2 }),
-        )
-        .await;
-    assert_eq!(status, StatusCode::OK, "{cv}");
-    assert_eq!(cv["draft"]["preview"]["template"], "compact");
-    assert_eq!(cv["draft"]["preview"]["length"], 2);
-    assert_eq!(s.model.calls(CV).await, 1);
-    let (status, body) =
-        s.h.json(
-            "POST",
-            &url(&s.opp, "/drafts/1/preview"),
-            &json!({ "length": 3 }),
-        )
-        .await;
-    assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
-
     // Seventy lines: a change makes it again, and it falls to two pages.
     let bullets: Vec<Value> = (0..70)
         .map(|i| {
@@ -1168,20 +1147,6 @@ async fn the_preview_follows_every_change_and_another_layout_needs_no_model(db: 
     .execute(&s.h.db)
     .await
     .unwrap();
-    let (status, cv) =
-        s.h.json(
-            "POST",
-            &url(&s.opp, "/drafts/1/preview"),
-            &json!({ "template": "clean", "length": 1 }),
-        )
-        .await;
-    assert_eq!(status, StatusCode::CONFLICT, "{cv}");
-    assert_eq!(cv["code"], "cv_doesnt_fit");
-    let (_, cv) = s.h.get(&url(&s.opp, "")).await;
-    assert_eq!(
-        cv["draft"]["preview"]["template"], "compact",
-        "a layout that does not fit leaves the preview as it was"
-    );
     let skill = flagged(&cv)
         .into_iter()
         .find(|(_, k)| k == "skill_not_on_profile")
@@ -1197,10 +1162,48 @@ async fn the_preview_follows_every_change_and_another_layout_needs_no_model(db: 
     assert_eq!(status, StatusCode::OK, "{cv}");
     let preview = &cv["draft"]["preview"];
     assert_eq!(preview["ready"], true, "{preview}");
+    assert_eq!(preview["template"], "clean");
     assert_eq!(preview["length"], 2);
     assert_eq!(preview["pages"], 2);
     assert_ne!(preview["at"], first);
-    assert_eq!(s.model.calls(CV).await, 1, "a change never calls the model");
+
+    // One page is asked for: it does not fit, and the preview stays.
+    let (status, body) =
+        s.h.json(
+            "POST",
+            &url(&s.opp, "/drafts/1/preview"),
+            &json!({ "template": "clean", "length": 1 }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CONFLICT, "{body}");
+    assert_eq!(body["code"], "cv_doesnt_fit");
+    let (_, cv) = s.h.get(&url(&s.opp, "")).await;
+    assert_eq!(cv["draft"]["preview"]["length"], 2);
+
+    // Another layout: no model call.
+    let (status, cv) =
+        s.h.json(
+            "POST",
+            &url(&s.opp, "/drafts/1/preview"),
+            &json!({ "template": "compact", "length": 2 }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    assert_eq!(cv["draft"]["preview"]["template"], "compact");
+    assert_eq!(cv["draft"]["preview"]["length"], 2);
+    let (status, body) =
+        s.h.json(
+            "POST",
+            &url(&s.opp, "/drafts/1/preview"),
+            &json!({ "length": 3 }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+    assert_eq!(
+        s.model.calls(CV).await,
+        1,
+        "a layout or a change never calls the model"
+    );
 }
 
 /// What the fake model answers the fix prompt: a rewrite for the line that

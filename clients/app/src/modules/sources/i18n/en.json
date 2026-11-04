@@ -430,8 +430,6 @@
     "worldwide": "Worldwide",
     "cancel": "Cancel",
     "askedOn": "Asked on {{date}}. No answer yet.",
-    "showMore_one": "Show {{count}} more",
-    "showMore_other": "Show {{count}} more",
     "totals": {
       "reading": "Being read",
       "readingDetail": "{{sites}} job sites and {{companies}} companies",
@@ -487,7 +485,9 @@
       "json_api": "a public list of jobs for apps",
       "rss": "a news feed of its jobs",
       "jsonld_sitemap": "jobs marked up on its pages",
-      "hn": "a monthly thread of posts"
+      "hn": "a monthly thread of posts",
+      "company_page": "the company’s own hiring page",
+      "hiring_system": "one hiring system for many companies"
     },
     "origin": {
       "seed": "the first research",
@@ -502,7 +502,7 @@
       "found": "Found through"
     },
     "all": {
-      "title": "All sites · {{total}}",
+      "title": "All sites",
       "search": "Find a site or a company",
       "searchHint": "Hotels, nurses, Lisbon, Greenhouse",
       "emptyTitle": "No site matches",
@@ -510,7 +510,7 @@
       "emptyNone": "No site is known yet. The app looks for new ones every week.",
       "clear": "Clear filters",
       "table": "All sites",
-      "showing": "Showing {{shown}} of {{total}}"
+      "showing": "Showing {{shown}}"
     },
     "filters": {
       "show": "Show",
@@ -625,6 +625,7 @@
     },
     "undo": "Undo",
     "declined": "Declined",
-    "open": "Open"
+    "open": "Open",
+    "more": "Show more"
   }
 }

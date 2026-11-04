@@ -430,8 +430,6 @@
     "worldwide": "Dans le monde entier",
     "cancel": "Annuler",
     "askedOn": "Demandé le {{date}}. Pas encore de réponse.",
-    "showMore_one": "Afficher {{count}} de plus",
-    "showMore_other": "Afficher {{count}} de plus",
     "totals": {
       "reading": "Lus",
       "readingDetail": "{{sites}} sites d’emploi et {{companies}} entreprises",
@@ -487,7 +485,9 @@
       "json_api": "une liste publique d’offres pour les apps",
       "rss": "un flux d’actualités avec ses offres",
       "jsonld_sitemap": "des offres balisées dans ses pages",
-      "hn": "un fil mensuel de messages"
+      "hn": "un fil mensuel de messages",
+      "company_page": "la page de recrutement de l’entreprise",
+      "hiring_system": "un système de recrutement pour de nombreuses entreprises"
     },
     "origin": {
       "seed": "la première recherche",
@@ -502,7 +502,7 @@
       "found": "Trouvé grâce à"
     },
     "all": {
-      "title": "Tous les sites · {{total}}",
+      "title": "Tous les sites",
       "search": "Chercher un site ou une entreprise",
       "searchHint": "Hôtels, infirmiers, Lisbonne, Greenhouse",
       "emptyTitle": "Aucun site ne correspond",
@@ -510,7 +510,7 @@
       "emptyNone": "Aucun site n’est encore connu. L’app en cherche de nouveaux chaque semaine.",
       "clear": "Effacer les filtres",
       "table": "Tous les sites",
-      "showing": "{{shown}} affichés sur {{total}}"
+      "showing": "{{shown}} affichés"
     },
     "filters": {
       "show": "Afficher",
@@ -625,6 +625,7 @@
     },
     "undo": "Annuler",
     "declined": "Refusé",
-    "open": "Ouvrir"
+    "open": "Ouvrir",
+    "more": "Afficher plus"
   }
 }

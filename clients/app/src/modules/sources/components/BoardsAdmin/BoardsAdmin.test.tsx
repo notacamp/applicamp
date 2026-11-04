@@ -3,6 +3,7 @@ import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import {
+  adminBoard,
   adminOverview,
   board,
   declined,
@@ -13,48 +14,78 @@ import {
   WAITING,
 } from "../../../../../test/boards";
 import { renderWithProviders, stubApi } from "../../../../../test/render";
-import type { BoardSummary } from "../../api/boards";
+import type { AdminBoard } from "../../api/admin";
 
 import { BoardsAdmin } from "./BoardsAdmin";
 
 function server() {
-  const boards = new Map<string, BoardSummary>([
-    [HIMALAYAS, board()],
-    [WAITING, waiting()],
-    [declined().id, declined()],
+  const lines = new Map<string, AdminBoard>([
+    [HIMALAYAS, adminBoard()],
+    [
+      WAITING,
+      adminBoard({
+        id: WAITING,
+        name: "Example Remote",
+        status: "candidate",
+        stage: "waiting",
+        need: "permission",
+        detail: "You may not scrape this site with automated tools.",
+        tags: ["remote"],
+      }),
+    ],
+    [
+      declined().id,
+      adminBoard({
+        id: declined().id,
+        name: "Landing.jobs",
+        status: "declined",
+        stage: "not_allowed",
+      }),
+    ],
   ]);
   const posted: { route: string; body: unknown }[] = [];
-  let askedAt: string | null = null;
+  const asked: { at: string | null } = { at: null };
   const requests = stubApi({
-    "GET /api/v1/boards": () => ({ body: { can_manage: true, boards: [...boards.values()] } }),
-    "GET /api/v1/boards/admin": () => ({
-      body: adminOverview({
-        candidates:
-          boards.get(WAITING)?.status === "candidate"
-            ? adminOverview().candidates.map((candidate) => ({ ...candidate, asked_at: askedAt }))
-            : [],
-      }),
-    }),
+    "GET /api/v1/boards/admin": () => ({ body: adminOverview() }),
+    "GET /api/v1/boards/admin/list": (request) => {
+      const query = new URL(request.url).searchParams;
+      const show = query.get("show");
+      const q = (query.get("q") ?? "").toLowerCase();
+      const boards = [...lines.values()].filter((line) => {
+        const stage = { notAllowed: "not_allowed" }[show ?? ""] ?? show;
+        if (show === "company" && line.group !== "company") {
+          return false;
+        }
+        if (stage !== null && show !== "company" && show !== "site" && line.stage !== stage) {
+          return false;
+        }
+        return q === "" || `${line.name} ${line.tags.join(" ")}`.toLowerCase().includes(q);
+      });
+      return { body: { boards, next_cursor: null } };
+    },
     [`GET /api/v1/boards/${WAITING}`]: () => ({
-      body: detail(boards.get(WAITING) ?? waiting(), {
+      body: detail(waiting(), {
         blockers: [{ code: "terms_forbid", detail: "You may not scrape this site." }],
       }),
     }),
     [`GET /api/v1/boards/${HIMALAYAS}`]: () => ({ body: detail(board()) }),
     [`GET /api/v1/boards/${WAITING}/permission-email`]: () => ({
-      body: permissionEmail({ asked_at: askedAt }),
+      body: permissionEmail({ asked_at: asked.at }),
     }),
     [`POST /api/v1/boards/${WAITING}/permission/asked`]: () => {
-      askedAt = "2026-11-04T10:00:00Z";
-      return { body: permissionEmail({ asked_at: askedAt }) };
+      asked.at = "2026-11-04T10:00:00Z";
+      return { body: permissionEmail({ asked_at: asked.at }) };
     },
     [`POST /api/v1/boards/${WAITING}/permission/answer`]: async (request) => {
       posted.push({
         route: new URL(request.url).pathname,
         body: JSON.parse(await request.text()) as unknown,
       });
-      boards.set(WAITING, { ...(boards.get(WAITING) ?? waiting()), status: "approved" });
-      return { body: detail(boards.get(WAITING) ?? waiting()) };
+      const line = lines.get(WAITING);
+      if (line !== undefined) {
+        lines.set(WAITING, { ...line, status: "approved", stage: "reading", need: null });
+      }
+      return { body: detail(board()) };
     },
   });
   return { posted, requests };
@@ -80,29 +111,39 @@ describe("the job boards admin page", () => {
       "Waiting for you",
     );
     const all = screen.getByTestId("boards-admin-all");
-    expect(all).toHaveTextContent("All sites · 3");
-    expect(within(all).getAllByTestId("boards-admin-row")).toHaveLength(3);
-    expect(screen.getByTestId("boards-admin-status-notAllowed")).toHaveTextContent("Not allowed");
+    expect(all).toHaveTextContent("All sites");
+    expect(await within(all).findAllByTestId("boards-admin-row")).toHaveLength(3);
+    expect(await screen.findByTestId("boards-admin-status-notAllowed")).toHaveTextContent(
+      "Not allowed",
+    );
   });
 
-  it("filters the table by status and by what is typed, and says when nothing matches", async () => {
-    server();
+  it("asks the server to filter and search, and says when nothing matches", async () => {
+    const { requests } = server();
     renderWithProviders(<BoardsAdmin back={null} />);
     const user = userEvent.setup();
     await screen.findByTestId("boards-admin-table");
     await user.selectOptions(screen.getByTestId("boards-admin-show"), "reading");
-    expect(screen.getAllByTestId("boards-admin-row")).toHaveLength(1);
+    await waitFor(() => {
+      expect(screen.getAllByTestId("boards-admin-row")).toHaveLength(1);
+    });
     expect(screen.getByTestId("boards-admin-table")).toHaveTextContent("Himalayas");
+    expect(requests.some((r) => r.route === "GET /api/v1/boards/admin/list")).toBe(true);
     await user.selectOptions(screen.getByTestId("boards-admin-show"), "all");
     await user.type(screen.getByTestId("boards-admin-search"), "landing");
-    expect(screen.getAllByTestId("boards-admin-row")).toHaveLength(1);
+    await waitFor(() => {
+      expect(screen.getAllByTestId("boards-admin-row")).toHaveLength(1);
+    });
+    expect(screen.getByTestId("boards-admin-table")).toHaveTextContent("Landing.jobs");
     await user.clear(screen.getByTestId("boards-admin-search"));
     await user.selectOptions(screen.getByTestId("boards-admin-show"), "company");
-    expect(screen.getByTestId("boards-admin-all-empty")).toHaveTextContent(
+    expect(await screen.findByTestId("boards-admin-all-empty")).toHaveTextContent(
       "No site matches these filters.",
     );
     await user.click(screen.getByTestId("boards-admin-clear"));
-    expect(screen.getAllByTestId("boards-admin-row")).toHaveLength(3);
+    await waitFor(() => {
+      expect(screen.getAllByTestId("boards-admin-row")).toHaveLength(3);
+    });
   });
 
   it("puts the decision first: copy the email, say it was sent, then record their yes", async () => {
@@ -149,7 +190,7 @@ describe("the job boards admin page", () => {
     renderWithProviders(<BoardsAdmin back={null} />);
     const user = userEvent.setup();
     const all = await screen.findByTestId("boards-admin-all");
-    const [first] = within(all).getAllByTestId("boards-admin-open");
+    const [first] = await within(all).findAllByTestId("boards-admin-open");
     if (first === undefined) {
       throw new Error("no board in the table");
     }

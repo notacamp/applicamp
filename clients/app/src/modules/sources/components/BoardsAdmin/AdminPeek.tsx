@@ -24,10 +24,11 @@ import {
 } from "~/lib/ui";
 
 import { useAnswerRequest, useMarkAsked, usePermissionEmail, useReopen } from "../../api/admin";
-import type { AdminRow } from "../../api/admin-rows";
+import type { AdminRow, RowStatus } from "../../api/admin-rows";
 import {
   boardErrorOf,
   type BoardErrorCode,
+  type BoardStatus,
   useBoard,
   useBoardAction,
   type BoardAction,
@@ -44,6 +45,32 @@ export interface AdminPeekProps {
   /** The board open; none closes the panel. */
   row: AdminRow | undefined;
   onClose: () => void;
+  /** The owner declined the board from here. */
+  onDeclined: (id: string) => void;
+}
+
+/** The row, brought up to date with what the board's own panel says it is now. */
+function reconcile(row: AdminRow, detail: BoardDetail | undefined): AdminRow {
+  const status: BoardStatus | undefined = detail?.board.status;
+  if (detail === undefined || status === undefined || status === row.board.status) {
+    return row;
+  }
+  let next: RowStatus = row.status;
+  if (status === "approved") {
+    next = "reading";
+  } else if (status === "paused") {
+    next = "paused";
+  } else if (status === "declined") {
+    next = "notAllowed";
+  } else if (row.status === "reading" || row.status === "paused" || row.status === "notAllowed") {
+    next = "waiting";
+  }
+  return {
+    ...row,
+    status: next,
+    need: next === "waiting" ? (row.need ?? "approve") : undefined,
+    board: { ...row.board, status, decline_reason: detail.board.decline_reason },
+  };
 }
 
 /**
@@ -51,10 +78,11 @@ export interface AdminPeekProps {
  * or pause, check again and stop), then the facts, then each check in plain words with the quoted
  * sentence. "More options" opens the full board panel (config, proposals, the key).
  */
-export function AdminPeek({ row, onClose }: AdminPeekProps) {
+export function AdminPeek({ row: listed, onClose, onDeclined }: AdminPeekProps) {
   const { t } = useTranslation("sources");
   const [more, setMore] = useState<string | null>(null);
-  const board = useBoard(row?.board.id ?? null);
+  const board = useBoard(listed?.board.id ?? null);
+  const row = listed === undefined ? undefined : reconcile(listed, board.data);
   if (more !== null && row?.board.id === more) {
     return (
       <BoardPeek
@@ -98,7 +126,12 @@ export function AdminPeek({ row, onClose }: AdminPeekProps) {
           {detail === undefined && !board.isError ? <Skeleton width="60%" /> : null}
           {detail === undefined ? null : (
             <>
-              <Decision key={row.board.id + row.status} row={row} detail={detail} />
+              <Decision
+                key={row.board.id + row.status}
+                row={row}
+                detail={detail}
+                onDeclined={onDeclined}
+              />
               <Facts row={row} detail={detail} />
               <Checks detail={detail} />
               <Cluster>
@@ -159,21 +192,29 @@ function errorText(code: BoardErrorCode, t: TFunction<"sources">): string {
   }
 }
 
-function Decision({ row, detail }: { row: AdminRow; detail: BoardDetail }) {
+function Decision({
+  row,
+  detail,
+  onDeclined,
+}: {
+  row: AdminRow;
+  detail: BoardDetail;
+  onDeclined: (id: string) => void;
+}) {
   switch (row.status) {
     case "waiting": {
       switch (row.need) {
         case "permission": {
-          return <PermissionDecision row={row} />;
+          return <PermissionDecision row={row} onDeclined={onDeclined} />;
         }
         case "key": {
-          return <KeyDecision detail={detail} />;
+          return <KeyDecision detail={detail} onDeclined={onDeclined} />;
         }
         case "choice": {
-          return <ChoiceDecision row={row} />;
+          return <ChoiceDecision row={row} onDeclined={onDeclined} />;
         }
         default: {
-          return <ApproveDecision row={row} />;
+          return <ApproveDecision row={row} onDeclined={onDeclined} />;
         }
       }
     }
@@ -185,13 +226,21 @@ function Decision({ row, detail }: { row: AdminRow; detail: BoardDetail }) {
     }
     case "reading":
     case "paused": {
-      return <ReadingDecision row={row} />;
+      return <ReadingDecision row={row} onDeclined={onDeclined} />;
     }
   }
 }
 
 /** Decline in place: it is never read, and it says so before it happens. */
-function DeclineButton({ id, name, label }: { id: string; name: string; label?: string }) {
+function DeclineButton({
+  id,
+  name,
+  onDeclined,
+}: {
+  id: string;
+  name: string;
+  onDeclined: (id: string) => void;
+}) {
   const { t } = useTranslation("sources");
   const action = useBoardAction(id);
   const [asking, setAsking] = useState(false);
@@ -203,7 +252,14 @@ function DeclineButton({ id, name, label }: { id: string; name: string; label?: 
           cancelLabel={t("admin.cancel")}
           busy={action.isPending}
           onConfirm={() => {
-            action.mutate({ kind: "decline", reason: DECLINED_HERE });
+            action.mutate(
+              { kind: "decline", reason: DECLINED_HERE },
+              {
+                onSuccess: () => {
+                  onDeclined(id);
+                },
+              },
+            );
           }}
           onCancel={() => {
             setAsking(false);
@@ -226,12 +282,18 @@ function DeclineButton({ id, name, label }: { id: string; name: string; label?: 
         setAsking(true);
       }}
     >
-      {label ?? t("admin.decline.button")}
+      {t("admin.decline.button")}
     </Button>
   );
 }
 
-function PermissionDecision({ row }: { row: AdminRow }) {
+function PermissionDecision({
+  row,
+  onDeclined,
+}: {
+  row: AdminRow;
+  onDeclined: (id: string) => void;
+}) {
   const { t, i18n } = useTranslation("sources");
   const id = row.board.id;
   const email = usePermissionEmail(id);
@@ -278,7 +340,7 @@ function PermissionDecision({ row }: { row: AdminRow }) {
             >
               {t("admin.permission.sent")}
             </Button>
-            <DeclineButton id={id} name={row.board.name} />
+            <DeclineButton id={id} name={row.board.name} onDeclined={onDeclined} />
           </Cluster>
         ) : (
           <>
@@ -306,7 +368,14 @@ function PermissionDecision({ row }: { row: AdminRow }) {
                 disabled={answer.isPending}
                 data-testid="boards-admin-no"
                 onClick={() => {
-                  answer.mutate({ answer: "no" });
+                  answer.mutate(
+                    { answer: "no" },
+                    {
+                      onSuccess: () => {
+                        onDeclined(row.board.id);
+                      },
+                    },
+                  );
                 }}
               >
                 {t("admin.permission.no")}
@@ -323,7 +392,13 @@ function PermissionDecision({ row }: { row: AdminRow }) {
   );
 }
 
-function KeyDecision({ detail }: { detail: BoardDetail }) {
+function KeyDecision({
+  detail,
+  onDeclined,
+}: {
+  detail: BoardDetail;
+  onDeclined: (id: string) => void;
+}) {
   const { t } = useTranslation("sources");
   const id = detail.board.id;
   const action = useBoardAction(id);
@@ -398,7 +473,7 @@ function KeyDecision({ detail }: { detail: BoardDetail }) {
           >
             {t("admin.key.save")}
           </Button>
-          <DeclineButton id={id} name={detail.board.name} />
+          <DeclineButton id={id} name={detail.board.name} onDeclined={onDeclined} />
         </Cluster>
         {action.isError ? <ErrorLine testId="boards-admin-key-error" error={action.error} /> : null}
       </Stack>
@@ -406,7 +481,7 @@ function KeyDecision({ detail }: { detail: BoardDetail }) {
   );
 }
 
-function ChoiceDecision({ row }: { row: AdminRow }) {
+function ChoiceDecision({ row, onDeclined }: { row: AdminRow; onDeclined: (id: string) => void }) {
   const { t } = useTranslation("sources");
   const answer = useAnswerRequest(row.board.id);
   return (
@@ -434,7 +509,14 @@ function ChoiceDecision({ row }: { row: AdminRow }) {
             disabled={answer.isPending}
             data-testid="boards-admin-choice-no"
             onClick={() => {
-              answer.mutate({ answer: "no", kind: "choice" });
+              answer.mutate(
+                { answer: "no", kind: "choice" },
+                {
+                  onSuccess: () => {
+                    onDeclined(row.board.id);
+                  },
+                },
+              );
             }}
           >
             {t("admin.choice.no")}
@@ -448,7 +530,7 @@ function ChoiceDecision({ row }: { row: AdminRow }) {
   );
 }
 
-function ApproveDecision({ row }: { row: AdminRow }) {
+function ApproveDecision({ row, onDeclined }: { row: AdminRow; onDeclined: (id: string) => void }) {
   const { t } = useTranslation("sources");
   const action = useBoardAction(row.board.id);
   return (
@@ -471,7 +553,7 @@ function ApproveDecision({ row }: { row: AdminRow }) {
           >
             {t("admin.approve.button")}
           </Button>
-          <DeclineButton id={row.board.id} name={row.board.name} />
+          <DeclineButton id={row.board.id} name={row.board.name} onDeclined={onDeclined} />
         </Cluster>
         {action.isError ? (
           <ErrorLine testId="boards-admin-approve-error" error={action.error} />
@@ -548,7 +630,7 @@ function NotAllowedDecision({ row }: { row: AdminRow }) {
   );
 }
 
-function ReadingDecision({ row }: { row: AdminRow }) {
+function ReadingDecision({ row, onDeclined }: { row: AdminRow; onDeclined: (id: string) => void }) {
   const { t } = useTranslation("sources");
   const action = useBoardAction(row.board.id);
   const [stopping, setStopping] = useState(false);
@@ -617,7 +699,14 @@ function ReadingDecision({ row }: { row: AdminRow }) {
               cancelLabel={t("admin.cancel")}
               busy={action.isPending}
               onConfirm={() => {
-                run({ kind: "decline", reason: DECLINED_HERE });
+                action.mutate(
+                  { kind: "decline", reason: DECLINED_HERE },
+                  {
+                    onSuccess: () => {
+                      onDeclined(row.board.id);
+                    },
+                  },
+                );
               }}
               onCancel={() => {
                 setStopping(false);
@@ -650,7 +739,7 @@ function Facts({ row, detail }: { row: AdminRow; detail: BoardDetail }) {
           : new Intl.NumberFormat(i18n.language).format(board.last_fetch_jobs)}
       </Property>
       <Property label={t("admin.facts.where")}>{board.country ?? t("admin.worldwide")}</Property>
-      <Property label={t("admin.facts.how")}>{t(`admin.how.${board.kind}`)}</Property>
+      <Property label={t("admin.facts.how")}>{howRead(board.kind, t)}</Property>
       <Property label={t("admin.facts.found")}>{found}</Property>
       <Property label={t("admin.facts.checked")}>
         {row.status === "checking" && checked === null

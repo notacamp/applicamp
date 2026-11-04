@@ -268,8 +268,9 @@ export function discoveryRun(): ScanRun {
 
 type AdminOverview = Schema<"AdminOverview">;
 type PermissionEmail = Schema<"PermissionEmail">;
+type AdminBoard = Schema<"AdminBoard">;
 
-/** The owners' overview: the boards `candidates` say what they wait for. */
+/** The owners' overview. */
 export function adminOverview(overrides: Partial<AdminOverview> = {}): AdminOverview {
   return {
     totals: {
@@ -281,16 +282,6 @@ export function adminOverview(overrides: Partial<AdminOverview> = {}): AdminOver
       paused: 0,
     },
     this_week: { found: 184, checked: 190, rechecked: 40, started_reading: 162 },
-    candidates: [
-      {
-        id: WAITING,
-        name: "Example Remote",
-        stage: "waiting",
-        need: "permission",
-        detail: "You may not scrape this site with automated tools.",
-        asked_at: null,
-      },
-    ],
     ...overrides,
   };
 }
@@ -304,6 +295,23 @@ export function permissionEmail(overrides: Partial<PermissionEmail> = {}): Permi
     asked_at: null,
     answered_at: null,
     answer: null,
+    ...overrides,
+  };
+}
+
+/** A line of the owners' table: a job site that is read, unless `overrides` say otherwise. */
+export function adminBoard(overrides: Partial<AdminBoard> = {}): AdminBoard {
+  return {
+    id: HIMALAYAS,
+    name: "Himalayas",
+    homepage: "https://himalayas.app",
+    kind: "json_api",
+    group: "site",
+    status: "approved",
+    stage: "reading",
+    origin: "seed",
+    last_fetch_jobs: 100,
+    tags: [],
     ...overrides,
   };
 }

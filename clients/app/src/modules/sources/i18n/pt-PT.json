@@ -430,8 +430,6 @@
     "worldwide": "Em todo o mundo",
     "cancel": "Cancelar",
     "askedOn": "Pedido a {{date}}. Ainda sem resposta.",
-    "showMore_one": "Mostrar mais {{count}}",
-    "showMore_other": "Mostrar mais {{count}}",
     "totals": {
       "reading": "A ser lidos",
       "readingDetail": "{{sites}} sites de emprego e {{companies}} empresas",
@@ -487,7 +485,9 @@
       "json_api": "uma lista pública de ofertas para apps",
       "rss": "um feed de notícias com as suas ofertas",
       "jsonld_sitemap": "ofertas marcadas nas suas páginas",
-      "hn": "uma conversa mensal de publicações"
+      "hn": "uma conversa mensal de publicações",
+      "company_page": "a página de recrutamento da própria empresa",
+      "hiring_system": "um sistema de recrutamento para muitas empresas"
     },
     "origin": {
       "seed": "a primeira pesquisa",
@@ -502,7 +502,7 @@
       "found": "Encontrado através de"
     },
     "all": {
-      "title": "Todos os sites · {{total}}",
+      "title": "Todos os sites",
       "search": "Procurar um site ou uma empresa",
       "searchHint": "Hotéis, enfermeiros, Lisboa, Greenhouse",
       "emptyTitle": "Nenhum site corresponde",
@@ -510,7 +510,7 @@
       "emptyNone": "Ainda não se conhece nenhum site. A app procura novos todas as semanas.",
       "clear": "Limpar filtros",
       "table": "Todos os sites",
-      "showing": "A mostrar {{shown}} de {{total}}"
+      "showing": "A mostrar {{shown}}"
     },
     "filters": {
       "show": "Mostrar",
@@ -625,6 +625,7 @@
     },
     "undo": "Anular",
     "declined": "Recusado",
-    "open": "Abrir"
+    "open": "Abrir",
+    "more": "Mostrar mais"
   }
 }

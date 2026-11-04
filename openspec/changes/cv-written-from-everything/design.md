@@ -46,6 +46,18 @@ its price.
   records `shortlist` among the steps the preparation did by itself. No model call; the preparation's
   own steps keep their caps and limits.
 
+## States (owner-approved after the design review)
+- `companies.read_failure` keeps why the last read failed (`robots_disallows`, `no_pages_readable`,
+  `site_unreachable`; cleared by a read; migration `20261104140000_pipeline__pasted_company_text.sql`,
+  which also allows pages of kind `pasted`). `GET …/cv` carries `company_read_failure`, `read_eur` and,
+  on the draft, `company_facts`.
+- `POST /api/v1/opportunities/{id}/brief/paste` `{text}` (1 to 20,000 characters): the text is read
+  like a page of the site (`facts_from`, shared with a read): one `complete` call, facts kept only
+  when they quote it, the company's facts replaced as a read does, one of the 20 reads a day.
+- `GET …/cv` carries `writing` while the preparation's read or draft step is queued or running; the
+  page reads the CV again every few seconds until it is there.
+- A paid step's button carries no price; the cost is on the line under it (owner decision).
+
 ## Scopes and endpoints
 Signed-in session as every pipeline endpoint; another person's data is 404. No new endpoint besides
 the list filter.

@@ -21,6 +21,28 @@ reached. No model SHALL be called to propose or to shortlist.
 - **WHEN** a search ends for someone whose goal is "Find only"
 - **THEN** the proposals stay Found
 
+### Requirement: The CV page says what could not be done, and offers the way on
+When the company's site could not be read and the CV was written without its facts, the page SHALL
+say so in plain words ("The site asks apps not to read it. The CV was written from the job posting
+and your profile only.") and offer "Paste what the site says": the pasted text SHALL be read like one
+of the site's pages with one model call, each fact quoting it, within the daily company reads, and
+never as instructions. When the PDF could not be made, the page SHALL say so, keep the CV's text and
+offer Try again and Download the text. While the app writes the CV by itself, the page SHALL say so
+and wait for it, with no button to press. A button that starts a paid step SHALL carry no price: its
+cost SHALL be on the line under it.
+
+#### Scenario: A site that asks apps not to read it
+- **WHEN** the company's site forbids reading and the person pastes "Example Co runs payroll for bakeries"
+- **THEN** a fact quoting those words is kept for the company, and the page no longer says the site was not read
+
+#### Scenario: The PDF could not be made
+- **WHEN** the PDF of a draft could not be made
+- **THEN** the page says so for that company, and offers Try again and Download the text
+
+#### Scenario: Being written
+- **WHEN** the app is writing the CV of a job it is preparing
+- **THEN** the page says it is being written and shows it when it is ready
+
 ## MODIFIED Requirements
 
 ### Requirement: Draft a CV from the profile, every line citing its sources

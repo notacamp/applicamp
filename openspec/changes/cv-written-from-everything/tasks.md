@@ -7,4 +7,5 @@
 - [x] 6 The wants pass; `draft.wants`; cost on the draft and `done`; tests
 - [x] 7 Proposals: migration, insert, eligibility, PATCH, list filter; the after-search handler and job; tests
 - [x] 8 Client: the review page of the prototype, four languages; the fake model's richer draft and Earlier; the e2e spec filmed
-- [ ] 9 OpenAPI regenerated, client types regenerated, changelog entry file (changelog/unreleased/added/73-cv-written-from-everything.md), gates green in CI, recording (UI at 375px and desktop)
+- [x] 9 The states: the site could not be read (and paste what it says), the PDF could not be made, the CV being written; no price in button labels
+- [ ] 10 OpenAPI regenerated, client types regenerated, changelog entry file (changelog/unreleased/added/73-cv-written-from-everything.md), gates green in CI, recording (UI at 375px and desktop)

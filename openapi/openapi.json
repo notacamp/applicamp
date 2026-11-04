@@ -1542,6 +1542,75 @@
         ]
       }
     },
+    "/api/v1/boards/{id}/reopen": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Take back a decline.",
+        "description": "A declined board is put back where it was: approved when it was\napproved before (the owner stopped reading it), else waiting for the\nowner. Its decline reason is cleared. Board owners only.",
+        "operationId": "sources.reopen_board",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The board.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Back where it was.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such board, or not a board owner",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`not_declined`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/v1/companies": {
       "get": {
         "tags": [

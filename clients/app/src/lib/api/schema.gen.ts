@@ -466,6 +466,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/boards/{id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Take back a decline.
+         * @description A declined board is put back where it was: approved when it was
+         *     approved before (the owner stopped reading it), else waiting for the
+         *     owner. Its decline reason is cleared. Board owners only.
+         */
+        post: operations["sources.reopen_board"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies": {
         parameters: {
             query?: never;
@@ -6562,6 +6584,56 @@ export interface operations {
                 };
             };
             /** @description `not_waiting`: the board is read or declined */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "sources.reopen_board": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The board. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Back where it was. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardDetail"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: no such board, or not a board owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_declined` */
             409: {
                 headers: {
                     [name: string]: unknown;

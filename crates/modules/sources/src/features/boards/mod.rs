@@ -305,7 +305,7 @@ fn neighbours(deps: &SourcesDeps) -> Result<&std::sync::Arc<dyn crate::Neighbour
 }
 
 /// Whether `account` manages the job boards.
-async fn is_owner(deps: &SourcesDeps, db: &PgPool, account: Uuid) -> Result<bool> {
+pub(crate) async fn is_owner(deps: &SourcesDeps, db: &PgPool, account: Uuid) -> Result<bool> {
     let email = neighbours(deps)?.account_email(db, account).await?;
     Ok(email.is_some_and(|email| deps.config.is_board_owner(&email)))
 }
@@ -569,7 +569,7 @@ async fn detail(
 
 /// A blocker's code as a problem's (`not_approvable` for one this server
 /// does not name).
-fn conflict_code(code: &str) -> &'static str {
+pub(crate) fn conflict_code(code: &str) -> &'static str {
     [
         "terms_forbid",
         "robots_disallowed",
@@ -583,7 +583,7 @@ fn conflict_code(code: &str) -> &'static str {
     .unwrap_or("not_approvable")
 }
 
-async fn fetch(db: &PgPool, id: Uuid) -> Result<BoardRow> {
+pub(crate) async fn fetch(db: &PgPool, id: Uuid) -> Result<BoardRow> {
     job_boards::get(db, id).await?.ok_or(Error::NotFound)
 }
 

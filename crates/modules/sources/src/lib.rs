@@ -179,11 +179,17 @@ impl SourcesDeps {
 
 /// The sources module, composed with `deps`.
 pub fn module(deps: SourcesDeps) -> Module {
-    use features::{boards as board, discovery, recheck, reground, search, watch};
+    use features::{
+        board_requests as requests, boards as board, discovery, recheck, reground, search, watch,
+    };
     let router = OpenApiRouter::new()
         .routes(routes!(search::start))
         .routes(routes!(search::latest))
         .routes(routes!(search::estimate))
+        .routes(routes!(requests::overview))
+        .routes(routes!(requests::draft))
+        .routes(routes!(requests::asked))
+        .routes(routes!(requests::answer))
         .routes(routes!(board::list))
         .routes(routes!(board::scanned))
         .routes(routes!(board::get))

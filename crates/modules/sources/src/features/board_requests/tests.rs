@@ -407,9 +407,9 @@ async fn a_hiring_system_waits_for_a_choice_and_its_pages_for_the_system(db: PgP
     let system = Uuid::now_v7();
     sqlx::query(
         "INSERT INTO sources.job_boards (id, slug, name, homepage, host, kind, priority, status,
-            origin, report, blockers, created_at, updated_at)
+            origin, report, blockers, system, created_at, updated_at)
          VALUES ($1, 'lever', 'Lever', 'https://lever.example', 'lever.example', 'hiring_system',
-                 'low', 'candidate', 'discovery', $2, $3, $4, $4)",
+                 'low', 'candidate', 'discovery', $2, $3, 'lever', $4, $4)",
     )
     .bind(system)
     .bind(sqlx::types::Json(
@@ -424,9 +424,9 @@ async fn a_hiring_system_waits_for_a_choice_and_its_pages_for_the_system(db: PgP
     .unwrap();
     sqlx::query(
         "INSERT INTO sources.job_boards (id, slug, name, homepage, host, kind, priority, status,
-            origin, system_id, created_at, updated_at)
+            origin, system_id, system, company_token, created_at, updated_at)
          VALUES ($1, 'lever-acme', 'Acme', 'https://acme.example', 'acme.example', 'company_page',
-                 'low', 'candidate', 'discovery', $2, $3, $3)",
+                 'low', 'candidate', 'discovery', $2, 'lever', 'acme', $3, $3)",
     )
     .bind(Uuid::now_v7())
     .bind(system)

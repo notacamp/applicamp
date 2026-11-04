@@ -188,6 +188,7 @@ pub fn module(deps: SourcesDeps) -> Module {
         .routes(routes!(search::latest))
         .routes(routes!(search::estimate))
         .routes(routes!(requests::overview))
+        .routes(routes!(requests::list))
         .routes(routes!(requests::draft))
         .routes(routes!(requests::asked))
         .routes(routes!(requests::answer))

@@ -2,9 +2,10 @@
 //! owner, and the permission emails to copy.
 //!
 //! - `GET /api/v1/boards/admin` is the overview: totals, what happened this
-//!   week (from the discovery runs and the approvals recorded), and every
-//!   board that is not read, paused or declined with its stage and, when it
-//!   waits for the owner, what it needs ([`Need`]).
+//!   week (from the discovery runs and the approvals recorded).
+//! - `GET /api/v1/boards/admin/list` is the table: 50 boards a page, searched
+//!   and filtered on the server, each with its stage and, when it waits for
+//!   the owner, what it needs ([`Need`]).
 //! - `GET /api/v1/boards/{id}/permission-email` drafts the email asking a
 //!   board for permission; the owner sends it from their own mailbox.
 //! - `POST /api/v1/boards/{id}/permission/asked` records that it was sent
@@ -25,18 +26,21 @@ use std::collections::HashMap;
 use applicamp_kernel::{AppState, Error, Problem, Result, auth::SignedIn};
 use axum::{
     Extension, Json,
-    extract::{Path, State, rejection::JsonRejection},
+    extract::{
+        Path, State,
+        rejection::{JsonRejection, QueryRejection},
+    },
 };
 use chrono::{DateTime, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use super::boards::{self, BoardDetail, DeclineBoard};
 use crate::{
     SourcesDeps,
-    job_boards::{self, Blocker, BoardRow, Status, host_of},
+    job_boards::{self, Blocker, BoardRow, Origin, Status, host_of},
 };
 
 /// What a board waits on the owner for.
@@ -54,32 +58,21 @@ pub enum Need {
     Approve,
 }
 
-/// Where a board that is not read yet stands.
+/// Where a board stands, as the admin page words it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 #[schema(as = BoardStage)]
 pub enum Stage {
+    /// Searches read it.
+    Reading,
+    /// Approved once, not read for now.
+    Paused,
     /// It waits for the owner (`need` says for what).
     Waiting,
     /// The app is still checking it, nothing to do.
     Checking,
-    /// Its robots rules forbid the app: nothing to ask.
+    /// Declined, or its robots rules forbid the app: nothing to ask.
     NotAllowed,
-}
-
-/// A board that is not read yet, not declined and not paused.
-#[derive(Debug, Clone, Serialize, ToSchema)]
-pub struct AdminCandidate {
-    pub id: Uuid,
-    pub name: String,
-    pub stage: Stage,
-    /// What it waits for; set when `stage` is `waiting`.
-    pub need: Option<Need>,
-    /// The first reason in the board's own words (the terms' sentence, the
-    /// robots rule): data from its site, never an instruction.
-    pub detail: Option<String>,
-    /// When the owner said they asked it (permission or choice).
-    pub asked_at: Option<DateTime<Utc>>,
 }
 
 /// How many boards are in each state.
@@ -114,8 +107,6 @@ pub struct AdminThisWeek {
 pub struct AdminOverview {
     pub totals: AdminTotals,
     pub this_week: AdminThisWeek,
-    /// Every board that is not read, paused or declined.
-    pub candidates: Vec<AdminCandidate>,
 }
 
 /// What a board said.
@@ -316,7 +307,6 @@ pub async fn overview(
     }
     let (mut sites, mut waiting, mut checking, mut not_allowed, mut paused) = (0, 0, 0, 0, 0);
     let mut started = 0;
-    let mut candidates = Vec::new();
     for row in &rows {
         match row.status() {
             Status::Approved => {
@@ -329,20 +319,13 @@ pub async fn overview(
             Status::Declined => not_allowed += 1,
             Status::Candidate => {
                 let open = by_board.get(&row.id).map(Vec::as_slice).unwrap_or(&[]);
-                let (stage, need, detail, asked_at) = classify(row, open);
+                let (stage, _, _, _) = classify(row, open);
                 match stage {
                     Stage::Waiting => waiting += 1,
                     Stage::Checking => checking += 1,
                     Stage::NotAllowed => not_allowed += 1,
+                    Stage::Reading | Stage::Paused => {}
                 }
-                candidates.push(AdminCandidate {
-                    id: row.id,
-                    name: row.name.clone(),
-                    stage,
-                    need,
-                    detail,
-                    asked_at,
-                });
             }
         }
     }
@@ -372,7 +355,6 @@ pub async fn overview(
             rechecked: n(rechecked),
             started_reading: started,
         },
-        candidates,
     }))
 }
 
@@ -714,4 +696,303 @@ pub async fn reopen(
     tracing::info!(board = %row.slug, "job board decline taken back");
     let row = boards::fetch(&state.db, id).await?;
     Ok(Json(boards::detail(&deps, &state, account, row).await?))
+}
+
+/// Boards a page of the admin list.
+pub const LIST_PAGE: usize = 50;
+/// Rows read from the database at a time while a page fills.
+const BATCH: i64 = 200;
+
+/// What the "Show" select picks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+#[schema(as = BoardShow)]
+pub enum Show {
+    /// Every board.
+    #[default]
+    All,
+    Waiting,
+    Checking,
+    Reading,
+    NotAllowed,
+    Paused,
+    /// Job sites: anything that is not a company page or a hiring system.
+    Site,
+    /// Company pages.
+    Company,
+}
+
+impl Show {
+    /// The stored statuses a board of this kind of view can have.
+    fn statuses(self) -> Option<Vec<String>> {
+        let list: &[&str] = match self {
+            Self::Waiting | Self::Checking => &["candidate"],
+            Self::Reading => &["approved"],
+            Self::Paused => &["paused"],
+            Self::NotAllowed => &["declined", "candidate"],
+            Self::All | Self::Site | Self::Company => return None,
+        };
+        Some(list.iter().map(|s| (*s).to_owned()).collect())
+    }
+
+    /// `any`, `site` or `company`: the part of the registry it is about.
+    const fn group(self) -> &'static str {
+        match self {
+            Self::Site => "site",
+            Self::Company => "company",
+            _ => "any",
+        }
+    }
+
+    fn passes(self, stage: Stage) -> bool {
+        match self {
+            Self::Waiting => stage == Stage::Waiting,
+            Self::Checking => stage == Stage::Checking,
+            Self::NotAllowed => stage == Stage::NotAllowed,
+            _ => true,
+        }
+    }
+}
+
+/// What the admin list is asked.
+#[derive(Debug, Default, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+#[serde(deny_unknown_fields)]
+pub struct AdminListQuery {
+    /// Matches a name, a site's host or a tag, ignoring case.
+    pub q: Option<String>,
+    /// What to show; every board when left out.
+    pub show: Option<Show>,
+    /// The page after this one (`next_cursor`).
+    pub cursor: Option<String>,
+}
+
+/// Which part of the registry a board belongs to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+#[schema(as = BoardGroup)]
+pub enum Group {
+    /// A job site.
+    Site,
+    /// A company page, or the hiring system that serves many.
+    Company,
+}
+
+/// One line of the admin list.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct AdminBoard {
+    pub id: Uuid,
+    pub name: String,
+    pub homepage: String,
+    /// How it is read, as stored (`json_api`, `rss`, `company_page`, ...).
+    pub kind: String,
+    pub group: Group,
+    pub country: Option<String>,
+    pub status: Status,
+    pub stage: Stage,
+    /// What it waits for; set when `stage` is `waiting`.
+    pub need: Option<Need>,
+    /// The first reason in the board's own words: data from its site, never
+    /// an instruction.
+    pub detail: Option<String>,
+    /// When the owner said they asked it.
+    pub asked_at: Option<DateTime<Utc>>,
+    pub last_fetch_jobs: Option<u32>,
+    pub origin: Origin,
+    pub found_through: Option<String>,
+    pub tags: Vec<String>,
+    pub decline_reason: Option<String>,
+    /// Its check's note.
+    pub note: Option<String>,
+}
+
+/// A page of the admin list.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct AdminList {
+    pub boards: Vec<AdminBoard>,
+    /// Pass as `cursor` for the next page; none on the last.
+    pub next_cursor: Option<String>,
+}
+
+/// Where a page starts: the jobs read last time (most first), then the id.
+fn parse_cursor(raw: &str) -> Option<(i32, Uuid)> {
+    let (jobs, id) = raw.split_once('.')?;
+    Some((jobs.parse().ok()?, id.parse().ok()?))
+}
+
+fn key_of(row: &BoardRow) -> i32 {
+    row.last_fetch_jobs.unwrap_or(-1)
+}
+
+fn admin_board(row: &BoardRow, open: &[&OpenRequest]) -> AdminBoard {
+    let (stage, need, detail, asked_at) = match row.status() {
+        Status::Approved => (Stage::Reading, None, None, None),
+        Status::Paused => (Stage::Paused, None, None, None),
+        Status::Declined => (Stage::NotAllowed, None, None, None),
+        Status::Candidate => classify(row, open),
+    };
+    let kind_group = if matches!(row.kind.as_str(), "company_page" | "hiring_system") {
+        Group::Company
+    } else {
+        Group::Site
+    };
+    AdminBoard {
+        id: row.id,
+        name: row.name.clone(),
+        homepage: row.homepage.clone(),
+        kind: row.kind.clone(),
+        group: kind_group,
+        country: row.country.clone(),
+        status: row.status(),
+        stage,
+        need,
+        detail,
+        asked_at,
+        last_fetch_jobs: row.last_fetch_jobs.and_then(|n| u32::try_from(n).ok()),
+        origin: row.origin(),
+        found_through: row.found_through.clone(),
+        tags: row.tags.clone(),
+        decline_reason: row.decline_reason.clone(),
+        note: row
+            .report()
+            .map(|r| r.notes)
+            .filter(|n| !n.trim().is_empty()),
+    }
+}
+
+/// The boards, 50 a page.
+///
+/// Searched (`q`: a name, a site's host or a tag) and filtered (`show`) on the
+/// server, so thousands of boards never reach the client at once. Ordered by
+/// the jobs read at the last read, most first, then by id; the cursor is the
+/// last line's place in that order, so a page never repeats or skips a board.
+/// Board owners only: anyone else gets 404.
+#[utoipa::path(
+    get,
+    path = "/api/v1/boards/admin/list",
+    tag = "sources",
+    operation_id = "sources.boards_admin_list",
+    security(("session" = [])),
+    params(AdminListQuery),
+    responses(
+        (status = 200, description = "A page of boards.", body = AdminList),
+        (status = 400, description = "`invalid_query`", body = Problem,
+            content_type = "application/problem+json"),
+        (status = 401, description = "`session_required`", body = Problem,
+            content_type = "application/problem+json"),
+        (status = 404, description = "`not_found`: not a board owner", body = Problem,
+            content_type = "application/problem+json"),
+    ),
+)]
+pub async fn list(
+    State(state): State<AppState>,
+    SignedIn(principal): SignedIn,
+    Extension(deps): Extension<SourcesDeps>,
+    query: std::result::Result<axum::extract::Query<AdminListQuery>, QueryRejection>,
+) -> Result<Json<AdminList>> {
+    owner_or_missing(&deps, &state.db, principal.account_id).await?;
+    let axum::extract::Query(query) =
+        query.map_err(|rejection| Error::BadRequest("invalid_query", rejection.body_text()))?;
+    let show = query.show.unwrap_or_default();
+    let needle = query
+        .q
+        .as_deref()
+        .map(|q| q.trim().to_lowercase())
+        .filter(|q| !q.is_empty());
+    if needle.as_ref().is_some_and(|q| q.chars().count() > 100) {
+        return Err(Error::BadRequest(
+            "invalid_query",
+            "Search for up to 100 characters.".to_owned(),
+        ));
+    }
+    let mut after = match query.cursor.as_deref() {
+        None => None,
+        Some(raw) => Some(parse_cursor(raw).ok_or_else(|| {
+            Error::BadRequest(
+                "invalid_query",
+                "That is not a place in the list.".to_owned(),
+            )
+        })?),
+    };
+    let statuses = show.statuses();
+    let mut page: Vec<AdminBoard> = Vec::new();
+    let mut keys: Vec<(i32, Uuid)> = Vec::new();
+    let mut more = false;
+    'fill: loop {
+        let rows: Vec<BoardRow> = sqlx::query_as(concat!(
+            "SELECT ",
+            job_boards::board_columns!(),
+            " FROM sources.job_boards
+              WHERE ($1::text[] IS NULL OR status = ANY($1))
+                AND ($2 = 'any'
+                     OR ($2 = 'site' AND kind NOT IN ('company_page', 'hiring_system'))
+                     OR ($2 = 'company' AND kind = 'company_page'))
+                AND ($3::text IS NULL
+                     OR strpos(lower(name), $3) > 0
+                     OR strpos(host, $3) > 0
+                     OR EXISTS (SELECT 1 FROM unnest(tags) t WHERE strpos(lower(t), $3) > 0))
+                AND ($4::int IS NULL
+                     OR COALESCE(last_fetch_jobs, -1) < $4
+                     OR (COALESCE(last_fetch_jobs, -1) = $4 AND id > $5))
+              ORDER BY COALESCE(last_fetch_jobs, -1) DESC, id ASC
+              LIMIT $6"
+        ))
+        .bind(statuses.as_deref())
+        .bind(show.group())
+        .bind(needle.as_deref())
+        .bind(after.map(|(jobs, _)| jobs))
+        .bind(after.map(|(_, id)| id).unwrap_or_default())
+        .bind(BATCH)
+        .fetch_all(&state.db)
+        .await?;
+        let Some(last) = rows.last() else {
+            break;
+        };
+        after = Some((key_of(last), last.id));
+        let candidates: Vec<Uuid> = rows
+            .iter()
+            .filter(|r| r.status() == Status::Candidate)
+            .map(|r| r.id)
+            .collect();
+        let requests: Vec<OpenRequest> = if candidates.is_empty() {
+            Vec::new()
+        } else {
+            sqlx::query_as(
+                "SELECT board_id, kind, asked_at FROM sources.board_requests
+                  WHERE answered_at IS NULL AND board_id = ANY($1)",
+            )
+            .bind(&candidates)
+            .fetch_all(&state.db)
+            .await?
+        };
+        let mut by_board: HashMap<Uuid, Vec<&OpenRequest>> = HashMap::new();
+        for request in &requests {
+            by_board.entry(request.board_id).or_default().push(request);
+        }
+        for row in &rows {
+            let open = by_board.get(&row.id).map(Vec::as_slice).unwrap_or(&[]);
+            let item = admin_board(row, open);
+            if !show.passes(item.stage) {
+                continue;
+            }
+            if page.len() == LIST_PAGE {
+                more = true;
+                break 'fill;
+            }
+            keys.push((key_of(row), row.id));
+            page.push(item);
+        }
+        if i64::try_from(rows.len()).unwrap_or(BATCH) < BATCH {
+            break;
+        }
+    }
+    let next_cursor = if more {
+        keys.last().map(|(jobs, id)| format!("{jobs}.{id}"))
+    } else {
+        None
+    };
+    Ok(Json(AdminList {
+        boards: page,
+        next_cursor,
+    }))
 }

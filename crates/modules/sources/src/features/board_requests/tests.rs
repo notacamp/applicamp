@@ -85,6 +85,7 @@ async fn anyone_but_an_owner_gets_a_404(db: PgPool) {
     let id = board(&h.db, "waits", "candidate", "/private", terms_forbid()).await;
     for (method, uri, body) in [
         ("GET", "/api/v1/boards/admin".to_owned(), None),
+        ("GET", "/api/v1/boards/admin/list".to_owned(), None),
         ("GET", format!("/api/v1/boards/{id}/permission-email"), None),
         (
             "POST",
@@ -142,8 +143,11 @@ async fn the_overview_counts_and_says_what_each_board_waits_for(db: PgPool) {
     // One declined, one whose robots rules forbid the feed.
     assert_eq!(totals["not_allowed"], 2);
     assert_eq!(totals["paused"], 1);
-    let stage = |id: Uuid| {
-        overview["candidates"]
+    // The table says what each board waits for.
+    let (status, page) = h.get("/api/v1/boards/admin/list").await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    let line = |id: Uuid| {
+        page["boards"]
             .as_array()
             .unwrap()
             .iter()
@@ -151,17 +155,17 @@ async fn the_overview_counts_and_says_what_each_board_waits_for(db: PgPool) {
             .cloned()
             .unwrap()
     };
-    let asks = stage(asks);
+    let asks = line(asks);
     assert_eq!(asks["stage"], "waiting");
     assert_eq!(asks["need"], "permission");
     assert_eq!(asks["detail"], "You may not scrape this site.");
     assert!(asks["asked_at"].is_string());
-    let ready = stage(ready);
+    let ready = line(ready);
     assert_eq!(
         (ready["stage"].as_str(), ready["need"].as_str()),
         (Some("waiting"), Some("approve"))
     );
-    assert_eq!(stage(looking)["stage"], "checking");
+    assert_eq!(line(looking)["stage"], "checking");
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -329,4 +333,70 @@ async fn a_decline_can_be_taken_back(db: PgPool) {
     .await;
     let (_, detail) = send(&h, "POST", &format!("/api/v1/boards/{read}/reopen"), None).await;
     assert_eq!(detail["board"]["status"], "approved");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_list_is_filtered_searched_and_paged_on_the_server(db: PgPool) {
+    let h = harness(db, true).await;
+    sqlx::query(
+        "INSERT INTO sources.job_boards (id, slug, name, homepage, host, kind, priority, status,
+            origin, last_fetch_jobs, tags, created_at, updated_at)
+         SELECT gen_random_uuid(), 'bulk-' || g, 'Bulk ' || g, 'https://bulk' || g || '.example',
+                'bulk' || g || '.example', 'json_api', 'low', 'approved', 'seed', g,
+                CASE WHEN g = 7 THEN ARRAY['hotels'] ELSE '{}' END, now(), now()
+           FROM generate_series(1, 52) g",
+    )
+    .execute(&h.db)
+    .await
+    .unwrap();
+    board(&h.db, "waits", "candidate", "/private", terms_forbid()).await;
+    let ids = |page: &Value| -> Vec<String> {
+        page["boards"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|b| b["id"].as_str().unwrap().to_owned())
+            .collect()
+    };
+
+    // 50 a page, most jobs first; the cursor continues without a repeat or a gap.
+    let (status, first) = h.get("/api/v1/boards/admin/list?show=reading").await;
+    assert_eq!(status, StatusCode::OK, "{first}");
+    assert_eq!(first["boards"].as_array().unwrap().len(), 50);
+    assert_eq!(first["boards"][0]["name"], "Bulk 52");
+    let cursor = first["next_cursor"].as_str().unwrap().to_owned();
+    let (_, second) = h
+        .get(&format!(
+            "/api/v1/boards/admin/list?show=reading&cursor={cursor}"
+        ))
+        .await;
+    assert_eq!(second["boards"].as_array().unwrap().len(), 2);
+    assert_eq!(second["next_cursor"], Value::Null);
+    let mut all = ids(&first);
+    all.extend(ids(&second));
+    all.sort();
+    all.dedup();
+    assert_eq!(all.len(), 52);
+
+    // A search matches a name, a host or a tag.
+    let (_, by_tag) = h.get("/api/v1/boards/admin/list?q=HOTELS").await;
+    assert_eq!(ids(&by_tag).len(), 1);
+    assert_eq!(by_tag["boards"][0]["name"], "Bulk 7");
+    let (_, by_host) = h.get("/api/v1/boards/admin/list?q=bulk52.example").await;
+    assert_eq!(ids(&by_host).len(), 1);
+
+    // The select: waiting boards only; company pages are none until there are some.
+    let (_, waiting) = h.get("/api/v1/boards/admin/list?show=waiting").await;
+    assert_eq!(ids(&waiting).len(), 1);
+    assert_eq!(waiting["boards"][0]["need"], "permission");
+    let (_, company) = h.get("/api/v1/boards/admin/list?show=company").await;
+    assert!(ids(&company).is_empty());
+    let (_, sites) = h.get("/api/v1/boards/admin/list?show=site&q=waits").await;
+    assert_eq!(ids(&sites).len(), 1);
+
+    // A place that is not one, or a show that is not one, is refused.
+    let (status, _) = h.get("/api/v1/boards/admin/list?cursor=nope").await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (status, _) = h.get("/api/v1/boards/admin/list?show=everything").await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
 }

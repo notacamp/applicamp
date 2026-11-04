@@ -178,8 +178,10 @@ fn a_quiet_site_is_read_less_often_but_never_more_than_its_limits_allow() {
     assert_eq!(next_interval(hour, 3, false), hour * 2);
     assert_eq!(next_interval(hour, 6, false), hour * 4);
     assert_eq!(next_interval(hour, 10, false), hour * 8);
-    assert_eq!(next_interval(hour, 50, false), TimeDelta::days(1));
-    assert_eq!(next_interval(hour, 50, true), TimeDelta::days(7));
+    assert_eq!(next_interval(hour, 50, false), hour * 16);
+    let six = TimeDelta::hours(6);
+    assert_eq!(next_interval(six, 50, false), TimeDelta::days(1));
+    assert_eq!(next_interval(six * 2, 50, true), TimeDelta::days(7));
     // A site whose own limit is a week is never read sooner.
     let week = TimeDelta::days(7);
     assert_eq!(next_interval(week, 0, false), week);

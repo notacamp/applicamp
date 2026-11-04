@@ -38,7 +38,12 @@ export function Boards({ tab, onTab }: BoardsProps) {
         <BoardsAdmin
           back={
             <div>
-              <ButtonLink variant="ghost" icon="chevron-left" data-testid="boards-back" {...link("/profile")}>
+              <ButtonLink
+                variant="ghost"
+                icon="chevron-left"
+                data-testid="boards-back"
+                {...link("/profile")}
+              >
                 {t("boards.back")}
               </ButtonLink>
             </div>

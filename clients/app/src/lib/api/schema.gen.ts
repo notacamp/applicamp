@@ -2614,12 +2614,12 @@ export interface components {
             paused: number;
             /**
              * Format: int32
-             * @description Companies read through their hiring system (Greenhouse, Lever, Ashby).
+             * @description Company pages that are read.
              */
             reading_companies: number;
             /**
              * Format: int32
-             * @description Approved job sites.
+             * @description Job sites that are read.
              */
             reading_sites: number;
             /** Format: int32 */

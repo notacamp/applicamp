@@ -8735,13 +8735,13 @@
           "reading_companies": {
             "type": "integer",
             "format": "int32",
-            "description": "Companies read through their hiring system (Greenhouse, Lever, Ashby).",
+            "description": "Company pages that are read.",
             "minimum": 0
           },
           "reading_sites": {
             "type": "integer",
             "format": "int32",
-            "description": "Approved job sites.",
+            "description": "Job sites that are read.",
             "minimum": 0
           },
           "waiting": {

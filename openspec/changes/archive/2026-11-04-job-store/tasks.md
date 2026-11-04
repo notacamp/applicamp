@@ -1,0 +1,11 @@
+# Tasks
+- [x] 1 migration: `store_jobs` (generated text search, indexes) and `store_reads`
+- [x] 2 readers: conditional first request (`Probe`, `NotModified`), partial reads, `store_read`
+- [x] 3 keeping: new, changed, seen again, closed, expired, limits; cleaning
+- [x] 4 the tick: due rows in SQL, hosts one at a time, reads a minute, cadence, backoff
+- [x] 5 company pages: read through their system once a day, apply links registered
+- [x] 6 the read function for searches (`find`, `StoredJob::into_job`), not wired
+- [x] 7 `GET /api/v1/boards/store` for board owners
+- [x] 8 settings and their documentation
+- [x] 9 tests (sqlx, wiremock) and an e2e check with no screen
+- [x] 10 changelog; recording by the reviewer

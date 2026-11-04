@@ -25,6 +25,14 @@
 //! | `APPLICAMP_SOURCES__COMPANY_PAGES` | `true`: company hiring pages found through apply links are checked every day |
 //! | `APPLICAMP_SOURCES__COMPANY_PAGE_CHECKS` | `300` (new company pages one daily run checks, at most) |
 //! | `APPLICAMP_SOURCES__SEARCH_COMPANY_PAGES` | `false`: a search reads only the company pages of companies the person watches |
+//! | `APPLICAMP_SOURCES__STORE` | `true`: every approved site and company page is read on its own schedule into the job store (#89) |
+//! | `APPLICAMP_SOURCES__STORE_READS_PER_MINUTE` | `60` (reads the store starts a minute, at most, over every host; a site's own polling limit and a host's one read at a time still apply) |
+//! | `APPLICAMP_SOURCES__STORE_PARALLEL` | `8` (hosts read at once; one read at a time on each) |
+//! | `APPLICAMP_SOURCES__STORE_MIN_MINUTES` | `60` (the least time between two reads of one site, whatever its terms allow; a company page is read once a day at most) |
+//! | `APPLICAMP_SOURCES__STORE_CLOSED_DAYS` | `14` (a job its site no longer lists is deleted after this many days) |
+//! | `APPLICAMP_SOURCES__STORE_DESCRIPTION_CHARS` | `10000` (a stored description is cut at this many characters) |
+//! | `APPLICAMP_SOURCES__STORE_MAX_PER_SITE` | `5000` (jobs kept per site, the newest) |
+//! | `APPLICAMP_SOURCES__STORE_MAX_TOTAL` | `500000` (jobs kept in all, the newest) |
 //! | `APPLICAMP_SEARCH__BRAVE_API_KEY_FILE` | unset: web search is off (a file holding the key) |
 //! | `APPLICAMP_SEARCH__BRAVE_URL` | `https://api.search.brave.com` |
 //! | `APPLICAMP_SEARCH__BRAVE_WEEKLY_QUERIES` | `50` (queries one weekly run asks, at most) |
@@ -134,6 +142,30 @@ pub struct SourcesConfig {
     /// A search reads the company pages of the companies the person watches.
     #[serde(default, deserialize_with = "flag")]
     pub search_company_pages: Option<bool>,
+    /// Read every approved site and company page into the job store.
+    #[serde(default, deserialize_with = "flag")]
+    pub store: Option<bool>,
+    /// Reads the store starts a minute, at most.
+    #[serde(default, deserialize_with = "number")]
+    pub store_reads_per_minute: Option<u64>,
+    /// Hosts the store reads at once.
+    #[serde(default, deserialize_with = "number")]
+    pub store_parallel: Option<u64>,
+    /// The least time between two reads of one site, in minutes.
+    #[serde(default, deserialize_with = "number")]
+    pub store_min_minutes: Option<u64>,
+    /// Days a closed job is kept.
+    #[serde(default, deserialize_with = "number")]
+    pub store_closed_days: Option<u64>,
+    /// Characters of a description kept.
+    #[serde(default, deserialize_with = "number")]
+    pub store_description_chars: Option<u64>,
+    /// Jobs kept per site.
+    #[serde(default, deserialize_with = "number")]
+    pub store_max_per_site: Option<u64>,
+    /// Jobs kept in all.
+    #[serde(default, deserialize_with = "number")]
+    pub store_max_total: Option<u64>,
     /// The web search (`APPLICAMP_SEARCH__…`).
     #[serde(skip)]
     pub search: SearchConfig,
@@ -215,6 +247,14 @@ impl Default for SourcesConfig {
             company_pages: None,
             company_page_checks: None,
             search_company_pages: None,
+            store: None,
+            store_reads_per_minute: None,
+            store_parallel: None,
+            store_min_minutes: None,
+            store_closed_days: None,
+            store_description_chars: None,
+            store_max_per_site: None,
+            store_max_total: None,
             search: SearchConfig::default(),
         }
     }
@@ -341,6 +381,60 @@ impl SourcesConfig {
     /// watches (off by default: a job store comes first).
     pub fn search_company_pages(&self) -> bool {
         self.search_company_pages.unwrap_or(false)
+    }
+
+    /// Whether every approved site and company page is read into the job
+    /// store (on by default).
+    pub fn store(&self) -> bool {
+        self.store.unwrap_or(true)
+    }
+
+    /// Reads the store starts a minute, at most (60 when left out).
+    pub fn store_reads_per_minute(&self) -> usize {
+        usize::try_from(self.store_reads_per_minute.unwrap_or(60).clamp(1, 2_000)).unwrap_or(60)
+    }
+
+    /// Hosts the store reads at once (8 when left out); each host one read at
+    /// a time.
+    pub fn store_parallel(&self) -> usize {
+        usize::try_from(self.store_parallel.unwrap_or(8).clamp(1, 32)).unwrap_or(8)
+    }
+
+    /// The least time between two reads of one site (an hour when left out).
+    pub fn store_min_interval(&self) -> chrono::TimeDelta {
+        let minutes = self.store_min_minutes.unwrap_or(60).clamp(15, 7 * 24 * 60);
+        chrono::TimeDelta::minutes(i64::try_from(minutes).unwrap_or(60))
+    }
+
+    /// How long a closed job is kept (14 days when left out).
+    pub fn store_closed_for(&self) -> chrono::TimeDelta {
+        let days = self.store_closed_days.unwrap_or(14).clamp(1, 365);
+        chrono::TimeDelta::days(i64::try_from(days).unwrap_or(14))
+    }
+
+    /// Characters of a description the store keeps (10000 when left out).
+    pub fn store_description_chars(&self) -> usize {
+        usize::try_from(
+            self.store_description_chars
+                .unwrap_or(10_000)
+                .clamp(500, 20_000),
+        )
+        .unwrap_or(10_000)
+    }
+
+    /// Jobs kept per site (5000 when left out).
+    pub fn store_max_per_site(&self) -> i64 {
+        i64::try_from(self.store_max_per_site.unwrap_or(5_000).clamp(10, 100_000)).unwrap_or(5_000)
+    }
+
+    /// Jobs kept in all (500000 when left out).
+    pub fn store_max_total(&self) -> i64 {
+        i64::try_from(
+            self.store_max_total
+                .unwrap_or(500_000)
+                .clamp(1_000, 10_000_000),
+        )
+        .unwrap_or(500_000)
     }
 
     /// The address of a company's page on a system whose address holds
@@ -523,6 +617,37 @@ mod tests {
             std::time::Duration::from_millis(500)
         );
         assert!(config.nightly());
+        assert!(config.store());
+        assert_eq!(config.store_reads_per_minute(), 60);
+        assert_eq!(config.store_parallel(), 8);
+        assert_eq!(config.store_min_interval(), chrono::TimeDelta::hours(1));
+        assert_eq!(config.store_closed_for(), chrono::TimeDelta::days(14));
+        assert_eq!(config.store_description_chars(), 10_000);
+        assert_eq!(config.store_max_per_site(), 5_000);
+        assert_eq!(config.store_max_total(), 500_000);
+    }
+
+    #[test]
+    fn the_stores_limits_are_read_and_kept_within_bounds() {
+        let config = load(serde_json::json!({ "sources": {
+            "store": "false",
+            "store_reads_per_minute": "5",
+            "store_min_minutes": 1,
+            "store_closed_days": "3",
+            "store_description_chars": "50",
+            "store_max_per_site": "100",
+        }}))
+        .unwrap();
+        assert!(!config.store());
+        assert_eq!(config.store_reads_per_minute(), 5);
+        assert_eq!(
+            config.store_min_interval(),
+            chrono::TimeDelta::minutes(15),
+            "never faster than the shortest polling interval a site may have"
+        );
+        assert_eq!(config.store_closed_for(), chrono::TimeDelta::days(3));
+        assert_eq!(config.store_description_chars(), 500);
+        assert_eq!(config.store_max_per_site(), 100);
     }
 
     #[test]

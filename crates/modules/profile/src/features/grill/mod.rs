@@ -429,6 +429,29 @@ struct ProposalRow {
     role_key: String,
 }
 
+/// How many of `ids` (facts taken from answers) still wait for Keep or Drop:
+/// kept, dropped and expired ones do not.
+pub async fn waiting_among(
+    db: &PgPool,
+    account: Uuid,
+    ids: &[Uuid],
+    now: DateTime<Utc>,
+) -> Result<u32> {
+    if ids.is_empty() {
+        return Ok(0);
+    }
+    let n: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM profile.grill_proposals
+          WHERE account_id = $1 AND id = ANY($2) AND status = 'ready' AND expires_at > $3",
+    )
+    .bind(account)
+    .bind(ids)
+    .bind(now)
+    .fetch_one(db)
+    .await?;
+    Ok(u32::try_from(n).unwrap_or(u32::MAX))
+}
+
 async fn proposal_rows(
     db: &PgPool,
     account: Uuid,

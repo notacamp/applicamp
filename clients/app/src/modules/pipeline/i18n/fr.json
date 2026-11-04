@@ -170,7 +170,15 @@
       "save": "Enregistrer le site",
       "cancel": "Annuler",
       "is": "Site de {{company}} : {{site}}",
-      "change": "Modifier"
+      "change": "Modifier",
+      "from": {
+        "board": "Donné par le site d’emploi.",
+        "apply_host": "Tiré du lien de candidature.",
+        "person": "Vous l’avez saisi.",
+        "posting_link": "Trouvé dans un lien de l’annonce.",
+        "posting_email": "Trouvé dans l’adresse e-mail de l’annonce.",
+        "name_guess": "Trouvé à partir du nom de l’entreprise : sa page d’accueil la nomme."
+      }
     },
     "readLead": "Lit l’annonce et le site de l’entreprise elle-même (ce site seulement, là où robots.txt le permet) et en tire les faits : un appel à l’IA, réutilisé pendant 30 jours. Ensuite, un autre compare le poste à votre profil.",
     "read": "Lire sur {{company}} · environ {{cost}}",
@@ -229,7 +237,7 @@
       "title": "Rédiger le CV",
       "lead": "Le CV est rédigé à partir de ces faits et de votre profil, et chaque ligne est vérifiée par rapport à ce que dit votre profil."
     },
-    "costLine": "Lire une entreprise : un appel à l’IA, environ {{read}}, réutilisé pendant 30 jours. Comparer le poste : un appel, environ {{analysis}}. Chaque réponse : un petit appel, environ {{answer}}. Rien ne tourne en arrière-plan.",
+    "costLine": "Lire une entreprise : un appel d’IA, environ {{read}}, réutilisé 30 jours. Comparer l’offre : un appel, environ {{analysis}}. Chaque réponse : un petit appel, environ {{answer}}. Une offre retenue n’est préparée toute seule que si vos objectifs le disent, dans les mêmes limites.",
     "spend": {
       "reads": "Entreprises lues aujourd’hui : {{n}} sur {{cap}}."
     },
@@ -251,7 +259,56 @@
       "profile_needed": "Ajoutez d’abord un poste à votre profil : la réponse a besoin d’un endroit où aller.",
       "no_skill": "Cette question ne porte pas sur une compétence.",
       "not_found": "Cette opportunité est introuvable.",
-      "generic": "Un problème est survenu. Réessayez."
+      "generic": "Un problème est survenu. Réessayez.",
+      "find_only": "Vos objectifs disent que l’app ne fait que trouver des offres. Changez cela d’abord dans vos objectifs.",
+      "stage_too_early": "Retenez d’abord cette offre."
+    },
+    "byItself": {
+      "off": "Ici, chaque étape commence par un clic : vos objectifs disent que l’app ne fait que trouver des offres. Choisissez « Préparer les candidatures » dans vos objectifs pour que les offres retenues soient préparées pour vous.",
+      "stop": "Arrêter",
+      "start": "Préparer toute seule",
+      "tryAgain": "Réessayer",
+      "review": "Relire",
+      "done": "Prêt : votre CV et votre lettre de motivation pour cette offre sont approuvés.",
+      "workingLead": "Rien ne part en votre nom : ce qu’elle prépare attend votre accord.",
+      "stoppedLead": "Ce qui a déjà été fait reste. Chaque étape est toujours là, en bouton.",
+      "failedLead": "Ce n’est pas réessayé tout seul. Chaque étape est toujours là, en bouton.",
+      "did": "Fait toute seule : {{steps}} · environ {{cost}} au total.",
+      "working": {
+        "read": "Préparation de {{company}} : recherche de son site, lecture et comparaison avec l’offre…",
+        "draft": "Rédaction de votre CV pour cette offre…",
+        "letter": "Rédaction de votre lettre de motivation et de vos réponses pour cette offre…"
+      },
+      "waiting": {
+        "site": "En attente de vous : le site de {{company}} n’a pas été trouvé. Saisissez-le ci-dessous et la suite se fait.",
+        "answers": "En attente de vos réponses ci-dessous : le CV est rédigé une fois les questions répondues ou passées, et leurs faits gardés ou écartés.",
+        "cv_approval": "Votre CV pour cette offre est rédigé et attend votre relecture.",
+        "letter_approval": "Votre lettre de motivation et vos réponses sont rédigées et attendent votre relecture."
+      },
+      "steps": {
+        "site": "trouvé le site ({{date}})",
+        "read": "lu l’entreprise ({{date}})",
+        "compare": "comparé l’offre ({{date}})",
+        "draft": "rédigé le CV ({{date}})",
+        "letter": "rédigé la lettre ({{date}})",
+        "other": "une étape ({{date}})"
+      },
+      "reasons": {
+        "stopped": "Vous avez arrêté la préparation de cette offre.",
+        "not_shortlisted": "Arrêté : cette offre n’est plus retenue.",
+        "find_only": "Arrêté : vos objectifs disent que l’app ne fait que trouver des offres.",
+        "company_reads_daily_cap": "Arrêté : vous avez lu 20 entreprises aujourd’hui. Continuez demain, ou cliquez sur Lire.",
+        "cv_drafts_daily_cap": "Arrêté : vous avez fait 20 brouillons de CV aujourd’hui. Continuez demain.",
+        "cv_drafts_per_opportunity_cap": "Arrêté : cette offre a déjà eu 10 brouillons de CV. Relisez-en un.",
+        "letter_drafts_daily_cap": "Arrêté : vous avez rédigé 20 lettres aujourd’hui. Continuez demain.",
+        "letter_drafts_per_opportunity_cap": "Arrêté : cette offre a déjà eu 10 brouillons de lettre. Relisez-en un.",
+        "ai_daily_limit_reached": "Arrêté : vous avez atteint la limite d’IA du jour. Elle reprend demain.",
+        "ai_budget_reached": "Arrêté : vous avez atteint votre limite de dépenses d’IA.",
+        "ai_unavailable": "Arrêté : l’IA n’est pas configurée sur ce serveur.",
+        "ai_failed": "L’IA n’a pas pu répondre cette fois.",
+        "profile_needed": "Arrêté : ajoutez d’abord un poste à votre profil.",
+        "generic": "Un problème est survenu pendant la préparation de cette offre."
+      }
     }
   },
   "cv": {

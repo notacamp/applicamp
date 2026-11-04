@@ -33,6 +33,15 @@
       "add_headline": "Añade un titular a tu perfil: afina todas las coincidencias.",
       "add_work": "Añade tus puestos a tu perfil: las coincidencias se valoran según ellos.",
       "add_skills": "Añade tus habilidades a tu perfil: las coincidencias se valoran según ellas."
+    },
+    "waitingTitle": "Preparado para ti: {{count}}",
+    "waitingBody": "La app llevó estas ofertas tan lejos como pudo. Cada una te espera.",
+    "open": "Abrir",
+    "waiting": {
+      "site": "{{title}} · {{company}}: escribe la web de la empresa",
+      "answers": "{{title}} · {{company}}: unas preguntas para el CV",
+      "cv_approval": "{{title}} · {{company}}: revisa tu CV",
+      "letter_approval": "{{title}} · {{company}}: revisa tu carta de presentación"
     }
   },
   "noSkills": {

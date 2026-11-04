@@ -106,6 +106,7 @@ export function todayAnswer(nextStep: Today["next_step"], overrides: Partial<Tod
     new_matches: nextStep === "review_matches" ? 9 : 0,
     latest_search: null,
     company_hits: [],
+    waiting_on_you: [],
     next_step: nextStep,
     ...overrides,
   };

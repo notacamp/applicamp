@@ -5,7 +5,8 @@
 //! - **The company's facts.** The company's own pages (its home page, a few
 //!   it links to about the company, and the posting) are read on a click and
 //!   become short facts, each with the words of the page that say it. The
-//!   site is the board's, else the apply link's host, else the person's, typed
+//!   site is the board's, else the apply link's host, else one the posting
+//!   names, else one found from the company's name, else the person's, typed
 //!   once ([`site`]). Nothing but the posting and the company's own site is
 //!   ever fetched, and only where robots.txt allows. A fact whose quote is not
 //!   on the page it cites is left out ([`judge`]). The person can remove any
@@ -19,10 +20,11 @@
 //!   "I don't have it" on a skill question records a skill dismissal and
 //!   makes no call.
 //!
-//! Every model call starts with a click; nothing runs in the background. The
-//! AI budget reserves before each call, and a company read is capped at
-//! [`DAILY_READS_CAP`] per account per UTC day (its fetches count, whether or
-//! not the model was reached).
+//! Every model call starts with a click, or with the preparation of a job the
+//! person shortlisted ([`crate::features::prepare`], ADR 0010); nothing runs on
+//! a timer. The AI budget reserves before each call, and a company read is
+//! capped at [`DAILY_READS_CAP`] per account per UTC day (its fetches count,
+//! whether or not the model was reached).
 
 pub mod employer;
 pub mod judge;
@@ -52,6 +54,7 @@ use self::{
 use crate::{
     PipelineDeps,
     companies::{self, Company, ReadPage, SiteSource},
+    features::prepare::{self, Preparation},
     ports::{Neighbours, ProfileDigest, SiteFailure, SitePage},
     store::{MAX_DESCRIPTION, MAX_URL},
 };
@@ -87,6 +90,12 @@ pub enum SiteOrigin {
     ApplyHost,
     /// The person typed it.
     Person,
+    /// A link in the posting.
+    PostingLink,
+    /// An email address in the posting.
+    PostingEmail,
+    /// A domain made from the company's name, whose home page names it.
+    NameGuess,
 }
 
 impl From<SiteSource> for SiteOrigin {
@@ -95,6 +104,9 @@ impl From<SiteSource> for SiteOrigin {
             SiteSource::Board => Self::Board,
             SiteSource::ApplyHost => Self::ApplyHost,
             SiteSource::Person => Self::Person,
+            SiteSource::PostingLink => Self::PostingLink,
+            SiteSource::PostingEmail => Self::PostingEmail,
+            SiteSource::NameGuess => Self::NameGuess,
         }
     }
 }
@@ -258,6 +270,11 @@ pub struct Brief {
     pub latest_role: Option<RoleRef>,
     pub estimates: Estimates,
     pub spend: BriefSpend,
+    /// What the app does by itself for this job: none until it started.
+    pub preparation: Option<Preparation>,
+    /// The app prepares shortlisted jobs by itself: the person's Autonomy goal
+    /// is "Prepare" (or not answered) and a model is set up.
+    pub prepares_by_itself: bool,
 }
 
 /// A fact taken from an answer, waiting for Keep, Fix or Drop.
@@ -392,8 +409,80 @@ async fn site_of(db: &PgPool, account: Uuid, opp: &Opp) -> Result<(Option<Compan
         &opp.url,
         opp.source == crate::store::LINK,
         &boards,
+        opp.description.as_deref(),
+        &opp.company,
     );
     Ok((company, choice))
+}
+
+/// Whether opportunity `id`'s job was compared (what it wants is stored).
+pub(crate) async fn was_compared(db: &PgPool, id: Uuid) -> Result<bool> {
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM pipeline.job_briefs WHERE opportunity_id = $1)",
+    )
+    .bind(id)
+    .fetch_one(db)
+    .await?)
+}
+
+/// Whether the site of opportunity `id`'s company is known now, without
+/// looking for it.
+pub(crate) async fn site_known(db: &PgPool, account: Uuid, id: Uuid) -> Result<bool> {
+    let opp = load(db, account, id).await?;
+    Ok(site_of(db, account, &opp).await?.1.site.is_some())
+}
+
+/// The company's site as [`site_of`] knows it, else found by asking at most
+/// [`site::MOST_TRIED`] home pages ([`site::to_try`]): the first that names
+/// the company is kept on it; when none does, it is not looked for again for
+/// [`FRESH_DAYS`] days. No model call.
+async fn find_site(
+    deps: &PipelineDeps,
+    db: &PgPool,
+    account: Uuid,
+    opp: &Opp,
+    now: DateTime<Utc>,
+) -> Result<site::Choice> {
+    let (_, choice) = site_of(db, account, opp).await?;
+    if choice.site.is_some() || opp.company.trim().is_empty() {
+        return Ok(choice);
+    }
+    let since = now - TimeDelta::days(FRESH_DAYS);
+    if companies::sought_since(db, account, &opp.company, since).await? {
+        return Ok(choice);
+    }
+    let neighbours = neighbours(deps)?;
+    let boards = board_hosts(db, opp.id).await?;
+    for found in site::to_try(opp.description.as_deref(), &boards, &opp.company) {
+        if !neighbours.site_allowed(&found.site) {
+            continue;
+        }
+        let Ok(text) = neighbours.home_page(&found.site).await else {
+            continue;
+        };
+        if site::names(&text, &opp.company) {
+            let mut tx = db.begin().await?;
+            companies::note_site(
+                &mut tx,
+                account,
+                &opp.company,
+                &found.site,
+                found.source,
+                now,
+            )
+            .await?;
+            tx.commit().await?;
+            // Ids and kinds only.
+            tracing::info!(source = found.source.as_str(), "a company's site was found");
+            return Ok(site::Choice {
+                site: Some(found.site),
+                source: Some(found.source),
+            });
+        }
+    }
+    companies::note_sought(db, account, &opp.company, now).await?;
+    tracing::info!("a company's site was not found");
+    Ok(choice)
 }
 
 fn role_ref(digest: Option<&ProfileDigest>, position: usize) -> Option<RoleRef> {
@@ -575,7 +664,109 @@ async fn build(
             answer_eur: ANSWER_EUR,
         },
         spend: spend_of(deps, db, account, now).await?,
+        preparation: prepare::view(db, opp.id).await?,
+        prepares_by_itself: prepare::by_itself(deps, db, account).await?,
     })
+}
+
+/// The brief of opportunity `id`, as it is now. Never calls the model.
+pub(crate) async fn brief_of(
+    deps: &PipelineDeps,
+    db: &PgPool,
+    account: Uuid,
+    id: Uuid,
+    now: DateTime<Utc>,
+) -> Result<Brief> {
+    let opp = load(db, account, id).await?;
+    build(deps, db, account, &opp, now).await
+}
+
+/// What [`read_and_compare`] did.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct Prepared {
+    /// The company's site is known (found now, or before).
+    pub site: bool,
+    /// Its pages were read just now (one model call).
+    pub read: bool,
+    /// The job was compared just now (one model call).
+    pub compared: bool,
+}
+
+/// Read the company (unless its facts are fresh) and compare the job (unless
+/// it was compared for this very posting text). The site is found first when
+/// it is not known ([`find_site`]). Without a site, nothing more is done
+/// unless `without_site`: then the job is compared without the company's
+/// facts. A site that cannot be read (robots.txt, no text, no answer) does not
+/// stop the comparison.
+pub(crate) async fn read_and_compare(
+    deps: &PipelineDeps,
+    db: &PgPool,
+    account: Uuid,
+    id: Uuid,
+    locale: Option<&str>,
+    without_site: bool,
+    now: DateTime<Utc>,
+) -> Result<Prepared> {
+    let opp = load(db, account, id).await?;
+    let mut prepared = Prepared::default();
+    if !opp.company.trim().is_empty() {
+        match read_company(deps, db, account, &opp, false, now).await {
+            Ok(read) => {
+                prepared.site = true;
+                prepared.read = read;
+            }
+            Err(Error::BadRequest("site_needed", _)) => {}
+            Err(e)
+                if matches!(
+                    e.code(),
+                    "robots_disallows" | "no_pages_readable" | "site_unreachable"
+                ) =>
+            {
+                prepared.site = true;
+                tracing::info!(error = e.code(), "a company could not be read");
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    if !prepared.site && !without_site {
+        return Ok(prepared);
+    }
+    prepared.compared = analyze(deps, db, account, id, locale, now).await?;
+    Ok(prepared)
+}
+
+/// What a job's questions still wait on: how many are open (a skill the
+/// person said is not theirs is not asked), and the facts the answers
+/// proposed (some may still wait for Keep or Drop).
+pub(crate) async fn questions_left(
+    deps: &PipelineDeps,
+    db: &PgPool,
+    account: Uuid,
+    id: Uuid,
+) -> Result<(u32, Vec<Uuid>)> {
+    let dismissed: Vec<String> = digest(deps, db, account)
+        .await?
+        .map(|p| p.dismissed_skills)
+        .unwrap_or_default();
+    let rows: Vec<(String, Option<String>, Vec<Uuid>)> = sqlx::query_as(
+        "SELECT state, skill, proposals FROM pipeline.brief_questions
+          WHERE opportunity_id = $1 AND account_id = $2",
+    )
+    .bind(id)
+    .bind(account)
+    .fetch_all(db)
+    .await?;
+    let open = rows
+        .iter()
+        .filter(|(state, skill, _)| {
+            state == QuestionState::Open.as_str()
+                && skill
+                    .as_deref()
+                    .is_none_or(|s| !dismissed.contains(&s.to_lowercase()))
+        })
+        .count();
+    let proposals = rows.into_iter().flat_map(|(_, _, p)| p).collect();
+    Ok((u32::try_from(open).unwrap_or(u32::MAX), proposals))
 }
 
 // ---- the model ------------------------------------------------------------
@@ -658,14 +849,14 @@ pub(crate) async fn ask_attempt<T: DeserializeOwned>(
 #[allow(clippy::too_many_arguments)]
 async fn read_company(
     deps: &PipelineDeps,
-    state: &AppState,
+    db: &PgPool,
     account: Uuid,
     opp: &Opp,
     again: bool,
     now: DateTime<Utc>,
 ) -> Result<bool> {
-    let db = &state.db;
-    let (company, choice) = site_of(db, account, opp).await?;
+    let choice = find_site(deps, db, account, opp, now).await?;
+    let company = companies::find(db, account, &opp.company).await?;
     if !again
         && company
             .as_ref()
@@ -684,7 +875,7 @@ async fn read_company(
     let posting = Url::parse(&opp.url).ok();
     fetch_and_store(
         deps,
-        state,
+        db,
         account,
         &opp.company,
         &site,
@@ -703,7 +894,7 @@ async fn read_company(
 #[allow(clippy::too_many_arguments)]
 async fn fetch_and_store(
     deps: &PipelineDeps,
-    state: &AppState,
+    db: &PgPool,
     account: Uuid,
     company: &str,
     site: &Url,
@@ -712,7 +903,6 @@ async fn fetch_and_store(
     opp: Option<&Opp>,
     now: DateTime<Utc>,
 ) -> Result<()> {
-    let db = &state.db;
     let neighbours = neighbours(deps)?;
     let gateway = gateway(deps)?;
     if reads_today(db, account, now).await? >= DAILY_READS_CAP {
@@ -938,20 +1128,20 @@ async fn store_read(
 }
 
 /// Compare the posting with the company's facts and the profile (**one model
-/// call**), unless that was done for this very posting text.
+/// call**), unless that was done for this very posting text. Whether it
+/// called the model.
 async fn analyze(
     deps: &PipelineDeps,
-    state: &AppState,
+    db: &PgPool,
     account: Uuid,
     opp_id: Uuid,
     locale: Option<&str>,
     now: DateTime<Utc>,
-) -> Result<()> {
-    let db = &state.db;
+) -> Result<bool> {
     let opp = load(db, account, opp_id).await?;
     let posting = opp.description.clone().unwrap_or_default();
     if posting.trim().is_empty() {
-        return Ok(());
+        return Ok(false);
     }
     let key = fingerprint(&format!("{}\n{posting}", opp.title));
     let cached: Option<String> =
@@ -960,7 +1150,7 @@ async fn analyze(
             .fetch_optional(db)
             .await?;
     if cached.as_deref() == Some(key.as_str()) {
-        return Ok(());
+        return Ok(false);
     }
     let gateway = gateway(deps)?;
     let profile = digest(deps, db, account).await?.unwrap_or_default();
@@ -1002,7 +1192,7 @@ async fn analyze(
         dropped = analysis.dropped,
         "a job compared"
     );
-    Ok(())
+    Ok(true)
 }
 
 async fn store_analysis(
@@ -1082,15 +1272,18 @@ async fn store_analysis(
 /// What a tailored CV for it would be based on, as it is now: the company's
 /// site (or that the person has to type it), the facts read on it, what the
 /// job wants most, the questions where the profile is thin, what each step
-/// costs and what was spent. **Never calls the model and never fetches.**
-/// Another account's opportunity is not found.
+/// costs and what was spent, and what the app does by itself for it. **Never
+/// calls the model and never fetches**; opening it may start the preparation
+/// of a shortlisted job that was never prepared, or its next step once what it
+/// waited on is done (it runs in the background). Another account's
+/// opportunity is not found.
 #[utoipa::path(
     get,
     path = "/api/v1/opportunities/{id}/brief",
     tag = "pipeline",
     operation_id = "pipeline.brief",
     security(("session" = [])),
-    params(("id" = Uuid, Path, description = "The opportunity.")),
+    params(("id" = Uuid, Path, description = "The opportunity."), LanguageQuery),
     responses(
         (status = 200, description = "The brief.", body = Brief),
         (status = 401, description = "`session_required`", body = Problem,
@@ -1104,12 +1297,14 @@ pub async fn get(
     SignedIn(principal): SignedIn,
     Extension(deps): Extension<PipelineDeps>,
     Path(id): Path<Uuid>,
+    Query(query): Query<LanguageQuery>,
 ) -> Result<Json<Brief>> {
     let account = principal.account_id;
     let opp = load(&state.db, account, id).await?;
-    Ok(Json(
-        build(&deps, &state.db, account, &opp, state.clock.now()).await?,
-    ))
+    let now = state.clock.now();
+    let locale = query.locale.as_deref();
+    prepare::nudge_in(&deps, &state.db, account, opp.id, locale, now).await;
+    Ok(Json(build(&deps, &state.db, account, &opp, now).await?))
 }
 
 /// Type the company's website.
@@ -1202,6 +1397,7 @@ pub async fn set_site(
         .await?;
     }
     tx.commit().await?;
+    prepare::nudge(&deps, &state.db, account, opp.id, now).await;
     Ok(Json(build(&deps, &state.db, account, &opp, now).await?))
 }
 
@@ -1260,14 +1456,14 @@ pub async fn read(
     let now = state.clock.now();
     read_company(
         &deps,
-        &state,
+        &state.db,
         account,
         &opp,
         query.again.unwrap_or(false),
         now,
     )
     .await?;
-    analyze(&deps, &state, account, id, query.locale.as_deref(), now).await?;
+    analyze(&deps, &state.db, account, id, query.locale.as_deref(), now).await?;
     let opp = load(&state.db, account, id).await?;
     Ok(Json(build(&deps, &state.db, account, &opp, now).await?))
 }
@@ -1472,7 +1668,14 @@ pub async fn answer(
             prompt::language(query.locale.as_deref()).as_deref(),
         )
         .await?;
-    set_state(&state.db, row.id, QuestionState::Answered).await?;
+    let proposals: Vec<Uuid> = answered.facts.iter().map(|f| f.id).collect();
+    sqlx::query("UPDATE pipeline.brief_questions SET state = $2, proposals = $3 WHERE id = $1")
+        .bind(row.id)
+        .bind(QuestionState::Answered.as_str())
+        .bind(&proposals)
+        .execute(&state.db)
+        .await?;
+    prepare::nudge(&deps, &state.db, account, opp.id, now).await;
     let mut view = row.view(Some(&profile));
     view.state = QuestionState::Answered;
     Ok(Json(AnswerResult {
@@ -1543,6 +1746,7 @@ pub async fn dont_have(
         .dismiss_skill(&state.db, account, skill, now)
         .await?;
     set_state(&state.db, row.id, QuestionState::DontHave).await?;
+    prepare::nudge(&deps, &state.db, account, opp.id, now).await;
     Ok(Json(build(&deps, &state.db, account, &opp, now).await?))
 }
 
@@ -1575,7 +1779,7 @@ pub async fn skip(
     let opp = load(&state.db, account, id).await?;
     let row = open_question(&state.db, account, opp.id, question).await?;
     set_state(&state.db, row.id, QuestionState::Skipped).await?;
-    Ok(Json(
-        build(&deps, &state.db, account, &opp, state.clock.now()).await?,
-    ))
+    let now = state.clock.now();
+    prepare::nudge(&deps, &state.db, account, opp.id, now).await;
+    Ok(Json(build(&deps, &state.db, account, &opp, now).await?))
 }

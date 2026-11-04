@@ -2025,7 +2025,7 @@
           "pipeline"
         ],
         "summary": "Change an opportunity.",
-        "description": "Its stage, next step, notes, \"Not for me\" (`dismissed`), or that it was\nopened (no longer new). Title, company and place can be typed only for\none added by a link to a site that is not a job board.",
+        "description": "Its stage, next step, notes, \"Not for me\" (`dismissed`), or that it was\nopened (no longer new). Title, company and place can be typed only for\none added by a link to a site that is not a job board. Shortlisting a job\nstarts its preparation when the person's Autonomy goal lets the app\nprepare by itself; moving it back to Found or \"Not for me\" stops it.",
         "operationId": "pipeline.update",
         "parameters": [
           {
@@ -2036,6 +2036,15 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "description": "A language tag such as `pt-PT`; English when left out.",
+            "required": false,
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -2114,7 +2123,7 @@
           "pipeline"
         ],
         "summary": "The brief of an opportunity.",
-        "description": "What a tailored CV for it would be based on, as it is now: the company's\nsite (or that the person has to type it), the facts read on it, what the\njob wants most, the questions where the profile is thin, what each step\ncosts and what was spent. **Never calls the model and never fetches.**\nAnother account's opportunity is not found.",
+        "description": "What a tailored CV for it would be based on, as it is now: the company's\nsite (or that the person has to type it), the facts read on it, what the\njob wants most, the questions where the profile is thin, what each step\ncosts and what was spent, and what the app does by itself for it. **Never\ncalls the model and never fetches**; opening it may start the preparation\nof a shortlisted job that was never prepared, or its next step once what it\nwaited on is done (it runs in the background). Another account's\nopportunity is not found.",
         "operationId": "pipeline.brief",
         "parameters": [
           {
@@ -2125,6 +2134,15 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "description": "A language tag such as `pt-PT`; English when left out.",
+            "required": false,
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -2850,7 +2868,7 @@
           "pipeline"
         ],
         "summary": "Draft a CV for this job.",
-        "description": "**One model call.** From the posting, what the job wants, the company\nfacts not removed and the profile; each line cites the profile sources it\ncomes from, and the server then checks that it says nothing they do not.\nThe model never sees a name or contact details. Needs the opportunity at\nShortlisted or later. At most 10 drafts per opportunity and 20 per account\nper UTC day; nothing retries past a limit. A new draft puts the earlier\nunapproved one away.",
+        "description": "**One model call.** From the posting, what the job wants, the company\nfacts not removed and the profile; each line cites the profile sources it\ncomes from, and the server then checks that it says nothing they do not.\nThe model never sees a name or contact details. Needs the opportunity at\nShortlisted or later. When the job was never compared, the company is read\nand the job compared first (up to two more calls, as Read does), so the\ndraft knows what the job wants; a company that cannot be read does not stop\nthe draft. At most 10 drafts per opportunity and 20 per account per UTC\nday; nothing retries past a limit. A new draft puts the earlier unapproved\none away.",
         "operationId": "pipeline.cv_draft",
         "parameters": [
           {
@@ -4361,6 +4379,153 @@
               "application/pdf": {
                 "schema": {
                   "$ref": "#/components/schemas/PdfFile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/prepare/start": {
+      "post": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Prepare this job by itself, again.",
+        "description": "Queues the preparation from its first step (each step that is already done\nis skipped without a model call): after Stop, after a cap or a limit\nstopped it, or after a step failed (Try again). Needs the job at\nShortlisted or later, a model, and an Autonomy goal other than \"Find\nonly\". Runs in the background; the brief says where it is.",
+        "operationId": "pipeline.prepare_start",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "description": "A language tag such as `pt-PT`; English when left out.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The brief, with the preparation queued.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Brief"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`stage_too_early`; `find_only`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`ai_unavailable`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/prepare/stop": {
+      "post": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Stop preparing this job by itself.",
+        "description": "What is still to run does not run; what was made stays (a draft is still\nthere to approve or discard). \"Prepare by itself\" starts it again.",
+        "operationId": "pipeline.prepare_stop",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The brief, with the preparation stopped.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Brief"
                 }
               }
             }
@@ -8411,7 +8576,8 @@
           "facts",
           "questions",
           "estimates",
-          "spend"
+          "spend",
+          "prepares_by_itself"
         ],
         "properties": {
           "company": {
@@ -8442,6 +8608,21 @@
           "opportunity_id": {
             "type": "string",
             "format": "uuid"
+          },
+          "preparation": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Preparation",
+                "description": "What the app does by itself for this job: none until it started."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "prepares_by_itself": {
+            "type": "boolean",
+            "description": "The app prepares shortlisted jobs by itself: the person's Autonomy goal\nis \"Prepare\" (or not answered) and a model is set up."
           },
           "questions": {
             "type": "array",
@@ -12492,6 +12673,105 @@
           "month"
         ]
       },
+      "Preparation": {
+        "type": "object",
+        "description": "What the app does by itself for a job.",
+        "required": [
+          "state",
+          "step",
+          "done",
+          "spent_eur",
+          "updated_at"
+        ],
+        "properties": {
+          "done": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PreparedStep"
+            },
+            "description": "The steps done by itself, oldest first."
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why it stopped or failed: a problem code (`cv_drafts_daily_cap`,\n`ai_budget_reached`, `find_only`, `stopped`, `not_shortlisted`…)."
+          },
+          "spent_eur": {
+            "type": "number",
+            "format": "double",
+            "description": "About what they cost, in euros."
+          },
+          "state": {
+            "$ref": "#/components/schemas/PreparationState"
+          },
+          "step": {
+            "$ref": "#/components/schemas/PreparationStep",
+            "description": "The step to run next, or the one that stopped or failed."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "waiting_on": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/WaitingOn",
+                "description": "While waiting: what on."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "PreparationState": {
+        "type": "string",
+        "description": "Where a job's preparation is.",
+        "enum": [
+          "queued",
+          "running",
+          "waiting",
+          "done",
+          "stopped",
+          "failed"
+        ]
+      },
+      "PreparationStep": {
+        "type": "string",
+        "description": "A step of the preparation.",
+        "enum": [
+          "read",
+          "draft",
+          "letter"
+        ]
+      },
+      "PreparedStep": {
+        "type": "object",
+        "description": "A step done by itself.",
+        "required": [
+          "step",
+          "at",
+          "eur"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "eur": {
+            "type": "number",
+            "format": "double",
+            "description": "About what it cost, in euros."
+          },
+          "step": {
+            "type": "string",
+            "description": "`site` (found the company's website, no model), `read` (read the\ncompany), `compare` (compared the job), `draft` (drafted the CV) or\n`letter` (wrote the letter)."
+          }
+        }
+      },
       "Problem": {
         "type": "object",
         "description": "RFC 9457 problem details.",
@@ -13973,7 +14253,10 @@
         "enum": [
           "board",
           "apply_host",
-          "person"
+          "person",
+          "posting_link",
+          "posting_email",
+          "name_guess"
         ]
       },
       "SiteRequest": {
@@ -14340,6 +14623,7 @@
           "profile_strength",
           "new_matches",
           "company_hits",
+          "waiting_on_you",
           "next_step"
         ],
         "properties": {
@@ -14401,6 +14685,13 @@
             "format": "int32",
             "description": "How strong the profile is, 0 to 100 (80 or more is strong).",
             "minimum": 0
+          },
+          "waiting_on_you": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TodayWaiting"
+            },
+            "description": "Jobs prepared by the app that wait on the person, oldest first."
           }
         }
       },
@@ -14513,6 +14804,38 @@
           }
         }
       },
+      "TodayWaiting": {
+        "type": "object",
+        "description": "A job the app prepared as far as it could: it waits on the person.",
+        "required": [
+          "opportunity_id",
+          "title",
+          "company",
+          "waiting_on",
+          "since"
+        ],
+        "properties": {
+          "company": {
+            "type": "string"
+          },
+          "opportunity_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "since": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Since when."
+          },
+          "title": {
+            "type": "string"
+          },
+          "waiting_on": {
+            "$ref": "#/components/schemas/WaitingOn",
+            "description": "What it waits on."
+          }
+        }
+      },
       "ToolCall": {
         "type": "object",
         "description": "One tool call.",
@@ -14541,6 +14864,16 @@
         "properties": {
           "result": {}
         }
+      },
+      "WaitingOn": {
+        "type": "string",
+        "description": "What a preparation waits on.",
+        "enum": [
+          "site",
+          "answers",
+          "cv_approval",
+          "letter_approval"
+        ]
       },
       "WatchBoardKind": {
         "type": "string",

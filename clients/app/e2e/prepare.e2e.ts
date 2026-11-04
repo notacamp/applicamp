@@ -6,6 +6,7 @@ import {
   expectAccessible,
   expectNoSidewaysScroll,
   expectPageFillsTheScreen,
+  setAutonomy,
   signIn,
 } from "./helpers";
 
@@ -59,6 +60,7 @@ test("someone prepares a job: reads the company's own pages, removes a wrong fac
 }, testInfo) => {
   const phone = testInfo.project.name === "phone";
   await signIn(page);
+  await setAutonomy(page, "find_only");
   const month = (phone ? 6 : 3) + testInfo.retry;
   expect(
     await callApi(
@@ -195,6 +197,7 @@ test("a posting on a job board's own tracker says the company's website is neede
   page,
 }, testInfo) => {
   await signIn(page);
+  await setAutonomy(page, "find_only");
   const tag = `${testInfo.project.name}-${String(testInfo.retry)}-${Date.now().toString(36)}`;
   const created = await callApiJson(page, "POST", "/api/v1/opportunities", {
     url: `https://careers.example.org/${tag}/jobs/42`,

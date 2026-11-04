@@ -33,6 +33,15 @@
       "add_headline": "Ajoutez un titre à votre profil : il affine chaque correspondance.",
       "add_work": "Ajoutez vos postes à votre profil : les correspondances sont évaluées par rapport à eux.",
       "add_skills": "Ajoutez vos compétences à votre profil : les correspondances sont évaluées par rapport à elles."
+    },
+    "waitingTitle": "Préparé pour vous : {{count}}",
+    "waitingBody": "L’app a avancé ces offres aussi loin qu’elle pouvait. Chacune vous attend.",
+    "open": "Ouvrir",
+    "waiting": {
+      "site": "{{title}} · {{company}} : saisissez le site de l’entreprise",
+      "answers": "{{title}} · {{company}} : quelques questions pour le CV",
+      "cv_approval": "{{title}} · {{company}} : relisez votre CV",
+      "letter_approval": "{{title}} · {{company}} : relisez votre lettre de motivation"
     }
   },
   "noSkills": {

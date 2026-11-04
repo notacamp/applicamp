@@ -126,6 +126,13 @@ export function CompanyFacts({ id, brief }: CompanyFactsProps) {
           <Tagged testId="prepare-site">
             <Text>{t("prepare.site.is", { company, site: siteHost })}</Text>
           </Tagged>
+          {brief.site_source === undefined || brief.site_source === null ? null : (
+            <Tagged testId="prepare-site-from">
+              <Text tone="secondary" size="sm">
+                {t(`prepare.site.from.${brief.site_source}`)}
+              </Text>
+            </Tagged>
+          )}
           <Button
             variant="ghost"
             data-testid="prepare-site-change"

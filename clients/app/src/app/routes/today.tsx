@@ -3,7 +3,18 @@ import type { MouseEvent, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { formatDay } from "~/lib/i18n";
-import { Banner, Button, ButtonLink, Page, Placeholder, Stack, Tagged, Text } from "~/lib/ui";
+import {
+  Banner,
+  Button,
+  ButtonLink,
+  Cluster,
+  Page,
+  Placeholder,
+  Section,
+  Stack,
+  Tagged,
+  Text,
+} from "~/lib/ui";
 import { CompanyHitCard, useToday, type Today as TodayState } from "~/modules/pipeline";
 import { StrengthNudge, type NudgeAction } from "~/modules/profile";
 import { SearchLine, SearchNowButton, TodaySuggestion } from "~/modules/sources";
@@ -222,6 +233,7 @@ function TodayBody({ state }: { state: TodayState }) {
         />
       ))}
       {step}
+      {state.waiting_on_you.length === 0 ? null : <WaitingOnYou jobs={state.waiting_on_you} />}
       {state.next_step === "set_up_profile" ? null : (
         <TodaySuggestion
           onSeeWatching={() => {
@@ -247,5 +259,47 @@ function TodayBody({ state }: { state: TodayState }) {
         </Tagged>
       )}
     </Stack>
+  );
+}
+
+/**
+ * The jobs the app prepared as far as it could by itself (ADR 0010), each
+ * waiting on the person: a website to type, a few questions, a CV or a
+ * letter to review. Each opens its Prepare page.
+ */
+function WaitingOnYou({ jobs }: { jobs: TodayState["waiting_on_you"] }) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  return (
+    <Section
+      title={t("today.waitingTitle", { count: String(jobs.length) })}
+      description={t("today.waitingBody")}
+      testId="today-waiting"
+    >
+      <Stack gap="sm">
+        {jobs.map((job) => (
+          <Tagged key={job.opportunity_id} testId={`today-waiting-${job.opportunity_id}`}>
+            <Cluster>
+              <Text>
+                {t(`today.waiting.${job.waiting_on}`, { title: job.title, company: job.company })}
+              </Text>
+              <ButtonLink
+                variant="secondary"
+                icon="arrow-right"
+                data-testid={`today-waiting-open-${job.opportunity_id}`}
+                {...inAppLink(`/pipeline/${job.opportunity_id}/prepare`, () => {
+                  void navigate({
+                    to: "/pipeline/$id/prepare",
+                    params: { id: job.opportunity_id },
+                  });
+                })}
+              >
+                {t("today.open")}
+              </ButtonLink>
+            </Cluster>
+          </Tagged>
+        ))}
+      </Stack>
+    </Section>
   );
 }

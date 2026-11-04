@@ -8,9 +8,9 @@ use std::collections::HashSet;
 use applicamp_kernel::{AppState, BoxFuture, EventBus, Result};
 use applicamp_pipeline::{
     ports::{
-        AnswerFacts, CvContact, CvEducation, CvFact, CvLanguage, CvPosition, CvProfile, Posting,
-        ProfileDigest, ProfileStatus, ProposedFact, RoleDigest, SearchLine, SiteFailure, SitePage,
-        SiteReading,
+        AnswerFacts, Autonomy, CvContact, CvEducation, CvFact, CvLanguage, CvPosition, CvProfile,
+        Posting, ProfileDigest, ProfileStatus, ProposedFact, RoleDigest, SearchLine, SiteFailure,
+        SitePage, SiteReading,
     },
     store::{self as pipeline_store, Eligibility, Found, UncheckedRow},
 };
@@ -765,6 +765,57 @@ impl applicamp_pipeline::Neighbours for PipelineWiring {
         skill: &'a str,
     ) -> BoxFuture<'a, Result<()>> {
         Box::pin(matching::add_skill(state, account, skill))
+    }
+
+    fn autonomy<'a>(
+        &'a self,
+        db: &'a PgPool,
+        account: Uuid,
+    ) -> BoxFuture<'a, Result<Option<Autonomy>>> {
+        use applicamp_profile::goals::Autonomy as Goal;
+        Box::pin(async move {
+            Ok(matching::autonomy(db, account)
+                .await?
+                .map(|goal| match goal {
+                    Goal::FindOnly => Autonomy::FindOnly,
+                    Goal::Prepare => Autonomy::Prepare,
+                    Goal::PrepareAndSchedule => Autonomy::PrepareAndSchedule,
+                }))
+        })
+    }
+
+    fn home_page<'a>(
+        &'a self,
+        site: &'a Url,
+    ) -> BoxFuture<'a, std::result::Result<String, SiteFailure>> {
+        Box::pin(async move {
+            let Some(reader) = &self.sources.reader else {
+                return Err(SiteFailure::Unreachable);
+            };
+            applicamp_sources::pages::home_text(reader, site)
+                .await
+                .map_err(|failure| match failure {
+                    applicamp_sources::pages::Failure::Unreachable => SiteFailure::Unreachable,
+                    applicamp_sources::pages::Failure::RobotsDisallows => {
+                        SiteFailure::RobotsDisallows
+                    }
+                    applicamp_sources::pages::Failure::NothingReadable => {
+                        SiteFailure::NothingReadable
+                    }
+                })
+        })
+    }
+
+    fn facts_waiting<'a>(
+        &'a self,
+        db: &'a PgPool,
+        account: Uuid,
+        facts: &'a [Uuid],
+        now: DateTime<Utc>,
+    ) -> BoxFuture<'a, Result<u32>> {
+        Box::pin(applicamp_profile::features::grill::waiting_among(
+            db, account, facts, now,
+        ))
     }
 }
 

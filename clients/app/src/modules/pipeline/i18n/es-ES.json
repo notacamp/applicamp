@@ -170,7 +170,15 @@
       "save": "Guardar la web",
       "cancel": "Cancelar",
       "is": "Web de {{company}}: {{site}}",
-      "change": "Cambiar"
+      "change": "Cambiar",
+      "from": {
+        "board": "Indicado por el portal de empleo.",
+        "apply_host": "Del enlace de candidatura.",
+        "person": "Lo escribiste tú.",
+        "posting_link": "Encontrado en un enlace de la oferta.",
+        "posting_email": "Encontrado en la dirección de email de la oferta.",
+        "name_guess": "Encontrado a partir del nombre de la empresa: su página de inicio la nombra."
+      }
     },
     "readLead": "Lee el anuncio y la web de la propia empresa (solo esa web, donde robots.txt lo permite) y crea los datos: una llamada a la IA, reutilizada durante 30 días. Después, otra compara la oferta con tu perfil.",
     "read": "Leer sobre {{company}} · unos {{cost}}",
@@ -229,7 +237,7 @@
       "title": "Redactar el CV",
       "lead": "El CV se redacta a partir de estos datos y tu perfil, y cada línea se comprueba contra lo que dice tu perfil."
     },
-    "costLine": "Leer una empresa: una llamada a la IA, unos {{read}}, reutilizada durante 30 días. Comparar la oferta: una llamada, unos {{analysis}}. Cada respuesta: una llamada pequeña, unos {{answer}}. Nada se ejecuta en segundo plano.",
+    "costLine": "Leer una empresa: una llamada de IA, unos {{read}}, reutilizada 30 días. Comparar la oferta: una llamada, unos {{analysis}}. Cada respuesta: una llamada pequeña, unos {{answer}}. Una oferta preseleccionada solo se prepara sola cuando tus objetivos lo dicen, con los mismos límites.",
     "spend": {
       "reads": "Empresas leídas hoy: {{n}} de {{cap}}."
     },
@@ -251,7 +259,56 @@
       "profile_needed": "Añade primero un puesto a tu perfil: la respuesta necesita uno donde guardarse.",
       "no_skill": "Esta pregunta no es sobre una habilidad.",
       "not_found": "No se ha encontrado esta oportunidad.",
-      "generic": "Algo ha salido mal. Inténtalo de nuevo."
+      "generic": "Algo ha salido mal. Inténtalo de nuevo.",
+      "find_only": "Tus objetivos dicen que la app solo busca ofertas. Cámbialo primero en tus objetivos.",
+      "stage_too_early": "Preselecciona primero esta oferta."
+    },
+    "byItself": {
+      "off": "Aquí cada paso empieza con un clic: tus objetivos dicen que la app solo busca ofertas. Elige “Preparar candidaturas” en tus objetivos para que las ofertas preseleccionadas se preparen solas.",
+      "stop": "Parar",
+      "start": "Preparar sola",
+      "tryAgain": "Reintentar",
+      "review": "Revisar",
+      "done": "Listo: tu CV y tu carta de presentación para esta oferta están aprobados.",
+      "workingLead": "Nada sale en tu nombre: lo que haga espera tu aprobación.",
+      "stoppedLead": "Lo que ya se hizo se queda. Cada paso sigue aquí como un botón.",
+      "failedLead": "No se reintenta solo. Cada paso sigue aquí como un botón.",
+      "did": "Hecho solo: {{steps}} · unos {{cost}} en total.",
+      "working": {
+        "read": "Preparando {{company}}: buscando su web, leyéndola y comparando la oferta…",
+        "draft": "Redactando tu CV para esta oferta…",
+        "letter": "Escribiendo tu carta de presentación y respuestas para esta oferta…"
+      },
+      "waiting": {
+        "site": "Te espera: no se encontró la web de {{company}}. Escríbela abajo y el resto sigue.",
+        "answers": "Esperando tus respuestas abajo: el CV se redacta cuando las respondas u omitas, y guardes o descartes sus datos.",
+        "cv_approval": "Tu CV para esta oferta está redactado y espera tu revisión.",
+        "letter_approval": "Tu carta de presentación y tus respuestas están escritas y esperan tu revisión."
+      },
+      "steps": {
+        "site": "encontró la web ({{date}})",
+        "read": "leyó la empresa ({{date}})",
+        "compare": "comparó la oferta ({{date}})",
+        "draft": "redactó el CV ({{date}})",
+        "letter": "escribió la carta ({{date}})",
+        "other": "un paso ({{date}})"
+      },
+      "reasons": {
+        "stopped": "Paraste la preparación de esta oferta.",
+        "not_shortlisted": "Parado: esta oferta ya no está preseleccionada.",
+        "find_only": "Parado: tus objetivos dicen que la app solo busca ofertas.",
+        "company_reads_daily_cap": "Parado: hoy ya leíste 20 empresas. Sigue mañana, o pulsa Leer.",
+        "cv_drafts_daily_cap": "Parado: hoy ya hiciste 20 borradores de CV. Sigue mañana.",
+        "cv_drafts_per_opportunity_cap": "Parado: esta oferta ya tuvo 10 borradores de CV. Revisa uno.",
+        "letter_drafts_daily_cap": "Parado: hoy ya escribiste 20 cartas. Sigue mañana.",
+        "letter_drafts_per_opportunity_cap": "Parado: esta oferta ya tuvo 10 borradores de carta. Revisa uno.",
+        "ai_daily_limit_reached": "Parado: alcanzaste el límite de IA de hoy. Sigue mañana.",
+        "ai_budget_reached": "Parado: alcanzaste tu límite de gasto en IA.",
+        "ai_unavailable": "Parado: la IA no está configurada en este servidor.",
+        "ai_failed": "La IA no pudo responder esta vez.",
+        "profile_needed": "Parado: añade primero un puesto a tu perfil.",
+        "generic": "Algo salió mal al preparar esta oferta."
+      }
     }
   },
   "cv": {

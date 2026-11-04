@@ -329,7 +329,7 @@ function PeekBody({
   onLetter: ((id: string) => void) | undefined;
 }) {
   const { t, i18n } = useTranslation("pipeline");
-  const update = useUpdateOpportunity();
+  const update = useUpdateOpportunity(i18n.language);
   const undo = useUndoToast();
   const save = (changes: OpportunityChanges) => {
     update.mutate({ id: opportunity.id, changes });

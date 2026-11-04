@@ -244,6 +244,18 @@ pub struct CvProfile {
     pub latest: Option<usize>,
 }
 
+/// How much the person lets the app do by itself: their goals' Autonomy
+/// answer. Applying and emailing always wait for them, whatever it says.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Autonomy {
+    /// Find jobs only: every other step starts with a click.
+    FindOnly,
+    /// Also prepare the jobs they shortlist.
+    Prepare,
+    /// Also prepare, and schedule the work.
+    PrepareAndSchedule,
+}
+
 /// The other modules, as the pipeline sees them.
 pub trait Neighbours: Send + Sync + 'static {
     /// The posting at `url` when it is a Greenhouse, Lever or Ashby posting
@@ -348,4 +360,28 @@ pub trait Neighbours: Send + Sync + 'static {
         account: Uuid,
         skill: &'a str,
     ) -> BoxFuture<'a, Result<()>>;
+
+    /// `account`'s Autonomy goal; none while it is not answered.
+    fn autonomy<'a>(
+        &'a self,
+        db: &'a PgPool,
+        account: Uuid,
+    ) -> BoxFuture<'a, Result<Option<Autonomy>>>;
+
+    /// The text of `site`'s home page, where its robots.txt allows: one page
+    /// and its robots.txt, never another host.
+    fn home_page<'a>(
+        &'a self,
+        site: &'a Url,
+    ) -> BoxFuture<'a, std::result::Result<String, SiteFailure>>;
+
+    /// How many of `facts` (taken from answers about a job) still wait for
+    /// Keep or Drop: kept, dropped and expired ones do not.
+    fn facts_waiting<'a>(
+        &'a self,
+        db: &'a PgPool,
+        account: Uuid,
+        facts: &'a [Uuid],
+        now: DateTime<Utc>,
+    ) -> BoxFuture<'a, Result<u32>>;
 }

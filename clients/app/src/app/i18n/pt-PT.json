@@ -33,6 +33,15 @@
       "add_headline": "Acrescente um título ao seu perfil: torna todas as correspondências mais precisas.",
       "add_work": "Acrescente as suas posições ao perfil: as correspondências são avaliadas com base nelas.",
       "add_skills": "Acrescente as suas competências ao perfil: as correspondências são avaliadas com base nelas."
+    },
+    "waitingTitle": "Preparado para si: {{count}}",
+    "waitingBody": "A app levou estas vagas o mais longe que pôde. Cada uma espera por si.",
+    "open": "Abrir",
+    "waiting": {
+      "site": "{{title}} · {{company}}: escreva o site da empresa",
+      "answers": "{{title}} · {{company}}: algumas perguntas para o CV",
+      "cv_approval": "{{title}} · {{company}}: reveja o seu CV",
+      "letter_approval": "{{title}} · {{company}}: reveja a sua carta de apresentação"
     }
   },
   "noSkills": {

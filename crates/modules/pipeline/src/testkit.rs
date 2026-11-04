@@ -23,8 +23,8 @@ use uuid::Uuid;
 use crate::{
     PipelineDeps, module,
     ports::{
-        AnswerFacts, CvProfile, Neighbours, Posting, ProfileDigest, ProfileStatus, SearchLine,
-        SiteFailure, SiteReading,
+        AnswerFacts, Autonomy, CvProfile, Neighbours, Posting, ProfileDigest, ProfileStatus,
+        SearchLine, SiteFailure, SiteReading,
     },
 };
 
@@ -57,6 +57,14 @@ pub(crate) struct Fake {
     pub(crate) kept: Mutex<Vec<(usize, String, String)>>,
     /// The skills added from a CV.
     pub(crate) added_skills: Mutex<Vec<String>>,
+    /// The Autonomy goal; not answered until a test sets it.
+    pub(crate) autonomy: Mutex<Option<Autonomy>>,
+    /// Home pages by origin; any other is unreachable.
+    pub(crate) homes: Mutex<Vec<(String, std::result::Result<String, SiteFailure>)>>,
+    /// The home pages it was asked for.
+    pub(crate) homes_asked: Mutex<Vec<String>>,
+    /// Facts taken from answers that still wait for Keep or Drop.
+    pub(crate) waiting: Mutex<Vec<Uuid>>,
 }
 
 fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
@@ -181,6 +189,41 @@ impl Neighbours for Fake {
     ) -> BoxFuture<'a, Result<()>> {
         lock(&self.added_skills).push(skill.to_owned());
         Box::pin(async move { Ok(()) })
+    }
+
+    fn autonomy<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        _account: Uuid,
+    ) -> BoxFuture<'a, Result<Option<Autonomy>>> {
+        let autonomy = *lock(&self.autonomy);
+        Box::pin(async move { Ok(autonomy) })
+    }
+
+    fn home_page<'a>(
+        &'a self,
+        site: &'a Url,
+    ) -> BoxFuture<'a, std::result::Result<String, SiteFailure>> {
+        lock(&self.homes_asked).push(site.to_string());
+        let home = lock(&self.homes)
+            .iter()
+            .find(|(origin, _)| *origin == site.as_str())
+            .map(|(_, home)| home.clone())
+            .unwrap_or(Err(SiteFailure::Unreachable));
+        Box::pin(async move { home })
+    }
+
+    fn facts_waiting<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        _account: Uuid,
+        facts: &'a [Uuid],
+        _now: DateTime<Utc>,
+    ) -> BoxFuture<'a, Result<u32>> {
+        let waiting = lock(&self.waiting);
+        let n = facts.iter().filter(|f| waiting.contains(f)).count();
+        let n = u32::try_from(n).unwrap_or(u32::MAX);
+        Box::pin(async move { Ok(n) })
     }
 }
 

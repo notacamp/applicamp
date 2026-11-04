@@ -31,7 +31,9 @@ const PROFILE = {
  * Goals a search keeps to: remote only, from Lisbon (the profile's place). The fake board's jobs
  * are remote within Europe, but one is remote only from Germany or Austria: it is dropped.
  */
-const GOALS = { roles: ["Staff engineer"], work_mode: ["remote"] };
+// "Find only": a job shortlisted here is not prepared by itself (that is
+// prepare-by-itself.e2e.ts), so nothing reads a found company's site.
+const GOALS = { roles: ["Staff engineer"], work_mode: ["remote"], autonomy: "find_only" };
 
 test("someone with a profile and goals presses Search now, sees the matches arrive as Found, opens one and shortlists it", async ({
   page,

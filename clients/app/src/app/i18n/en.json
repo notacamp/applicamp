@@ -33,6 +33,15 @@
       "add_headline": "Add a headline to your profile: it sharpens every match.",
       "add_work": "Add your positions to your profile: matches are scored against them.",
       "add_skills": "Add your skills to your profile: matches are scored against them."
+    },
+    "waitingTitle": "Prepared for you: {{count}}",
+    "waitingBody": "The app got these jobs as far as it could. Each one waits on you.",
+    "open": "Open",
+    "waiting": {
+      "site": "{{title}} · {{company}}: type the company’s website",
+      "answers": "{{title}} · {{company}}: a few questions for the CV",
+      "cv_approval": "{{title}} · {{company}}: review your CV",
+      "letter_approval": "{{title}} · {{company}}: review your cover letter"
     }
   },
   "noSkills": {

@@ -238,6 +238,8 @@ export function cvDraft(overrides: Partial<CvDraft> = {}): CvDraft {
         question: "Did invoice runs drop to 20 minutes?",
         proposal: "I cut invoice runs to 20 minutes.",
         role: "Senior Engineer · Example Org",
+        company: "Example Org",
+        quote: "Cut invoice runs from 6 hours to 40 minutes",
         flags: [{ kind: "claim_not_in_sources", claim: "20", cites: ["w0.h1"] }],
       },
       {

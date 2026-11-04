@@ -143,7 +143,7 @@ test("someone drafts a CV, sees it as a PDF at once, says yes to the one questio
   const number = questions.filter({ hasText: "from 23 hours to 40 minutes" });
   await expect(number).toContainText("Is this true?");
   await expect(number).toContainText(
-    "If you keep it, it goes on your profile under Senior Engineer · Example Org.",
+    "You told us about Example Org: “Rebuilt the billing pipeline in Rust, cutting invoice runs from 6 hours to 40 minutes”. If you keep it, it goes on your profile.",
   );
   const skill = questions.filter({ hasText: "Kubernetes" });
   await expect(skill).toContainText("Do you have this skill?");
@@ -215,6 +215,14 @@ test("someone drafts a CV, sees it as a PDF at once, says yes to the one questio
   await expect(page.getByTestId("cv-status")).toContainText("Approved · v1");
   await expect(page.getByTestId("cv-banner-approved")).toBeVisible();
   await expect(page.getByTestId("cv-approve")).toHaveCount(0);
+
+  // For a moment it can be undone: a draft again, then approved again.
+  await expect(page.getByTestId("cv-approved-now")).toContainText("Approved");
+  await page.getByTestId("cv-undo").click();
+  await expect(page.getByTestId("cv-status")).toContainText("Draft");
+  await expect(page.getByTestId("cv-approve")).toBeEnabled();
+  await page.getByTestId("cv-approve").click();
+  await expect(page.getByTestId("cv-status")).toContainText("Approved · v1");
   await expectNoSidewaysScroll(page);
 
   // The PDF: read back, opened in the viewer, downloadable.

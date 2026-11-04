@@ -569,19 +569,18 @@ function Review({
  */
 function useUndoWindow(until: string | undefined): boolean {
   const end = until === undefined ? 0 : Date.parse(until);
-  const [open, setOpen] = useState(() => end > Date.now());
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const left = end - Date.now();
-    setOpen(left > 0);
     if (left <= 0) {
       return;
     }
     const timer = setTimeout(() => {
-      setOpen(false);
+      setNow(Date.now());
     }, left);
     return () => {
       clearTimeout(timer);
     };
   }, [end]);
-  return open;
+  return end > now;
 }

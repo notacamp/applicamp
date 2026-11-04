@@ -68,6 +68,11 @@ function profile(tag: string) {
   };
 }
 
+// Filmed: CI keeps this spec's videos (the `e2e-recordings` artifact), the
+// recording of a CV made, shown as a PDF and approved at desktop width and at
+// 375px.
+test.use({ video: "on" });
+
 /** The opportunities a test added: put away at the end ("Not for me"). */
 const added: string[] = [];
 
@@ -95,7 +100,7 @@ async function addJob(page: Page, tag: string, stage: string) {
   return id;
 }
 
-test("someone drafts a CV, sees the lines that can't be traced to their profile, fixes one by editing, one in their own words and one by removing a skill, and approves it", async ({
+test("someone drafts a CV, sees it as a PDF at once, says yes to the one question the app could not answer, removes a skill and approves it", async ({
   page,
 }, testInfo) => {
   const phone = testInfo.project.name === "phone";
@@ -107,120 +112,127 @@ test("someone drafts a CV, sees the lines that can't be traced to their profile,
 
   // Prepare: read the company's pages (the facts the CV may cite), then draft.
   await page.goto(`/pipeline/${id}/prepare`);
-  await expect(page.getByTestId("prepare-draft")).toContainText("Draft the CV · about €0.002");
+  await expect(page.getByTestId("prepare-draft")).toContainText("Draft the CV · about €0.004");
   await page.getByTestId("prepare-read").click();
   await expect(page.getByTestId("prepare-facts")).toContainText("Builds ledgers for small shops");
   await page.getByTestId("prepare-draft").click();
   await expect(page).toHaveURL(new RegExp(`/pipeline/${id}/cv$`));
   await expectPageFillsTheScreen(page, "cv-review");
 
-  // The CV as a page, the contact filled in by the server.
-  await expect(page.getByTestId("cv-paper")).toBeVisible();
-  await expect(page.getByTestId("cv-name")).toContainText("Alex Demo");
-  await expect(page.getByTestId("cv-contact")).toContainText("alex.demo@example.com");
+  // The draft is a PDF at once, drawn on the page.
+  await expect(page.getByTestId("cv-preview-pdf-page-1")).toHaveAttribute("data-drawn", "");
+  await expect(page.getByTestId("cv-preview-facts")).toContainText("1 page · English");
+  const preview = `/api/v1/opportunities/${id}/cv/drafts/1/preview.pdf`;
+  const served = await page.request.get(preview);
+  expect(served.status()).toBe(200);
+  expect(served.headers()["content-type"]).toBe("application/pdf");
+  expect(served.headers()["content-disposition"]).toContain("(draft).pdf");
+  await expect(page.getByTestId("cv-preview-download")).toHaveAttribute(
+    "href",
+    `${preview}?download=1`,
+  );
   await expect(page.getByTestId("cv-draft-number")).toContainText("Draft 1");
   await expect(page.getByTestId("cv-status")).toContainText("Draft");
-  await expect(page.getByTestId("cv-education")).toContainText("Example University");
-  await expect(page.getByTestId("cv-languages")).toContainText("English (Fluent)");
 
-  // Each line says how it relates to the profile.
-  const lines = page.getByTestId(/^cv-line-l\d+$/);
-  const reworded = lines.filter({ hasText: "Delivered: Moved invoicing onto PostgreSQL" });
-  await expect(reworded.getByTestId(/^cv-line-mark-/)).toContainText("Reworded");
-  await reworded.getByTestId(/^cv-from-toggle-/).click();
-  await expect(reworded.getByTestId(/^cv-from-l\d+$/)).toContainText(
-    "Moved invoicing onto PostgreSQL",
+  // The app checked every line and fixed one; two things wait on the person.
+  await expect(page.getByTestId("cv-checked")).toContainText(
+    "Checked every line against your profile · fixed 1 line",
   );
-  // A highlight copied word for word (the summary quotes it too, and a flagged line holds its source: so look in
-  // Experience, at the lines that start with it).
-  const verbatim = page
-    .getByTestId("cv-experience")
-    .getByTestId(/^cv-line-l\d+$/)
-    .filter({
-      hasText: /^Rebuilt the billing pipeline in Rust, cutting invoice runs from 6 hours/,
-    });
-  await expect(verbatim.getByTestId(/^cv-line-mark-/)).toContainText("As in profile");
-
-  // Three things can't be traced: Approve is off and the aside says so first.
-  await expect(page.getByTestId("cv-banner-flagged")).toContainText(
-    "3 lines can’t be traced to your profile",
+  await expect(page.getByTestId("cv-needs-you")).toContainText("Needs you · 2");
+  const questions = page.getByTestId(/^cv-question-l\d+$/);
+  const number = questions.filter({ hasText: "from 23 hours to 40 minutes" });
+  await expect(number).toContainText("Is this true?");
+  await expect(number.getByTestId(/^cv-question-ask-/)).toContainText("Is “23” right?");
+  await expect(number.getByTestId(/^cv-question-where-/)).toContainText(
+    "You told us about Example Org: “Rebuilt the billing pipeline in Rust, cutting invoice runs from 6 hours to 40 minutes”.",
   );
+  // What a yes keeps on the profile, word for word.
+  await expect(number.getByTestId(/^cv-question-keeps-/)).toContainText(
+    "If you keep it, this goes on your profile: “I rebuilt the billing pipeline in Rust, cutting invoice runs from 23 hours to 40 minutes.”",
+  );
+  const skill = questions.filter({ hasText: "Kubernetes" });
+  await expect(skill).toContainText("Do you have this skill?");
   await expect(page.getByTestId("cv-approve")).toBeDisabled();
-  await expect(page.getByTestId("cv-approve")).toContainText("Approve v1");
-  const banner = await page.getByTestId("cv-first-flagged").boundingBox();
-  const paper = await page.getByTestId("cv-paper").boundingBox();
-  expect(banner).not.toBeNull();
-  expect(paper).not.toBeNull();
-  if (banner !== null && paper !== null) {
+  await expect(page.getByTestId("cv-approve-reason")).toContainText(
+    "Answer the 2 questions to approve.",
+  );
+  // The first question's Yes and the PDF's pages: boxes the page draws.
+  const asks = await number.getByTestId(/^cv-question-yes-/).boundingBox();
+  const pdf = await page.getByTestId("cv-preview-pdf-pages").boundingBox();
+  expect(asks).not.toBeNull();
+  expect(pdf).not.toBeNull();
+  if (asks !== null && pdf !== null) {
     if (phone) {
-      // One column, the aside above the CV.
-      expect(banner.y + banner.height).toBeLessThanOrEqual(paper.y + 1);
+      // One column: what needs the person comes first.
+      expect(asks.y + asks.height).toBeLessThanOrEqual(pdf.y + 1);
     } else {
-      // Two columns, the aside beside the CV.
-      expect(banner.x).toBeGreaterThanOrEqual(paper.x + paper.width - 1);
+      // Two columns: the questions beside the PDF.
+      expect(asks.x).toBeGreaterThanOrEqual(pdf.x + pdf.width - 1);
     }
   }
   await expect(page.getByTestId("cv-keywords-count")).toContainText("/");
-  await expect(page.getByTestId("cv-changes")).toContainText("left out");
   await expect(page.getByTestId("cv-drafts-today")).toContainText("of 20");
   await expect(page.getByTestId("cv-month-spend")).toBeVisible();
-  await expect(page.getByTestId("cv-left-out")).toContainText("Left out for this job · 1 item");
   await expectNoSidewaysScroll(page);
   await expectAccessible(page);
 
-  // "Go to the first one" lands on a flagged line.
-  await page.getByTestId("cv-first-flagged").click();
-  const flagged = lines.filter({ has: page.getByTestId(/^cv-flag-/) });
-  await expect(flagged).toHaveCount(2);
-
-  // A number nobody wrote: the person says it in their own words, and it becomes a fact.
-  const number = lines.filter({ hasText: "from 23 hours to 40 minutes" });
-  await expect(number.getByTestId(/^cv-flag-/)).toContainText("“23” isn’t in the sources");
-  await number.getByTestId(/^cv-confirm-l/).click();
-  await number
-    .getByTestId(/^cv-confirm-input-/)
-    .fill("Invoice runs took 23 hours before I rebuilt the pipeline");
-  await number.getByTestId(/^cv-confirm-save-/).click();
-  await expect(page.getByTestId("cv-banner-flagged")).toContainText(
-    "2 lines can’t be traced to your profile",
+  // Another layout: the PDF is made again, with no AI.
+  const remade = page.waitForResponse(
+    (response) =>
+      response.url().endsWith(`/cv/drafts/1/preview`) && response.request().method() === "POST",
   );
-  await expect(number.getByTestId(/^cv-flag-/)).toHaveCount(0);
-
-  // A company fact used as an achievement: edited back to what the profile says.
-  const company = lines.filter({ hasText: "for customers like those of" });
-  await expect(company.getByTestId(/^cv-flag-/)).toContainText(
-    "Company facts can’t be your achievements",
+  await page.getByTestId("cv-template-compact").click();
+  expect((await remade).status()).toBe(200);
+  await expect(page.getByTestId("cv-preview-pdf-page-1")).toHaveAttribute("data-drawn", "");
+  const back = page.waitForResponse(
+    (response) =>
+      response.url().endsWith(`/cv/drafts/1/preview`) && response.request().method() === "POST",
   );
-  await expect(company.getByTestId(/^cv-confirm-l/)).toHaveCount(0);
-  await company.getByTestId(/^cv-edit-l/).click();
-  await company.getByTestId(/^cv-edit-input-/).fill("Led a team of 4 engineers");
-  await company.getByTestId(/^cv-edit-save-/).click();
-  await expect(page.getByTestId("cv-banner-flagged")).toContainText(
-    "1 line can’t be traced to your profile",
-  );
+  await page.getByTestId("cv-template-clean").click();
+  expect((await back).status()).toBe(200);
 
-  // A skill that is not on the profile: removed.
-  const skill = page.getByTestId(/^cv-skill-flag-/);
-  await expect(skill).toContainText("Kubernetes isn’t one of your skills");
+  // Yes, keep it: the fact goes on the profile and the line passes.
+  await number.getByTestId(/^cv-question-yes-/).click();
+  await expect(page.getByTestId("cv-needs-you")).toContainText("Needs you · 1");
+  await expect(number).toHaveCount(0);
+
+  // A skill the person does not have: removed.
+  await skill.getByTestId(/^cv-question-remove-/).click();
+  await expect(page.getByTestId("cv-needs-you")).toHaveCount(0);
+  await expect(page.getByTestId("cv-approve-ready")).toContainText(
+    "Approve when you’re happy with it.",
+  );
+  await expect(page.getByTestId("cv-preview-pdf-page-1")).toHaveAttribute("data-drawn", "");
+
+  // Every line and where it comes from, one click away.
+  await page.getByTestId("cv-lines-toggle").click();
+  await expect(page.getByTestId("cv-paper")).toBeVisible();
+  await expect(page.getByTestId("cv-name")).toContainText("Alex Demo");
+  await expect(page.getByTestId("cv-contact")).toContainText("alex.demo@example.com");
+  await expect(page.getByTestId("cv-education")).toContainText("Example University");
+  await expect(page.getByTestId("cv-left-out")).toContainText("Left out for this job · 1 item");
   await expectNoSidewaysScroll(page);
-  await skill.getByTestId(/^cv-skill-remove-/).click();
-  await expect(page.getByTestId("cv-banner-clean")).toContainText(
-    "Every line traces to your profile",
-  );
-  await expect(page.getByTestId("cv-approve-reason")).toHaveCount(0);
 
-  // Approve: a version that can't change.
+  // Approve: version 1, the PDF that was shown.
   await expect(page.getByTestId("cv-approve")).toBeEnabled();
+  await expect(page.getByTestId("cv-approve")).toContainText("Approve v1");
   await expectAccessible(page);
   await page.getByTestId("cv-approve").click();
   await expect(page.getByTestId("cv-status")).toContainText("Approved · v1");
   await expect(page.getByTestId("cv-banner-approved")).toBeVisible();
   await expect(page.getByTestId("cv-approve")).toHaveCount(0);
+
+  // For a moment it can be undone: a draft again, then approved again.
+  await expect(page.getByTestId("cv-approved-now")).toContainText("Approved");
+  await page.getByTestId("cv-undo").click();
+  await expect(page.getByTestId("cv-status")).toContainText("Draft");
+  await expect(page.getByTestId("cv-approve")).toBeEnabled();
+  await page.getByTestId("cv-approve").click();
+  await expect(page.getByTestId("cv-status")).toContainText("Approved · v1");
   await expectNoSidewaysScroll(page);
 
-  // The PDF: read back, opened in the viewer (a page drawn on a canvas), downloadable.
+  // The PDF: read back, opened in the viewer, downloadable.
   await expect(page.getByTestId("cv-pdf-checks")).toContainText("Read back from the PDF");
-  await expect(page.getByTestId("cv-pdf-check-contact")).toBeVisible();
   await page.getByTestId("cv-open-pdf").click();
   await expect(page.getByTestId("pdf-viewer")).toBeVisible();
   await expect(page.getByTestId("pdf-viewer-page-1")).toHaveAttribute("data-drawn", "");
@@ -232,40 +244,26 @@ test("someone drafts a CV, sees the lines that can't be traced to their profile,
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("pdf-viewer")).toHaveCount(0);
 
-  // Compact: a new version, no AI; v1 stays.
-  await page.getByTestId("cv-template-compact").click();
-  await page.getByTestId("cv-layout-confirm").click();
-  await expect(page.getByTestId("cv-version-2")).toBeVisible();
-  await expect(page.getByTestId("cv-version-1")).toBeVisible();
-  await expectNoSidewaysScroll(page);
-
-  // The CVs page lists both and opens a PDF.
+  // The CVs page lists it and opens it.
   await page.goto("/cvs");
   await expect(page.getByTestId("cvs")).toBeVisible();
   await page.getByTestId("cvs-filter-cvs").click();
   const mine = page.getByTestId("cvs-row").filter({ hasText: `Example Co ${tag}` });
-  await expect(mine).toHaveCount(2);
-  await expect(mine.first().getByTestId("cvs-row-version")).toContainText("v2");
-  await mine.nth(1).getByTestId("cvs-view").click();
-  await expect(page.getByTestId("pdf-viewer-page-1")).toHaveAttribute("data-drawn", "");
-  await page.getByTestId("pdf-viewer-close").click();
-  await expectNoSidewaysScroll(page);
-  await page.goBack();
+  await expect(mine).toHaveCount(1);
+  await expect(mine.first().getByTestId("cvs-row-version")).toContainText("v1");
 
-  // The peek shows the newest version: v2, the Compact one.
+  // The peek shows it.
   await page.goto("/pipeline");
   await page.getByTestId("pipeline-search").fill(`Example Co ${tag}`);
   const row = page.getByTestId("pipeline-row").first();
   await expect(row).toBeVisible();
   await (phone ? row.click() : row.getByTestId("pipeline-row-open").click());
-  await expect(page.getByTestId("peek-cv-state")).toContainText("v2 approved");
-  await page.getByTestId("peek-review").click();
-  await expect(page).toHaveURL(new RegExp(`/pipeline/${id}/cv$`));
+  await expect(page.getByTestId("peek-cv-state")).toContainText("v1 approved");
 
-  // The person's words are a fact on the profile, under the role the line was about.
+  // The yes is a fact on the profile, under the role the line was about.
   await page.goto("/profile");
   await expect(page.getByTestId("role-facts-list-0")).toContainText(
-    "Invoice runs took 23 hours before I rebuilt the pipeline",
+    "I rebuilt the billing pipeline in Rust, cutting invoice runs from 23 hours to 40 minutes.",
   );
   await expectNoSidewaysScroll(page);
 });

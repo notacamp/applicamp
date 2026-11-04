@@ -1104,7 +1104,10 @@ pub async fn approve(
                 );
                 Error::Conflict("letter_pdf_check_failed", checks.reasons().join("\n"))
             }
-            Refusal::Unavailable => Error::Unavailable("letter_pdf_unavailable"),
+            Refusal::Unavailable(cause) => {
+                cause.log("letter");
+                Error::Unavailable("letter_pdf_unavailable")
+            }
         })?;
     let mut tx = state.db.begin().await?;
     let version = next_version(&mut tx, opp.id).await?;

@@ -52,6 +52,9 @@
 // no source says (it is flagged), a bullet that cites a company fact outside
 // the summary (flagged), a summary that cites a company fact, a skill that is
 // not on the profile (flagged), and every position after the second left out.
+// The fix prompt ("You fix the lines of a CV…", #73) rewrites the company-fact
+// line to its own source's words and asks about any other, proposing the line
+// as a first-person fact.
 //
 // The cover letter (#45): the model answers the letter prompt ("You write a
 // cover letter…") by fixed rules: a paragraph citing a company fact and a
@@ -734,6 +737,10 @@ async function complete(request: IncomingMessage, response: ServerResponse) {
       json(response, 200, completion(tailoredCv(user?.content ?? "")));
       return;
     }
+    if (system.startsWith("You fix the lines of a CV")) {
+      json(response, 200, completion(cvFixes(user?.content ?? "")));
+      return;
+    }
     if (system.startsWith("You write a cover letter")) {
       json(response, 200, completion(coverLetter(user?.content ?? "")));
       return;
@@ -1345,6 +1352,55 @@ function tailoredCv(userContent: string) {
     experience,
     // One skill the profile does not list: the check flags it.
     skills: [...skills, "Kubernetes"],
+  };
+}
+
+/** One flagged line of the CV fix prompt: its id, text, why, and its sources' words. */
+interface FixLine {
+  id: string;
+  text: string;
+  flagged: string[];
+  sources: string[];
+}
+
+/** The `<line>` blocks of the CV fix prompt. */
+function fixLinesOf(content: string): FixLine[] {
+  return [...content.matchAll(/<line id="([^"]+)"[^>]*>\n([\s\S]*?)<\/line>/g)].map((match) => {
+    const block = match[2] ?? "";
+    return {
+      id: match[1] ?? "",
+      text: /<text>([\s\S]*?)<\/text>/.exec(block)?.[1] ?? "",
+      flagged: [...block.matchAll(/<flagged>(.*?)<\/flagged>/g)].map((found) => found[1] ?? ""),
+      sources: [...block.matchAll(/<source id="[^"]+">(.*?)<\/source>/g)].map(
+        (found) => found[1] ?? "",
+      ),
+    };
+  });
+}
+
+/**
+ * The CV fixer (system prompt "You fix the lines of a CV…"): a line that uses
+ * a company fact as an achievement is rewritten to its own source's words;
+ * any other gets a question, with the line as a first-person fact.
+ */
+function cvFixes(userContent: string) {
+  return {
+    lines: fixLinesOf(userContent).map((line) => {
+      const own = line.sources[0];
+      if (line.flagged.some((why) => why.includes("about the company")) && own !== undefined) {
+        return { id: line.id, rewrite: own, question: null, fact: null };
+      }
+      const lower = `${line.text.charAt(0).toLowerCase()}${line.text.slice(1)}`;
+      const claim = line.flagged
+        .map((why) => /^"(.+)" is not in its sources$/.exec(why)?.[1])
+        .find((found) => found !== undefined);
+      return {
+        id: line.id,
+        rewrite: null,
+        question: claim === undefined ? "Is this line right?" : `Is “${claim}” right?`,
+        fact: `I ${lower.replace(/[.!?]+$/, "")}.`,
+      };
+    }),
   };
 }
 

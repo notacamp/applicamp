@@ -131,7 +131,7 @@ test("someone shortlists a job and the app gets it ready by itself: it reads the
   // Approving stays theirs: Review opens the draft.
   await page.getByTestId("prepare-by-itself-review").click();
   await expect(page).toHaveURL(new RegExp(`/pipeline/${id}/cv$`));
-  await expect(page.getByTestId("cv-paper")).toBeVisible();
+  await expect(page.getByTestId("cv-preview")).toBeVisible();
   await expect(page.getByTestId("cv-status")).toContainText("Draft");
 
   // Today lists it with what it waits on, and opens its Prepare page.

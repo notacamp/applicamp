@@ -158,6 +158,7 @@ pub fn prepare(content: &Content, company: &str, language: &str) -> Result<Prepa
 /// The letter as a one-page PDF that has been read back and found to say what
 /// the letter says.
 pub async fn make(content: &Content, company: &str, language: &str) -> Result<Made, Refusal> {
-    let prepared = prepare(content, company, language).map_err(|_| Refusal::Unavailable)?;
-    pdf::make_prepared(TEMPLATE, prepared, Length::One, Vec::new()).await
+    let prepared = prepare(content, company, language)
+        .map_err(|_| Refusal::Unavailable(pdf::Cause::TooLarge))?;
+    pdf::make_prepared(TEMPLATE, prepared, Length::One, Vec::new(), true).await
 }

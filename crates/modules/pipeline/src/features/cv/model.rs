@@ -334,7 +334,7 @@ fn language_line(l: &crate::ports::CvLanguage) -> String {
 }
 
 /// A line of the CV: its words and the sources it says they come from.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Line {
     pub id: String,
     pub text: String,
@@ -342,6 +342,35 @@ pub struct Line {
     /// The person wrote this text.
     #[serde(default)]
     pub edited: bool,
+    /// The app rewrote it to say only what its sources say, after the check
+    /// flagged what the draft first said (#73).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub fixed_by_app: bool,
+    /// What it said before the app rewrote it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub original: Option<String>,
+    /// What the app asks the person about it, when it could not fix it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ask: Option<Ask>,
+}
+
+/// A question about a flagged line only the person can answer, with the fact
+/// "Yes, keep it" would keep on their profile.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Ask {
+    /// One plain yes-or-no question about what the line claims.
+    pub question: Option<String>,
+    /// The claim as one plain sentence, checked to back the line.
+    pub proposal: Option<String>,
+}
+
+/// Where a line is on the CV.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Place {
+    Headline,
+    Summary,
+    /// Under the position at this index of the profile's `work`.
+    Bullet(usize),
 }
 
 /// A position on the CV, with the bullets chosen for it.
@@ -430,6 +459,39 @@ impl Content {
                     .iter()
                     .flat_map(|r| r.bullets.iter().map(|l| (l, false))),
             )
+    }
+
+    /// Every line with where it is: the headline, the summary, or a bullet
+    /// of the position it is under.
+    pub fn placed_lines(&self) -> impl Iterator<Item = (&Line, Place)> {
+        self.headline
+            .iter()
+            .map(|l| (l, Place::Headline))
+            .chain(self.summary.iter().map(|l| (l, Place::Summary)))
+            .chain(self.experience.iter().flat_map(|r| {
+                r.bullets
+                    .iter()
+                    .map(move |l| (l, Place::Bullet(r.position)))
+            }))
+    }
+
+    /// Every line, to change.
+    pub fn lines_mut(&mut self) -> impl Iterator<Item = &mut Line> {
+        self.headline
+            .iter_mut()
+            .chain(self.summary.iter_mut())
+            .chain(
+                self.experience
+                    .iter_mut()
+                    .flat_map(|r| r.bullets.iter_mut()),
+            )
+    }
+
+    /// Where the line `id` is.
+    pub fn place_of(&self, id: &str) -> Option<Place> {
+        self.placed_lines()
+            .find(|(l, _)| l.id == id)
+            .map(|(_, place)| place)
     }
 
     /// The position a line is about: its role's, else the most recent one.

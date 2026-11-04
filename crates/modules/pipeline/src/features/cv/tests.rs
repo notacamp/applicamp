@@ -11,12 +11,13 @@ use uuid::Uuid;
 use super::{CAP_PER_DAY, CAP_PER_OPPORTUNITY};
 use crate::{
     ports::{CvContact, CvEducation, CvFact, CvLanguage, CvPosition, CvProfile},
-    testkit::{Fake, Harness, Model},
+    testkit::{Fake, Fixer, Harness, Model},
 };
 
 pub(crate) const FACT_ID: &str = "aaaa1111-0000-4000-8000-000000000001";
 pub(crate) const COMPANY_FACT: &str = "Builds ledgers for small shops";
 pub(crate) const CV: &str = "You write a one-page CV";
+pub(crate) const FIX: &str = "You fix the lines of a CV";
 
 pub(crate) fn profile() -> CvProfile {
     CvProfile {
@@ -174,12 +175,19 @@ pub(crate) async fn company_fact(h: &Harness) {
 }
 
 async fn stack(db: PgPool) -> Stack {
+    stack_with(db, answer(), None).await
+}
+
+/// A stack whose model drafts `cv` and answers the fix prompt with `fixer`.
+async fn stack_with(db: PgPool, cv: Value, fixer: Option<Fixer>) -> Stack {
     let fake = Arc::new(Fake::default());
     *fake.cv_profile.lock().unwrap() = Some(profile());
-    let model = Model::with_cv(
+    let model = Model::with_fixer(
         json!({"facts": []}),
         json!({"wants": [], "questions": []}),
-        answer(),
+        cv,
+        Value::Null,
+        fixer,
     )
     .await;
     let h = Harness::with_ai(db, Uuid::now_v7(), Arc::clone(&fake), Some(model.gateway()));
@@ -662,6 +670,12 @@ async fn another_accounts_opportunity_is_not_found(db: PgPool) {
         ("POST", "/drafts/1/put-back", json!({ "position": 2 })),
         ("POST", "/drafts/1/approve", json!({})),
         ("POST", "/drafts/1/discard", json!({})),
+        ("POST", "/drafts/1/unapprove", json!({})),
+        (
+            "POST",
+            "/drafts/1/preview",
+            json!({ "template": "compact" }),
+        ),
         ("POST", "/versions", json!({ "template": "compact" })),
     ] {
         let (status, got) = if method == "GET" {
@@ -671,9 +685,15 @@ async fn another_accounts_opportunity_is_not_found(db: PgPool) {
         };
         assert_eq!(status, StatusCode::NOT_FOUND, "{method} {tail}: {got}");
     }
+    for tail in ["/drafts/1/preview.pdf", "/drafts/1/preview.pdf?download=1"] {
+        let (status, _, _) = other.get_raw(&url(&s.opp, tail)).await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{tail}");
+    }
     // And its own account sees it untouched.
     let (_, cv) = s.h.get(&url(&s.opp, "")).await;
     assert_eq!(cv["draft"]["status"], "draft");
+    let (status, _, _) = s.h.get_raw(&url(&s.opp, "/drafts/1/preview.pdf")).await;
+    assert_eq!(status, StatusCode::OK);
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -1056,4 +1076,636 @@ async fn the_cvs_page_lists_every_version_and_live_draft_of_the_account_and_no_o
     .await
     .unwrap();
     assert_eq!(downloaded, 0, "a refused download is not a download");
+}
+
+// ---- the preview and the app's own fixes (#73) ---------------------------------
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn every_draft_is_a_pdf_at_once_seen_inline_or_downloaded_by_its_owner(db: PgPool) {
+    let s = stack(db).await;
+    let cv = draft(&s).await;
+    let preview = &cv["draft"]["preview"];
+    assert_eq!(preview["ready"], true, "{preview}");
+    assert_eq!(preview["template"], "clean");
+    assert_eq!(preview["length"], 1);
+    assert_eq!(preview["pages"], 1);
+    assert!(preview["error"].is_null());
+    assert!(preview["at"].is_string());
+    // The read-back is a note: it is there even with lines still flagged.
+    assert!(preview["checks"]["sections"]["expected"].is_array());
+
+    let (status, headers, bytes) = s.h.get_raw(&url(&s.opp, "/drafts/1/preview.pdf")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(bytes.starts_with(b"%PDF-"));
+    let header = |name: &str| headers[name].to_str().unwrap().to_owned();
+    assert_eq!(header("content-type"), "application/pdf");
+    assert_eq!(header("cache-control"), "private, no-store");
+    assert_eq!(header("x-content-type-options"), "nosniff");
+    assert!(
+        header("content-disposition")
+            .starts_with("inline; filename=\"Alex Demo CV - Example Co (draft).pdf\""),
+        "{}",
+        header("content-disposition")
+    );
+    let read = super::pdf::readback::extract(&bytes).unwrap();
+    assert!(
+        read.text.contains("Moved invoicing over to PostgreSQL"),
+        "{}",
+        read.text
+    );
+    let (status, headers, _) =
+        s.h.get_raw(&url(&s.opp, "/drafts/1/preview.pdf?download=1"))
+            .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        headers["content-disposition"]
+            .to_str()
+            .unwrap()
+            .starts_with("attachment; filename=\"Alex Demo CV - Example Co (draft).pdf\"")
+    );
+    // No such draft.
+    let (status, _, _) = s.h.get_raw(&url(&s.opp, "/drafts/2/preview.pdf")).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_preview_follows_every_change_and_another_layout_needs_no_model(db: PgPool) {
+    let s = stack(db).await;
+    let cv = draft(&s).await;
+    let first = cv["draft"]["preview"]["at"].clone();
+
+    // Seventy lines: a change makes it again, and it falls to two pages.
+    let bullets: Vec<Value> = (0..70)
+        .map(|i| {
+            json!({ "id": format!("x{i}"), "text": "Led a team of 4 engineers",
+                          "sources": ["w0.h2"], "edited": false })
+        })
+        .collect();
+    sqlx::query(
+        "UPDATE pipeline.cv_drafts SET content = jsonb_set(content, '{experience,0,bullets}', $1)",
+    )
+    .bind(sqlx::types::Json(bullets))
+    .execute(&s.h.db)
+    .await
+    .unwrap();
+    let skill = flagged(&cv)
+        .into_iter()
+        .find(|(_, k)| k == "skill_not_on_profile")
+        .unwrap()
+        .0;
+    let (status, cv) =
+        s.h.json(
+            "PATCH",
+            &url(&s.opp, &format!("/drafts/1/lines/{skill}")),
+            &json!({ "remove": true }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    let preview = &cv["draft"]["preview"];
+    assert_eq!(preview["ready"], true, "{preview}");
+    assert_eq!(preview["template"], "clean");
+    assert_eq!(preview["length"], 2);
+    assert_eq!(preview["pages"], 2);
+    assert_ne!(preview["at"], first);
+
+    // One page is asked for: it does not fit, and the preview stays.
+    let (status, body) =
+        s.h.json(
+            "POST",
+            &url(&s.opp, "/drafts/1/preview"),
+            &json!({ "template": "clean", "length": 1 }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CONFLICT, "{body}");
+    assert_eq!(body["code"], "cv_doesnt_fit");
+    let (_, cv) = s.h.get(&url(&s.opp, "")).await;
+    assert_eq!(cv["draft"]["preview"]["length"], 2);
+
+    // Another layout: no model call.
+    let (status, cv) =
+        s.h.json(
+            "POST",
+            &url(&s.opp, "/drafts/1/preview"),
+            &json!({ "template": "compact", "length": 2 }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    assert_eq!(cv["draft"]["preview"]["template"], "compact");
+    assert_eq!(cv["draft"]["preview"]["length"], 2);
+    let (status, body) =
+        s.h.json(
+            "POST",
+            &url(&s.opp, "/drafts/1/preview"),
+            &json!({ "length": 3 }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+    assert_eq!(
+        s.model.calls(CV).await,
+        1,
+        "a layout or a change never calls the model"
+    );
+}
+
+/// Put `bytes` in place of the draft's preview PDF, as if it had been made
+/// so: what Approve keeps when it reuses the preview.
+async fn mark_preview(s: &Stack, bytes: &[u8]) {
+    sqlx::query("UPDATE pipeline.cv_drafts SET preview_pdf = $1 WHERE status = 'draft'")
+        .bind(bytes)
+        .execute(&s.h.db)
+        .await
+        .unwrap();
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn approve_keeps_the_preview_only_for_the_same_text_in_the_same_layout(db: PgPool) {
+    let s = stack(db).await;
+    ready(&s).await;
+    let marker = b"%PDF-1.7 the preview as it was made".to_vec();
+    let undo = || async {
+        let (status, cv) =
+            s.h.json("POST", &url(&s.opp, "/drafts/1/unapprove"), &json!({}))
+                .await;
+        assert_eq!(status, StatusCode::OK, "{cv}");
+    };
+
+    // Another layout than the preview's: made again.
+    mark_preview(&s, &marker).await;
+    let (status, cv) =
+        s.h.json(
+            "POST",
+            &url(&s.opp, "/drafts/1/approve"),
+            &json!({ "template": "clean", "length": 2 }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    assert_ne!(stored(&s, 1).await, marker, "another layout is rendered");
+    undo().await;
+
+    // The text changed since the preview was made: made again, and the page
+    // says the PDF is older than the change.
+    mark_preview(&s, &marker).await;
+    sqlx::query(
+        "UPDATE pipeline.cv_drafts
+            SET content = jsonb_set(content, '{experience,0,bullets,0,text}',
+                                    '\"Moved invoicing onto PostgreSQL\"')
+          WHERE status = 'draft'",
+    )
+    .execute(&s.h.db)
+    .await
+    .unwrap();
+    let (_, cv) = s.h.get(&url(&s.opp, "")).await;
+    assert_eq!(cv["draft"]["preview"]["stale"], true, "{cv}");
+    let (status, cv) =
+        s.h.json("POST", &url(&s.opp, "/drafts/1/approve"), &json!({}))
+            .await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    assert_ne!(stored(&s, 1).await, marker, "the changed text is rendered");
+    undo().await;
+
+    // The same text in the same layout: the preview's PDF, as it is.
+    let (_, cv) = s.h.get(&url(&s.opp, "")).await;
+    assert_eq!(cv["draft"]["preview"]["stale"], false, "{cv}");
+    mark_preview(&s, &marker).await;
+    let (status, cv) =
+        s.h.json("POST", &url(&s.opp, "/drafts/1/approve"), &json!({}))
+            .await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    assert_eq!(stored(&s, 1).await, marker);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_preview_that_cannot_be_made_keeps_the_draft_and_says_why(db: PgPool) {
+    let s = stack(db).await;
+    let cv = draft(&s).await;
+    // Far more than two pages hold.
+    let bullets: Vec<Value> = (0..400)
+        .map(|i| {
+            json!({ "id": format!("x{i}"), "text": "Led a team of 4 engineers",
+                    "sources": ["w0.h2"], "edited": false })
+        })
+        .collect();
+    sqlx::query(
+        "UPDATE pipeline.cv_drafts SET content = jsonb_set(content, '{experience,0,bullets}', $1)",
+    )
+    .bind(sqlx::types::Json(bullets))
+    .execute(&s.h.db)
+    .await
+    .unwrap();
+    let skill = flagged(&cv)
+        .into_iter()
+        .find(|(_, k)| k == "skill_not_on_profile")
+        .unwrap()
+        .0;
+    let (status, cv) =
+        s.h.json(
+            "PATCH",
+            &url(&s.opp, &format!("/drafts/1/lines/{skill}")),
+            &json!({ "remove": true }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "the change is kept: {cv}");
+    let preview = &cv["draft"]["preview"];
+    assert_eq!(preview["ready"], false, "{preview}");
+    assert!(preview["error"].is_string(), "{preview}");
+    assert_eq!(cv["draft"]["status"], "draft");
+    assert_eq!(
+        cv["draft"]["experience"][0]["bullets"]
+            .as_array()
+            .unwrap()
+            .len(),
+        400
+    );
+    let (status, _, _) = s.h.get_raw(&url(&s.opp, "/drafts/1/preview.pdf")).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn thirty_pdfs_of_drafts_a_day_is_the_limit(db: PgPool) {
+    let s = stack(db).await;
+    draft(&s).await;
+    for _ in 0..super::preview::PREVIEWS_PER_DAY {
+        sqlx::query(
+            "INSERT INTO pipeline.cv_preview_makes (id, account_id, made_at)
+             VALUES ($1, $2, now())",
+        )
+        .bind(Uuid::now_v7())
+        .bind(s.h.account)
+        .execute(&s.h.db)
+        .await
+        .unwrap();
+    }
+    let (status, body) =
+        s.h.json(
+            "POST",
+            &url(&s.opp, "/drafts/1/preview"),
+            &json!({ "template": "compact" }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS, "{body}");
+    assert_eq!(body["code"], "cv_previews_daily_cap");
+    // Yesterday's do not count.
+    sqlx::query("UPDATE pipeline.cv_preview_makes SET made_at = now() - interval '2 days'")
+        .execute(&s.h.db)
+        .await
+        .unwrap();
+    let (status, body) =
+        s.h.json(
+            "POST",
+            &url(&s.opp, "/drafts/1/preview"),
+            &json!({ "template": "compact" }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+}
+
+/// What the fake model answers the fix prompt: a rewrite for the line that
+/// says 20 minutes, a question for the one that says a team of 6, and only a
+/// question for any other.
+fn fixer() -> Fixer {
+    Box::new(|user: &str| {
+        let lines: Vec<Value> = user
+            .split("<line id=\"")
+            .skip(1)
+            .map(|block| {
+                let id = block.split('"').next().unwrap_or_default();
+                let text = block
+                    .split("<text>")
+                    .nth(1)
+                    .and_then(|t| t.split("</text>").next())
+                    .unwrap_or_default();
+                if text.contains("20 minutes") {
+                    json!({ "id": id, "rewrite": "Cut invoice runs from 6 hours to 40 minutes",
+                            "question": null, "fact": null })
+                } else if text.contains("team of 6") {
+                    json!({ "id": id, "rewrite": null,
+                            "question": "Did you lead a team of 6 engineers?",
+                            "fact": "I led a team of 6 engineers." })
+                } else {
+                    json!({ "id": id, "rewrite": null, "question": "Is this right?",
+                            "fact": null })
+                }
+            })
+            .collect();
+        json!({ "lines": lines })
+    })
+}
+
+fn waiting_for<'a>(cv: &'a Value, text: &str) -> &'a Value {
+    cv["draft"]["waiting"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|w| w["text"].as_str().is_some_and(|t| t.contains(text)))
+        .unwrap_or_else(|| panic!("nothing waits for {text} in {cv}"))
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_app_fixes_what_it_can_asks_the_rest_and_yes_keeps_the_fact_it_proposed(db: PgPool) {
+    let mut cv = answer();
+    cv["experience"][0]["bullets"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({ "text": "Led a team of 6 engineers", "sources": ["w0.h2"] }));
+    let s = stack_with(db, cv, Some(fixer())).await;
+    let cv = draft(&s).await;
+    assert_eq!(
+        s.model.calls(FIX).await,
+        1,
+        "one call for every flagged line"
+    );
+    let d = &cv["draft"];
+
+    // Rewritten by the app to what the highlight says, its first words kept.
+    assert_eq!(d["fixed_by_app"], 1);
+    let rewritten = d["experience"][0]["bullets"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|b| b["fixed_by_app"] == true)
+        .unwrap();
+    assert_eq!(
+        rewritten["text"],
+        "Cut invoice runs from 6 hours to 40 minutes"
+    );
+    assert_eq!(
+        rewritten["original"],
+        "Cut invoice runs from 6 hours to 20 minutes"
+    );
+    assert_eq!(rewritten["flags"], json!([]));
+
+    // What waits: a question with a proposed fact, a company fact that can't
+    // be kept, and the skill.
+    let waiting = d["waiting"].as_array().unwrap();
+    assert_eq!(waiting.len(), 3, "{waiting:?}");
+    let team = waiting_for(&cv, "team of 6");
+    assert_eq!(team["kind"], "line");
+    assert_eq!(team["question"], "Did you lead a team of 6 engineers?");
+    assert_eq!(team["proposal"], "I led a team of 6 engineers.");
+    assert_eq!(team["role"], "Senior Engineer · Example Org");
+    // "You told us about Example Org": the person's own words, never the
+    // model's, are what Change it starts from.
+    assert_eq!(team["company"], "Example Org");
+    assert_eq!(team["quote"], "Led a team of 4 engineers");
+    let company = waiting_for(&cv, COMPANY_FACT);
+    assert!(company["proposal"].is_null());
+    assert_eq!(company["cannot_keep"], "company");
+    let skill = waiting_for(&cv, "Kubernetes");
+    assert_eq!(skill["kind"], "skill");
+    assert_eq!(skill["proposal"], "Kubernetes");
+
+    // The model was shown the lines, never who the person is.
+    let messages = s.model.user_messages(FIX).await;
+    for needle in ["Alex", "alex@example.com", "Porto"] {
+        assert!(!messages[0].contains(needle), "{needle}");
+    }
+
+    let confirm = |id: &str| url(&s.opp, &format!("/drafts/1/lines/{id}/confirm"));
+    // A company fact is never kept as the person's.
+    let (status, body) =
+        s.h.json(
+            "POST",
+            &confirm(company["line_id"].as_str().unwrap()),
+            &json!({ "proposal": true }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CONFLICT, "{body}");
+    assert_eq!(body["code"], "cannot_keep");
+
+    // Yes, keep it: the proposed fact is kept as a confirmed assumption, and
+    // the line passes with it.
+    let team_id = team["line_id"].as_str().unwrap().to_owned();
+    let (status, cv) =
+        s.h.json("POST", &confirm(&team_id), &json!({ "proposal": true }))
+            .await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    assert_eq!(
+        *s.fake.assumed.lock().unwrap(),
+        [(
+            0,
+            "I led a team of 6 engineers.".to_owned(),
+            "The CV draft for Example Co".to_owned()
+        )]
+    );
+    assert_eq!(line(&cv, &team_id)["flags"], json!([]));
+    assert_eq!(cv["draft"]["waiting"].as_array().unwrap().len(), 2);
+    // Twice: it is not flagged any more.
+    let (status, body) =
+        s.h.json("POST", &confirm(&team_id), &json!({ "proposal": true }))
+            .await;
+    assert_eq!(status, StatusCode::CONFLICT, "{body}");
+    assert_eq!(body["code"], "not_flagged");
+
+    // Remove the company line, keep the skill: Approve turns on.
+    let (status, _) =
+        s.h.json(
+            "PATCH",
+            &url(
+                &s.opp,
+                &format!("/drafts/1/lines/{}", company["line_id"].as_str().unwrap()),
+            ),
+            &json!({ "remove": true }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, cv) =
+        s.h.json(
+            "POST",
+            &confirm(skill["line_id"].as_str().unwrap()),
+            &json!({ "proposal": true }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    assert_eq!(*s.fake.added_skills.lock().unwrap(), ["Kubernetes"]);
+    assert_eq!(cv["draft"]["can_approve"], true, "{cv}");
+    assert_eq!(cv["draft"]["waiting"], json!([]));
+
+    // Approving keeps the preview's PDF as it is: the person approves what
+    // they saw.
+    let (_, _, seen) = s.h.get_raw(&url(&s.opp, "/drafts/1/preview.pdf")).await;
+    let (status, cv) =
+        s.h.json("POST", &url(&s.opp, "/drafts/1/approve"), &json!({}))
+            .await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    assert_eq!(cv["versions"][0]["version"], 1);
+    assert_eq!(stored(&s, 1).await, seen);
+    assert!(cv["draft"]["preview"].is_null());
+    assert_eq!(cv["draft"]["needs_version"], false);
+    let (status, _, _) = s.h.get_raw(&url(&s.opp, "/drafts/1/preview.pdf")).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(s.model.calls(CV).await, 1);
+    assert_eq!(
+        s.model.calls(FIX).await,
+        1,
+        "nothing after the draft calls the model"
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_fix_the_model_cannot_answer_leaves_every_flag_to_the_person(db: PgPool) {
+    let s = stack(db).await;
+    let cv = draft(&s).await;
+    assert_eq!(s.model.calls(FIX).await, 1);
+    assert_eq!(cv["draft"]["fixed_by_app"], 0);
+    let waiting = cv["draft"]["waiting"].as_array().unwrap();
+    assert_eq!(waiting.len(), 3);
+    // With no question, Yes keeps the line's own words.
+    let number = waiting_for(&cv, "20 minutes");
+    assert!(number["question"].is_null());
+    assert_eq!(
+        number["proposal"],
+        "Cut invoice runs from 6 hours to 20 minutes"
+    );
+    let (status, cv) =
+        s.h.json(
+            "POST",
+            &url(
+                &s.opp,
+                &format!(
+                    "/drafts/1/lines/{}/confirm",
+                    number["line_id"].as_str().unwrap()
+                ),
+            ),
+            &json!({ "proposal": true }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    assert_eq!(
+        s.fake.assumed.lock().unwrap()[0].1,
+        "Cut invoice runs from 6 hours to 20 minutes"
+    );
+    assert_eq!(cv["draft"]["waiting"].as_array().unwrap().len(), 2);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_approved_cv_with_no_pdf_offers_to_make_it(db: PgPool) {
+    let s = stack(db).await;
+    approved(&s, json!({})).await;
+    // As a draft approved before PDFs were made.
+    sqlx::query("DELETE FROM pipeline.cv_versions")
+        .execute(&s.h.db)
+        .await
+        .unwrap();
+    let (_, cv) = s.h.get(&url(&s.opp, "")).await;
+    assert_eq!(cv["draft"]["status"], "approved");
+    assert_eq!(cv["draft"]["needs_version"], true);
+    let (status, cv) =
+        s.h.json("POST", &url(&s.opp, "/versions"), &json!({}))
+            .await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    assert_eq!(cv["draft"]["needs_version"], false);
+    assert_eq!(cv["versions"].as_array().unwrap().len(), 1);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_approval_can_be_undone_for_a_moment_and_not_after(db: PgPool) {
+    let s = stack(db).await;
+    // A job being prepared by itself, waiting for the CV's approval.
+    sqlx::query(
+        "INSERT INTO pipeline.preparations
+            (opportunity_id, account_id, state, step, waiting_on, updated_at)
+         VALUES ($1, $2, 'waiting', 'draft', 'cv_approval', now())
+         ON CONFLICT (opportunity_id) DO UPDATE
+            SET state = 'waiting', step = 'draft', waiting_on = 'cv_approval'",
+    )
+    .bind(Uuid::parse_str(&s.opp).unwrap())
+    .bind(s.h.account)
+    .execute(&s.h.db)
+    .await
+    .unwrap();
+    let cv = approved(&s, json!({})).await;
+    assert!(cv["draft"]["undo_until"].is_string(), "{cv}");
+    // What starts next by itself, and what it costs: the letter waits.
+    assert_eq!(cv["next"]["step"], "letter", "{cv}");
+    assert!(cv["next"]["eur"].as_f64().unwrap() > 0.0);
+    assert!(cv["next"]["at"].is_string());
+    // Undo: a draft again, its PDF version gone, the preview back.
+    let (status, cv) =
+        s.h.json("POST", &url(&s.opp, "/drafts/1/unapprove"), &json!({}))
+            .await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    assert_eq!(cv["draft"]["status"], "draft");
+    assert!(cv["draft"]["version"].is_null());
+    assert_eq!(cv["versions"], json!([]));
+    assert_eq!(cv["draft"]["can_approve"], true);
+    assert_eq!(cv["draft"]["preview"]["ready"], true);
+    // The letter waits for the CV again.
+    assert!(cv["next"].is_null(), "{cv}");
+    let waiting: String = sqlx::query_scalar(
+        "SELECT waiting_on FROM pipeline.preparations WHERE opportunity_id = $1",
+    )
+    .bind(Uuid::parse_str(&s.opp).unwrap())
+    .fetch_one(&s.h.db)
+    .await
+    .unwrap();
+    assert_eq!(waiting, "cv_approval");
+    let (status, body) =
+        s.h.json("POST", &url(&s.opp, "/drafts/1/unapprove"), &json!({}))
+            .await;
+    assert_eq!(status, StatusCode::CONFLICT, "{body}");
+    assert_eq!(body["code"], "not_approved");
+
+    // Approved again, it is version 1 again; past the moment, no undo.
+    let (status, cv) =
+        s.h.json("POST", &url(&s.opp, "/drafts/1/approve"), &json!({}))
+            .await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    assert_eq!(cv["versions"][0]["version"], 1);
+    // The first approval's job comes due while the second can still be
+    // undone: the letter does not start, and waits for the newest moment.
+    let opp = Uuid::parse_str(&s.opp).unwrap();
+    let preparation = || async {
+        sqlx::query_as::<_, (String, String)>(
+            "SELECT state, step FROM pipeline.preparations WHERE opportunity_id = $1",
+        )
+        .bind(opp)
+        .fetch_one(&s.h.db)
+        .await
+        .unwrap()
+    };
+    assert_eq!(
+        preparation().await,
+        ("queued".to_owned(), "letter".to_owned())
+    );
+    let neighbours: Arc<dyn crate::ports::Neighbours> = s.fake.clone();
+    let deps = crate::PipelineDeps {
+        neighbours: Some(neighbours),
+        ai: Some(s.model.gateway()),
+    };
+    crate::features::prepare::run(&deps, &s.h.db, opp)
+        .await
+        .unwrap();
+    assert_eq!(
+        preparation().await,
+        ("queued".to_owned(), "letter".to_owned())
+    );
+    let letters: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM pipeline.letter_drafts WHERE opportunity_id = $1")
+            .bind(opp)
+            .fetch_one(&s.h.db)
+            .await
+            .unwrap();
+    assert_eq!(letters, 0, "no letter while Undo is offered");
+    let later: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM kernel.jobs
+          WHERE kind = 'pipeline.prepare' AND state = 'pending' AND run_at > now()
+            AND payload ->> 'opportunity' = $1",
+    )
+    .bind(&s.opp)
+    .fetch_one(&s.h.db)
+    .await
+    .unwrap();
+    assert!(later >= 1, "the letter runs once the moment is over");
+    sqlx::query("UPDATE pipeline.cv_drafts SET approved_at = now() - interval '1 minute'")
+        .execute(&s.h.db)
+        .await
+        .unwrap();
+    let (_, cv) = s.h.get(&url(&s.opp, "")).await;
+    assert!(cv["draft"]["undo_until"].is_null());
+    let (status, body) =
+        s.h.json("POST", &url(&s.opp, "/drafts/1/unapprove"), &json!({}))
+            .await;
+    assert_eq!(status, StatusCode::CONFLICT, "{body}");
+    assert_eq!(body["code"], "too_late");
+    assert_eq!(s.model.calls(CV).await, 1);
 }

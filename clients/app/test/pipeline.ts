@@ -133,11 +133,15 @@ export function cvLine(id: string, text: string, overrides: Partial<CvLine> = {}
     ],
     flags: [],
     claims: [],
+    fixed_by_app: false,
     ...overrides,
   };
 }
 
-/** A draft with a reworded line, a verbatim one, a number nobody wrote and a skill off the profile. */
+/**
+ * A draft with a reworded line, a verbatim one, a number nobody wrote and a
+ * skill off the profile, both waiting on the person as questions, and its PDF.
+ */
 export function cvDraft(overrides: Partial<CvDraft> = {}): CvDraft {
   const wrong = cvLine("l5", "Cut invoice runs to 20 minutes", {
     mark: "reworded",
@@ -225,6 +229,36 @@ export function cvDraft(overrides: Partial<CvDraft> = {}): CvDraft {
       left_out_roles: 1,
       left_out_lines: 0,
     },
+    fixed_by_app: 1,
+    waiting: [
+      {
+        line_id: "l5",
+        kind: "line",
+        text: "Cut invoice runs to 20 minutes",
+        question: "Did invoice runs drop to 20 minutes?",
+        proposal: "I cut invoice runs to 20 minutes.",
+        role: "Senior Engineer · Example Org",
+        company: "Example Org",
+        quote: "Cut invoice runs from 6 hours to 40 minutes",
+        flags: [{ kind: "claim_not_in_sources", claim: "20", cites: ["w0.h1"] }],
+      },
+      {
+        line_id: "l7",
+        kind: "skill",
+        text: "Kubernetes",
+        proposal: "Kubernetes",
+        flags: [{ kind: "skill_not_on_profile", skill: "Kubernetes" }],
+      },
+    ],
+    preview: {
+      ready: true,
+      stale: false,
+      template: "clean",
+      length: 1,
+      pages: 1,
+      at: "2026-10-31T10:00:01Z",
+    },
+    needs_version: false,
     ...overrides,
   };
 }
@@ -246,7 +280,7 @@ export function cv(overrides: Partial<Cv> = {}): Cv {
       month_eur: 0.42,
       month_limit_eur: 5,
     },
-    draft_eur: 0.002,
+    draft_eur: 0.004,
     ...overrides,
   };
 }

@@ -18,6 +18,7 @@ fn line(id: &str, text: &str) -> Line {
         text: text.into(),
         sources: vec!["hl".into()],
         edited: false,
+        ..Line::default()
     }
 }
 

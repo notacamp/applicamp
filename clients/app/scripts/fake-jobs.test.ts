@@ -196,6 +196,36 @@ describe("the fake CV writer", () => {
     expect(draft.skills).toEqual(["Rust", "PostgreSQL", "Kubernetes"]);
   });
 
+  it("fixes the CV's flagged lines: the company fact back to its own source, a question for the rest", async () => {
+    const fixes = await model<{
+      lines: { id: string; rewrite: string | null; question: string | null; fact: string | null }[];
+    }>(
+      "You fix the lines of a CV that a check found saying more than their sources say.",
+      `<language>en</language>
+<lines>
+<line id="l5" where="a bullet under Senior Engineer · Example Org">
+<text>Rebuilt the billing pipeline in Rust, cutting invoice runs from 23 hours to 40 minutes</text>
+<flagged>"23" is not in its sources</flagged>
+<source id="w0.h1">Rebuilt the billing pipeline in Rust, cutting invoice runs from 6 hours to 40 minutes</source>
+</line>
+<line id="l6" where="a bullet under Senior Engineer · Example Org">
+<text>Led a team of 4 engineers for customers like those of Example Co</text>
+<flagged>it uses a fact about the company as the person's achievement</flagged>
+<source id="w0.h2">Led a team of 4 engineers</source>
+</line>
+</lines>`,
+    );
+    expect(fixes.lines).toEqual([
+      {
+        id: "l5",
+        rewrite: null,
+        question: "Is “23” right?",
+        fact: "I rebuilt the billing pipeline in Rust, cutting invoice runs from 23 hours to 40 minutes.",
+      },
+      { id: "l6", rewrite: "Led a team of 4 engineers", question: null, fact: null },
+    ]);
+  });
+
   it("copes with a profile that has less: no company fact, no kept fact", async () => {
     const draft = await cv(`<language>en</language>
 <posting>

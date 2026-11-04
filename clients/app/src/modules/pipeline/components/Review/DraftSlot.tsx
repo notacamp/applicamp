@@ -11,7 +11,7 @@ export function blockedReason(cv: Cv): NonNullable<Cv["can_draft"]["reason"]> | 
 }
 
 /**
- * "Draft the CV · about €0.002": one AI call, then the check without AI.
+ * "Draft the CV · about €0.004": the draft's AI call and, at worst, the app's fix round, then the check without AI.
  * Off, with its reason, when the job is not yet shortlisted or a cap or a
  * limit is hit. With a draft already made it says "Review the CV".
  */

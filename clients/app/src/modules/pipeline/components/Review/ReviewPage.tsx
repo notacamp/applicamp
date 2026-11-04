@@ -1,13 +1,15 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { problemCode } from "~/lib/api";
 import {
+  ActionDock,
   Banner,
   Bullets,
   Button,
   Cluster,
   Dialog,
+  Disclosure,
   formatSize,
   Label,
   Page,
@@ -17,6 +19,7 @@ import {
   Stack,
   Tagged,
   Text,
+  TouchTargets,
 } from "~/lib/ui";
 
 import {
@@ -25,13 +28,16 @@ import {
   DEFAULT_LAYOUT,
   layoutOf,
   pdfFailureReasons,
+  previewLayout,
   useApprove,
   useChangeLine,
   useConfirmLine,
   useCv,
   useMakeDraft,
   useMakeVersion,
+  usePreview,
   usePutBack,
+  useUnapprove,
   type Cv,
   type CvDraft,
   type CvLayout,
@@ -45,6 +51,7 @@ import { DraftSlot } from "./DraftSlot";
 import { cvLanguage, LayoutControls } from "./LayoutControls";
 import type { LineActions } from "./LineRow";
 import { VersionsSection } from "./PdfPanel";
+import { PreviewPane } from "./PreviewPane";
 import { ReviewAside } from "./ReviewAside";
 
 export interface ReviewPageProps {
@@ -70,10 +77,11 @@ export function languageName(tag: string, display: string): string {
 }
 
 /**
- * `/pipeline/$id/cv`: the review of a tailored CV. The CV as a page, every
- * line marked by how it relates to the profile and, when it can't be traced
- * to it, blocked with the reason and what to do; beside it the check, the
- * job's keywords and what changed. Approve is off while any line is blocked.
+ * `/pipeline/$id/cv`: the review of a tailored CV. The draft as the PDF it
+ * will be, made again after every change; beside it the questions the app
+ * could not answer by itself (Yes, keep it / Change it / Remove it), the
+ * job's keywords and what changed. Every line and where it comes from opens
+ * below the PDF. Approve is off while a question waits.
  */
 export function ReviewPage({ id, onBack, onPipeline, spend, onLetter }: ReviewPageProps) {
   const { t } = useTranslation("pipeline");
@@ -177,13 +185,19 @@ function Review({
   const putBack = usePutBack(id, draft.n);
   const approve = useApprove(id, draft.n);
   const makeVersion = useMakeVersion(id);
+  const preview = usePreview(id, draft.n);
+  const unapprove = useUnapprove(id, draft.n);
+  const undoing = useUndoWindow(draft.undo_until ?? undefined);
   const [language, setLanguage] = useState(() => cvLanguage(draft.language));
   const again = useMakeDraft(id, language);
   const editable = draft.status === "draft";
   const newest = cv.versions[0];
-  // What the PDF is made with: the person's choice before Approve, the newest version's after.
-  const [chosen, setChosen] = useState<CvLayout>(DEFAULT_LAYOUT);
-  const layout = editable ? chosen : newest === undefined ? DEFAULT_LAYOUT : layoutOf(newest);
+  // What the PDF is made with: the preview's before Approve, the newest version's after.
+  const layout = editable
+    ? (previewLayout(draft.preview) ?? DEFAULT_LAYOUT)
+    : newest === undefined
+      ? DEFAULT_LAYOUT
+      : layoutOf(newest);
   // A layout asked for on an approved CV, waiting for the person to confirm.
   const [asked, setAsked] = useState<CvLayout | null>(null);
   const [viewing, setViewing] = useState<number | null>(null);
@@ -193,14 +207,29 @@ function Review({
     putBack.isPending ||
     approve.isPending ||
     makeVersion.isPending ||
+    preview.isPending ||
+    unapprove.isPending ||
     again.isPending;
-  const failure = [change, confirm, putBack, approve, makeVersion, again].find(
+  const failure = [change, confirm, putBack, approve, makeVersion, preview, unapprove, again].find(
     (action) => action.isError,
   )?.error;
-  const failedLength = approve.isError ? layout.length : (asked ?? layout).length;
+  const failedLength = preview.isError
+    ? preview.variables.length
+    : approve.isError
+      ? layout.length
+      : (asked ?? layout).length;
 
   const resetErrors = () => {
-    for (const action of [change, confirm, putBack, approve, makeVersion, again]) {
+    for (const action of [
+      change,
+      confirm,
+      putBack,
+      approve,
+      makeVersion,
+      preview,
+      unapprove,
+      again,
+    ]) {
       action.reset();
     }
   };
@@ -220,227 +249,344 @@ function Review({
       resetErrors();
       confirm.mutate(text === undefined ? { line } : { line, text });
     },
+    keep: (line) => {
+      resetErrors();
+      confirm.mutate({ line, proposal: true });
+    },
   };
   const version = draft.version ?? (newest?.version ?? 0) + 1;
-  const goFirst = () => {
-    if (draft.first_flagged === undefined || draft.first_flagged === null) {
-      return;
-    }
-    const target = document.getElementById(`cv-line-${draft.first_flagged}`);
-    target?.scrollIntoView({ behavior: "smooth", block: "center" });
-    target?.querySelector("button")?.focus({ preventScroll: true });
-  };
+  const waiting = draft.waiting.length;
+  const sheet = (
+    <CvSheet
+      draft={draft}
+      actions={actions}
+      onPutBack={(what) => {
+        resetErrors();
+        putBack.mutate(what);
+      }}
+    />
+  );
 
   return (
-    <Stack>
-      <Tagged testId="cv-toolbar">
-        <Cluster>
-          <Tagged testId="cv-draft-number">
-            <Text weight="semibold">{t("cv.toolbar.draft", { n: draft.n })}</Text>
-          </Tagged>
-          <Tagged testId="cv-status">
-            <Label hue={draft.status === "approved" ? "green" : "blue"}>
-              {draft.status === "approved"
-                ? t("cv.toolbar.approvedPill", { version: draft.version ?? 1 })
-                : t("cv.toolbar.draftPill")}
-            </Label>
-          </Tagged>
-          <Tagged testId="cv-language">
-            <Text tone="secondary" size="sm">
-              {t("cv.toolbar.language", { language: languageName(draft.language, i18n.language) })}
-            </Text>
-          </Tagged>
-          <Button
-            variant="secondary"
-            ai
-            disabled={busy || !cv.can_draft.allowed}
-            data-testid="cv-make-again"
-            onClick={() => {
-              resetErrors();
-              again.mutate();
-            }}
-          >
-            {again.isPending
-              ? t("cv.toolbar.making")
-              : t("cv.toolbar.makeAgain", { cost: formatCost(cv.draft_eur, i18n.language) })}
-          </Button>
-          {editable ? (
-            <Button
-              variant="primary"
-              icon="check"
-              disabled={busy || !draft.can_approve}
-              data-testid="cv-approve"
-              onClick={() => {
-                resetErrors();
-                approve.mutate(chosen);
-              }}
-            >
-              {approve.isPending ? t("cv.toolbar.approving") : t("cv.toolbar.approve", { version })}
-            </Button>
-          ) : null}
-        </Cluster>
-      </Tagged>
-      {editable && !draft.can_approve ? (
-        <Tagged testId="cv-approve-reason">
-          <Text tone="secondary" size="sm">
-            {t("cv.toolbar.approveWhy")}
-          </Text>
-        </Tagged>
-      ) : null}
-      {!cv.can_draft.allowed &&
-      cv.can_draft.reason !== undefined &&
-      cv.can_draft.reason !== null ? (
-        <Tagged testId="cv-make-again-reason">
-          <Text tone="secondary" size="sm">
-            {t(`cv.draft.blocked.${cv.can_draft.reason}`)}
-          </Text>
-        </Tagged>
-      ) : null}
-      {failure === undefined ? null : (
-        <Tagged testId="cv-error">
-          <Banner
-            tone="danger"
-            icon="warning"
-            role="alert"
-            title={t(`cv.errors.${cvErrorCode(failure)}`, { count: failedLength })}
-          >
-            {pdfFailureReasons(failure).length === 0 ? null : (
-              <Tagged testId="cv-error-reasons">
-                <Bullets items={pdfFailureReasons(failure)} />
-              </Tagged>
-            )}
-          </Banner>
-        </Tagged>
-      )}
-      {onLetter === undefined || newest === undefined ? null : (
-        <Tagged testId="cv-letter">
-          <Section title={t("letter.fromCv.title")} description={t("letter.fromCv.body")}>
-            <LetterSlot
-              id={id}
-              testIdPrefix="cv-letter"
-              onReview={() => {
-                onLetter(id);
-              }}
-            />
-          </Section>
-        </Tagged>
-      )}
-      <LayoutControls
-        layout={layout}
-        onLayout={(next) => {
-          resetErrors();
-          if (editable) {
-            setChosen(next);
-          } else {
-            setAsked(next);
-          }
-        }}
-        language={language}
-        onLanguage={(next) => {
-          setLanguage(cvLanguage(next));
-        }}
-        disabled={busy}
-      />
-      <ReviewLayout
-        testId="cv-layout"
-        aside={
-          <ReviewAside
-            cv={cv}
-            draft={draft}
-            spend={spend}
-            onFirst={goFirst}
-            onBack={onPipeline}
-            onOpenPdf={setViewing}
-          />
-        }
-      >
-        <Stack>
-          <CvSheet
-            draft={draft}
-            actions={actions}
-            onPutBack={(what) => {
-              resetErrors();
-              putBack.mutate(what);
-            }}
-          />
-          <VersionsSection opportunity={id} versions={cv.versions} onOpen={setViewing} />
-        </Stack>
-      </ReviewLayout>
-      <Dialog
-        open={asked !== null}
-        onClose={() => {
-          setAsked(null);
-        }}
-        visor={null}
-        title={t("cv.layout.confirmTitle")}
-        description={
-          asked === null
-            ? undefined
-            : t("cv.layout.confirmBody", {
-                version: newest?.version ?? 0,
-                next: (newest?.version ?? 0) + 1,
-                template: t(`cv.layout.templates.${asked.template}`),
-                pages: t("cv.layout.pages", { count: asked.length }),
-              })
-        }
-        footer={
-          <>
+    <TouchTargets>
+      <Stack>
+        <Tagged testId="cv-toolbar">
+          <Cluster>
+            <Tagged testId="cv-draft-number">
+              <Text weight="semibold">{t("cv.toolbar.draft", { n: draft.n })}</Text>
+            </Tagged>
+            <Tagged testId="cv-status">
+              <Label hue={draft.status === "approved" ? "green" : "blue"}>
+                {draft.status === "approved"
+                  ? t("cv.toolbar.approvedPill", { version: draft.version ?? 1 })
+                  : t("cv.toolbar.draftPill")}
+              </Label>
+            </Tagged>
+            <Tagged testId="cv-language">
+              <Text tone="secondary" size="sm">
+                {t("cv.toolbar.language", {
+                  language: languageName(draft.language, i18n.language),
+                })}
+              </Text>
+            </Tagged>
             <Button
               variant="secondary"
-              data-testid="cv-layout-cancel"
+              ai
+              disabled={busy || !cv.can_draft.allowed}
+              data-testid="cv-make-again"
               onClick={() => {
-                setAsked(null);
+                resetErrors();
+                again.mutate();
               }}
             >
-              {t("cv.layout.cancel")}
+              {again.isPending
+                ? t("cv.toolbar.making")
+                : t("cv.toolbar.makeAgain", { cost: formatCost(cv.draft_eur, i18n.language) })}
             </Button>
-            <Button
-              variant="primary"
-              disabled={makeVersion.isPending}
-              data-testid="cv-layout-confirm"
-              onClick={() => {
-                if (asked !== null) {
-                  makeVersion.mutate(asked, {
-                    onSettled: () => {
-                      setAsked(null);
-                    },
-                  });
-                }
-              }}
+          </Cluster>
+        </Tagged>
+        {draft.needs_version ? (
+          <Tagged testId="cv-needs-version">
+            <Banner
+              icon="warning"
+              title={t("cv.needsVersion.title")}
+              action={
+                <Button
+                  variant="primary"
+                  disabled={busy}
+                  data-testid="cv-make-pdf"
+                  onClick={() => {
+                    resetErrors();
+                    makeVersion.mutate(DEFAULT_LAYOUT);
+                  }}
+                >
+                  {makeVersion.isPending ? t("cv.layout.making") : t("cv.needsVersion.make")}
+                </Button>
+              }
             >
-              {makeVersion.isPending
-                ? t("cv.layout.making")
-                : t("cv.layout.confirm", { next: (newest?.version ?? 0) + 1 })}
-            </Button>
-          </>
-        }
-      />
-      <PdfViewer
-        open={viewed !== undefined}
-        onClose={() => {
-          setViewing(null);
-        }}
-        url={cvPdfUrl(id, viewed?.version ?? 0)}
-        downloadUrl={cvPdfUrl(id, viewed?.version ?? 0, true)}
-        title={t("cv.viewer.title", { version: viewed?.version ?? 0 })}
-        subtitle={
-          viewed === undefined
-            ? undefined
-            : t("cv.viewer.subtitle", {
-                date: formatShortDate(viewed.created_at, i18n.language),
-                template: t(`cv.layout.templates.${viewed.template}`),
-                pages: t("cv.layout.pages", { count: viewed.pages }),
-                size: formatSize(viewed.size_bytes, i18n.language),
-              })
-        }
-        labels={{
-          close: t("cv.viewer.close"),
-          download: t("cv.pdf.download"),
-          loading: t("cv.viewer.loading"),
-          failed: t("cv.viewer.failed"),
-          page: (page, pages) => t("cv.viewer.page", { page, pages }),
-        }}
-      />
-    </Stack>
+              {t("cv.needsVersion.body")}
+            </Banner>
+          </Tagged>
+        ) : null}
+        {!cv.can_draft.allowed &&
+        cv.can_draft.reason !== undefined &&
+        cv.can_draft.reason !== null ? (
+          <Tagged testId="cv-make-again-reason">
+            <Text tone="secondary" size="sm">
+              {t(`cv.draft.blocked.${cv.can_draft.reason}`)}
+            </Text>
+          </Tagged>
+        ) : null}
+        {failure === undefined ? null : (
+          <Tagged testId="cv-error">
+            <Banner
+              tone="danger"
+              icon="warning"
+              role="alert"
+              title={t(`cv.errors.${cvErrorCode(failure)}`, { count: failedLength })}
+            >
+              {pdfFailureReasons(failure).length === 0 ? null : (
+                <Tagged testId="cv-error-reasons">
+                  <Bullets items={pdfFailureReasons(failure)} />
+                </Tagged>
+              )}
+            </Banner>
+          </Tagged>
+        )}
+        {onLetter === undefined || newest === undefined ? null : (
+          <Tagged testId="cv-letter">
+            <Section title={t("letter.fromCv.title")} description={t("letter.fromCv.body")}>
+              <LetterSlot
+                id={id}
+                testIdPrefix="cv-letter"
+                onReview={() => {
+                  onLetter(id);
+                }}
+              />
+            </Section>
+          </Tagged>
+        )}
+        <LayoutControls
+          layout={layout}
+          onLayout={(next) => {
+            resetErrors();
+            if (editable) {
+              preview.mutate(next);
+            } else {
+              setAsked(next);
+            }
+          }}
+          language={language}
+          onLanguage={(next) => {
+            setLanguage(cvLanguage(next));
+          }}
+          disabled={busy}
+        />
+        <ReviewLayout
+          testId="cv-layout"
+          aside={
+            <ReviewAside
+              cv={cv}
+              draft={draft}
+              spend={spend}
+              actions={actions}
+              onBack={onPipeline}
+              onOpenPdf={setViewing}
+            />
+          }
+        >
+          <Stack>
+            {editable ? (
+              <>
+                <PreviewPane
+                  opportunity={id}
+                  n={draft.n}
+                  language={draft.language}
+                  preview={draft.preview}
+                  making={preview.isPending}
+                  disabled={busy}
+                  onMake={() => {
+                    resetErrors();
+                    preview.mutate(layout);
+                  }}
+                />
+                <Tagged testId="cv-lines">
+                  <Disclosure
+                    summary={
+                      <Tagged testId="cv-lines-toggle">
+                        <span>{t("cv.preview.lines")}</span>
+                      </Tagged>
+                    }
+                  >
+                    {sheet}
+                  </Disclosure>
+                </Tagged>
+              </>
+            ) : (
+              sheet
+            )}
+            <VersionsSection opportunity={id} versions={cv.versions} onOpen={setViewing} />
+          </Stack>
+        </ReviewLayout>
+        {editable ? (
+          <ActionDock
+            testId="cv-dock"
+            actions={
+              <Button
+                variant="primary"
+                icon="check"
+                disabled={busy || !draft.can_approve}
+                data-testid="cv-approve"
+                onClick={() => {
+                  resetErrors();
+                  approve.mutate(layout);
+                }}
+              >
+                {approve.isPending
+                  ? t("cv.toolbar.approving")
+                  : t("cv.toolbar.approve", { version })}
+              </Button>
+            }
+            note={
+              <Tagged testId={draft.can_approve ? "cv-approve-ready" : "cv-approve-reason"}>
+                <Text tone="secondary" size="sm">
+                  {draft.can_approve
+                    ? t("cv.waiting.ready")
+                    : t("cv.waiting.answer", { count: Math.max(waiting, 1) })}
+                </Text>
+              </Tagged>
+            }
+          />
+        ) : undoing ? (
+          <ActionDock
+            testId="cv-dock"
+            actions={
+              <>
+                <Tagged testId="cv-approved-now">
+                  <Text weight="semibold">{t("cv.dock.approved")}</Text>
+                </Tagged>
+                <Button
+                  variant="secondary"
+                  disabled={busy}
+                  data-testid="cv-undo"
+                  onClick={() => {
+                    resetErrors();
+                    unapprove.mutate();
+                  }}
+                >
+                  {unapprove.isPending ? t("cv.dock.undoing") : t("cv.dock.undo")}
+                </Button>
+              </>
+            }
+            note={
+              cv.next === undefined || cv.next === null ? undefined : (
+                <Tagged testId="cv-next">
+                  <Text tone="secondary" size="sm">
+                    {t("cv.dock.next", { cost: formatCost(cv.next.eur, i18n.language) })}
+                  </Text>
+                </Tagged>
+              )
+            }
+          />
+        ) : null}
+        <Dialog
+          open={asked !== null}
+          onClose={() => {
+            setAsked(null);
+          }}
+          visor={null}
+          title={t("cv.layout.confirmTitle")}
+          description={
+            asked === null
+              ? undefined
+              : t("cv.layout.confirmBody", {
+                  version: newest?.version ?? 0,
+                  next: (newest?.version ?? 0) + 1,
+                  template: t(`cv.layout.templates.${asked.template}`),
+                  pages: t("cv.layout.pages", { count: asked.length }),
+                })
+          }
+          footer={
+            <>
+              <Button
+                variant="secondary"
+                data-testid="cv-layout-cancel"
+                onClick={() => {
+                  setAsked(null);
+                }}
+              >
+                {t("cv.layout.cancel")}
+              </Button>
+              <Button
+                variant="primary"
+                disabled={makeVersion.isPending}
+                data-testid="cv-layout-confirm"
+                onClick={() => {
+                  if (asked !== null) {
+                    makeVersion.mutate(asked, {
+                      onSettled: () => {
+                        setAsked(null);
+                      },
+                    });
+                  }
+                }}
+              >
+                {makeVersion.isPending
+                  ? t("cv.layout.making")
+                  : t("cv.layout.confirm", { next: (newest?.version ?? 0) + 1 })}
+              </Button>
+            </>
+          }
+        />
+        <PdfViewer
+          open={viewed !== undefined}
+          onClose={() => {
+            setViewing(null);
+          }}
+          url={cvPdfUrl(id, viewed?.version ?? 0)}
+          downloadUrl={cvPdfUrl(id, viewed?.version ?? 0, true)}
+          title={t("cv.viewer.title", { version: viewed?.version ?? 0 })}
+          subtitle={
+            viewed === undefined
+              ? undefined
+              : t("cv.viewer.subtitle", {
+                  date: formatShortDate(viewed.created_at, i18n.language),
+                  template: t(`cv.layout.templates.${viewed.template}`),
+                  pages: t("cv.layout.pages", { count: viewed.pages }),
+                  size: formatSize(viewed.size_bytes, i18n.language),
+                })
+          }
+          labels={{
+            close: t("cv.viewer.close"),
+            download: t("cv.pdf.download"),
+            loading: t("cv.viewer.loading"),
+            failed: t("cv.viewer.failed"),
+            page: (page, pages) => t("cv.viewer.page", { page, pages }),
+          }}
+        />
+      </Stack>
+    </TouchTargets>
   );
+}
+
+/**
+ * Whether the moment to undo an approval lasts: until `until`, then not
+ * (the page is drawn again when it ends).
+ */
+function useUndoWindow(until: string | undefined): boolean {
+  const end = until === undefined ? 0 : Date.parse(until);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const left = end - Date.now();
+    if (left <= 0) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      setNow(Date.now());
+    }, left);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [end]);
+  return end > now;
 }

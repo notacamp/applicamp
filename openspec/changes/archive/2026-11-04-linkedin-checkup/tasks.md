@@ -6,5 +6,5 @@
 - [x] 5 Server tests: the flow from the export ZIP, privacy of the prompt, flags, decisions, cap, stale, another account, expiry
 - [x] 6 Client: `api/linkedin.ts`, `LinkedInPage` (upload, review, to-do list), `LinkedInSection` on Profile & goals, the route, four languages
 - [x] 7 Client tests (page states, keep/edit/drop/done, flagged proposal), e2e with the fake model's review
-- [ ] 8 OpenAPI regenerated, client types regenerated, changelog entry file
+- [x] 8 OpenAPI regenerated, client types regenerated, changelog entry file
 - [ ] 9 Gates green in CI, recording (UI at 375px and desktop)

@@ -118,7 +118,8 @@ pub fn schema() -> Value {
 }
 
 /// The LinkedIn profile as it is kept and shown: without the person's name,
-/// email, location, website or links, with email addresses and phone numbers
+/// email, location, website or links, without the positions' places (they
+/// say where the person lives), with email addresses and phone numbers
 /// replaced in every free text, and without facts (LinkedIn has none).
 pub fn scrubbed(mut linkedin: Profile) -> Profile {
     let basics = &mut linkedin.basics;
@@ -130,6 +131,7 @@ pub fn scrubbed(mut linkedin: Profile) -> Profile {
     basics.summary = basics.summary.as_deref().map(without_contact);
     basics.background = basics.background.as_deref().map(without_contact);
     for work in &mut linkedin.work {
+        work.location = None;
         work.summary = work.summary.as_deref().map(without_contact);
         work.highlights = work.highlights.iter().map(|h| without_contact(h)).collect();
         work.facts.clear();
@@ -319,6 +321,7 @@ mod tests {
             work: vec![Work {
                 name: Some("Example Org".to_owned()),
                 position: Some("Senior Engineer".to_owned()),
+                location: Some("Lisbon, Portugal".to_owned()),
                 summary: Some("Runs billing. Write to alex@example.com.".to_owned()),
                 ..Work::default()
             }],
@@ -338,6 +341,7 @@ mod tests {
         assert!(!summary.contains("912"), "{summary}");
         let work = clean.work[0].summary.clone().unwrap();
         assert!(!work.contains("alex@example.com"), "{work}");
+        assert_eq!(clean.work[0].location, None);
         assert_eq!(clean.basics.label.as_deref(), Some("Backend engineer"));
     }
 

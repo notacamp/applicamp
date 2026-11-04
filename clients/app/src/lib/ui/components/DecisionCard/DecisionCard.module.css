@@ -1,6 +1,7 @@
 /*
- * A proposal to keep or drop. Kept: the success colours. Dropped: faded and
- * struck out. The card never leaves the list, so Undo stays in reach.
+ * A proposal to keep or drop. Kept: the success colours. Dropped: quieter
+ * colours and struck out. The card never leaves the list, so Undo stays in
+ * reach.
  */
 .list {
   container: decisions / inline-size;
@@ -27,11 +28,14 @@
   background: var(--success-soft);
 }
 
-.card[data-state="dropped"] .body {
-  opacity: 0.6;
+/* Faded with colours, not opacity: the words keep their contrast. */
+.card[data-state="dropped"] {
+  background: var(--surface-sunken);
 }
 
 .card[data-state="dropped"] .text {
+  color: var(--text-secondary);
+  font-weight: var(--weight-regular);
   text-decoration: line-through;
 }
 

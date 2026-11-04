@@ -14,10 +14,10 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use super::{
-    judge::MAX_BULLET,
-    model::{Content, Frame, Line, Role as CvRole},
+    judge::{MAX_BULLET, MAX_BULLETS, MAX_ROLE_BULLETS},
+    model::{Content, Frame, Line, Role as CvRole, SourceKind},
     prompt::{blocks, cut, data},
-    view::{KeywordKind, KeywordState, keywords},
+    view::{KeywordKind, KeywordState, found, keywords, words},
 };
 use crate::features::brief::{self, BriefWant};
 
@@ -31,7 +31,7 @@ pub const PREFIX: &str = "You add bullets to a CV";
 pub const MAX_ADDED: usize = 3;
 
 /// The most tokens the answer may take.
-const MAX_TOKENS: u32 = 3_000;
+pub(super) const MAX_TOKENS: u32 = 3_000;
 
 pub const INSTRUCTIONS: &str = "You add bullets to a CV for what a job wants that the person's \
 profile shows but the CV does not say yet.\n\
@@ -143,8 +143,9 @@ pub fn wants_view(
         .collect()
 }
 
-/// The wants the profile shows and the draft does not say: what the pass
-/// asks about.
+/// The wants the draft does not say and that a position's own words or the
+/// skills show: what the pass asks about, since a bullet may cite only
+/// those (never the background, a project, a certificate or the education).
 fn missing<'a>(
     wants: &'a [BriefWant],
     title: &str,
@@ -153,12 +154,23 @@ fn missing<'a>(
     frame: &Frame,
 ) -> Vec<&'a BriefWant> {
     let views = wants_view(wants, title, posting, content, frame);
+    let citable = words(
+        &frame
+            .sources
+            .iter()
+            .filter(|s| s.position.is_some() || s.kind == SourceKind::Skills)
+            .map(|s| s.text.as_str())
+            .chain(frame.skills.iter().map(String::as_str))
+            .collect::<Vec<_>>()
+            .join("\n"),
+    );
     wants
         .iter()
         .filter(|w| {
             views
                 .iter()
                 .any(|v| v.text == w.label && v.reason == WantReason::InProfile)
+                && found(&w.label, &citable)
         })
         .collect()
 }
@@ -186,7 +198,8 @@ pub fn message(missing: &[&BriefWant], frame: &Frame, language: &str) -> String 
 }
 
 /// Add the model's bullets to `content`: at most [`MAX_ADDED`], each under a
-/// position the profile has, never past the length of a bullet. How many.
+/// position the profile has, never past the length of a bullet nor the caps
+/// on bullets (a position's and the CV's). How many.
 pub fn apply(content: &mut Content, frame: &Frame, answer: RawAdds) -> u32 {
     let mut added = 0;
     for raw in answer.bullets.into_iter().take(MAX_ADDED) {
@@ -196,6 +209,15 @@ pub fn apply(content: &mut Content, frame: &Frame, answer: RawAdds) -> u32 {
         else {
             continue;
         };
+        let total: usize = content.experience.iter().map(|r| r.bullets.len()).sum();
+        let here = content
+            .experience
+            .iter()
+            .find(|r| r.position == position)
+            .map_or(0, |r| r.bullets.len());
+        if total >= MAX_BULLETS || here >= MAX_ROLE_BULLETS {
+            continue;
+        }
         let text = raw.text.trim();
         if text.is_empty() || text.chars().count() > MAX_BULLET {
             continue;
@@ -374,6 +396,64 @@ mod tests {
         assert!(message.contains("- On-call rota (must)"), "{message}");
         assert!(message.contains("[w0.h1] Ran the on-call rota for billing"));
         assert!(!message.contains("Elixir"));
+    }
+
+    #[test]
+    fn a_want_only_the_background_shows_is_never_asked_for() {
+        let f = Frame::build(
+            &CvProfile {
+                background: Some("Ran a small hotel's hospitality team for six years".into()),
+                positions: vec![CvPosition {
+                    index: 0,
+                    title: Some("Engineer".into()),
+                    start_date: Some("2021".into()),
+                    highlights: vec!["Ran the on-call rota for billing".into()],
+                    ..CvPosition::default()
+                }],
+                skills: vec!["Rust".into()],
+                ..CvProfile::default()
+            },
+            "Example Co",
+            &[],
+        );
+        let wants = [want("Hospitality", "nice"), want("On-call rota", "must")];
+        let views = wants_view(&wants, "Engineer", "", &content(), &f);
+        assert!(
+            views
+                .iter()
+                .any(|v| v.text == "Hospitality" && v.reason == WantReason::InProfile),
+            "the profile shows it: {views:?}"
+        );
+        let asked = missing(&wants, "Engineer", "", &content(), &f);
+        assert_eq!(asked.len(), 1, "a bullet cannot cite the background");
+        assert_eq!(asked[0].label, "On-call rota");
+    }
+
+    #[test]
+    fn added_bullets_keep_to_the_caps_on_bullets() {
+        let mut c = content();
+        c.experience[0].bullets = (0..MAX_ROLE_BULLETS)
+            .map(|i| Line {
+                id: format!("b{i}"),
+                text: "Wrote Rust".into(),
+                sources: vec!["sk".into()],
+                ..Line::default()
+            })
+            .collect();
+        let raw = |position: i64| RawAdded {
+            position,
+            text: "Ran the on-call rota for billing".into(),
+            sources: vec!["w0.h1".into()],
+        };
+        let added = apply(
+            &mut c,
+            &frame(),
+            RawAdds {
+                bullets: vec![raw(0), raw(1)],
+            },
+        );
+        assert_eq!(added, 1, "the full position takes none");
+        assert_eq!(c.experience[0].bullets.len(), MAX_ROLE_BULLETS);
     }
 
     #[test]

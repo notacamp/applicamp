@@ -27,10 +27,13 @@
 //!   model's price in US dollars per million tokens, when the built-in table
 //!   ([`crate::price`]) does not know it.
 //! - `APPLICAMP_AI__WRITE__…`: the same settings for the `write` role, the
-//!   model for longer writing (CVs, letters). When it is not set, the
-//!   callers use `complete` ([`AiConfig::writer`]), so one model still runs
-//!   everything. Price it with `APPLICAMP_AI__WRITE__PRICE_IN_USD_PER_MTOK`
-//!   and `…_PRICE_OUT_…` when the built-in table does not know it.
+//!   model for longer writing (the tailored CV and its second look at what
+//!   the job wants; the cover letter stays on `complete`). When it is not
+//!   set, the callers use `complete` ([`AiConfig::writer`]), so one model
+//!   still runs everything. Price it with
+//!   `APPLICAMP_AI__WRITE__PRICE_IN_USD_PER_MTOK` and `…_PRICE_OUT_…`
+//!   whenever the built-in table does not know the model: an unknown model is
+//!   priced high, so a CV's estimate and its reservations are high too.
 //! - Spending limits in euros ([`BudgetConfig`]):
 //!   `APPLICAMP_AI__BUDGET__ACCOUNT_DAILY_EUR` (default 0.30),
 //!   `…__ACCOUNT_MONTHLY_EUR` (3), `…__INSTANCE_MONTHLY_EUR` (15), each `0`
@@ -75,8 +78,8 @@ pub const DEFAULT_USD_TO_EUR: f64 = 0.92;
 pub enum Role {
     /// Free-form generation and structuring (a CV into a profile).
     Complete,
-    /// Longer writing: CVs, letters. Falls back to `complete` when it is not
-    /// configured ([`AiConfig::writer`]).
+    /// Longer writing: the tailored CV. Falls back to `complete` when it is
+    /// not configured ([`AiConfig::writer`]).
     Write,
 }
 

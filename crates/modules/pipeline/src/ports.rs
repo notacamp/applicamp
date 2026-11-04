@@ -361,6 +361,14 @@ pub trait Neighbours: Send + Sync + 'static {
         account: Uuid,
     ) -> BoxFuture<'a, Result<Option<CvProfile>>>;
 
+    /// The languages `account` works in (their goals, as language tags), in
+    /// their order: what a CV's language choice offers first.
+    fn work_languages<'a>(
+        &'a self,
+        db: &'a PgPool,
+        account: Uuid,
+    ) -> BoxFuture<'a, Result<Vec<String>>>;
+
     /// Keep `text`, in the person's own words, as a fact on position
     /// `position` (which must still be `title` at `company`: else 409
     /// `profile_changed`) in `area` (one of Grill me's, e.g. `results`).

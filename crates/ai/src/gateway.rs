@@ -418,7 +418,7 @@ impl Gateway {
         self.config.is_configured(role)
     }
 
-    /// The role longer writing (CVs, letters) goes to: `write` when it is
+    /// The role longer writing (the tailored CV) goes to: `write` when it is
     /// configured, else `complete`.
     pub fn writer(&self) -> Role {
         self.config.writer()

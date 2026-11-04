@@ -38,7 +38,7 @@ use super::{
 use crate::features::brief::{self, Attempt};
 
 /// The most tokens the answer may take.
-const MAX_TOKENS: u32 = 3_000;
+pub(super) const MAX_TOKENS: u32 = 3_000;
 /// Longest question and fact kept, in characters.
 const MAX_QUESTION: usize = 200;
 pub(super) const MAX_PROPOSAL: usize = 300;

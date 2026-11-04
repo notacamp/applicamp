@@ -757,8 +757,9 @@ async fn run_step(
                 Next::Run(PreparationStep::Draft) => {}
                 other => return Ok(other),
             }
-            cv::draft(deps, db, account, opp, None, now).await?;
-            record(db, opp, "draft", cv::DRAFT_EUR, now).await?;
+            // What the draft's calls really cost.
+            let cost = cv::draft(deps, db, account, opp, None, now).await?;
+            record(db, opp, "draft", cost, now).await?;
             Ok(Next::Wait(WaitingOn::CvApproval))
         }
         PreparationStep::Letter => {

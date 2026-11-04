@@ -100,6 +100,7 @@ fn content(bullets: &[&str]) -> Content {
             fluency: Some("Fluent".into()),
         }],
         next_line: 10,
+        hidden_positions: vec![],
     }
 }
 

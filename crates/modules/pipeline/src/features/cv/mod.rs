@@ -2,7 +2,10 @@
 //!
 //! For an opportunity at Shortlisted or later (`/api/v1/opportunities/{id}/cv…`):
 //!
-//! - **Draft** (one model call, on a click): the model is shown the posting,
+//! - **Draft** (on a click; at most four model calls with the ones below: the
+//!   draft on the `write` role, a second try with more room only when the
+//!   first answer is cut off, the wants pass and the fix): the model is shown
+//!   the posting,
 //!   what the job wants, the company facts the person has not removed and the
 //!   profile cut into sources with ids ([`model`], [`prompt`]), and answers a
 //!   headline, a summary, positions with bullets and skills, each line citing
@@ -48,7 +51,7 @@ pub mod versions;
 pub mod view;
 pub mod wants;
 
-use applicamp_ai::Role;
+use applicamp_ai::{Gateway, Role};
 use applicamp_kernel::{
     AppState, Error, Job, JobContext, JobError, Problem, Result, auth::SignedIn, jobs,
 };
@@ -80,10 +83,10 @@ use crate::{
 pub const CAP_PER_OPPORTUNITY: i64 = 10;
 /// Drafts one account can start in a UTC day.
 pub const CAP_PER_DAY: i64 = 20;
-/// About what a draft costs, in euros, at its worst on the default models:
-/// the draft's call and the wants pass on the `write` role, and the app's fix
-/// round after them (up to 10,000, 3,000 and 3,000 tokens).
-pub const DRAFT_EUR: f64 = 0.01;
+/// What a draft costs at its worst, in euros, when no model is set up to
+/// price it (see [`draft_eur`]); and what a draft made before costs were
+/// kept is taken to have cost.
+pub const DRAFT_EUR: f64 = 0.015;
 /// How long a draft nobody approves is kept after its last change.
 pub const LIFETIME: TimeDelta = TimeDelta::days(7);
 /// How long a CV just approved can be put back as a draft (Undo); the cover
@@ -191,14 +194,18 @@ pub struct Cv {
     /// The app is getting this CV ready by itself right now (reading the
     /// company or writing the draft): the page waits for it.
     pub writing: bool,
+    /// The languages the person works in (their goals), in their order: what
+    /// the CV's language choice offers first.
+    pub work_languages: Vec<String>,
 }
 
 /// What to make a draft of.
 #[derive(Debug, Clone, Default, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CvDraftRequest {
-    /// A language tag such as `pt-PT`; the posting's when it says, else
-    /// English.
+    /// A language tag such as `pt-PT`; when left out, the first language the
+    /// person works in (their goals), else one their profile says they speak
+    /// well enough, else English. The posting's is only offered.
     #[serde(default)]
     pub language: Option<String>,
 }
@@ -546,6 +553,10 @@ async fn build(
         Some(ai) => ai.spend(db, account, now).await?,
         None => applicamp_ai::Spend::default(),
     };
+    let work_languages = match deps.neighbours.as_deref() {
+        Some(neighbours) => neighbours.work_languages(db, account).await?,
+        None => Vec::new(),
+    };
     Ok(Cv {
         opportunity_id: opp.id,
         draft,
@@ -561,7 +572,7 @@ async fn build(
             month_eur: spend.month_eur,
             month_limit_eur: spend.month_limit_eur,
         },
-        draft_eur: DRAFT_EUR,
+        draft_eur: deps.ai.as_ref().map_or(DRAFT_EUR, draft_eur),
         next: next.map(|(queued,)| CvNext {
             step: "letter".to_owned(),
             eur: letter::DRAFT_EUR,
@@ -572,6 +583,7 @@ async fn build(
         company_read_failure,
         read_eur: brief::COMPANY_READ_EUR,
         writing,
+        work_languages,
     })
 }
 
@@ -584,28 +596,76 @@ fn neighbours(deps: &PipelineDeps) -> Result<&dyn Neighbours> {
 /// The `max_tokens` a draft is given, then given again when it is cut off.
 const DRAFT_BUDGETS: [u32; 2] = [6_000, 10_000];
 
-/// Fluencies that are enough to write a CV in.
-const WORKING: &[&str] = &[
+/// The prompt tokens a draft's call is taken to need at worst (the
+/// instructions, the posting cut to 8,000 characters, what the job wants,
+/// the company's facts and the profile cut into sources), and a wants pass's
+/// or a fix's.
+const DRAFT_PROMPT_TOKENS: u64 = 8_000;
+const PASS_PROMPT_TOKENS: u64 = 4_000;
+
+/// What a draft can cost at its worst, in euros, at the gateway's prices:
+/// the draft on the `write` role and its second try with more room, the
+/// wants pass on the same role, and the fix on `complete`. What "Draft the
+/// CV" says it costs; a model the price table does not know is priced high.
+pub fn draft_eur(gateway: &Gateway) -> f64 {
+    let (Some(write), Some(complete)) = (
+        gateway.price(gateway.writer()),
+        gateway.price(Role::Complete),
+    ) else {
+        return DRAFT_EUR;
+    };
+    let usd = DRAFT_BUDGETS
+        .iter()
+        .map(|&out| write.cost(DRAFT_PROMPT_TOKENS, u64::from(out)))
+        .sum::<f64>()
+        + write.cost(PASS_PROMPT_TOKENS, u64::from(wants::MAX_TOKENS))
+        + complete.cost(PASS_PROMPT_TOKENS, u64::from(fix::MAX_TOKENS));
+    usd * gateway.usd_to_eur()
+}
+
+/// Fluencies of a first language, as profiles and LinkedIn write them
+/// (after " proficiency" is taken off).
+const NATIVE: &[&str] = &[
     "native",
-    "fluent",
-    "professional",
-    "full professional",
+    "native or bilingual",
     "bilingual",
-    "c1",
-    "c2",
+    "native speaker",
     "nativo",
     "nativa",
-    "fluente",
-    "fluido",
-    "fluida",
     "natif",
-    "native speaker",
-    "courant",
+    "native language",
     "materna",
     "langue maternelle",
     "língua materna",
     "lengua materna",
 ];
+
+/// Fluencies that are enough to write a CV in, short of a first language.
+const WORKING: &[&str] = &[
+    "fluent",
+    "professional",
+    "full professional",
+    "c1",
+    "c2",
+    "fluente",
+    "fluido",
+    "fluida",
+    "courant",
+];
+
+/// How well a fluency writes a CV: 2 for a first language, 1 for a working
+/// one, none for less.
+fn fluency_rank(fluency: &str) -> Option<u8> {
+    let fluency = fluency.trim().to_lowercase();
+    let fluency = fluency.trim_end_matches(" proficiency").trim();
+    if NATIVE.contains(&fluency) {
+        Some(2)
+    } else if WORKING.contains(&fluency) {
+        Some(1)
+    } else {
+        None
+    }
+}
 
 /// The language tag of a language's name, for the CV's languages.
 fn tag_of_name(name: &str) -> Option<&'static str> {
@@ -620,7 +680,8 @@ fn tag_of_name(name: &str) -> Option<&'static str> {
 
 /// The language a draft is written in: the one asked for, else the first
 /// the person works in (their goals), else a language their profile says
-/// they speak well enough, else English. The posting's is only offered.
+/// they speak well enough (a first language before a working one), else
+/// English. The posting's is only offered.
 fn language_of(asked: Option<&str>, profile: &CvProfile) -> String {
     brief::prompt::language(asked)
         .or_else(|| {
@@ -630,19 +691,20 @@ fn language_of(asked: Option<&str>, profile: &CvProfile) -> String {
                 .find_map(|tag| brief::prompt::language(Some(tag)))
         })
         .or_else(|| {
-            profile.languages.iter().find_map(|l| {
-                let fluency = l
-                    .fluency
-                    .as_deref()
-                    .unwrap_or_default()
-                    .trim()
-                    .to_lowercase();
-                WORKING
-                    .contains(&fluency.as_str())
-                    .then(|| tag_of_name(&l.language))
-                    .flatten()
-                    .map(str::to_owned)
-            })
+            // A first language before a working one, else the profile's order.
+            let mut best: Option<(u8, &'static str)> = None;
+            for l in &profile.languages {
+                let Some(rank) = fluency_rank(l.fluency.as_deref().unwrap_or_default()) else {
+                    continue;
+                };
+                let Some(tag) = tag_of_name(&l.language) else {
+                    continue;
+                };
+                if best.is_none_or(|(had, _)| rank > had) {
+                    best = Some((rank, tag));
+                }
+            }
+            best.map(|(_, tag)| tag.to_owned())
         })
         .unwrap_or_else(|| "en".to_owned())
 }
@@ -909,7 +971,10 @@ pub async fn get(
 
 /// Draft a CV for this job.
 ///
-/// **One model call.** From the posting, what the job wants, the company
+/// **Up to four model calls**: the draft on the `write` role (again with more
+/// room only when its answer is cut off), the second look at what the job
+/// wants, and the app's fix of what the check flags. From the posting, what
+/// the job wants, the company
 /// facts not removed and the profile; each line cites the profile sources it
 /// comes from, and the server then checks that it says nothing they do not.
 /// The model never sees a name or contact details. Needs the opportunity at
@@ -977,8 +1042,9 @@ pub async fn create(
     Ok(Json(build(&deps, db, account, &opp, now).await?))
 }
 
-/// Make a draft of `id`'s CV (**one model call**), with the same checks and
+/// Make a draft of `id`'s CV (**up to four model calls**), with the same checks and
 /// caps as "Draft the CV": the endpoint's and the preparation's one way in.
+/// What its calls cost, in euros.
 pub(crate) async fn draft(
     deps: &PipelineDeps,
     db: &PgPool,
@@ -986,7 +1052,7 @@ pub(crate) async fn draft(
     id: Uuid,
     language: Option<&str>,
     now: DateTime<Utc>,
-) -> Result<()> {
+) -> Result<f64> {
     let opp = load(db, account, id).await?;
     if opp.stage == "found" {
         return Err(Error::Conflict(
@@ -1162,7 +1228,7 @@ pub(crate) async fn draft(
         now,
     )
     .await;
-    Ok(())
+    Ok(cost_eur)
 }
 
 /// Change one line of a draft.
@@ -1258,7 +1324,11 @@ pub async fn change_line(
                 if let Some(role) = content.experience.get_mut(r) {
                     role.bullets.remove(b);
                     if role.bullets.is_empty() {
+                        // Its last line gone: the person took the position
+                        // off, so "Earlier" does not name it either.
+                        let position = role.position;
                         content.experience.remove(r);
+                        content.hide_position(position);
                     }
                 }
             }
@@ -1623,6 +1693,69 @@ pub async fn put_back(
             ));
         }
     }
+    // A position back on the CV is no longer taken off.
+    let shown: Vec<usize> = content.experience.iter().map(|r| r.position).collect();
+    content.hidden_positions.retain(|p| !shown.contains(p));
+    recheck_and_save(&state, &deps, account, &opp, &row, &content, frame, now).await
+}
+
+/// A position to take off the CV.
+#[derive(Debug, Clone, Default, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct HidePositionRequest {
+    /// A position the CV names under "Earlier" (its place in the profile's
+    /// `work`).
+    pub position: u32,
+}
+
+/// Take a position off "Earlier".
+///
+/// The position is no longer named under "Earlier", in the PDF or on the
+/// page. It stays among what the CV left out, and putting it back shows it
+/// again. The preview is made again. No model call. Only a draft can change.
+#[utoipa::path(
+    post,
+    path = "/api/v1/opportunities/{id}/cv/drafts/{n}/hide-position",
+    tag = "pipeline",
+    operation_id = "pipeline.cv_hide_position",
+    security(("session" = [])),
+    params(("id" = Uuid, Path, description = "The opportunity."),
+        ("n" = u32, Path, description = "The draft.")),
+    request_body = HidePositionRequest,
+    responses(
+        (status = 200, description = "The CV, without that position.", body = Cv),
+        (status = 400, description = "`invalid_request`", body = Problem,
+            content_type = "application/problem+json"),
+        (status = 401, description = "`session_required`", body = Problem,
+            content_type = "application/problem+json"),
+        (status = 404, description = "`not_found`: no such draft or position",
+            body = Problem, content_type = "application/problem+json"),
+        (status = 409, description = "`draft_frozen`; `already_on_cv`", body = Problem,
+            content_type = "application/problem+json"),
+    ),
+)]
+pub async fn hide_position(
+    axum::extract::State(state): axum::extract::State<AppState>,
+    SignedIn(principal): SignedIn,
+    Extension(deps): Extension<PipelineDeps>,
+    Path((id, n)): Path<(Uuid, u32)>,
+    body: std::result::Result<Json<HidePositionRequest>, JsonRejection>,
+) -> Result<Json<Cv>> {
+    let request = json_body(body, "invalid_request")?;
+    let account = principal.account_id;
+    let now = state.clock.now();
+    let (opp, row) = open_draft(&state, account, id, n, now).await?;
+    let frame = &row.frame.0;
+    let mut content = row.content.0.clone();
+    let position = usize::try_from(request.position).map_err(|_| Error::NotFound)?;
+    frame.position(position).ok_or(Error::NotFound)?;
+    if content.experience.iter().any(|r| r.position == position) {
+        return Err(Error::Conflict(
+            "already_on_cv",
+            "That position has lines on the CV: remove them instead.".to_owned(),
+        ));
+    }
+    content.hide_position(position);
     recheck_and_save(&state, &deps, account, &opp, &row, &content, frame, now).await
 }
 

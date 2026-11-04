@@ -2,7 +2,7 @@
 //!
 //! Every model call goes through [`Gateway`] by **role**, never by vendor:
 //! [`Role::Complete`] (structuring, short answers) and [`Role::Write`]
-//! (longer writing: CVs, letters; `complete` serves it when it is not set),
+//! (longer writing: the tailored CV; `complete` serves it when it is not set),
 //! each served by any provider speaking the OpenAI-compatible chat
 //! completions API: OpenRouter, or a self-hosted vLLM / llama.cpp / Ollama.
 //!

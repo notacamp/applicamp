@@ -226,6 +226,19 @@ fn year(date: Option<&str>) -> Option<&str> {
 }
 
 /// A position the CV leaves out, by name: "Title, Company (2015–2017)".
+/// The "Earlier" lines of `content`, newest first, each with its position:
+/// what the PDF prints and the page shows.
+pub fn earlier_lines(
+    content: &crate::features::cv::model::Content,
+    frame: &crate::features::cv::model::Frame,
+) -> Vec<(usize, String)> {
+    content
+        .earlier(frame)
+        .into_iter()
+        .filter_map(|p| earlier_line(p).map(|line| (p.index, line)))
+        .collect()
+}
+
 fn earlier_line(position: &crate::features::cv::model::PositionInfo) -> Option<String> {
     let head = [position.title.as_deref(), position.company.as_deref()]
         .into_iter()
@@ -363,14 +376,11 @@ pub fn prepare(content: &Content, frame: &Frame, language: &str) -> Result<Prepa
     }
 
     // The positions the CV leaves out, by name only: no text of the model's,
-    // nothing to check.
-    let mut left_out: Vec<&crate::features::cv::model::PositionInfo> = frame
-        .positions
-        .iter()
-        .filter(|p| !content.experience.iter().any(|r| r.position == p.index))
+    // nothing to check. Never one the person took off.
+    let earlier: Vec<String> = earlier_lines(content, frame)
+        .into_iter()
+        .map(|(_, line)| line)
         .collect();
-    left_out.sort_by_key(|p| std::cmp::Reverse(crate::features::cv::model::started(Some(p))));
-    let earlier: Vec<String> = left_out.into_iter().filter_map(earlier_line).collect();
     if !earlier.is_empty() {
         expect.headings.push(labels.earlier.to_owned());
         for (i, line) in earlier.iter().enumerate() {

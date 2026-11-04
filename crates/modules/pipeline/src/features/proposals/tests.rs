@@ -221,3 +221,50 @@ async fn the_daily_cv_cap_holds_the_app_back(db: PgPool) {
         0
     );
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_posting_that_has_closed_is_never_shortlisted(db: PgPool) {
+    let s = stack(db).await;
+    *s.fake.autonomy.lock().unwrap() = Some(Autonomy::Prepare);
+    // The best match closed yesterday.
+    sqlx::query(
+        "UPDATE pipeline.opportunities SET expires_at = now() - interval '1 day'
+          WHERE match_score = 92",
+    )
+    .execute(&s.h.db)
+    .await
+    .unwrap();
+    assert_eq!(
+        shortlist(&s.deps, &s.h.db, s.h.account, Utc::now())
+            .await
+            .unwrap(),
+        3
+    );
+    let mut scores: Vec<i32> = sqlx::query_scalar(
+        "SELECT match_score FROM pipeline.opportunities WHERE shortlisted_by = 'app'",
+    )
+    .fetch_all(&s.h.db)
+    .await
+    .unwrap();
+    scores.sort_unstable();
+    assert_eq!(scores, [76, 80, 88]);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn two_searches_ending_at_once_shortlist_three_at_most(db: PgPool) {
+    let s = stack(db).await;
+    *s.fake.autonomy.lock().unwrap() = Some(Autonomy::Prepare);
+    let now = Utc::now();
+    let (first, second) = tokio::join!(
+        shortlist(&s.deps, &s.h.db, s.h.account, now),
+        shortlist(&s.deps, &s.h.db, s.h.account, now),
+    );
+    assert_eq!(first.unwrap() + second.unwrap(), 3);
+    let app: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM pipeline.opportunities WHERE shortlisted_by = 'app'",
+    )
+    .fetch_one(&s.h.db)
+    .await
+    .unwrap();
+    assert_eq!(app, 3);
+}

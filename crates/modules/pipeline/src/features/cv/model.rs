@@ -499,9 +499,36 @@ pub struct Content {
     pub languages: Vec<LanguageItem>,
     /// The next number of a line id (`l<n>`).
     pub next_line: u32,
+    /// Positions the person took off the CV (its last line removed, or
+    /// removed from "Earlier"): named nowhere, not even under "Earlier",
+    /// until put back.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hidden_positions: Vec<usize>,
 }
 
 impl Content {
+    /// Take position `index` off the CV.
+    pub fn hide_position(&mut self, index: usize) {
+        if !self.hidden_positions.contains(&index) {
+            self.hidden_positions.push(index);
+        }
+    }
+
+    /// The positions the CV names under "Earlier": the profile's positions
+    /// it shows no line of and the person did not take off, newest first.
+    pub fn earlier<'a>(&self, frame: &'a Frame) -> Vec<&'a PositionInfo> {
+        let mut earlier: Vec<&PositionInfo> = frame
+            .positions
+            .iter()
+            .filter(|p| {
+                !self.experience.iter().any(|r| r.position == p.index)
+                    && !self.hidden_positions.contains(&p.index)
+            })
+            .collect();
+        earlier.sort_by_key(|p| std::cmp::Reverse(started(Some(p))));
+        earlier
+    }
+
     /// A new line id.
     pub fn new_line_id(&mut self) -> String {
         self.next_line += 1;

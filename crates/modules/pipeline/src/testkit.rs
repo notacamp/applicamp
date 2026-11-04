@@ -170,6 +170,18 @@ impl Neighbours for Fake {
         Box::pin(async move { Ok(profile) })
     }
 
+    fn work_languages<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        _account: Uuid,
+    ) -> BoxFuture<'a, Result<Vec<String>>> {
+        let languages = lock(&self.cv_profile)
+            .as_ref()
+            .map(|p| p.work_languages.clone())
+            .unwrap_or_default();
+        Box::pin(async move { Ok(languages) })
+    }
+
     fn keep_fact<'a>(
         &'a self,
         _state: &'a AppState,

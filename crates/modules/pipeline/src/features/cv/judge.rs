@@ -86,7 +86,16 @@ pub fn judge(raw: RawCv, frame: &Frame, profile: &CvProfile) -> Option<Content> 
     content.headline = tidy(raw.headline, MAX_HEADLINE, &mut content);
     content.summary = tidy(raw.summary, MAX_SUMMARY, &mut content);
     let mut total = 0;
-    for role in raw.experience {
+    // Newest first before the cap on bullets, so the cap cuts the oldest.
+    let mut experience = raw.experience;
+    experience.sort_by_key(|role| {
+        std::cmp::Reverse(super::model::started(
+            usize::try_from(role.position)
+                .ok()
+                .and_then(|p| frame.position(p)),
+        ))
+    });
+    for role in experience {
         let Some(position) = usize::try_from(role.position)
             .ok()
             .filter(|p| frame.position(*p).is_some())

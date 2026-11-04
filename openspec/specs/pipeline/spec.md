@@ -373,9 +373,12 @@ An opportunity SHALL have at most 10 drafts and an account at most 20 drafts per
 UTC day, refused with `cv_drafts_per_opportunity_cap` and `cv_drafts_daily_cap`
 before any call; drafts made by a job's preparation count the same. A draft
 SHALL start only from a click or from the preparation of a job the person or
-the app shortlisted, and SHALL make at most three model calls: the draft, the
-second look at what the job wants, and the fix of what the check flagged; its
-cost estimate SHALL count the three at their worst. The calls SHALL go through
+the app shortlisted, and SHALL make at most four model calls: the draft, a
+second try of it with more room only when its answer is cut off, the second
+look at what the job wants, and the fix of what the check flagged. The cost a
+draft is shown to have before the click SHALL count the four at their worst at
+the configured models' prices, and a preparation SHALL record what the calls
+really cost. The calls SHALL go through
 the account and instance spending limits, and nothing SHALL be retried past a
 limit or run on a timer. Rendering a preview SHALL call no model. A draft nobody
 approved SHALL be deleted 7 days after its last change; approved versions SHALL

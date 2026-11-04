@@ -743,6 +743,14 @@ impl applicamp_pipeline::Neighbours for PipelineWiring {
         })
     }
 
+    fn work_languages<'a>(
+        &'a self,
+        db: &'a PgPool,
+        account: Uuid,
+    ) -> BoxFuture<'a, Result<Vec<String>>> {
+        Box::pin(matching::languages_for_work(db, account))
+    }
+
     fn keep_fact<'a>(
         &'a self,
         state: &'a AppState,

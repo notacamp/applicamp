@@ -713,6 +713,7 @@ async fn another_accounts_opportunity_is_not_found(db: PgPool) {
         ("POST", "/drafts/1/approve", json!({})),
         ("POST", "/drafts/1/discard", json!({})),
         ("POST", "/drafts/1/unapprove", json!({})),
+        ("POST", "/drafts/1/hide-position", json!({ "position": 2 })),
         (
             "POST",
             "/drafts/1/preview",
@@ -1808,6 +1809,90 @@ async fn the_model_is_shown_everything_and_the_cv_reads_newest_first_with_the_re
         "{}",
         read.text
     );
+    // The page shows the same line.
+    assert_eq!(
+        d["earlier"],
+        json!([{ "position": 2, "text": "Junior Developer, Tiny Co (2015–2017)" }])
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_position_taken_off_is_named_nowhere_until_it_is_put_back(db: PgPool) {
+    let s = stack(db).await;
+    draft(&s).await;
+    let hide = url(&s.opp, "/drafts/1/hide-position");
+    // A position with lines on the CV is not taken off this way.
+    let (status, body) = s.h.json("POST", &hide, &json!({ "position": 0 })).await;
+    assert_eq!(status, StatusCode::CONFLICT, "{body}");
+    assert_eq!(body["code"], "already_on_cv");
+    let (status, _) = s.h.json("POST", &hide, &json!({ "position": 9 })).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+
+    // Off "Earlier", in the PDF and on the page; still among what was left out.
+    let (status, cv) = s.h.json("POST", &hide, &json!({ "position": 2 })).await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    assert_eq!(cv["draft"]["earlier"], json!([]));
+    assert!(
+        cv["draft"]["left_out"]["roles"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["position"] == 2)
+    );
+    let (_, _, bytes) = s.h.get_raw(&url(&s.opp, "/drafts/1/preview.pdf")).await;
+    let read = super::pdf::readback::extract(&bytes).unwrap();
+    assert!(!read.text.contains("Tiny Co"), "{}", read.text);
+
+    // Its last line removed, a position is taken off too.
+    let second: Vec<String> = cv["draft"]["experience"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["position"] == 1)
+        .unwrap()["bullets"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|b| b["id"].as_str().unwrap().to_owned())
+        .collect();
+    let mut cv = cv;
+    for id in second {
+        let (status, next) =
+            s.h.json(
+                "PATCH",
+                &url(&s.opp, &format!("/drafts/1/lines/{id}")),
+                &json!({ "remove": true }),
+            )
+            .await;
+        assert_eq!(status, StatusCode::OK, "{next}");
+        cv = next;
+    }
+    assert_eq!(cv["draft"]["earlier"], json!([]), "{}", cv["draft"]);
+
+    // Put back, it is on the CV again.
+    let (status, cv) =
+        s.h.json(
+            "POST",
+            &url(&s.opp, "/drafts/1/put-back"),
+            &json!({ "position": 2 }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    assert!(
+        cv["draft"]["experience"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["position"] == 2)
+    );
+    let hidden: Vec<i64> = sqlx::query_scalar(
+        "SELECT (jsonb_array_elements(content -> 'hidden_positions'))::bigint
+           FROM pipeline.cv_drafts WHERE status = 'draft'",
+    )
+    .fetch_all(&s.h.db)
+    .await
+    .unwrap();
+    assert_eq!(hidden, [1], "only the one still off the CV");
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -1947,4 +2032,32 @@ async fn a_site_that_asks_apps_not_to_read_it_is_said_and_what_it_says_can_be_pa
         .json("POST", &paste, &json!({ "text": "Anything" }))
         .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[test]
+fn with_no_language_for_work_a_first_language_comes_before_a_working_one() {
+    let mut p = profile();
+    p.work_languages = vec![];
+    // As LinkedIn writes them.
+    p.languages = vec![
+        CvLanguage {
+            language: "English".into(),
+            fluency: Some("Full professional proficiency".into()),
+        },
+        CvLanguage {
+            language: "Portuguese".into(),
+            fluency: Some("Native or bilingual proficiency".into()),
+        },
+    ];
+    assert_eq!(super::language_of(None, &p), "pt-PT");
+    p.languages.truncate(1);
+    assert_eq!(super::language_of(None, &p), "en");
+    // Not enough to write a CV in: English, the default.
+    p.languages = vec![CvLanguage {
+        language: "French".into(),
+        fluency: Some("Elementary proficiency".into()),
+    }];
+    assert_eq!(super::language_of(None, &p), "en");
+    // What the person asked for wins.
+    assert_eq!(super::language_of(Some("fr"), &p), "fr");
 }

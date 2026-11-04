@@ -177,6 +177,15 @@ pub struct LanguageView {
     pub fluency: Option<String>,
 }
 
+/// A position the CV names only, under "Earlier", as the PDF prints it.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct EarlierLine {
+    /// For `…/hide-position` and `…/put-back`.
+    pub position: u32,
+    /// "Title, Company (2015–2017)".
+    pub text: String,
+}
+
 /// A position that is not on the CV.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct LeftOutRole {
@@ -308,6 +317,10 @@ pub struct CvDraftView {
     pub education: Vec<EducationView>,
     pub languages: Vec<LanguageView>,
     pub left_out: LeftOut,
+    /// The positions named under "Earlier", newest first, as in the PDF:
+    /// every one left out that has a title or a company and that the person
+    /// did not take off.
+    pub earlier: Vec<EarlierLine>,
     /// How many lines (and skills) cannot be traced to the profile.
     pub flagged: u32,
     /// The first of them, as the page shows them.
@@ -846,6 +859,13 @@ pub fn draft_view(
             })
             .collect(),
         left_out,
+        earlier: super::pdf::data::earlier_lines(content, frame)
+            .into_iter()
+            .map(|(position, text)| EarlierLine {
+                position: to_u32(position),
+                text,
+            })
+            .collect(),
         flagged: to_u32(flagged_ids.len()),
         first_flagged: flagged_ids.first().cloned(),
         can_approve: draft && flagged_ids.is_empty(),

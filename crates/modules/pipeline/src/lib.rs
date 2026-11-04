@@ -106,6 +106,7 @@ pub fn module(deps: PipelineDeps) -> Module {
         .routes(routes!(cv::change_line))
         .routes(routes!(cv::confirm_line))
         .routes(routes!(cv::put_back))
+        .routes(routes!(cv::hide_position))
         .routes(routes!(cv::preview::make))
         .routes(routes!(cv::preview::pdf_file))
         .routes(routes!(cv::approve))

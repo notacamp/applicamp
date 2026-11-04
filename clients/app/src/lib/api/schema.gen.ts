@@ -938,7 +938,8 @@ export interface paths {
          * @description `{proposal: true}` keeps the fact the app proposed for a flagged line
          *     (its question's, else the line's own words) on the line's position as a
          *     **confirmed assumption**, based on this CV draft; refused
-         *     (`cannot_keep`) for a company fact used as an achievement. `{text}`
+         *     (`cannot_keep`) for a company fact used as an achievement, another job's
+         *     line, or one longer than a fact (its `waiting` item says which). `{text}`
          *     keeps the person's own words as a fact (its `quote` is the text; `area`
          *     defaults to `results`), as Grill me's Keep does. Either way the line is
          *     checked again with that fact as a source (and none another position's or
@@ -963,12 +964,13 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * See the draft in another layout.
+         * See the draft in another layout, or make its PDF again.
          * @description Renders the draft's text with the `template` and `length` asked for (what
          *     the preview has when left out) and keeps it as its preview. **No model
          *     call.** What the read-back finds is a note, never a refusal. Refused when
          *     it does not fit the length (`cv_doesnt_fit`): the preview stays as it was.
-         *     Only a draft has a preview to change.
+         *     Only a draft has a preview to change. At most 30 a day per account
+         *     (`cv_previews_daily_cap`).
          */
         post: operations["pipeline.cv_preview"];
         delete?: never;
@@ -2935,16 +2937,16 @@ export interface components {
             allowed: boolean;
             reason?: components["schemas"]["LetterBlocked"] | null;
         };
-        /** @description A careers page (or a link to a job board) someone pasted. */
-        CareersPage: {
-            /** @description Its address. */
-            url: string;
-        };
         /**
          * @description Why "Yes, keep it" is not offered for a flagged line.
          * @enum {string}
          */
         CannotKeep: "company" | "other_position" | "too_long";
+        /** @description A careers page (or a link to a job board) someone pasted. */
+        CareersPage: {
+            /** @description Its address. */
+            url: string;
+        };
         /** @description The least they would take, before tax. */
         CashFloor: {
             /**
@@ -5562,14 +5564,15 @@ export interface components {
             /**
              * @description What "Yes, keep it" (`{proposal: true}`) keeps on the profile: the
              *     app's sentence, else the line's own words, or the skill. None when it
-             *     cannot be kept (a company fact used as an achievement).
+             *     cannot be kept (`cannot_keep` says why).
              */
             proposal?: string | null;
             /** @description The app's own question about it, when it asked one. */
             question?: string | null;
             /**
              * @description The person's own words the line was made from, as the profile has
-             *     them: what "Change it" starts from. None when it cites none.
+             *     them on that position: what "Change it" starts from. None when it
+             *     cites none.
              */
             quote?: string | null;
             /** @description "Title · Company" of the position a kept fact lands on. */
@@ -8103,6 +8106,15 @@ export interface operations {
             };
             /** @description `draft_frozen`; `cv_doesnt_fit` */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `cv_previews_daily_cap` */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

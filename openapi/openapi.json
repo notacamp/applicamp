@@ -3277,7 +3277,7 @@
           "pipeline"
         ],
         "summary": "\"Yes, keep it\", or \"It's true\" in the person's words.",
-        "description": "`{proposal: true}` keeps the fact the app proposed for a flagged line\n(its question's, else the line's own words) on the line's position as a\n**confirmed assumption**, based on this CV draft; refused\n(`cannot_keep`) for a company fact used as an achievement. `{text}`\nkeeps the person's own words as a fact (its `quote` is the text; `area`\ndefaults to `results`), as Grill me's Keep does. Either way the line is\nchecked again with that fact as a source (and none another position's or\na company's), and the preview is made again. For a skill it adds the\nskill to the profile instead. A summary or headline puts the fact on the\nmost recent position. No model call.",
+        "description": "`{proposal: true}` keeps the fact the app proposed for a flagged line\n(its question's, else the line's own words) on the line's position as a\n**confirmed assumption**, based on this CV draft; refused\n(`cannot_keep`) for a company fact used as an achievement, another job's\nline, or one longer than a fact (its `waiting` item says which). `{text}`\nkeeps the person's own words as a fact (its `quote` is the text; `area`\ndefaults to `results`), as Grill me's Keep does. Either way the line is\nchecked again with that fact as a source (and none another position's or\na company's), and the preview is made again. For a skill it adds the\nskill to the profile instead. A summary or headline puts the fact on the\nmost recent position. No model call.",
         "operationId": "pipeline.cv_confirm",
         "parameters": [
           {
@@ -3385,8 +3385,8 @@
         "tags": [
           "pipeline"
         ],
-        "summary": "See the draft in another layout.",
-        "description": "Renders the draft's text with the `template` and `length` asked for (what\nthe preview has when left out) and keeps it as its preview. **No model\ncall.** What the read-back finds is a note, never a refusal. Refused when\nit does not fit the length (`cv_doesnt_fit`): the preview stays as it was.\nOnly a draft has a preview to change.",
+        "summary": "See the draft in another layout, or make its PDF again.",
+        "description": "Renders the draft's text with the `template` and `length` asked for (what\nthe preview has when left out) and keeps it as its preview. **No model\ncall.** What the read-back finds is a note, never a refusal. Refused when\nit does not fit the length (`cv_doesnt_fit`): the preview stays as it was.\nOnly a draft has a preview to change. At most 30 a day per account\n(`cv_previews_daily_cap`).",
         "operationId": "pipeline.cv_preview",
         "parameters": [
           {
@@ -3464,6 +3464,16 @@
           },
           "409": {
             "description": "`draft_frozen`; `cv_doesnt_fit`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`cv_previews_daily_cap`",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -9492,6 +9502,15 @@
           }
         }
       },
+      "CannotKeep": {
+        "type": "string",
+        "description": "Why \"Yes, keep it\" is not offered for a flagged line.",
+        "enum": [
+          "company",
+          "other_position",
+          "too_long"
+        ]
+      },
       "CareersPage": {
         "type": "object",
         "description": "A careers page (or a link to a job board) someone pasted.",
@@ -10723,7 +10742,8 @@
         "type": "object",
         "description": "What the preview of a draft is, as the review page shows it.",
         "required": [
-          "ready"
+          "ready",
+          "stale"
         ],
         "properties": {
           "at": {
@@ -10773,6 +10793,10 @@
           "ready": {
             "type": "boolean",
             "description": "There is a PDF to show (`…/preview.pdf`)."
+          },
+          "stale": {
+            "type": "boolean",
+            "description": "The PDF was made before the draft's last change: \"Make the PDF\"\n(`POST …/preview`) makes it again."
           },
           "template": {
             "oneOf": [
@@ -16035,6 +16059,17 @@
           "flags"
         ],
         "properties": {
+          "cannot_keep": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CannotKeep",
+                "description": "Why \"Yes, keep it\" is not offered: `company` (it is about the\ncompany), `other_position` (another job's line), `too_long` (longer\nthan a fact the profile keeps). None when it is."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "company": {
             "type": [
               "string",
@@ -16061,7 +16096,7 @@
               "string",
               "null"
             ],
-            "description": "What \"Yes, keep it\" (`{proposal: true}`) keeps on the profile: the\napp's sentence, else the line's own words, or the skill. None when it\ncannot be kept (a company fact used as an achievement)."
+            "description": "What \"Yes, keep it\" (`{proposal: true}`) keeps on the profile: the\napp's sentence, else the line's own words, or the skill. None when it\ncannot be kept (`cannot_keep` says why)."
           },
           "question": {
             "type": [
@@ -16075,7 +16110,7 @@
               "string",
               "null"
             ],
-            "description": "The person's own words the line was made from, as the profile has\nthem: what \"Change it\" starts from. None when it cites none."
+            "description": "The person's own words the line was made from, as the profile has\nthem on that position: what \"Change it\" starts from. None when it\ncites none."
           },
           "role": {
             "type": [

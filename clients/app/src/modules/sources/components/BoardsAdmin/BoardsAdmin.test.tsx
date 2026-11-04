@@ -145,8 +145,14 @@ describe("the job boards admin page", () => {
     renderWithProviders(<BoardsAdmin back={null} />);
     const user = userEvent.setup();
     const all = await screen.findByTestId("boards-admin-all");
-    await user.click(within(all).getAllByTestId("boards-admin-open")[0] as HTMLElement);
+    const [first] = within(all).getAllByTestId("boards-admin-open");
+    if (first === undefined) {
+      throw new Error("no board in the table");
+    }
+    await user.click(first);
     await user.click(await screen.findByTestId("boards-admin-stop"));
-    expect(screen.getByRole("button", { name: "Stop reading" })).toBeInTheDocument();
+    expect(screen.getByTestId("boards-admin-stop-confirm")).toHaveTextContent(
+      "Stop reading Himalayas? Searches will no longer use it.",
+    );
   });
 });

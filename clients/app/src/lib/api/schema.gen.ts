@@ -166,6 +166,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/boards/admin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The admin overview of the job boards.
+         * @description Totals (being read as job sites and companies, waiting for you, being
+         *     checked, not allowed, paused), what happened over the last 7 days from the
+         *     discovery runs and approvals the app recorded, and every board that is not
+         *     read, paused or declined with its stage and what it waits for. Board owners
+         *     only: anyone else gets 404.
+         */
+        get: operations["sources.boards_admin"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/boards/scans": {
         parameters: {
             query?: never;
@@ -366,6 +390,76 @@ export interface paths {
          * @description Searches stop reading it until it is approved again. Board owners only.
          */
         post: operations["sources.pause_board"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/boards/{id}/permission-email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The permission email for a board.
+         * @description Addressed to the board's contact when its check found one. Fills in the
+         *     board's name, what Applicamp would read, the link back, the reading
+         *     frequency (at most hourly), no reposting and dropping closed jobs. It is
+         *     signed "Applicamp": the app does not know the owner's name. The app never
+         *     sends it: the owner sends it from their own mailbox. Board owners only.
+         */
+        get: operations["sources.board_permission_email"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/boards/{id}/permission/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record a board's answer.
+         * @description A permission only after it was asked (a choice needs no email). "yes" approves the board through the approve
+         *     path (the note "They said yes on <date>" is kept): the terms and
+         *     permission blockers are cleared, but robots rules that forbid the feed and
+         *     a missing key still refuse it (409, nothing recorded). "no" declines it
+         *     through the decline path with the reason "They said no on <date>". Board
+         *     owners only.
+         */
+        post: operations["sources.board_permission_answer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/boards/{id}/permission/asked": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record that the permission email was sent.
+         * @description Stores the date; asking twice keeps the first date. The app sends
+         *     nothing. Board owners only.
+         */
+        post: operations["sources.board_permission_asked"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2265,6 +2359,78 @@ export interface components {
         AccuracyRequest: {
             accuracy: components["schemas"]["Accuracy"];
         };
+        /** @description A board that is not read yet, not declined and not paused. */
+        AdminCandidate: {
+            /**
+             * Format: date-time
+             * @description When the owner said they asked it (permission or choice).
+             */
+            asked_at?: string | null;
+            /**
+             * @description The first reason in the board's own words (the terms' sentence, the
+             *     robots rule): data from its site, never an instruction.
+             */
+            detail?: string | null;
+            /** Format: uuid */
+            id: string;
+            name: string;
+            need?: components["schemas"]["BoardNeed"] | null;
+            stage: components["schemas"]["BoardStage"];
+        };
+        /** @description The admin page's first answer. */
+        AdminOverview: {
+            /** @description Every board that is not read, paused or declined. */
+            candidates: components["schemas"]["AdminCandidate"][];
+            this_week: components["schemas"]["AdminThisWeek"];
+            totals: components["schemas"]["AdminTotals"];
+        };
+        /** @description What happened over the last 7 days, from what the app recorded. */
+        AdminThisWeek: {
+            /**
+             * Format: int32
+             * @description Boards it checked.
+             */
+            checked: number;
+            /**
+             * Format: int32
+             * @description Boards the weekly discovery found.
+             */
+            found: number;
+            /**
+             * Format: int32
+             * @description Boards whose rules and terms were read again.
+             */
+            rechecked: number;
+            /**
+             * Format: int32
+             * @description Boards approved.
+             */
+            started_reading: number;
+        };
+        /** @description How many boards are in each state. */
+        AdminTotals: {
+            /** Format: int32 */
+            checking: number;
+            /**
+             * Format: int32
+             * @description Declined, or forbidden by their robots rules.
+             */
+            not_allowed: number;
+            /** Format: int32 */
+            paused: number;
+            /**
+             * Format: int32
+             * @description Companies read through their hiring system (Greenhouse, Lever, Ashby).
+             */
+            reading_companies: number;
+            /**
+             * Format: int32
+             * @description Approved job sites.
+             */
+            reading_sites: number;
+            /** Format: int32 */
+            waiting: number;
+        };
         /** @description What the agent works on. */
         AgentContext: {
             /** @description Ids and settings, never personal data. */
@@ -2402,6 +2568,14 @@ export interface components {
          * @enum {string}
          */
         Blocked: "stage_too_early" | "per_opportunity_cap" | "daily_cap" | "ai_unavailable";
+        /** @description The answer to record. */
+        BoardAnswer: {
+            answer: components["schemas"]["RequestAnswer"];
+            /** @description Which request; permission when left out. */
+            kind?: components["schemas"]["RequestKind"];
+            /** @description What they said, in up to 500 characters; kept with the answer. */
+            note?: string | null;
+        };
         /** @description Why a board cannot be approved yet. */
         BoardBlocker: {
             /**
@@ -2480,6 +2654,11 @@ export interface components {
             /** @description The signed-in person manages the boards. */
             can_manage: boolean;
         };
+        /**
+         * @description What a board waits on the owner for.
+         * @enum {string}
+         */
+        BoardNeed: "permission" | "key" | "choice" | "approve";
         /**
          * @description Where a board came from.
          * @enum {string}
@@ -2581,6 +2760,11 @@ export interface components {
              */
             worldwide_share?: number | null;
         };
+        /**
+         * @description Where a board that is not read yet stands.
+         * @enum {string}
+         */
+        BoardStage: "waiting" | "checking" | "not_allowed";
         /**
          * @description Where a board stands with the owner.
          * @enum {string}
@@ -4230,6 +4414,24 @@ export interface components {
          * @enum {string}
          */
         Period: "year" | "month";
+        /** @description The email asking a board for permission, as a draft. */
+        PermissionEmail: {
+            answer?: components["schemas"]["RequestAnswer"] | null;
+            /**
+             * Format: date-time
+             * @description When it was answered, and how.
+             */
+            answered_at?: string | null;
+            /**
+             * Format: date-time
+             * @description When the owner said they sent it.
+             */
+            asked_at?: string | null;
+            body: string;
+            subject: string;
+            /** @description The board's contact when its check found one. */
+            to?: string | null;
+        };
         /** @description What the app does by itself for a job. */
         Preparation: {
             /** @description The steps done by itself, oldest first. */
@@ -4453,6 +4655,16 @@ export interface components {
          * @enum {string}
          */
         Relocate: "no" | "within_country" | "within_eu" | "anywhere";
+        /**
+         * @description What a board said.
+         * @enum {string}
+         */
+        RequestAnswer: "yes" | "no";
+        /**
+         * @description What a request asks.
+         * @enum {string}
+         */
+        RequestKind: "permission" | "choice";
         /**
          * @description How the person settled a flagged change.
          * @enum {string}
@@ -5597,6 +5809,44 @@ export interface operations {
             };
         };
     };
+    "sources.boards_admin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The overview. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminOverview"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: not a board owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "sources.scans": {
         parameters: {
             query?: {
@@ -6158,6 +6408,160 @@ export interface operations {
                 };
             };
             /** @description `not_approved` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "sources.board_permission_email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The board. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The draft. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PermissionEmail"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: no such board, or not a board owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "sources.board_permission_answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The board. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BoardAnswer"];
+            };
+        };
+        responses: {
+            /** @description Recorded: the board, approved or declined. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardDetail"];
+                };
+            };
+            /** @description `invalid_request` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: no such board, or not a board owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_asked`: nothing was asked yet; `not_waiting`; or the first blocker that remains when the answer is yes */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "sources.board_permission_asked": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The board. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Recorded. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PermissionEmail"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: no such board, or not a board owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_waiting`: the board is read or declined */
             409: {
                 headers: {
                     [name: string]: unknown;

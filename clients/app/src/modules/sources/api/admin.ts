@@ -28,7 +28,7 @@ export interface FinderFields {
 
 /** A board with what the finder may have added. */
 export function withFinder(board: BoardSummary): BoardSummary & FinderFields {
-  return board as BoardSummary & FinderFields;
+  return board;
 }
 
 const ADMIN_KEY = [...BOARDS_QUERY_KEY, "admin"] as const;

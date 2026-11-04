@@ -23,13 +23,8 @@ import {
   TextField,
 } from "~/lib/ui";
 
-import {
-  useAnswerRequest,
-  useMarkAsked,
-  usePermissionEmail,
-  withFinder,
-} from "../../api/admin";
-import type { AdminRow } from "../../api/adminRows";
+import { useAnswerRequest, useMarkAsked, usePermissionEmail, withFinder } from "../../api/admin";
+import type { AdminRow } from "../../api/admin-rows";
 import {
   boardErrorOf,
   type BoardErrorCode,
@@ -60,7 +55,7 @@ export function AdminPeek({ row, onClose }: AdminPeekProps) {
   const { t } = useTranslation("sources");
   const [more, setMore] = useState<string | null>(null);
   const board = useBoard(row?.board.id ?? null);
-  if (row !== undefined && more === row.board.id) {
+  if (more !== null && row?.board.id === more) {
     return (
       <BoardPeek
         id={row.board.id}
@@ -215,7 +210,9 @@ function DeclineButton({ id, name, label }: { id: string; name: string; label?: 
         >
           {t("admin.decline.sure", { name })}
         </InlineConfirm>
-        {action.isError ? <ErrorLine testId="boards-admin-decline-error" error={action.error} /> : null}
+        {action.isError ? (
+          <ErrorLine testId="boards-admin-decline-error" error={action.error} />
+        ) : null}
       </Stack>
     );
   }
@@ -331,11 +328,19 @@ function KeyDecision({ detail }: { detail: BoardDetail }) {
     return null;
   }
   const filled = key.params.every((param) => (values[param] ?? "").trim() !== "");
-  const save = async () => {
-    const body = Object.fromEntries(key.params.map((param) => [param, (values[param] ?? "").trim()]));
-    await action.mutateAsync({ kind: "key", values: body });
-    await action.mutateAsync({ kind: "check" });
-    setValues({});
+  const save = () => {
+    const body = Object.fromEntries(
+      key.params.map((param) => [param, (values[param] ?? "").trim()]),
+    );
+    action.mutate(
+      { kind: "key", values: body },
+      {
+        onSuccess: () => {
+          setValues({});
+          action.mutate({ kind: "check" });
+        },
+      },
+    );
   };
   return (
     <Section
@@ -383,9 +388,7 @@ function KeyDecision({ detail }: { detail: BoardDetail }) {
             icon="check"
             disabled={!filled || action.isPending}
             data-testid="boards-admin-key-save"
-            onClick={() => {
-              void save().catch(() => undefined);
-            }}
+            onClick={save}
           >
             {t("admin.key.save")}
           </Button>
@@ -491,7 +494,9 @@ function CheckingDecision({ row }: { row: AdminRow }) {
             {t("admin.reading.check")}
           </Button>
         </Cluster>
-        {action.isError ? <ErrorLine testId="boards-admin-check-error" error={action.error} /> : null}
+        {action.isError ? (
+          <ErrorLine testId="boards-admin-check-error" error={action.error} />
+        ) : null}
       </Stack>
     </Section>
   );
@@ -572,21 +577,25 @@ function ReadingDecision({ row }: { row: AdminRow }) {
           </Button>
         </Cluster>
         {stopping ? (
-          <InlineConfirm
-            confirmLabel={t("admin.reading.stopConfirm")}
-            cancelLabel={t("admin.cancel")}
-            busy={action.isPending}
-            onConfirm={() => {
-              run({ kind: "decline", reason: DECLINED_HERE });
-            }}
-            onCancel={() => {
-              setStopping(false);
-            }}
-          >
-            {t("admin.reading.stopSure", { name: row.board.name })}
-          </InlineConfirm>
+          <Tagged testId="boards-admin-stop-confirm">
+            <InlineConfirm
+              confirmLabel={t("admin.reading.stopConfirm")}
+              cancelLabel={t("admin.cancel")}
+              busy={action.isPending}
+              onConfirm={() => {
+                run({ kind: "decline", reason: DECLINED_HERE });
+              }}
+              onCancel={() => {
+                setStopping(false);
+              }}
+            >
+              {t("admin.reading.stopSure", { name: row.board.name })}
+            </InlineConfirm>
+          </Tagged>
         ) : null}
-        {action.isError ? <ErrorLine testId="boards-admin-action-error" error={action.error} /> : null}
+        {action.isError ? (
+          <ErrorLine testId="boards-admin-action-error" error={action.error} />
+        ) : null}
       </Stack>
     </Section>
   );

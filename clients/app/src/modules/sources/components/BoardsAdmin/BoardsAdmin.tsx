@@ -32,7 +32,7 @@ import {
   type AdminRow,
   type RowKind,
   type RowStatus,
-} from "../../api/adminRows";
+} from "../../api/admin-rows";
 import { useBoards } from "../../api/boards";
 import { shortDate } from "../../api/format";
 import { AdminPeek } from "./AdminPeek";
@@ -129,10 +129,13 @@ function Totals({ overview }: { overview: AdminOverview }) {
   return (
     <Tagged testId="boards-admin-totals">
       <FactList>
-        <Fact label={t("admin.totals.reading")} detail={t("admin.totals.readingDetail", {
-          sites: n(totals.reading_sites),
-          companies: n(totals.reading_companies),
-        })}>
+        <Fact
+          label={t("admin.totals.reading")}
+          detail={t("admin.totals.readingDetail", {
+            sites: n(totals.reading_sites),
+            companies: n(totals.reading_companies),
+          })}
+        >
           <Tagged testId="boards-admin-total-reading">{n(reading)}</Tagged>
         </Fact>
         <Fact label={t("admin.totals.waiting")} detail={t("admin.totals.waitingDetail")}>
@@ -272,53 +275,9 @@ function AllBoards({
   const set = (change: Partial<AdminFilters>) => {
     setFilters((current) => ({ ...current, ...change }));
   };
-  const columns: DataColumn<AdminRow>[] = [
-    {
-      id: "board",
-      header: t("admin.table.board"),
-      cell: (row) => (
-        <>
-          <Text weight="medium">{row.board.name}</Text>
-          <Text tone="secondary" size="sm">
-            {t(`admin.how.${row.board.kind}`)}
-          </Text>
-        </>
-      ),
-    },
-    {
-      id: "jobs",
-      header: t("admin.table.jobs"),
-      cell: (row) => (
-        <Text numeric>
-          {row.board.last_fetch_jobs === undefined || row.board.last_fetch_jobs === null
-            ? t("admin.none")
-            : new Intl.NumberFormat(i18n.language).format(row.board.last_fetch_jobs)}
-        </Text>
-      ),
-      nowrap: true,
-    },
-    {
-      id: "where",
-      header: t("admin.table.where"),
-      cell: (row) => <Text>{row.board.country ?? t("admin.worldwide")}</Text>,
-    },
-    {
-      id: "status",
-      header: t("admin.table.status"),
-      cell: (row) => <StageLabel status={row.status} />,
-      nowrap: true,
-    },
-    {
-      id: "found",
-      header: t("admin.table.found"),
-      cell: (row) => <Text tone="secondary">{foundThrough(row, t)}</Text>,
-    },
-  ];
+  const columns = boardColumns(t, i18n.language);
   return (
-    <Section
-      title={t("admin.all.title", { total: rows.length })}
-      testId="boards-admin-all"
-    >
+    <Section title={t("admin.all.title", { total: rows.length })} testId="boards-admin-all">
       <Stack gap="sm">
         <TextField
           label={t("admin.all.search")}
@@ -426,6 +385,54 @@ function AllBoards({
       )}
     </Section>
   );
+}
+
+/** The table's columns: the board first (it opens the board), then what the owner scans for. */
+function boardColumns(t: TFunction<"sources">, locale: string): DataColumn<AdminRow>[] {
+  return [
+    {
+      id: "board",
+      header: t("admin.table.board"),
+      cell: (row) => (
+        <>
+          <Text as="span" weight="medium">
+            {row.board.name}
+          </Text>
+          <Text as="span" tone="secondary" size="sm">
+            {` · ${t(`admin.how.${row.board.kind}`)}`}
+          </Text>
+        </>
+      ),
+    },
+    {
+      id: "jobs",
+      header: t("admin.table.jobs"),
+      cell: (row) => (
+        <Text numeric>
+          {row.board.last_fetch_jobs === undefined || row.board.last_fetch_jobs === null
+            ? t("admin.none")
+            : new Intl.NumberFormat(locale).format(row.board.last_fetch_jobs)}
+        </Text>
+      ),
+      nowrap: true,
+    },
+    {
+      id: "where",
+      header: t("admin.table.where"),
+      cell: (row) => <Text>{row.board.country ?? t("admin.worldwide")}</Text>,
+    },
+    {
+      id: "status",
+      header: t("admin.table.status"),
+      cell: (row) => <StageLabel status={row.status} />,
+      nowrap: true,
+    },
+    {
+      id: "found",
+      header: t("admin.table.found"),
+      cell: (row) => <Text tone="secondary">{foundThrough(row, t)}</Text>,
+    },
+  ];
 }
 
 /** Where the app first heard of a board, in plain words. */

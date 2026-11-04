@@ -196,7 +196,7 @@ test("the owner's Job boards page: totals, what waits for them, and a board's de
   await signIn(page);
   await page.goto("/boards");
   await expectPageFillsTheScreen(page, "boards");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Job boards");
+  await expect(page.getByTestId("boards")).toContainText("Job boards");
   await expect(page.getByTestId("boards-back")).toBeVisible();
   await expect(page.getByTestId("boards-admin-totals")).toBeVisible();
   await expect(page.getByTestId("boards-admin-week")).toBeVisible();

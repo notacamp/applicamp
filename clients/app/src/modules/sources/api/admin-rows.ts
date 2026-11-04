@@ -23,14 +23,25 @@ export function adminRows(boards: readonly BoardSummary[], overview: AdminOvervi
   return boards.map((board) => {
     const candidate = candidates.get(board.id);
     let status: RowStatus = "checking";
-    if (board.status === "approved") {
-      status = "reading";
-    } else if (board.status === "paused") {
-      status = "paused";
-    } else if (board.status === "declined") {
-      status = "notAllowed";
-    } else if (candidate !== undefined) {
-      status = candidate.stage === "not_allowed" ? "notAllowed" : candidate.stage;
+    switch (board.status) {
+      case "approved": {
+        status = "reading";
+        break;
+      }
+      case "paused": {
+        status = "paused";
+        break;
+      }
+      case "declined": {
+        status = "notAllowed";
+        break;
+      }
+      case "candidate": {
+        if (candidate !== undefined) {
+          status = candidate.stage === "not_allowed" ? "notAllowed" : candidate.stage;
+        }
+        break;
+      }
     }
     return {
       board,

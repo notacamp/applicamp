@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import { Pill, Tag, Tagged } from "~/lib/ui";
 
-import type { RowStatus } from "../../api/adminRows";
+import type { RowStatus } from "../../api/admin-rows";
 
 /**
  * Where a board stands: reading and paused are a quiet tag, waiting for you asks you to decide,

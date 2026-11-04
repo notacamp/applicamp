@@ -116,31 +116,52 @@ fn children(inside: &str) -> HashMap<String, String> {
     fields
 }
 
+/// Where `open` (`<item`) starts at or after `from` in `lower`, as a whole
+/// tag name (`<item>` or `<item …>`, never `<itemFoo>`).
+fn find_open(lower: &str, open: &str, from: usize) -> Option<usize> {
+    let mut at = from;
+    while let Some(found) = lower.get(at..)?.find(open).map(|i| i + at) {
+        let after = lower.get(found + open.len()..)?;
+        if after.starts_with(['>', '/']) || after.starts_with(char::is_whitespace) {
+            return Some(found);
+        }
+        at = found + open.len();
+    }
+    None
+}
+
 /// The items of a feed (RSS `<item>` or Atom `<entry>`), at most 500.
+///
+/// Read leniently, as feeds are in the wild: tags in any case, a byte-order
+/// mark, a bare `&` in a link, and an item left unclosed (it ends where the
+/// next one starts, or where the feed does).
 pub fn items(body: &[u8]) -> Vec<FeedItem> {
     let text = decode(body);
+    let text = text.trim_start_matches('\u{feff}');
+    // ASCII lower case keeps every byte offset: tags are found in `lower`
+    // and read from `text`.
+    let lower = text.to_ascii_lowercase();
     let mut items = Vec::new();
     for (open, close) in [("<item", "</item>"), ("<entry", "</entry>")] {
         let mut at = 0;
-        while let Some(start) = text[at..].find(open).map(|i| i + at) {
-            let after = &text[start + open.len()..];
-            // `<item>` or `<item …>`, never `<itemFoo>`.
-            if !after.starts_with('>') && !after.starts_with(char::is_whitespace) {
-                at = start + open.len();
-                continue;
-            }
-            let Some(tag_end) = after.find('>') else {
+        while let Some(start) = find_open(&lower, open, at) {
+            let Some(tag_end) = lower[start..].find('>') else {
                 break;
             };
-            let inside_start = start + open.len() + tag_end + 1;
-            let Some(end) = text[inside_start..].find(close).map(|i| i + inside_start) else {
-                break;
+            let inside_start = start + tag_end + 1;
+            let next = find_open(&lower, open, inside_start);
+            let closed = lower[inside_start..].find(close).map(|i| i + inside_start);
+            let (end, resume) = match (closed, next) {
+                (Some(c), Some(n)) if n < c => (n, n),
+                (Some(c), _) => (c, c + close.len()),
+                (None, Some(n)) => (n, n),
+                (None, None) => (text.len(), text.len()),
             };
             items.push(FeedItem(children(&text[inside_start..end])));
             if items.len() >= MAX_ITEMS {
                 return items;
             }
-            at = end + close.len();
+            at = resume;
         }
         if !items.is_empty() {
             break;
@@ -228,6 +249,33 @@ mod tests {
         latin1.extend_from_slice(b"\n");
         let items = super::items(&latin1);
         assert_eq!(items[0].raw("title").as_deref(), Some("Programador Sénior"));
+    }
+
+    #[test]
+    fn malformed_feeds_are_read_leniently() {
+        // A bare `&` in an attribute and in a link, an item never closed, a
+        // tag in capitals and a byte-order mark.
+        let feed = "\u{feff}<?xml version=\"1.0\"?><rss><channel>\
+            <ITEM><title>Staff Engineer at Example Co</title>\
+            <enclosure url=\"https://board.example/a.png?x=1&y=2\" type=\"image/png\">\
+            <link>https://board.example/jobs/1?utm_source=rss&ref=rss</link></ITEM>\
+            <item><title>Platform Engineer at Other Co</title>\
+            <link>https://board.example/jobs/2</link>\
+            <item><title>Last one</title><link>https://board.example/jobs/3</link>";
+        let items = items(feed.as_bytes());
+        assert_eq!(items.len(), 3);
+        assert_eq!(
+            items[0].raw("link").as_deref(),
+            Some("https://board.example/jobs/1?utm_source=rss&ref=rss")
+        );
+        assert_eq!(
+            items[1].raw("title").as_deref(),
+            Some("Platform Engineer at Other Co")
+        );
+        assert_eq!(
+            items[2].raw("link").as_deref(),
+            Some("https://board.example/jobs/3")
+        );
     }
 
     #[test]

@@ -185,8 +185,13 @@ impl Harness {
 
     /// `POST /api/v1/profile/imports` with `parts`.
     pub(crate) async fn upload(&self, parts: &[Part<'_>]) -> (StatusCode, Value) {
+        self.upload_to("/api/v1/profile/imports", parts).await
+    }
+
+    /// `POST uri` with `parts` as `multipart/form-data`.
+    pub(crate) async fn upload_to(&self, uri: &str, parts: &[Part<'_>]) -> (StatusCode, Value) {
         self.send(
-            Request::post("/api/v1/profile/imports")
+            Request::post(uri)
                 .header(
                     header::CONTENT_TYPE,
                     format!("multipart/form-data; boundary={BOUNDARY}"),

@@ -26,6 +26,7 @@ import { PipelineLetter } from "./routes/pipeline-letter";
 import { PipelinePrepare } from "./routes/pipeline-prepare";
 import { Profile } from "./routes/profile";
 import { ProfileAbout } from "./routes/profile-about";
+import { ProfileLinkedIn } from "./routes/profile-linkedin";
 import { Today } from "./routes/today";
 
 export interface RouterContext {
@@ -314,6 +315,9 @@ const profileRoute = createRoute({
         onAbout={() => {
           void navigate({ to: "/profile/about" });
         }}
+        onLinkedIn={() => {
+          void navigate({ to: "/profile/linkedin" });
+        }}
         onAction={(action) => {
           switch (action.kind) {
             // What a part of the strength still needs is asked in Tell me about
@@ -357,6 +361,22 @@ const profileAboutRoute = createRoute({
     const navigate = profileAboutRoute.useNavigate();
     return (
       <ProfileAbout
+        onBack={() => {
+          void navigate({ to: "/profile" });
+        }}
+      />
+    );
+  },
+});
+
+/** Your LinkedIn: the check-up of the LinkedIn profile, in the app frame. */
+const profileLinkedInRoute = createRoute({
+  getParentRoute: () => frameRoute,
+  path: "/profile/linkedin",
+  component: function ProfileLinkedInRoute() {
+    const navigate = profileLinkedInRoute.useNavigate();
+    return (
+      <ProfileLinkedIn
         onBack={() => {
           void navigate({ to: "/profile" });
         }}
@@ -440,6 +460,7 @@ const routeTree = rootRoute.addChildren([
     profileRoute,
     profileSkillsRoute,
     profileAboutRoute,
+    profileLinkedInRoute,
     profileGrillRoute,
     profileGrillRoleRoute,
   ]),

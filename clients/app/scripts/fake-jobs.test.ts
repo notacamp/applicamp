@@ -96,6 +96,7 @@ const PORTRAIT_SYSTEM = "You write what a job-hunting app knows about one person
 const EXTRA_SYSTEM = "You read what a person wrote about themselves, to fit it into a profile.";
 const QUESTION_SYSTEM = "You word one question that a job-hunting app asks a person.";
 const ANSWER_SYSTEM = "You read a person's answer to one question about their own profile.";
+const LINKEDIN_SYSTEM = "You review one person's LinkedIn profile for a job-hunting app.";
 
 interface Asked {
   question: string;
@@ -271,6 +272,59 @@ Company: Example Co
         (sentence) => sentence.kind === "assumed" && sentence.position === 0,
       ).length,
     ).toBeGreaterThan(1);
+  });
+
+  it("reviews a LinkedIn profile: a clean headline naming the role, a buzzword, a tool no source names, a missing skill and one with no source", async () => {
+    const review = await model<{
+      overall: string;
+      findings: {
+        part: string;
+        position: number | null;
+        state: string;
+        proposals: { field: string; text: string; sources: string[] }[];
+      }[];
+    }>(
+      LINKEDIN_SYSTEM,
+      `<language>en</language>
+<today>2026-11-04</today>
+<goals>
+{"roles":["Staff Engineer"]}
+</goals>
+<sources>
+[{"id":"p.headline","kind":"profile","text":"Backend engineer"},
+ {"id":"w0","kind":"profile","text":"Senior Engineer at Example Org. Runs the billing platform in Rust."},
+ {"id":"skills","kind":"profile","text":"Skills: Rust, Kafka."},
+ {"id":"goals","kind":"profile","text":"Roles they want next: Staff Engineer."},
+ {"id":"l.headline","kind":"linkedin","text":"Backend engineer · Rust and Postgres"}]
+</sources>
+<linkedin>
+{"headline":"Backend engineer · Rust and Postgres","summary":null,"positions":[{"index":0,"title":"Senior Engineer","company":"Example Org"}],"skills":["Rust","PostgreSQL"]}
+</linkedin>`,
+    );
+    expect(review.overall).toContain("Staff Engineer");
+    expect(review.findings.map((finding) => finding.part)).toEqual([
+      "headline",
+      "summary",
+      "position",
+      "skills",
+      "education",
+    ]);
+    const proposals = review.findings.flatMap((finding) => finding.proposals);
+    expect(proposals[0]).toEqual({
+      field: "headline",
+      text: "Backend engineer · Rust and Postgres · open to Staff Engineer roles",
+      sources: ["l.headline", "goals"],
+      why: "Says the role you want next, in your own words.",
+    });
+    expect(proposals[1]?.text).toMatch(/^Passionate/);
+    expect(proposals[2]?.text).toContain("Kubernetes");
+    expect(review.findings[2]?.position).toBe(0);
+    expect(proposals.filter((proposal) => proposal.field === "skill").map((p) => p.text)).toEqual([
+      "Kafka",
+      "Kubernetes",
+    ]);
+    expect(review.findings[1]?.state).toBe("missing");
+    expect(review.findings[4]?.state).toBe("good");
   });
 
   it("reads what a person wrote into changes across the profile, with a summary that says one thing they did not", async () => {

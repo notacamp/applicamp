@@ -15,10 +15,19 @@ export interface ProfileProps {
   onAction: (action: Action) => void;
   /** Open "Tell me about you". */
   onAbout: () => void;
+  /** Open "Your LinkedIn". */
+  onLinkedIn: () => void;
 }
 
 /** `/profile`: what agents know about you, how you sign in, and what the AI cost this month. */
-export function Profile({ importing, onImporting, onStartGoals, onAction, onAbout }: ProfileProps) {
+export function Profile({
+  importing,
+  onImporting,
+  onStartGoals,
+  onAction,
+  onAbout,
+  onLinkedIn,
+}: ProfileProps) {
   const { t } = useTranslation();
   const me = useMe();
   return (
@@ -29,6 +38,7 @@ export function Profile({ importing, onImporting, onStartGoals, onAction, onAbou
         onStartGoals={onStartGoals}
         onAction={onAction}
         onAbout={onAbout}
+        onLinkedIn={onLinkedIn}
       />
       {me.data === undefined ? null : (
         <Tagged testId="profile-account">

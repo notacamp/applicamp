@@ -9,8 +9,10 @@
 //! | `APPLICAMP_SOURCES__JOB_BOARDS_FILE` | the job boards built in (`job_boards.toml`) |
 //! | `APPLICAMP_SOURCES__ALLOW_PRIVATE_HOSTS` | `false`: job boards are read only at public https hosts |
 //! | `APPLICAMP_SOURCES__BOARD_OWNERS` | none: the addresses that may approve, decline, edit and pause boards |
-//! | `APPLICAMP_SOURCES__DISCOVERY` | `true` (weekly) |
+//! | `APPLICAMP_SOURCES__DISCOVERY` | `true` (daily, 04:00 UTC) |
 //! | `APPLICAMP_SOURCES__DISCOVERY_LIST_URL` | the CC0 list `emredurukn/awesome-job-boards` |
+//! | `APPLICAMP_SOURCES__DISCOVERY_SOURCES` | every list discovery reads (`awesome-job-boards`, `awesome-remote-job`, `remote-working-list`, `awesome-remote-jobs`, `idimetrix-awesome-job-boards`, `wikidata`); else the ones listed |
+//! | `APPLICAMP_SOURCES__DISCOVERY_MAX_CHECKS` | `100` (boards one discovery run checks, at most) |
 //! | `APPLICAMP_SOURCES__GREENHOUSE_URL` | `https://boards-api.greenhouse.io` |
 //! | `APPLICAMP_SOURCES__LEVER_URL` | `https://api.lever.co` |
 //! | `APPLICAMP_SOURCES__LEVER_EU_URL` | `https://api.eu.lever.co` |
@@ -53,12 +55,16 @@ pub struct SourcesConfig {
     /// The addresses (lower case) whose accounts manage the job boards.
     #[serde(default, deserialize_with = "list")]
     pub board_owners: Option<Vec<String>>,
-    /// Look for new job boards every week.
+    /// Look for new job boards every day.
     #[serde(default, deserialize_with = "flag")]
     pub discovery: Option<bool>,
     /// The list of job boards discovery reads (names and links only).
     #[serde(default = "discovery_list_url")]
     pub discovery_list_url: Url,
+    #[serde(default, deserialize_with = "list")]
+    pub discovery_sources: Option<Vec<String>>,
+    #[serde(default, deserialize_with = "number")]
+    pub discovery_max_checks: Option<u64>,
     /// Greenhouse's job board API.
     #[serde(default = "greenhouse_url")]
     pub greenhouse_url: Url,
@@ -107,6 +113,8 @@ impl Default for SourcesConfig {
             board_owners: None,
             discovery: None,
             discovery_list_url: discovery_list_url(),
+            discovery_sources: None,
+            discovery_max_checks: None,
             greenhouse_url: greenhouse_url(),
             lever_url: lever_url(),
             lever_eu_url: lever_eu_url(),
@@ -208,9 +216,21 @@ impl SourcesConfig {
                 .any(|owner| owner.trim().eq_ignore_ascii_case(&email))
     }
 
-    /// Whether discovery runs every week.
+    /// Whether discovery runs every day.
     pub fn discovery(&self) -> bool {
         self.discovery.unwrap_or(true)
+    }
+
+    /// Boards one discovery run checks, at most (100 when left out).
+    pub fn discovery_max_checks(&self) -> usize {
+        usize::try_from(self.discovery_max_checks.unwrap_or(100).clamp(1, 5_000)).unwrap_or(100)
+    }
+
+    /// Whether discovery reads the list `id` (every list when left out).
+    pub fn reads_list(&self, id: &str) -> bool {
+        self.discovery_sources
+            .as_ref()
+            .is_none_or(|ids| ids.iter().any(|name| name == id))
     }
 
     /// How long a board's answer is reused.

@@ -26,6 +26,13 @@
 //   seeded-board.test     a JSON API the seed list names: checked at start,
 //                         then approvable;
 //   keyed-board.test      a JSON API that answers only with the key `e2e-key`;
+//   clean-site.test       a JSON API with five jobs from the last week and a
+//                         terms page with nothing against apps (and a
+//                         Content-Signal line): the check at start approves
+//                         it by itself, and the model's reading of its terms
+//                         (the fake answers "silent") tags it (#75);
+//   ask-first-site.test   the same, but its terms ask for written consent
+//                         first: it waits, with that sentence quoted;
 //   feed-site-<p>.test    a site with no config whose homepage links its RSS
 //                         feed: the check proposes a config (one per
 //                         Playwright project, desktop and phone).
@@ -567,6 +574,119 @@ function completion(content: unknown) {
   };
 }
 
+/** What the LinkedIn check-up's prompt shows (`<linkedin>`, `<goals>`). */
+interface LinkedInShown {
+  headline?: string | null;
+  summary?: string | null;
+  positions?: { index: number; title?: string | null; company?: string | null }[];
+  skills?: string[];
+}
+
+/**
+ * The LinkedIn check-up (#84, system prompt "You review one person's LinkedIn
+ * profile…"): a headline that keeps LinkedIn's own words and names the role
+ * wanted (clean), an About text with a buzzword (flagged), a description of
+ * the first position that adds a tool no source names (flagged, to edit), a
+ * skill the profile has and LinkedIn lacks (clean) and one that cites nothing
+ * (flagged), and education left as it is.
+ */
+function linkedinReview(userContent: string) {
+  const sources = parsedBetween<AboutSource[]>(userContent, "sources", []);
+  const goals = parsedBetween<{ roles?: string[] }>(userContent, "goals", {});
+  const linkedin = parsedBetween<LinkedInShown>(userContent, "linkedin", {});
+  const role = goals.roles?.[0] ?? null;
+  const has = (id: string) => sources.some((source) => source.id === id);
+  const text = (id: string) => sources.find((source) => source.id === id)?.text ?? "";
+  const headlineNow = linkedin.headline ?? "";
+  const headline = {
+    field: "headline",
+    text:
+      role !== null && has("goals")
+        ? `${headlineNow} · open to ${role} roles`.trim()
+        : headlineNow || text("p.headline"),
+    sources: [
+      ...(headlineNow === "" ? ["p.headline"] : ["l.headline"]),
+      ...(has("goals") ? ["goals"] : []),
+    ],
+    why: "Says the role you want next, in your own words.",
+  };
+  const summary = {
+    field: "summary",
+    text: `Passionate about this work. ${text("w0")}`.trim(),
+    sources: ["w0"],
+    why: "An About text that says what you do today.",
+  };
+  const description = {
+    field: "position_description",
+    text: `${text("w0")} Also runs Kubernetes.`.trim(),
+    sources: ["w0"],
+    why: "A description that says what the role was.",
+  };
+  const onLinkedin = new Set((linkedin.skills ?? []).map((skill) => skill.toLowerCase()));
+  const known = text("skills")
+    .replace(/^Skills:\s*/, "")
+    .replace(/\.$/, "")
+    .split(",")
+    .map((skill) => skill.trim())
+    .filter((skill) => skill !== "" && !onLinkedin.has(skill.toLowerCase()));
+  const skills = [
+    ...known.slice(0, 1).map((skill) => ({
+      field: "skill",
+      text: skill,
+      sources: ["skills"],
+      why: "Your profile has it; LinkedIn does not.",
+    })),
+    { field: "skill", text: "Kubernetes", sources: [], why: "Often asked for in such roles." },
+  ];
+  const first = linkedin.positions?.[0];
+  return {
+    overall: `Your headline says what you do today, not the ${role ?? "role"} you want next. Your About text is ${
+      (linkedin.summary ?? "") === "" ? "empty" : "short"
+    }.`,
+    findings: [
+      {
+        part: "headline",
+        position: null,
+        state: "could_be_better",
+        why: "A recruiter for that role does not see it named here.",
+        proposals: [headline],
+      },
+      {
+        part: "summary",
+        position: null,
+        state: (linkedin.summary ?? "") === "" ? "missing" : "could_be_better",
+        why: "The About text is where you say what you want next.",
+        proposals: [summary],
+      },
+      ...(first === undefined
+        ? []
+        : [
+            {
+              part: "position",
+              position: first.index,
+              state: "could_be_better",
+              why: "The description says little about what you did.",
+              proposals: [description],
+            },
+          ]),
+      {
+        part: "skills",
+        position: null,
+        state: "could_be_better",
+        why: "Recruiters filter on skills; some of yours are missing here.",
+        proposals: skills,
+      },
+      {
+        part: "education",
+        position: null,
+        state: "good",
+        why: "It says what it needs to.",
+        proposals: [],
+      },
+    ],
+  };
+}
+
 /**
  * Answers a chat completion as the model would, by what it is asked, or (any
  * other) the scoring of every posting of the last user message, with its
@@ -585,6 +705,10 @@ async function complete(request: IncomingMessage, response: ServerResponse) {
       json(response, 200, completion(aboutPortrait(user?.content ?? "")));
       return;
     }
+    if (system.startsWith("You review one person's LinkedIn profile")) {
+      json(response, 200, completion(linkedinReview(user?.content ?? "")));
+      return;
+    }
     if (system.startsWith("You read what a person wrote about themselves")) {
       json(response, 200, completion(aboutChanges(user?.content ?? "")));
       return;
@@ -595,6 +719,10 @@ async function complete(request: IncomingMessage, response: ServerResponse) {
     }
     if (system.startsWith("You read a person's answer to one question about their own profile")) {
       json(response, 200, completion(aboutAnswer(user?.content ?? "")));
+      return;
+    }
+    if (system.startsWith("You read the terms of a job board")) {
+      json(response, 200, completion(termsReading(user?.content ?? "")));
       return;
     }
     if (system.startsWith("You read pages from a company")) {
@@ -690,6 +818,72 @@ function waitingJobs(site: string) {
   };
 }
 
+/** The sentence the sites that approve themselves have in their terms. */
+const CLEAN_TERMS = "Jobs here may be linked to from other sites, with attribution to Clean Site.";
+/** The sentence of the site that asks first. */
+const ASK_FIRST_TERMS =
+  "You may not access the site by automated means without our prior written consent.";
+
+/** Five invented jobs posted in the last week, as the sites of #75 list them. */
+function recentJobs(site: string) {
+  const titles = [
+    "Hotel Operations Lead",
+    "Backend Engineer",
+    "Travel Experience Designer",
+    "Platform Engineer",
+    "Guest Services Manager",
+  ];
+  return {
+    jobs: titles.map((title, index) => ({
+      id: `${site}-${String(index + 1)}`,
+      title,
+      company: [
+        "Harbour Stays",
+        "Northlight Labs",
+        "Wayfarer Co",
+        "Northlight Labs",
+        "Harbour Stays",
+      ][index],
+      url: `https://example.com/${site}/jobs/${String(index + 1)}`,
+      location: "Remote - Europe",
+      posted_at: new Date(Date.now() - (index + 1) * 24 * 3600 * 1000).toISOString(),
+    })),
+  };
+}
+
+/** The terms page of a site of #75. */
+function termsPage(site: string): string {
+  const sentence = site === "ask-first-site.test" ? ASK_FIRST_TERMS : CLEAN_TERMS;
+  return `<html lang="en"><body><h1>Terms</h1><p>${sentence}</p></body></html>`;
+}
+
+/**
+ * The terms reader (system prompt "You read the terms of a job board…"): the
+ * sentences it is shown are a JSON array between <terms> tags. Written consent
+ * first is `ask_first`, quoting that sentence; anything else is `silent`.
+ * Both are tagged for a hospitality-and-tech board in Europe.
+ */
+function termsReading(user: string) {
+  const block = /<terms>\s*([\s\S]*?)\s*<\/terms>/.exec(user)?.[1] ?? "[]";
+  let sentences: string[] = [];
+  try {
+    sentences = (JSON.parse(block) as unknown[]).filter(
+      (sentence): sentence is string => typeof sentence === "string",
+    );
+  } catch {
+    sentences = [];
+  }
+  const asks = sentences.find((sentence) => /written consent|written permission/i.test(sentence));
+  return {
+    verdict: asks === undefined ? "silent" : "ask_first",
+    quote: asks ?? "",
+    kinds: ["hospitality-travel", "tech"],
+    where: ["europe"],
+    remote: "mostly-remote",
+    specialities: [],
+  };
+}
+
 /** The same jobs as an RSS feed. */
 function waitingFeed(site: string): string {
   const items = waitingJobs(site)
@@ -710,8 +904,29 @@ function text(response: ServerResponse, type: string, body: string, status = 200
 /** A waiting board's site, by its host name; whether it answered. */
 function waitingBoard(site: string, url: URL, response: ServerResponse): boolean {
   if (url.pathname === "/robots.txt") {
-    text(response, "text/plain", "User-agent: *\nDisallow: /private\n");
+    const signal = site === "clean-site.test" ? "Content-Signal: search=yes, ai-train=no\n" : "";
+    text(response, "text/plain", `User-agent: *\n${signal}Disallow: /private\n`);
     return true;
+  }
+  if (site === "clean-site.test" || site === "ask-first-site.test") {
+    if (url.pathname === "/") {
+      text(
+        response,
+        "text/html",
+        `<html lang="en"><body>Invented jobs. <a href="/terms">Terms of service</a></body></html>`,
+      );
+      return true;
+    }
+    if (url.pathname === "/terms") {
+      text(response, "text/html", termsPage(site));
+      return true;
+    }
+    if (url.pathname === "/api/jobs") {
+      console.log(`fake-jobs: listed ${site}`);
+      json(response, 200, recentJobs(site));
+      return true;
+    }
+    return false;
   }
   if (site.startsWith("feed-site-")) {
     if (url.pathname === "/") {

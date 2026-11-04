@@ -33,7 +33,7 @@ import {
   type BoardKey,
   type BoardProposal,
 } from "../../api/boards";
-import { formatWhen } from "../../api/format";
+import { formatDay, formatWhen, tagText } from "../../api/format";
 
 export interface BoardPeekProps {
   /** The board open; none closes the peek. */
@@ -118,6 +118,21 @@ function PeekBody({ detail }: { detail: BoardDetail }) {
   ].filter((part): part is string => part !== null);
   return (
     <Stack>
+      {board.tags.length === 0 ? null : (
+        <Tagged testId="board-tags">
+          <Cluster>
+            {board.tags.map((tag) => (
+              <Label key={tag} hue="gray">
+                {tagText(
+                  tag,
+                  (key) => String(t(key as never)),
+                  (key) => i18n.exists(key, { ns: "sources" }),
+                )}
+              </Label>
+            ))}
+          </Cluster>
+        </Tagged>
+      )}
       <PropertyList testId="board-properties">
         <Property label={t("board.status")}>
           <Label hue={board.status === "approved" ? "green" : "gray"}>
@@ -162,6 +177,24 @@ function PeekBody({ detail }: { detail: BoardDetail }) {
           </Stack>
         </Property>
       </PropertyList>
+      {board.status === "approved" &&
+      board.approved_by === "app" &&
+      board.approved_at !== undefined &&
+      board.approved_at !== null ? (
+        <Tagged testId="board-approved-by-app">
+          <Text tone="secondary">
+            {t("board.approvedByApp", { when: formatDay(board.approved_at, language) })}
+          </Text>
+        </Tagged>
+      ) : null}
+      {(board.status === "candidate" || board.status === "paused") &&
+      board.found_through !== undefined &&
+      board.found_through !== null &&
+      board.found_through !== "" ? (
+        <Tagged testId="board-found-through">
+          <Text tone="secondary">{t("board.foundThrough", { source: board.found_through })}</Text>
+        </Tagged>
+      ) : null}
       {board.flags.length === 0 ? null : (
         <Tagged testId="board-flags">
           <Banner icon="warning" title={t("board.flagsTitle")}>
@@ -179,6 +212,11 @@ function PeekBody({ detail }: { detail: BoardDetail }) {
           <Tagged testId="board-robots">
             <Text>{robotsText}</Text>
           </Tagged>
+          {board.content_signal?.["ai-train"] === "no" ? (
+            <Tagged testId="board-content-signal">
+              <Text tone="secondary">{t("board.contentSignalNoTrain")}</Text>
+            </Tagged>
+          ) : null}
           {report?.found_url === undefined || report.found_url === null ? null : (
             <Text tone="secondary">{t("board.report.found", { url: report.found_url })}</Text>
           )}

@@ -119,6 +119,24 @@ pub struct BoardSummary {
     pub totals_7d: BoardTotals,
     /// Over the last 30 days.
     pub totals_30d: BoardTotals,
+    /// Who approved it: `owner` or `app`.
+    pub approved_by: Option<String>,
+    /// When it was approved.
+    pub approved_at: Option<DateTime<Utc>>,
+    /// Plain lowercase words that describe it ("tech", "europe").
+    pub tags: Vec<String>,
+    /// What its terms say: `allow`, `silent`, `forbid`, `ask_first` or `personal_only`.
+    pub terms_verdict: Option<String>,
+    /// The sentence of its terms that decided the verdict.
+    pub terms_quote: Option<String>,
+    /// The page its terms are on.
+    pub terms_url: Option<String>,
+    /// What its site rules say about use of its content (search, ai-train).
+    pub content_signal: Option<std::collections::BTreeMap<String, String>>,
+    /// Where to ask it for permission.
+    pub contact_email: Option<String>,
+    /// How the app found it, in plain words.
+    pub found_through: Option<String>,
 }
 
 /// The job boards, highest average salary first (none last).
@@ -144,7 +162,7 @@ pub struct BoardDetail {
     /// It can be approved now; else `blockers` say why.
     pub approvable: bool,
     /// The first blocker's code (`terms_forbid`, `robots_disallowed`,
-    /// `needs_key`, `no_endpoint`, `config_invalid`, `check_needed`), or
+    /// `needs_key`, `needs_permission`, `no_endpoint`, `config_invalid`, `check_needed`), or
     /// none.
     pub blocked: Option<String>,
     /// Everything that stands between the board and its approval, in order,
@@ -399,6 +417,18 @@ fn summary(
         note: report.map(|r| r.notes).filter(|n| !n.trim().is_empty()),
         totals_7d: t7.into(),
         totals_30d: t30.into(),
+        approved_by: row.approved_by.clone(),
+        approved_at: row.approved_at.filter(|_| row.approved_by.is_some()),
+        tags: row.tags.clone(),
+        terms_verdict: row.terms_verdict.clone(),
+        terms_quote: row.terms_quote.clone(),
+        terms_url: row.terms_url.clone(),
+        content_signal: row
+            .content_signal
+            .as_ref()
+            .and_then(|json| serde_json::from_value(json.0.clone()).ok()),
+        contact_email: row.contact_email.clone(),
+        found_through: row.found_through.clone(),
     }
 }
 
@@ -430,7 +460,7 @@ async fn rankings(
         .collect())
 }
 
-fn blocker(code: &str, detail: impl Into<String>, source: Option<String>) -> Blocker {
+pub(crate) fn blocker(code: &str, detail: impl Into<String>, source: Option<String>) -> Blocker {
     Blocker {
         code: code.to_owned(),
         detail: detail.into(),
@@ -444,6 +474,12 @@ fn blocker(code: &str, detail: impl Into<String>, source: Option<String>) -> Blo
 /// that host's robots rules. Empty when it can be approved.
 pub fn blockers(row: &BoardRow) -> Vec<Blocker> {
     let mut found = row.blockers();
+    // What the model read in its terms (a fact quoted from them).
+    if let Some(read) = crate::terms::blocker_of(row, row.report().as_ref())
+        && !found.iter().any(|b| b.code == read.code)
+    {
+        found.push(read);
+    }
     let Some(kind) = row.kind() else {
         found.push(blocker(
             "config_invalid",
@@ -572,6 +608,7 @@ async fn detail(
 fn conflict_code(code: &str) -> &'static str {
     [
         "terms_forbid",
+        "needs_permission",
         "robots_disallowed",
         "needs_key",
         "no_endpoint",
@@ -681,18 +718,19 @@ async fn set_status(
     sqlx::query(
         "UPDATE sources.job_boards
             SET status = $2, decline_reason = $3,
-                approved_at = CASE WHEN $2 = 'approved' THEN $5 ELSE approved_at END,
-                approved_by = CASE WHEN $2 = 'approved' THEN $4 ELSE approved_by END,
-                recheck_after = CASE WHEN $2 = 'approved' THEN $5 + interval '182 days'
+                approved_at = CASE WHEN $2 = 'approved' THEN $4 ELSE approved_at END,
+                approved_by = CASE WHEN $2 = 'approved' THEN 'owner' ELSE approved_by END,
+                approved_account = CASE WHEN $2 = 'approved' THEN $5 ELSE approved_account END,
+                recheck_after = CASE WHEN $2 = 'approved' THEN $4 + interval '182 days'
                                      ELSE recheck_after END,
-                updated_at = $5
+                updated_at = $4
           WHERE id = $1",
     )
     .bind(id)
     .bind(status.as_str())
     .bind(reason)
-    .bind(by)
     .bind(now)
+    .bind(by)
     .execute(db)
     .await?;
     Ok(())
@@ -721,8 +759,8 @@ async fn set_status(
         (status = 404, description = "`not_found`", body = Problem,
             content_type = "application/problem+json"),
         (status = 409, description = "`not_waiting`: it is approved or declined; else its first \
-            blocker: `terms_forbid`, `robots_disallowed`, `needs_key`, `no_endpoint`, \
-            `config_invalid`, `check_needed`; the detail says what exactly", body = Problem,
+            blocker: `terms_forbid`, `robots_disallowed`, `needs_key`, `needs_permission`, \
+            `no_endpoint`, `config_invalid`, `check_needed`; the detail says what exactly", body = Problem,
             content_type = "application/problem+json"),
     ),
 )]
@@ -1205,8 +1243,9 @@ pub async fn suggest(
     sqlx::query(
         "INSERT INTO sources.job_boards
             (id, slug, name, homepage, host, kind, priority, status, origin, suggested_by,
-             created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, 'json_api', 'low', 'candidate', 'suggested', $6, $7, $7)",
+             found_through, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, 'json_api', 'low', 'candidate', 'suggested', $6,
+                 'a suggestion from a person using the app', $7, $7)",
     )
     .bind(id)
     .bind(&slug)

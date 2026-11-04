@@ -234,6 +234,36 @@
       "notJson": "Ce n’est pas du JSON valide.",
       "notObject": "La configuration est un objet JSON.",
       "advanced": "Avancé : modifier la configuration en JSON"
+    },
+    "tags": {
+      "kind": {
+        "tech": "Technologie",
+        "data": "Données",
+        "design": "Design",
+        "product": "Produit",
+        "marketing": "Marketing",
+        "sales": "Ventes",
+        "finance": "Finance",
+        "legal": "Juridique",
+        "people": "Personnes et ressources humaines",
+        "operations": "Opérations",
+        "support": "Support client",
+        "health-care": "Santé et soins",
+        "education": "Éducation",
+        "hospitality-travel": "Hôtels et voyages",
+        "retail": "Commerce",
+        "logistics": "Logistique",
+        "trades": "Métiers manuels",
+        "climate": "Climat",
+        "nonprofit": "Associatif",
+        "public-sector": "Secteur public",
+        "media": "Médias",
+        "science": "Science"
+      },
+      "remote": {
+        "remote": "Surtout à distance",
+        "some-remote": "Un peu à distance"
+      }
     }
   },
   "scanned": {

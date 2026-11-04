@@ -272,7 +272,7 @@ describe("the boards page", () => {
   it("says when the app approved a board itself", async () => {
     fakeBoards(true, {
       [`GET /api/v1/boards/${HIMALAYAS}`]: () => ({
-        body: detail(board({ approved_by: "app", approved_at: "2026-10-26T21:00:00Z" })),
+        body: detail(board({ approved_by: "app", approved_at: "2026-10-26T12:00:00Z" })),
       }),
     });
     renderPage();
@@ -280,7 +280,22 @@ describe("the boards page", () => {
     const approved = await screen.findByTestId("boards-section-approved");
     await user.click(within(approved).getByTestId("boards-row"));
     expect(await screen.findByTestId("board-approved-by-app")).toHaveTextContent(
-      "Approved by the app on",
+      "Approved by the app on 26 October",
+    );
+  });
+
+  it("shows what a site offers as tags, kinds first, translated", async () => {
+    fakeBoards(true, {
+      [`GET /api/v1/boards/${HIMALAYAS}`]: () => ({
+        body: detail(board({ tags: ["hospitality-travel", "europe", "remote", "ruby on rails"] })),
+      }),
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const approved = await screen.findByTestId("boards-section-approved");
+    await user.click(within(approved).getByTestId("boards-row"));
+    expect(await screen.findByTestId("board-tags")).toHaveTextContent(
+      "Hotels and travelEuropeMostly remoteRuby on rails",
     );
   });
 

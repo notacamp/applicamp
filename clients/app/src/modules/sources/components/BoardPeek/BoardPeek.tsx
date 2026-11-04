@@ -33,7 +33,7 @@ import {
   type BoardKey,
   type BoardProposal,
 } from "../../api/boards";
-import { formatWhen } from "../../api/format";
+import { formatDay, formatWhen, tagText } from "../../api/format";
 
 export interface BoardPeekProps {
   /** The board open; none closes the peek. */
@@ -118,6 +118,21 @@ function PeekBody({ detail }: { detail: BoardDetail }) {
   ].filter((part): part is string => part !== null);
   return (
     <Stack>
+      {board.tags.length === 0 ? null : (
+        <Tagged testId="board-tags">
+          <Cluster>
+            {board.tags.map((tag) => (
+              <Label key={tag} hue="gray">
+                {tagText(
+                  tag,
+                  (key) => t(key),
+                  (key) => i18n.exists(key, { ns: "sources" }),
+                )}
+              </Label>
+            ))}
+          </Cluster>
+        </Tagged>
+      )}
       <PropertyList testId="board-properties">
         <Property label={t("board.status")}>
           <Label hue={board.status === "approved" ? "green" : "gray"}>
@@ -168,7 +183,7 @@ function PeekBody({ detail }: { detail: BoardDetail }) {
       board.approved_at !== null ? (
         <Tagged testId="board-approved-by-app">
           <Text tone="secondary">
-            {t("board.approvedByApp", { when: formatWhen(board.approved_at, language).text })}
+            {t("board.approvedByApp", { when: formatDay(board.approved_at, language) })}
           </Text>
         </Tagged>
       ) : null}

@@ -234,6 +234,36 @@
       "notJson": "That isn’t valid JSON.",
       "notObject": "The config is a JSON object.",
       "advanced": "Advanced: edit the config as JSON"
+    },
+    "tags": {
+      "kind": {
+        "tech": "Tech",
+        "data": "Data",
+        "design": "Design",
+        "product": "Product",
+        "marketing": "Marketing",
+        "sales": "Sales",
+        "finance": "Finance",
+        "legal": "Legal",
+        "people": "People and HR",
+        "operations": "Operations",
+        "support": "Customer support",
+        "health-care": "Health and care",
+        "education": "Education",
+        "hospitality-travel": "Hotels and travel",
+        "retail": "Retail",
+        "logistics": "Logistics",
+        "trades": "Trades",
+        "climate": "Climate",
+        "nonprofit": "Nonprofit",
+        "public-sector": "Public sector",
+        "media": "Media",
+        "science": "Science"
+      },
+      "remote": {
+        "remote": "Mostly remote",
+        "some-remote": "Some remote"
+      }
     }
   },
   "scanned": {

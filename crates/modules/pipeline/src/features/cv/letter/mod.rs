@@ -638,7 +638,7 @@ pub(crate) async fn write(
         None => Vec::new(),
     };
     let frame = Frame::build(&profile, &opp.company, &facts);
-    let language = language_of(language, &opp);
+    let language = language_of(language, &profile);
     let posting = opp.description.clone().unwrap_or_default();
     let questions = questions::parse(&posting);
     let cv_words = cv_words(&cv.content.0);

@@ -38,7 +38,12 @@
 //!   and drafts the CV, then the letter once the CV is approved, waiting on
 //!   the person for answers and approvals (`/api/v1/opportunities/{id}/prepare…`).
 //!
-//! Publishes `pipeline.opportunity_added` (ids only).
+//! - **Shortlist proposals** (#73): a found job that fits well is proposed;
+//!   after a search, with the Autonomy goal "Prepare", the best few are
+//!   shortlisted by the app and prepared, a few a day.
+//!
+//! Publishes `pipeline.opportunity_added` (ids only); consumes
+//! `sources.search_finished`.
 
 #![forbid(unsafe_code)]
 
@@ -83,7 +88,7 @@ impl std::fmt::Debug for PipelineDeps {
 
 /// The pipeline module, composed with `deps`.
 pub fn module(deps: PipelineDeps) -> Module {
-    use features::{brief, cv, opportunities, prepare, today};
+    use features::{brief, cv, opportunities, prepare, proposals, today};
     let router = OpenApiRouter::new()
         .routes(routes!(opportunities::list, opportunities::add))
         .routes(routes!(opportunities::get, opportunities::update))
@@ -125,7 +130,9 @@ pub fn module(deps: PipelineDeps) -> Module {
         router,
         background: Background::new()
             .job::<cv::ExpireCvDrafts>()
-            .job_with::<prepare::Prepare, _>(deps)
+            .job_with::<prepare::Prepare, _>(deps.clone())
+            .job_with::<proposals::ShortlistProposals, _>(deps)
+            .on_event::<proposals::AfterSearch>()
             .publishes::<events::OpportunityAdded>(),
         kinds: Vec::new(),
     }

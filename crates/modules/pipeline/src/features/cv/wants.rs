@@ -277,7 +277,10 @@ pub async fn add(
             cost
         }
         Ok((brief::Attempt::Retry(error), cost)) => {
-            tracing::warn!(error = error.code(), "the wants pass answered nothing usable");
+            tracing::warn!(
+                error = error.code(),
+                "the wants pass answered nothing usable"
+            );
             cost
         }
         Err(error) => {
@@ -359,7 +362,10 @@ mod tests {
         assert_eq!(reason("On-call rota"), Some(WantReason::InProfile));
         assert_eq!(reason("Elixir"), Some(WantReason::NotInProfile));
         assert!(views.iter().find(|v| v.text == "Rust").unwrap().covered);
-        assert_eq!(views.iter().find(|v| v.text == "Elixir").unwrap().level, "nice");
+        assert_eq!(
+            views.iter().find(|v| v.text == "Elixir").unwrap().level,
+            "nice"
+        );
         // Only the one the profile shows is asked about.
         let asked = missing(&wants, "Engineer", "", &content(), &frame());
         assert_eq!(asked.len(), 1);
@@ -392,7 +398,10 @@ mod tests {
                 ],
             },
         );
-        assert_eq!(added, 2, "the first three, less the ones that cannot go anywhere");
+        assert_eq!(
+            added, 2,
+            "the first three, less the ones that cannot go anywhere"
+        );
         assert_eq!(c.experience.len(), 2);
         assert_eq!(c.experience[0].position, 0, "newest first");
         assert_eq!(c.experience[0].bullets.len(), 2);

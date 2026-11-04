@@ -308,6 +308,11 @@ pub struct CvDraftView {
     pub needs_version: bool,
     /// Just approved: until then `…/unapprove` puts it back as a draft.
     pub undo_until: Option<DateTime<Utc>>,
+    /// What the job wants, each covered by the CV or why not.
+    pub wants: Vec<super::wants::WantView>,
+    /// What the app's calls for this draft cost, in euros (the draft, the
+    /// second look at what the job wants, the fix of what was flagged).
+    pub cost_eur: Option<f64>,
 }
 
 /// An approved version: the approved text as a PDF.
@@ -809,6 +814,8 @@ pub fn draft_view(
         preview: None,
         needs_version: false,
         undo_until: None,
+        wants: super::wants::wants_view(wants, title, posting, content, frame),
+        cost_eur: None,
     }
 }
 

@@ -73,7 +73,7 @@ use self::{
 use crate::{
     PipelineDeps, companies,
     features::brief::{self, BriefWant},
-    ports::Neighbours,
+    ports::{CvProfile, Neighbours},
 };
 
 /// Drafts one opportunity can have, ever (until they are swept).
@@ -138,6 +138,16 @@ pub struct CvCaps {
     pub month_limit_eur: Option<f64>,
 }
 
+/// A step the app did by itself for this job, with what it cost.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct CvDoneStep {
+    /// `shortlist`, `site`, `read`, `compare` or `draft`.
+    pub step: String,
+    /// About what it cost, in euros.
+    pub eur: f64,
+    pub at: DateTime<Utc>,
+}
+
 /// What the app starts by itself now that the CV is approved.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct CvNext {
@@ -164,6 +174,12 @@ pub struct Cv {
     pub draft_eur: f64,
     /// What the app starts next by itself, when it does.
     pub next: Option<CvNext>,
+    /// What the app did by itself for this CV, in order: the job's
+    /// preparation (when it prepared it) and the draft.
+    pub done: Vec<CvDoneStep>,
+    /// The posting's language, when the CV is in another: offered, never
+    /// chosen for the person.
+    pub suggested_language: Option<String>,
 }
 
 /// What to make a draft of.
@@ -262,6 +278,7 @@ struct Row {
     preview_checks: Option<sqlx::types::Json<PdfChecks>>,
     preview_error: Option<String>,
     preview_at: Option<DateTime<Utc>>,
+    cost_eur: Option<f64>,
 }
 
 /// A select of a draft's columns, with `$tail` after the table.
@@ -271,7 +288,7 @@ macro_rules! select_draft {
             "SELECT id, n, language, status, version, content, frame, checks, created_at, \
              approved_at, expires_at, preview_pdf IS NOT NULL AS preview_ready, \
              preview_template, preview_length, preview_pages, preview_checks, preview_error, \
-             preview_at FROM pipeline.cv_drafts ",
+             preview_at, cost_eur FROM pipeline.cv_drafts ",
             $tail
         )
     };
@@ -338,7 +355,7 @@ async fn drafts_here(db: &PgPool, opp: Uuid) -> Result<i64> {
     )
 }
 
-async fn drafts_today(db: &PgPool, account: Uuid, now: DateTime<Utc>) -> Result<i64> {
+pub(crate) async fn drafts_today(db: &PgPool, account: Uuid, now: DateTime<Utc>) -> Result<i64> {
     Ok(sqlx::query_scalar(
         "SELECT count(*) FROM pipeline.cv_drafts WHERE account_id = $1 AND created_at >= $2",
     )
@@ -393,6 +410,7 @@ fn draft_view(row: &Row, wants: &[BriefWant], opp: &Opp) -> CvDraftView {
         opp.description.as_deref().unwrap_or_default(),
     );
     view.preview = preview::view(row);
+    view.cost_eur = row.cost_eur;
     view
 }
 
@@ -484,6 +502,10 @@ async fn build(
         }
         draft
     });
+    let suggested_language = draft
+        .as_ref()
+        .and_then(|d| suggested_language(opp, &d.language));
+    let done = done_of(db, account, opp.id, draft.as_ref()).await?;
     let next: Option<(DateTime<Utc>,)> = sqlx::query_as(
         "SELECT updated_at FROM pipeline.preparations
           WHERE opportunity_id = $1 AND account_id = $2 AND state = 'queued' AND step = 'letter'",
@@ -519,6 +541,8 @@ async fn build(
             eur: letter::DRAFT_EUR,
             at: queued + UNDO_WINDOW,
         }),
+        done,
+        suggested_language,
     })
 }
 
@@ -533,9 +557,25 @@ const DRAFT_BUDGETS: [u32; 2] = [6_000, 10_000];
 
 /// Fluencies that are enough to write a CV in.
 const WORKING: &[&str] = &[
-    "native", "fluent", "professional", "full professional", "bilingual", "c1", "c2",
-    "nativo", "nativa", "fluente", "fluido", "fluida", "natif", "native speaker", "courant",
-    "materna", "langue maternelle", "língua materna", "lengua materna",
+    "native",
+    "fluent",
+    "professional",
+    "full professional",
+    "bilingual",
+    "c1",
+    "c2",
+    "nativo",
+    "nativa",
+    "fluente",
+    "fluido",
+    "fluida",
+    "natif",
+    "native speaker",
+    "courant",
+    "materna",
+    "langue maternelle",
+    "língua materna",
+    "lengua materna",
 ];
 
 /// The language tag of a language's name, for the CV's languages.
@@ -562,7 +602,12 @@ fn language_of(asked: Option<&str>, profile: &CvProfile) -> String {
         })
         .or_else(|| {
             profile.languages.iter().find_map(|l| {
-                let fluency = l.fluency.as_deref().unwrap_or_default().trim().to_lowercase();
+                let fluency = l
+                    .fluency
+                    .as_deref()
+                    .unwrap_or_default()
+                    .trim()
+                    .to_lowercase();
                 WORKING
                     .contains(&fluency.as_str())
                     .then(|| tag_of_name(&l.language))
@@ -573,6 +618,49 @@ fn language_of(asked: Option<&str>, profile: &CvProfile) -> String {
         .unwrap_or_else(|| "en".to_owned())
 }
 
+/// What the app did by itself for `opp`'s CV: its preparation's steps (not
+/// the letter's), then the draft, with what its calls cost when it was made
+/// by a click.
+async fn done_of(
+    db: &PgPool,
+    account: Uuid,
+    opp: Uuid,
+    draft: Option<&CvDraftView>,
+) -> Result<Vec<CvDoneStep>> {
+    let steps: Option<sqlx::types::Json<Vec<crate::features::prepare::PreparedStep>>> =
+        sqlx::query_scalar(
+            "SELECT done FROM pipeline.preparations WHERE opportunity_id = $1 AND account_id = $2",
+        )
+        .bind(opp)
+        .bind(account)
+        .fetch_optional(db)
+        .await?;
+    let mut done: Vec<CvDoneStep> = steps
+        .map(|s| s.0)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|s| s.step != "letter")
+        .map(|s| CvDoneStep {
+            step: s.step,
+            eur: s.eur,
+            at: s.at,
+        })
+        .collect();
+    if let Some(draft) = draft {
+        let cost = draft.cost_eur.unwrap_or(DRAFT_EUR);
+        match done.iter_mut().rev().find(|s| s.step == "draft") {
+            // The draft the preparation made: what its calls really cost.
+            Some(step) if step.at <= draft.created_at => step.eur = cost,
+            _ => done.push(CvDoneStep {
+                step: "draft".to_owned(),
+                eur: cost,
+                at: draft.created_at,
+            }),
+        }
+    }
+    Ok(done)
+}
+
 /// The posting's language, when it is not the CV's: offered as a choice.
 fn suggested_language(opp: &Opp, current: &str) -> Option<String> {
     let posting = opp
@@ -580,7 +668,12 @@ fn suggested_language(opp: &Opp, current: &str) -> Option<String> {
         .as_ref()
         .and_then(|l| l.first())
         .and_then(|l| brief::prompt::language(Some(l)))?;
-    let base = |tag: &str| tag.split(['-', '_']).next().unwrap_or_default().to_lowercase();
+    let base = |tag: &str| {
+        tag.split(['-', '_'])
+            .next()
+            .unwrap_or_default()
+            .to_lowercase()
+    };
     (base(&posting) != base(current)).then_some(posting)
 }
 
@@ -918,7 +1011,7 @@ pub(crate) async fn draft(
         None => Vec::new(),
     };
     let frame = Frame::build(&profile, &opp.company, &facts);
-    let language = language_of(language, &opp);
+    let language = language_of(language, &profile);
     let user = prompt::message(
         &opp.title,
         &opp.company,
@@ -927,8 +1020,12 @@ pub(crate) async fn draft(
         &frame,
         &language,
     );
-    let raw: RawCv = brief::ask(
+    // The longer writing goes to the `write` model, `complete` without one.
+    let role = gateway.writer();
+    let (raw, mut cost_usd): (RawCv, f64) = brief::ask_as(
         gateway,
+        role,
+        &DRAFT_BUDGETS,
         db,
         account,
         now,
@@ -940,10 +1037,25 @@ pub(crate) async fn draft(
     .await?;
     let mut content =
         judge::judge(raw, &frame, &profile).ok_or(Error::Unavailable(applicamp_ai::AI_FAILED))?;
+    // What the job wants that the profile shows and the draft does not say.
+    cost_usd += wants::add(
+        gateway,
+        role,
+        db,
+        account,
+        now,
+        &mut content,
+        &frame,
+        &wants,
+        &opp.title,
+        opp.description.as_deref().unwrap_or_default(),
+        &language,
+    )
+    .await;
     let known = known_of(&opp, &frame, &content);
     let mut checks = check::check(&content, &frame, &known);
     // The app fixes what it can before the person is asked (#73).
-    let fixed = fix::fix(
+    let (fixed, fix_cost) = fix::fix(
         gateway,
         db,
         account,
@@ -958,6 +1070,8 @@ pub(crate) async fn draft(
     if fixed.rewritten > 0 {
         checks = check::check(&content, &frame, &known);
     }
+    cost_usd += fix_cost;
+    let cost_eur = cost_usd * gateway.usd_to_eur();
 
     let expires_at = now + LIFETIME;
     let id = Uuid::now_v7();
@@ -980,8 +1094,8 @@ pub(crate) async fn draft(
     sqlx::query(
         "INSERT INTO pipeline.cv_drafts
             (id, account_id, opportunity_id, n, language, status, content, frame, checks,
-             created_at, updated_at, expires_at)
-         VALUES ($1, $2, $3, $4, $5, 'draft', $6, $7, $8, $9, $9, $10)",
+             created_at, updated_at, expires_at, cost_eur)
+         VALUES ($1, $2, $3, $4, $5, 'draft', $6, $7, $8, $9, $9, $10, $11)",
     )
     .bind(id)
     .bind(account)
@@ -993,6 +1107,7 @@ pub(crate) async fn draft(
     .bind(sqlx::types::Json(&checks))
     .bind(now)
     .bind(expires_at)
+    .bind(cost_eur)
     .execute(&mut *tx)
     .await?;
     jobs::enqueue_at(&mut tx, &ExpireCvDrafts {}, expires_at).await?;

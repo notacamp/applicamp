@@ -20,6 +20,7 @@ pub(crate) const FACT_ID: &str = "aaaa1111-0000-4000-8000-000000000001";
 pub(crate) const COMPANY_FACT: &str = "Builds ledgers for small shops";
 pub(crate) const CV: &str = "You write a one-page CV";
 pub(crate) const FIX: &str = "You fix the lines of a CV";
+pub(crate) const WANTS: &str = "You add bullets to a CV";
 
 pub(crate) fn profile() -> CvProfile {
     CvProfile {
@@ -194,16 +195,30 @@ async fn stack(db: PgPool) -> Stack {
 
 /// A stack whose model drafts `cv` and answers the fix prompt with `fixer`.
 async fn stack_with(db: PgPool, cv: Value, fixer: Option<Fixer>) -> Stack {
+    stack_full(
+        db,
+        cv,
+        json!({"wants": [], "questions": []}),
+        fixer,
+        Value::Null,
+    )
+    .await
+}
+
+/// A stack whose model compares the job with `analysis`, drafts `cv`,
+/// answers the fix prompt with `fixer` and the second look at what the job
+/// wants with `adds`.
+async fn stack_full(
+    db: PgPool,
+    cv: Value,
+    analysis: Value,
+    fixer: Option<Fixer>,
+    adds: Value,
+) -> Stack {
     let fake = Arc::new(Fake::default());
     *fake.cv_profile.lock().unwrap() = Some(profile());
-    let model = Model::with_fixer(
-        json!({"facts": []}),
-        json!({"wants": [], "questions": []}),
-        cv,
-        Value::Null,
-        fixer,
-    )
-    .await;
+    let model =
+        Model::with_adds(json!({"facts": []}), analysis, cv, Value::Null, fixer, adds).await;
     let h = Harness::with_ai(db, Uuid::now_v7(), Arc::clone(&fake), Some(model.gateway()));
     company_fact(&h).await;
     let opp = add(&h, "shortlisted").await;
@@ -1530,4 +1545,133 @@ async fn an_approval_can_be_undone_for_a_moment_and_not_after(db: PgPool) {
     assert_eq!(status, StatusCode::CONFLICT, "{body}");
     assert_eq!(body["code"], "too_late");
     assert_eq!(s.model.calls(CV).await, 1);
+}
+
+// ---- written from everything the profile knows (#73) ----------------------------
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_model_is_shown_everything_and_the_cv_reads_newest_first_with_the_rest_earlier(
+    db: PgPool,
+) {
+    // The model gives the older position first.
+    let mut cv = answer();
+    cv["experience"].as_array_mut().unwrap().reverse();
+    let s = stack_with(db, cv, None).await;
+    let cv = draft(&s).await;
+    let message = &s.model.user_messages(CV).await[0];
+    for needle in [
+        "[bg] Ran a small hotel for six years before engineering",
+        "[pr0] Ledgerly: An open-source billing toolkit",
+        "[ce0] Cloud Practitioner, Example Academy, 2022",
+        "<language>en</language>",
+    ] {
+        assert!(message.contains(needle), "{needle}\n{message}");
+    }
+    let d = &cv["draft"];
+    let positions: Vec<i64> = d["experience"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["position"].as_i64().unwrap())
+        .collect();
+    assert_eq!(
+        positions,
+        [0, 1],
+        "newest first, whatever the model's order"
+    );
+    // What the calls cost, and what the app did.
+    let cost = d["cost_eur"].as_f64().unwrap();
+    assert!(cost > 0.0, "{cost}");
+    let done = cv["done"].as_array().unwrap();
+    assert_eq!(done.last().unwrap()["step"], "draft");
+    assert!((done.last().unwrap()["eur"].as_f64().unwrap() - cost).abs() < 1e-12);
+    assert!(cv["suggested_language"].is_null());
+    // The position left out is named under Earlier, by the app.
+    let (_, _, bytes) = s.h.get_raw(&url(&s.opp, "/drafts/1/preview.pdf")).await;
+    let read = super::pdf::readback::extract(&bytes).unwrap();
+    assert!(read.text.contains("Earlier"), "{}", read.text);
+    assert!(
+        read.text.contains("Junior Developer, Tiny Co (2015–2017)"),
+        "{}",
+        read.text
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_cv_is_in_the_persons_language_and_the_postings_is_only_offered(db: PgPool) {
+    let s = stack(db).await;
+    if let Some(profile) = s.fake.cv_profile.lock().unwrap().as_mut() {
+        profile.work_languages = vec!["pt-PT".into()];
+    }
+    sqlx::query("UPDATE pipeline.opportunities SET working_languages = '{en}'")
+        .execute(&s.h.db)
+        .await
+        .unwrap();
+    let cv = draft(&s).await;
+    assert_eq!(cv["draft"]["language"], "pt-PT");
+    assert_eq!(cv["suggested_language"], "en");
+    assert!(s.model.user_messages(CV).await[0].contains("<language>pt-PT</language>"));
+    // Asked for, the posting's.
+    let (status, cv) =
+        s.h.json(
+            "POST",
+            &url(&s.opp, "/drafts"),
+            &json!({ "language": "en" }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    assert_eq!(cv["draft"]["language"], "en");
+    assert!(cv["suggested_language"].is_null());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn what_the_job_wants_and_the_profile_shows_is_added_in_one_more_call(db: PgPool) {
+    // A draft that leaves the second position out.
+    let mut cv = answer();
+    cv["experience"].as_array_mut().unwrap().truncate(1);
+    let analysis = json!({
+        "wants": [
+            { "label": "Partner feeds", "quote": "partner feeds", "level": "must" },
+            { "label": "Elixir", "quote": "Elixir is a plus", "level": "nice" },
+        ],
+        "questions": [],
+    });
+    let adds = json!({ "bullets": [
+        { "position": 1, "text": "Built ingestion for 3 partner feeds", "sources": ["w1.h1"] },
+    ]});
+    let s = stack_full(db, cv, analysis, None, adds).await;
+    sqlx::query(
+        "UPDATE pipeline.opportunities
+            SET description = 'You will own billing and partner feeds. Elixir is a plus. \
+                               Rust and PostgreSQL required.'",
+    )
+    .execute(&s.h.db)
+    .await
+    .unwrap();
+    let cv = draft(&s).await;
+    assert_eq!(s.model.calls(WANTS).await, 1);
+    let message = &s.model.user_messages(WANTS).await[0];
+    assert!(message.contains("- Partner feeds (must)"), "{message}");
+    assert!(
+        !message.contains("Elixir"),
+        "a want the profile lacks is never asked for"
+    );
+    let d = &cv["draft"];
+    let second = d["experience"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["position"] == 1)
+        .expect("the position comes back with the bullet");
+    assert_eq!(
+        second["bullets"][0]["text"],
+        "Built ingestion for 3 partner feeds"
+    );
+    assert_eq!(second["bullets"][0]["flags"], json!([]));
+    let wants = d["wants"].as_array().unwrap();
+    let want = |text: &str| wants.iter().find(|w| w["text"] == text).unwrap();
+    assert_eq!(want("Partner feeds")["covered"], true);
+    assert_eq!(want("Elixir")["covered"], false);
+    assert_eq!(want("Elixir")["reason"], "not_in_profile");
+    assert_eq!(want("Elixir")["level"], "nice");
 }

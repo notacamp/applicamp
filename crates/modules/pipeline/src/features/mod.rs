@@ -4,4 +4,5 @@ pub mod brief;
 pub mod cv;
 pub mod opportunities;
 pub mod prepare;
+pub mod proposals;
 pub mod today;

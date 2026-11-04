@@ -151,8 +151,9 @@ test("someone drafts a CV, sees it as a PDF at once, says yes to the one questio
   await expect(page.getByTestId("cv-approve-reason")).toContainText(
     "Answer the 2 questions to approve.",
   );
-  const asks = await page.getByTestId("cv-needs-you").boundingBox();
-  const pdf = await page.getByTestId("cv-preview").boundingBox();
+  // The first question's Yes and the PDF's pages: boxes the page draws.
+  const asks = await number.getByTestId(/^cv-question-yes-/).boundingBox();
+  const pdf = await page.getByTestId("cv-preview-pdf-pages").boundingBox();
   expect(asks).not.toBeNull();
   expect(pdf).not.toBeNull();
   if (asks !== null && pdf !== null) {

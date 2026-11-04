@@ -389,7 +389,7 @@
     }
   },
   "admin": {
-    "loadFailed": "The job boards could not be loaded.",
+    "loadFailed": "The job sites could not be loaded.",
     "retry": "Try again",
     "none": "Not yet",
     "worldwide": "Worldwide",
@@ -411,19 +411,19 @@
     },
     "week": {
       "title": "This week",
-      "found_one": "Found {{count}} new board and checked {{checked}}.",
-      "found_other": "Found {{count}} new boards and checked {{checked}}.",
-      "started_one": "{{count}} board started reading.",
-      "started_other": "{{count}} boards started reading.",
-      "rechecked_one": "The rules of {{count}} board were read again.",
-      "rechecked_other": "The rules of {{count}} boards were read again.",
-      "nothing": "Nothing new this week. The app looks for new boards every week."
+      "found_one": "Found {{count}} new site and checked {{checked}}.",
+      "found_other": "Found {{count}} new sites and checked {{checked}}.",
+      "started_one": "{{count}} site started reading.",
+      "started_other": "{{count}} sites started reading.",
+      "rechecked_one": "The rules of {{count}} site were read again.",
+      "rechecked_other": "The rules of {{count}} sites were read again.",
+      "nothing": "Nothing new this week. The app looks for new sites every week."
     },
     "waiting": {
       "title": "Waiting for you",
       "description": "Each one needs something only you can do.",
       "emptyTitle": "Nothing waits for you",
-      "emptyBody": "A board shows up here when its rules ask for permission, it needs a key, or only your approval is left. The app finds and checks new boards every week."
+      "emptyBody": "A site shows up here when its rules ask for permission, it needs a key, or only your approval is left. The app finds and checks new sites every week."
     },
     "need": {
       "permission": "Its rules ask for written permission before an app reads its jobs.",
@@ -456,31 +456,31 @@
     },
     "origin": {
       "seed": "the first research",
-      "discovery": "the weekly search for boards",
+      "discovery": "the weekly search for sites",
       "suggested": "a suggestion"
     },
     "table": {
-      "board": "Board",
+      "board": "Site",
       "jobs": "Jobs it has",
       "where": "Where",
       "status": "Status",
       "found": "Found through"
     },
     "all": {
-      "title": "All boards · {{total}}",
-      "search": "Find a board or a company",
+      "title": "All sites · {{total}}",
+      "search": "Find a site or a company",
       "searchHint": "Hotels, nurses, Lisbon, Greenhouse",
-      "emptyTitle": "No board matches",
-      "emptyBody": "No board matches these filters. Clear a filter to see more.",
-      "emptyNone": "No board is known yet. The app looks for new ones every week.",
+      "emptyTitle": "No site matches",
+      "emptyBody": "No site matches these filters. Clear a filter to see more.",
+      "emptyNone": "No site is known yet. The app looks for new ones every week.",
       "clear": "Clear filters",
-      "table": "All boards",
+      "table": "All sites",
       "showing": "Showing {{shown}} of {{total}}"
     },
     "filters": {
       "show": "Show",
       "options": {
-        "all": "All boards",
+        "all": "All sites",
         "waiting": "Waiting for you",
         "checking": "Being checked",
         "reading": "Reading",
@@ -491,7 +491,7 @@
       }
     },
     "peek": {
-      "eyebrow": "Job board",
+      "eyebrow": "Job site",
       "close": "Close",
       "more": "More options"
     },
@@ -524,7 +524,7 @@
     },
     "choice": {
       "title": "Your choice",
-      "description": "Reading these pages to show their jobs is allowed. Their site asks AI tools not to learn from its pages. The app never trains a model on jobs, but it does ask a model whether a job fits the person.",
+      "description": "Reading these pages to show their jobs is allowed. Their site asks artificial intelligence tools not to learn from its pages. The app never trains a model on jobs, but it does ask a model whether a job fits the person.",
       "yes": "Read them",
       "no": "Do not read them"
     },
@@ -564,7 +564,7 @@
     },
     "errors": {
       "not_asked": "Say you sent it first.",
-      "not_waiting": "Only a board waiting for you can be answered.",
+      "not_waiting": "Only a site waiting for you can be answered.",
       "robots_disallowed": "Its site tells programs to stay away from that list, so a yes cannot start it.",
       "needs_key": "It needs a key first. Add it, then answer.",
       "check_needed": "The app has not checked its rules yet. Check it again first.",
@@ -587,6 +587,8 @@
         "part": "Still being checked",
         "none": "Needs attention"
       }
-    }
+    },
+    "undo": "Undo",
+    "declined": "Declined"
   }
 }

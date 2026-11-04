@@ -190,13 +190,13 @@ test("every waiting board can be approved or says why: checked at start, a key s
   await expect(page.getByTestId("board-approve")).toBeEnabled();
 });
 
-test("the owner's Job boards page: totals, what waits for them, and a board's decision before its facts and checks", async ({
+test("the owner's Job sites page: totals, what waits for them, and a board's decision before its facts and checks", async ({
   page,
 }) => {
   await signIn(page);
   await page.goto("/boards");
   await expectPageFillsTheScreen(page, "boards");
-  await expect(page.getByTestId("boards")).toContainText("Job boards");
+  await expect(page.getByTestId("boards")).toContainText("Job sites");
   await expect(page.getByTestId("boards-back")).toBeVisible();
   await expect(page.getByTestId("boards-admin-totals")).toBeVisible();
   await expect(page.getByTestId("boards-admin-week")).toBeVisible();

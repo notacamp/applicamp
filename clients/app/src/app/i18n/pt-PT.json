@@ -55,8 +55,9 @@
   "boards": {
     "title": "Portais",
     "lead": "Os portais de emprego que as pesquisas leem, ordenados pelos salários que anunciam, os novos à sua espera e o que cada pesquisa analisou.",
-    "adminTitle": "Portais de emprego",
-    "back": "Perfil"
+    "adminTitle": "Sites de emprego",
+    "back": "Perfil",
+    "eyebrow": "Perfil · Sites de emprego"
   },
   "companies": {
     "title": "Empresas",

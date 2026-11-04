@@ -97,3 +97,20 @@ export function useAnswerRequest(id: string) {
     },
   });
 }
+
+/** Take back a decline: the board goes back to where it was. */
+export function useReopen(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (): Promise<BoardDetail> =>
+      unwrap(
+        await api.POST("/api/v1/boards/{id}/reopen", {
+          params: { path: { id } },
+          headers: CSRF_HEADERS,
+        }),
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: BOARDS_QUERY_KEY });
+    },
+  });
+}

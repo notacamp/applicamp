@@ -389,7 +389,7 @@
     }
   },
   "admin": {
-    "loadFailed": "No se pudieron cargar los portales de empleo.",
+    "loadFailed": "No se pudieron cargar los sitios de empleo.",
     "retry": "Reintentar",
     "none": "Aún no",
     "worldwide": "En todo el mundo",
@@ -399,7 +399,7 @@
     "showMore_other": "Mostrar {{count}} más",
     "totals": {
       "reading": "Leídos",
-      "readingDetail": "{{sites}} portales de empleo y {{companies}} empresas",
+      "readingDetail": "{{sites}} sitios de empleo y {{companies}} empresas",
       "waiting": "Esperándote",
       "waitingDetail": "Permisos, claves y decisiones",
       "checking": "En revisión",
@@ -411,19 +411,19 @@
     },
     "week": {
       "title": "Esta semana",
-      "found_one": "Encontrado {{count}} portal nuevo y revisados {{checked}}.",
-      "found_other": "Encontrados {{count}} portales nuevos y revisados {{checked}}.",
-      "started_one": "{{count}} portal empezó a leerse.",
-      "started_other": "{{count}} portales empezaron a leerse.",
-      "rechecked_one": "Se volvieron a leer las normas de {{count}} portal.",
-      "rechecked_other": "Se volvieron a leer las normas de {{count}} portales.",
-      "nothing": "Nada nuevo esta semana. La app busca portales nuevos cada semana."
+      "found_one": "Encontrado {{count}} sitio nuevo y revisados {{checked}}.",
+      "found_other": "Encontrados {{count}} sitios nuevos y revisados {{checked}}.",
+      "started_one": "{{count}} sitio empezó a leerse.",
+      "started_other": "{{count}} sitios empezaron a leerse.",
+      "rechecked_one": "Se volvieron a leer las normas de {{count}} sitio.",
+      "rechecked_other": "Se volvieron a leer las normas de {{count}} sitios.",
+      "nothing": "Nada nuevo esta semana. La app busca sitios nuevos cada semana."
     },
     "waiting": {
       "title": "Esperándote",
       "description": "Cada uno necesita algo que solo tú puedes hacer.",
       "emptyTitle": "Nada te espera",
-      "emptyBody": "Un portal aparece aquí cuando sus normas piden permiso, necesita una clave o solo falta tu aprobación. La app encuentra y revisa portales nuevos cada semana."
+      "emptyBody": "Un sitio aparece aquí cuando sus normas piden permiso, necesita una clave o solo falta tu aprobación. La app encuentra y revisa sitios nuevos cada semana."
     },
     "need": {
       "permission": "Sus normas piden permiso por escrito antes de que una app lea sus ofertas.",
@@ -445,7 +445,7 @@
       "paused": "En pausa"
     },
     "kind": {
-      "site": "Portal de empleo",
+      "site": "Sitio de empleo",
       "company": "Página de empresa"
     },
     "how": {
@@ -456,42 +456,42 @@
     },
     "origin": {
       "seed": "la primera investigación",
-      "discovery": "la búsqueda semanal de portales",
+      "discovery": "la búsqueda semanal de sitios",
       "suggested": "una sugerencia"
     },
     "table": {
-      "board": "Portal",
+      "board": "Sitio",
       "jobs": "Ofertas que tiene",
       "where": "Dónde",
       "status": "Estado",
       "found": "Encontrado a través de"
     },
     "all": {
-      "title": "Todos los portales · {{total}}",
-      "search": "Buscar un portal o una empresa",
+      "title": "Todos los sitios · {{total}}",
+      "search": "Buscar un sitio o una empresa",
       "searchHint": "Hoteles, enfermeros, Lisboa, Greenhouse",
-      "emptyTitle": "Ningún portal coincide",
-      "emptyBody": "Ningún portal coincide con estos filtros. Quita un filtro para ver más.",
-      "emptyNone": "Aún no se conoce ningún portal. La app busca nuevos cada semana.",
+      "emptyTitle": "Ningún sitio coincide",
+      "emptyBody": "Ningún sitio coincide con estos filtros. Quita un filtro para ver más.",
+      "emptyNone": "Aún no se conoce ningún sitio. La app busca nuevos cada semana.",
       "clear": "Quitar filtros",
-      "table": "Todos los portales",
+      "table": "Todos los sitios",
       "showing": "Mostrando {{shown}} de {{total}}"
     },
     "filters": {
       "show": "Mostrar",
       "options": {
-        "all": "Todos los portales",
+        "all": "Todos los sitios",
         "waiting": "Esperándote",
         "checking": "En revisión",
         "reading": "Leídos",
         "notAllowed": "No permitidos",
         "paused": "En pausa",
-        "site": "Portales de empleo",
+        "site": "Sitios de empleo",
         "company": "Páginas de empresas"
       }
     },
     "peek": {
-      "eyebrow": "Portal de empleo",
+      "eyebrow": "Sitio de empleo",
       "close": "Cerrar",
       "more": "Más opciones"
     },
@@ -524,7 +524,7 @@
     },
     "choice": {
       "title": "Tu decisión",
-      "description": "Se permite leer estas páginas para mostrar sus ofertas. Su sitio pide a las herramientas de IA que no aprendan de sus páginas. La app nunca entrena un modelo con ofertas, pero sí pregunta a un modelo si una oferta le sirve a la persona.",
+      "description": "Se permite leer estas páginas para mostrar sus ofertas. Su sitio pide a las herramientas de inteligencia artificial que no aprendan de sus páginas. La app nunca entrena un modelo con ofertas, pero sí pregunta a un modelo si una oferta le sirve a la persona.",
       "yes": "Leerlas",
       "no": "No leerlas"
     },
@@ -564,7 +564,7 @@
     },
     "errors": {
       "not_asked": "Di primero que lo enviaste.",
-      "not_waiting": "Solo se puede responder a un portal que te espera.",
+      "not_waiting": "Solo se puede responder a un sitio que te espera.",
       "robots_disallowed": "Su sitio dice a los programas que no se acerquen a esa lista, así que un sí no puede ponerlo en marcha.",
       "needs_key": "Antes necesita una clave. Añádela y responde después.",
       "check_needed": "La app aún no revisó sus normas. Revísalo de nuevo primero.",
@@ -587,6 +587,8 @@
         "part": "Aún en revisión",
         "none": "Necesita atención"
       }
-    }
+    },
+    "undo": "Deshacer",
+    "declined": "Rechazado"
   }
 }

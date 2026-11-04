@@ -38,7 +38,7 @@ import { BoardPeek } from "../BoardPeek/BoardPeek";
 import { StageLabel } from "./StageLabel";
 
 /** What a decline from this page says, kept with the board. */
-const DECLINED_HERE = "Declined from the Job boards page.";
+const DECLINED_HERE = "Declined from the Job sites page.";
 
 export interface AdminPeekProps {
   /** The board open; none closes the panel. */
@@ -104,6 +104,7 @@ export function AdminPeek({ row, onClose }: AdminPeekProps) {
               <Cluster>
                 <Button
                   variant="ghost"
+                  size="lg"
                   data-testid="boards-admin-more-options"
                   onClick={() => {
                     setMore(row.board.id);
@@ -219,6 +220,7 @@ function DeclineButton({ id, name, label }: { id: string; name: string; label?: 
   return (
     <Button
       variant="secondary"
+      size="lg"
       data-testid="boards-admin-decline"
       onClick={() => {
         setAsking(true);
@@ -266,6 +268,7 @@ function PermissionDecision({ row }: { row: AdminRow }) {
           <Cluster>
             <Button
               variant="primary"
+              size="lg"
               icon="check"
               disabled={asked.isPending}
               data-testid="boards-admin-asked"
@@ -287,6 +290,7 @@ function PermissionDecision({ row }: { row: AdminRow }) {
             <Cluster>
               <Button
                 variant="primary"
+                size="lg"
                 icon="check"
                 disabled={answer.isPending}
                 data-testid="boards-admin-yes"
@@ -298,6 +302,7 @@ function PermissionDecision({ row }: { row: AdminRow }) {
               </Button>
               <Button
                 variant="secondary"
+                size="lg"
                 disabled={answer.isPending}
                 data-testid="boards-admin-no"
                 onClick={() => {
@@ -385,6 +390,7 @@ function KeyDecision({ detail }: { detail: BoardDetail }) {
         <Cluster>
           <Button
             variant="primary"
+            size="lg"
             icon="check"
             disabled={!filled || action.isPending}
             data-testid="boards-admin-key-save"
@@ -413,6 +419,7 @@ function ChoiceDecision({ row }: { row: AdminRow }) {
         <Cluster>
           <Button
             variant="primary"
+            size="lg"
             disabled={answer.isPending}
             data-testid="boards-admin-choice-yes"
             onClick={() => {
@@ -423,6 +430,7 @@ function ChoiceDecision({ row }: { row: AdminRow }) {
           </Button>
           <Button
             variant="secondary"
+            size="lg"
             disabled={answer.isPending}
             data-testid="boards-admin-choice-no"
             onClick={() => {
@@ -453,6 +461,7 @@ function ApproveDecision({ row }: { row: AdminRow }) {
         <Cluster>
           <Button
             variant="primary"
+            size="lg"
             icon="check"
             disabled={action.isPending}
             data-testid="boards-admin-approve"
@@ -485,6 +494,7 @@ function CheckingDecision({ row }: { row: AdminRow }) {
         <Cluster>
           <Button
             variant="secondary"
+            size="lg"
             disabled={action.isPending}
             data-testid="boards-admin-check"
             onClick={() => {
@@ -504,16 +514,36 @@ function CheckingDecision({ row }: { row: AdminRow }) {
 
 function NotAllowedDecision({ row }: { row: AdminRow }) {
   const { t } = useTranslation("sources");
+  const reopen = useReopen(row.board.id);
   const reason = row.board.decline_reason ?? row.detail;
+  const declined = row.board.status === "declined";
   return (
     <Section
-      title={t("admin.notAllowed.title")}
-      description={t("admin.notAllowed.description")}
+      title={declined ? t("admin.declined") : t("admin.notAllowed.title")}
+      description={declined ? undefined : t("admin.notAllowed.description")}
       testId="boards-admin-not-allowed"
     >
-      {reason === undefined || reason === null ? null : (
-        <Text tone="secondary">{`“${reason}”`}</Text>
-      )}
+      <Stack gap="sm">
+        {reason === undefined ? null : <Text tone="secondary">{`\u201C${reason}\u201D`}</Text>}
+        {declined ? (
+          <Cluster>
+            <Button
+              variant="secondary"
+              size="lg"
+              disabled={reopen.isPending}
+              data-testid="boards-admin-peek-undo"
+              onClick={() => {
+                reopen.mutate();
+              }}
+            >
+              {t("admin.undo")}
+            </Button>
+          </Cluster>
+        ) : null}
+        {reopen.isError ? (
+          <ErrorLine testId="boards-admin-undo-error" error={reopen.error} />
+        ) : null}
+      </Stack>
     </Section>
   );
 }
@@ -535,6 +565,7 @@ function ReadingDecision({ row }: { row: AdminRow }) {
           {row.status === "paused" ? (
             <Button
               variant="secondary"
+              size="lg"
               disabled={action.isPending}
               data-testid="boards-admin-resume"
               onClick={() => {
@@ -546,6 +577,7 @@ function ReadingDecision({ row }: { row: AdminRow }) {
           ) : (
             <Button
               variant="secondary"
+              size="lg"
               disabled={action.isPending}
               data-testid="boards-admin-pause"
               onClick={() => {
@@ -557,6 +589,7 @@ function ReadingDecision({ row }: { row: AdminRow }) {
           )}
           <Button
             variant="secondary"
+            size="lg"
             disabled={action.isPending}
             data-testid="boards-admin-check"
             onClick={() => {
@@ -567,6 +600,7 @@ function ReadingDecision({ row }: { row: AdminRow }) {
           </Button>
           <Button
             variant="secondary"
+            size="lg"
             disabled={action.isPending}
             data-testid="boards-admin-stop"
             onClick={() => {

@@ -389,7 +389,7 @@
     }
   },
   "admin": {
-    "loadFailed": "Não foi possível carregar os portais de emprego.",
+    "loadFailed": "Não foi possível carregar os sites de emprego.",
     "retry": "Tentar de novo",
     "none": "Ainda não",
     "worldwide": "Em todo o mundo",
@@ -399,7 +399,7 @@
     "showMore_other": "Mostrar mais {{count}}",
     "totals": {
       "reading": "A ser lidos",
-      "readingDetail": "{{sites}} portais de emprego e {{companies}} empresas",
+      "readingDetail": "{{sites}} sites de emprego e {{companies}} empresas",
       "waiting": "À sua espera",
       "waitingDetail": "Permissões, chaves e escolhas",
       "checking": "Em verificação",
@@ -411,19 +411,19 @@
     },
     "week": {
       "title": "Esta semana",
-      "found_one": "Encontrado {{count}} portal novo e verificados {{checked}}.",
-      "found_other": "Encontrados {{count}} portais novos e verificados {{checked}}.",
-      "started_one": "{{count}} portal começou a ser lido.",
-      "started_other": "{{count}} portais começaram a ser lidos.",
-      "rechecked_one": "As regras de {{count}} portal foram lidas outra vez.",
-      "rechecked_other": "As regras de {{count}} portais foram lidas outra vez.",
-      "nothing": "Nada de novo esta semana. A app procura portais novos todas as semanas."
+      "found_one": "Encontrado {{count}} site novo e verificados {{checked}}.",
+      "found_other": "Encontrados {{count}} sites novos e verificados {{checked}}.",
+      "started_one": "{{count}} site começou a ser lido.",
+      "started_other": "{{count}} sites começaram a ser lidos.",
+      "rechecked_one": "As regras de {{count}} site foram lidas outra vez.",
+      "rechecked_other": "As regras de {{count}} sites foram lidas outra vez.",
+      "nothing": "Nada de novo esta semana. A app procura sites novos todas as semanas."
     },
     "waiting": {
       "title": "À sua espera",
       "description": "Cada um precisa de algo que só você pode fazer.",
       "emptyTitle": "Nada está à sua espera",
-      "emptyBody": "Um portal aparece aqui quando as regras pedem permissão, precisa de uma chave ou só falta a sua aprovação. A app encontra e verifica portais novos todas as semanas."
+      "emptyBody": "Um site aparece aqui quando as regras pedem permissão, precisa de uma chave ou só falta a sua aprovação. A app encontra e verifica sites novos todas as semanas."
     },
     "need": {
       "permission": "As regras pedem permissão escrita antes de uma app ler as suas ofertas.",
@@ -445,7 +445,7 @@
       "paused": "Em pausa"
     },
     "kind": {
-      "site": "Portal de emprego",
+      "site": "Site de emprego",
       "company": "Página de empresa"
     },
     "how": {
@@ -456,42 +456,42 @@
     },
     "origin": {
       "seed": "a primeira pesquisa",
-      "discovery": "a procura semanal de portais",
+      "discovery": "a procura semanal de sites",
       "suggested": "uma sugestão"
     },
     "table": {
-      "board": "Portal",
+      "board": "Site",
       "jobs": "Ofertas que tem",
       "where": "Onde",
       "status": "Estado",
       "found": "Encontrado através de"
     },
     "all": {
-      "title": "Todos os portais · {{total}}",
-      "search": "Procurar um portal ou uma empresa",
+      "title": "Todos os sites · {{total}}",
+      "search": "Procurar um site ou uma empresa",
       "searchHint": "Hotéis, enfermeiros, Lisboa, Greenhouse",
-      "emptyTitle": "Nenhum portal corresponde",
-      "emptyBody": "Nenhum portal corresponde a estes filtros. Limpe um filtro para ver mais.",
-      "emptyNone": "Ainda não se conhece nenhum portal. A app procura novos todas as semanas.",
+      "emptyTitle": "Nenhum site corresponde",
+      "emptyBody": "Nenhum site corresponde a estes filtros. Limpe um filtro para ver mais.",
+      "emptyNone": "Ainda não se conhece nenhum site. A app procura novos todas as semanas.",
       "clear": "Limpar filtros",
-      "table": "Todos os portais",
+      "table": "Todos os sites",
       "showing": "A mostrar {{shown}} de {{total}}"
     },
     "filters": {
       "show": "Mostrar",
       "options": {
-        "all": "Todos os portais",
+        "all": "Todos os sites",
         "waiting": "À sua espera",
         "checking": "Em verificação",
         "reading": "A ser lidos",
         "notAllowed": "Não permitidos",
         "paused": "Em pausa",
-        "site": "Portais de emprego",
+        "site": "Sites de emprego",
         "company": "Páginas de empresas"
       }
     },
     "peek": {
-      "eyebrow": "Portal de emprego",
+      "eyebrow": "Site de emprego",
       "close": "Fechar",
       "more": "Mais opções"
     },
@@ -524,7 +524,7 @@
     },
     "choice": {
       "title": "A sua escolha",
-      "description": "É permitido ler estas páginas para mostrar as suas ofertas. O site pede às ferramentas de IA que não aprendam com as suas páginas. A app nunca treina um modelo com ofertas, mas pergunta a um modelo se uma oferta serve à pessoa.",
+      "description": "É permitido ler estas páginas para mostrar as suas ofertas. O site pede às ferramentas de inteligência artificial que não aprendam com as suas páginas. A app nunca treina um modelo com ofertas, mas pergunta a um modelo se uma oferta serve à pessoa.",
       "yes": "Lê-las",
       "no": "Não as ler"
     },
@@ -564,7 +564,7 @@
     },
     "errors": {
       "not_asked": "Diga primeiro que enviou.",
-      "not_waiting": "Só se pode responder a um portal que está à sua espera.",
+      "not_waiting": "Só se pode responder a um site que está à sua espera.",
       "robots_disallowed": "O site diz aos programas para ficarem longe dessa lista, por isso um sim não o pode ativar.",
       "needs_key": "Precisa primeiro de uma chave. Junte-a e responda depois.",
       "check_needed": "A app ainda não verificou as regras. Verifique de novo primeiro.",
@@ -587,6 +587,8 @@
         "part": "Ainda em verificação",
         "none": "Precisa de atenção"
       }
-    }
+    },
+    "undo": "Anular",
+    "declined": "Recusado"
   }
 }

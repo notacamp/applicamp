@@ -34,7 +34,7 @@ export function Boards({ tab, onTab }: BoardsProps) {
   }
   if (tab === "admin" && boards.data?.can_manage === true) {
     return (
-      <Page testId="boards" title={t("boards.adminTitle")} wide>
+      <Page testId="boards" title={t("boards.adminTitle")} eyebrow={t("boards.eyebrow")} wide>
         <BoardsAdmin
           back={
             <div>

@@ -56,7 +56,8 @@
     "title": "Sites d’emploi",
     "lead": "Les sites d’emploi que lisent les recherches, classés par les salaires qu’ils affichent, les nouveaux qui vous attendent et ce que chaque recherche a analysé.",
     "adminTitle": "Sites d’emploi",
-    "back": "Vous"
+    "back": "Vous",
+    "eyebrow": "Vous · Sites d’emploi"
   },
   "companies": {
     "title": "Entreprises",

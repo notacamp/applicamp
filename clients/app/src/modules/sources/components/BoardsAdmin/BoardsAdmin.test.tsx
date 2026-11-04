@@ -71,8 +71,8 @@ describe("the job boards admin page", () => {
     );
     expect(screen.getByTestId("boards-admin-total-waiting")).toHaveTextContent("1");
     const week = screen.getByTestId("boards-admin-week");
-    expect(week).toHaveTextContent("Found 184 new boards and checked 190.");
-    expect(week).toHaveTextContent("162 boards started reading.");
+    expect(week).toHaveTextContent("Found 184 new sites and checked 190.");
+    expect(week).toHaveTextContent("162 sites started reading.");
     const waitingList = screen.getByTestId("boards-admin-waiting");
     expect(waitingList).toHaveTextContent("Example Remote");
     expect(waitingList).toHaveTextContent("written permission");
@@ -80,7 +80,7 @@ describe("the job boards admin page", () => {
       "Waiting for you",
     );
     const all = screen.getByTestId("boards-admin-all");
-    expect(all).toHaveTextContent("All boards · 3");
+    expect(all).toHaveTextContent("All sites · 3");
     expect(within(all).getAllByTestId("boards-admin-row")).toHaveLength(3);
     expect(screen.getByTestId("boards-admin-status-notAllowed")).toHaveTextContent("Not allowed");
   });

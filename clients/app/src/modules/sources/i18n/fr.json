@@ -524,7 +524,7 @@
     },
     "choice": {
       "title": "Votre choix",
-      "description": "Lire ces pages pour montrer leurs offres est permis. Leur site demande aux outils d’IA de ne pas apprendre de ses pages. L’app n’entraîne jamais un modèle sur des offres, mais elle demande bien à un modèle si une offre convient à la personne.",
+      "description": "Lire ces pages pour montrer leurs offres est permis. Leur site demande aux outils d’intelligence artificielle de ne pas apprendre de ses pages. L’app n’entraîne jamais un modèle sur des offres, mais elle demande bien à un modèle si une offre convient à la personne.",
       "yes": "Les lire",
       "no": "Ne pas les lire"
     },
@@ -587,6 +587,8 @@
         "part": "Encore en vérification",
         "none": "Demande de l’attention"
       }
-    }
+    },
+    "undo": "Annuler",
+    "declined": "Refusé"
   }
 }

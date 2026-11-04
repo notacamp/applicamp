@@ -15,13 +15,14 @@ import {
   Select,
   SkeletonList,
   Stack,
+  Tag,
   Tagged,
   Text,
   TextField,
   type DataColumn,
 } from "~/lib/ui";
 
-import { useAdminOverview, withFinder, type AdminOverview } from "../../api/admin";
+import { useAdminOverview, useReopen, withFinder, type AdminOverview } from "../../api/admin";
 import {
   adminRows,
   filterRows,
@@ -45,7 +46,7 @@ export interface BoardsAdminProps {
 }
 
 /**
- * The Job boards page for board owners: totals, what happened this week, the boards that wait for
+ * The Job sites page for board owners: totals, what happened this week, the boards that wait for
  * you with a plain reason, and every board with a search, filters and a side panel.
  */
 export function BoardsAdmin({ back }: BoardsAdminProps) {
@@ -53,6 +54,8 @@ export function BoardsAdmin({ back }: BoardsAdminProps) {
   const boards = useBoards();
   const overview = useAdminOverview(boards.isSuccess && boards.data.can_manage);
   const [open, setOpen] = useState<string | null>(null);
+  // Boards that waited for you when you opened them: one you decline stays in the list.
+  const [pinned, setPinned] = useState<ReadonlySet<string>>(new Set());
   if (boards.isPending || (boards.isSuccess && boards.data.can_manage && overview.isPending)) {
     return (
       <Stack gap="lg">
@@ -75,6 +78,7 @@ export function BoardsAdmin({ back }: BoardsAdminProps) {
             action={
               <Button
                 variant="secondary"
+                size="lg"
                 onClick={() => {
                   void boards.refetch();
                   void overview.refetch();
@@ -89,6 +93,12 @@ export function BoardsAdmin({ back }: BoardsAdminProps) {
     );
   }
   const rows = adminRows(boards.data.boards, overview.data);
+  const show = (row: AdminRow) => {
+    if (row.status === "waiting") {
+      setPinned((current) => new Set(current).add(row.board.id));
+    }
+    setOpen(row.board.id);
+  };
   const opened = rows.find((row) => row.board.id === open);
   return (
     <Stack gap="lg">
@@ -96,18 +106,14 @@ export function BoardsAdmin({ back }: BoardsAdminProps) {
       <Totals overview={overview.data} />
       <ThisWeek overview={overview.data} />
       <Waiting
-        rows={rows.filter((row) => row.status === "waiting")}
-        onOpen={(row) => {
-          setOpen(row.board.id);
-        }}
+        rows={rows.filter(
+          (row) =>
+            row.status === "waiting" ||
+            (pinned.has(row.board.id) && row.board.status === "declined"),
+        )}
+        onOpen={show}
       />
-      <AllBoards
-        rows={rows}
-        selected={open}
-        onOpen={(row) => {
-          setOpen(row.board.id);
-        }}
-      />
+      <AllBoards rows={rows} selected={open} onOpen={show} />
       <AdminPeek
         row={opened}
         onClose={() => {
@@ -176,6 +182,67 @@ function ThisWeek({ overview }: { overview: AdminOverview }) {
   );
 }
 
+/** One board waiting for you; after you decline it, it stays here with "Declined" and Undo. */
+function WaitingRow({ row, onOpen }: { row: AdminRow; onOpen: (row: AdminRow) => void }) {
+  const { t, i18n } = useTranslation("sources");
+  const reopen = useReopen(row.board.id);
+  if (row.board.status === "declined") {
+    return (
+      <RowItem
+        testId="boards-admin-waiting-row"
+        title={row.board.name}
+        meta={
+          <Tagged testId="boards-admin-declined">
+            <Tag tone="danger">{t("admin.declined")}</Tag>
+          </Tagged>
+        }
+        actions={
+          <Button
+            variant="secondary"
+            size="lg"
+            disabled={reopen.isPending}
+            data-testid="boards-admin-undo"
+            onClick={() => {
+              reopen.mutate();
+            }}
+          >
+            {t("admin.undo")}
+          </Button>
+        }
+      />
+    );
+  }
+  return (
+    <RowItem
+      testId="boards-admin-waiting-row"
+      title={row.board.name}
+      subtitle={t(`admin.need.${row.need ?? "approve"}`)}
+      meta={
+        <>
+          <StageLabel status="waiting" />
+          {row.askedAt === undefined ? null : (
+            <Text tone="secondary">
+              {t("admin.askedOn", { date: shortDate(row.askedAt, i18n.language) })}
+            </Text>
+          )}
+        </>
+      }
+      actions={
+        <Button
+          variant="secondary"
+          size="lg"
+          data-testid="boards-admin-waiting-open"
+          onClick={() => {
+            onOpen(row);
+          }}
+        >
+          {t(`admin.cta.${row.need ?? "approve"}`)}
+        </Button>
+      }
+    />
+  );
+}
+
 function Waiting({ rows, onOpen }: { rows: AdminRow[]; onOpen: (row: AdminRow) => void }) {
   const { t, i18n } = useTranslation("sources");
   const [all, setAll] = useState(false);
@@ -198,38 +265,13 @@ function Waiting({ rows, onOpen }: { rows: AdminRow[]; onOpen: (row: AdminRow) =
         <Stack gap="sm">
           <RowList label={t("admin.waiting.title")} testId="boards-admin-waiting-list">
             {shown.map((row) => (
-              <RowItem
-                key={row.board.id}
-                testId="boards-admin-waiting-row"
-                title={row.board.name}
-                subtitle={t(`admin.need.${row.need ?? "approve"}`)}
-                meta={
-                  <>
-                    <StageLabel status="waiting" />
-                    {row.askedAt === undefined ? null : (
-                      <Text tone="secondary">
-                        {t("admin.askedOn", { date: shortDate(row.askedAt, i18n.language) })}
-                      </Text>
-                    )}
-                  </>
-                }
-                actions={
-                  <Button
-                    variant="secondary"
-                    data-testid="boards-admin-waiting-open"
-                    onClick={() => {
-                      onOpen(row);
-                    }}
-                  >
-                    {t(`admin.cta.${row.need ?? "approve"}`)}
-                  </Button>
-                }
-              />
+              <WaitingRow key={row.board.id} row={row} onOpen={onOpen} />
             ))}
           </RowList>
           {rows.length > shown.length ? (
             <Button
               variant="ghost"
+              size="lg"
               data-testid="boards-admin-waiting-more"
               onClick={() => {
                 setAll(true);
@@ -299,6 +341,7 @@ function AllBoards({
           action={
             <Button
               variant="secondary"
+              size="lg"
               data-testid="boards-admin-clear"
               onClick={() => {
                 setFilters(NO_FILTERS);
@@ -329,6 +372,7 @@ function AllBoards({
           {matching.length > shown.length ? (
             <Button
               variant="ghost"
+              size="lg"
               data-testid="boards-admin-more"
               onClick={() => {
                 setAll(true);

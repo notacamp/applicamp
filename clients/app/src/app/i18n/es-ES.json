@@ -55,8 +55,9 @@
   "boards": {
     "title": "Portales",
     "lead": "Los portales de empleo que leen las búsquedas, ordenados por los salarios que publican, los nuevos que te esperan y lo que analizó cada búsqueda.",
-    "adminTitle": "Portales de empleo",
-    "back": "Tú"
+    "adminTitle": "Sitios de empleo",
+    "back": "Tú",
+    "eyebrow": "Tú · Sitios de empleo"
   },
   "companies": {
     "title": "Empresas",

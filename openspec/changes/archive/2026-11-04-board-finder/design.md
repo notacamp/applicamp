@@ -1,6 +1,6 @@
 # Design
 
-- **Data** (`sources.job_boards`, migration `20261104100000_sources__board_finder`):
+- **Data** (`sources.job_boards`, migration `20261104145115_sources__board_finder`):
   `approved_by` becomes text (`owner` or `app`; it held the approving account's id),
   `approved_at` stays; new `tags text[]`, `terms_verdict`, `terms_quote`, `terms_url`,
   `content_signal jsonb`, `contact_email`, `found_through`. All appear on `BoardSummary`.

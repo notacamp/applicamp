@@ -1,0 +1,1 @@
+- The server starts on a new database again: two database updates no longer share one version number.

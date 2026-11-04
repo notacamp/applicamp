@@ -438,15 +438,12 @@ async fn pull_forward_or<J: Job>(
     if moved > 0 {
         return Ok(true);
     }
-    let states = if running_counts {
-        "state IN ('pending', 'running')"
-    } else {
-        "state = 'pending'"
-    };
-    let waiting: bool = sqlx::query_scalar(&format!(
-        "SELECT EXISTS (SELECT 1 FROM kernel.jobs WHERE kind = $1 AND {states})"
-    ))
+    let waiting: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM kernel.jobs
+                         WHERE kind = $1 AND (state = 'pending' OR ($2 AND state = 'running')))",
+    )
     .bind(J::NAME)
+    .bind(running_counts)
     .fetch_one(&mut *conn)
     .await?;
     if waiting {

@@ -282,7 +282,9 @@ async fn the_next_download_is_conditional_and_a_304_changes_nothing(db: PgPool) 
     let asked = server.received_requests().await.unwrap();
     let last = &asked[asked.len() - 1];
     assert_eq!(
-        last.headers.get("if-modified-since").and_then(|v| v.to_str().ok()),
+        last.headers
+            .get("if-modified-since")
+            .and_then(|v| v.to_str().ok()),
         Some("Wed, 04 Nov 2026 16:18:18 GMT")
     );
     // The cache validators are kept for the day after.

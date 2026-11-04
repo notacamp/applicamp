@@ -23,7 +23,13 @@ import {
   TextField,
 } from "~/lib/ui";
 
-import { useAnswerRequest, useMarkAsked, usePermissionEmail, withFinder } from "../../api/admin";
+import {
+  useAnswerRequest,
+  useMarkAsked,
+  usePermissionEmail,
+  withFinder,
+  useReopen,
+} from "../../api/admin";
 import type { AdminRow } from "../../api/admin-rows";
 import {
   boardErrorOf,

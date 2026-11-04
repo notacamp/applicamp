@@ -99,7 +99,7 @@ describe("the job boards admin page", () => {
     await user.clear(screen.getByTestId("boards-admin-search"));
     await user.selectOptions(screen.getByTestId("boards-admin-show"), "company");
     expect(screen.getByTestId("boards-admin-all-empty")).toHaveTextContent(
-      "No board matches these filters.",
+      "No site matches these filters.",
     );
     await user.click(screen.getByTestId("boards-admin-clear"));
     expect(screen.getAllByTestId("boards-admin-row")).toHaveLength(3);
@@ -118,7 +118,11 @@ describe("the job boards admin page", () => {
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     await waitFor(() => {
-      expect(permission).toHaveTextContent("May Applicamp show jobs from Example Remote?");
+      const field = permission.querySelector("input, textarea");
+      expect(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement).toBe(true);
+      expect((field as HTMLInputElement).value).toContain(
+        "Subject: May Applicamp show jobs from Example Remote?",
+      );
     });
     expect(permission).toHaveTextContent("Send it to the contact on its site.");
     expect(screen.getByTestId("boards-admin-checks")).toHaveTextContent(

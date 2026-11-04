@@ -210,6 +210,9 @@ fn has(blockers: &[Blocker], code: &str) -> bool {
     blockers.iter().any(|b| b.code == code)
 }
 
+/// When a permission request was asked and answered, and the answer.
+type LatestRequest = (Option<DateTime<Utc>>, Option<DateTime<Utc>>, Option<String>);
+
 type Classified = (Stage, Option<Need>, Option<String>, Option<DateTime<Utc>>);
 
 /// Where a candidate stands and what it waits for.
@@ -423,15 +426,14 @@ async fn email_of(db: &PgPool, id: Uuid) -> Result<PermissionEmail> {
     let row = boards::fetch(db, id).await?;
     let to = contact_of(db, id).await?;
     let (subject, body) = draft_for(&row);
-    let latest: Option<(Option<DateTime<Utc>>, Option<DateTime<Utc>>, Option<String>)> =
-        sqlx::query_as(
-            "SELECT asked_at, answered_at, answer FROM sources.board_requests
+    let latest: Option<LatestRequest> = sqlx::query_as(
+        "SELECT asked_at, answered_at, answer FROM sources.board_requests
           WHERE board_id = $1 AND kind = 'permission'
           ORDER BY created_at DESC LIMIT 1",
-        )
-        .bind(id)
-        .fetch_optional(db)
-        .await?;
+    )
+    .bind(id)
+    .fetch_optional(db)
+    .await?;
     let (asked_at, answered_at, answer) = latest.unwrap_or((None, None, None));
     Ok(PermissionEmail {
         to,

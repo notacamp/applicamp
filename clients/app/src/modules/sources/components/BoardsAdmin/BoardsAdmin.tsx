@@ -244,7 +244,7 @@ function WaitingRow({ row, onOpen }: { row: AdminRow; onOpen: (row: AdminRow) =>
 }
 
 function Waiting({ rows, onOpen }: { rows: AdminRow[]; onOpen: (row: AdminRow) => void }) {
-  const { t, i18n } = useTranslation("sources");
+  const { t } = useTranslation("sources");
   const [all, setAll] = useState(false);
   const shown = all ? rows : rows.slice(0, WAITING_SHOWN);
   return (

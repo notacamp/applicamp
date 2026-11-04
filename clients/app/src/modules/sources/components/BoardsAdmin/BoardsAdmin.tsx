@@ -19,6 +19,7 @@ import {
   Tagged,
   Text,
   TextField,
+  useNarrowScreen,
   type DataColumn,
 } from "~/lib/ui";
 
@@ -304,6 +305,7 @@ function AllBoards({
     setFilters((current) => ({ ...current, ...change }));
   };
   const columns = boardColumns(t, i18n.language);
+  const narrow = useNarrowScreen();
   return (
     <Section title={t("admin.all.title", { total: rows.length })} testId="boards-admin-all">
       <Stack gap="sm">
@@ -355,17 +357,48 @@ function AllBoards({
         </Placeholder>
       ) : (
         <Stack gap="sm">
-          <DataTable
-            label={t("admin.all.table")}
-            columns={columns}
-            rows={shown}
-            rowKey={(row) => row.board.id}
-            selected={selected}
-            onOpen={onOpen}
-            rowTestId="boards-admin-row"
-            openTestId="boards-admin-open"
-            testId="boards-admin-table"
-          />
+          {narrow ? (
+            <RowList label={t("admin.all.table")} testId="boards-admin-table">
+              {shown.map((row) => (
+                <RowItem
+                  key={row.board.id}
+                  testId="boards-admin-row"
+                  title={row.board.name}
+                  subtitle={t(`admin.how.${row.board.kind}`)}
+                  meta={
+                    <>
+                      <StageLabel status={row.status} />
+                      <Text tone="secondary">{row.board.country ?? t("admin.worldwide")}</Text>
+                    </>
+                  }
+                  actions={
+                    <Button
+                      variant="secondary"
+                      size="lg"
+                      data-testid="boards-admin-open"
+                      onClick={() => {
+                        onOpen(row);
+                      }}
+                    >
+                      {t("admin.open")}
+                    </Button>
+                  }
+                />
+              ))}
+            </RowList>
+          ) : (
+            <DataTable
+              label={t("admin.all.table")}
+              columns={columns}
+              rows={shown}
+              rowKey={(row) => row.board.id}
+              selected={selected}
+              onOpen={onOpen}
+              rowTestId="boards-admin-row"
+              openTestId="boards-admin-open"
+              testId="boards-admin-table"
+            />
+          )}
           <Text tone="secondary" size="sm">
             {t("admin.all.showing", { shown: shown.length, total: rows.length })}
           </Text>

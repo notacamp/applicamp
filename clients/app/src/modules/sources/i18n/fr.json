@@ -589,6 +589,7 @@
       }
     },
     "undo": "Annuler",
-    "declined": "Refusé"
+    "declined": "Refusé",
+    "open": "Ouvrir"
   }
 }

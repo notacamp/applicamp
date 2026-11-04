@@ -589,6 +589,7 @@
       }
     },
     "undo": "Deshacer",
-    "declined": "Rechazado"
+    "declined": "Rechazado",
+    "open": "Abrir"
   }
 }

@@ -326,7 +326,9 @@ pub async fn schedule(db: &PgPool, deps: &SourcesDeps) -> Result<bool> {
         return Ok(false);
     }
     let mut tx = db.begin().await?;
-    let added = jobs::enqueue_unique_at(&mut tx, &Discover {}, next_run(deps.clock.now())).await?;
+    let added =
+        jobs::enqueue_unique_at_or_earlier(&mut tx, &Discover {}, next_run(deps.clock.now()))
+            .await?;
     tx.commit().await?;
     Ok(added)
 }
@@ -338,7 +340,8 @@ async fn schedule_next(db: &PgPool, deps: &SourcesDeps) -> Result<bool> {
         return Ok(false);
     }
     let mut tx = db.begin().await?;
-    let added = jobs::enqueue_next_at(&mut tx, &Discover {}, next_run(deps.clock.now())).await?;
+    let added =
+        jobs::enqueue_next_at_or_earlier(&mut tx, &Discover {}, next_run(deps.clock.now())).await?;
     tx.commit().await?;
     Ok(added)
 }

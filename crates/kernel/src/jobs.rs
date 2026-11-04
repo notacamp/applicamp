@@ -394,6 +394,68 @@ pub async fn enqueue_next_at<J: Job>(
     Ok(true)
 }
 
+/// [`enqueue_unique_at`], but a job of its kind already pending for a time
+/// later than `run_at` is pulled forward to `run_at` (a schedule that got
+/// shorter, daily instead of weekly, takes effect at the next start). Whether
+/// a job was enqueued or moved.
+pub async fn enqueue_unique_at_or_earlier<J: Job>(
+    conn: &mut PgConnection,
+    job: &J,
+    run_at: chrono::DateTime<chrono::Utc>,
+) -> Result<bool, sqlx::Error> {
+    pull_forward_or(conn, job, run_at, true).await
+}
+
+/// [`enqueue_next_at`], pulling a pending job of its kind forward to `run_at`
+/// when it is later, as [`enqueue_unique_at_or_earlier`] does.
+pub async fn enqueue_next_at_or_earlier<J: Job>(
+    conn: &mut PgConnection,
+    job: &J,
+    run_at: chrono::DateTime<chrono::Utc>,
+) -> Result<bool, sqlx::Error> {
+    pull_forward_or(conn, job, run_at, false).await
+}
+
+async fn pull_forward_or<J: Job>(
+    conn: &mut PgConnection,
+    job: &J,
+    run_at: chrono::DateTime<chrono::Utc>,
+    running_counts: bool,
+) -> Result<bool, sqlx::Error> {
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtext($1))")
+        .bind(J::NAME)
+        .execute(&mut *conn)
+        .await?;
+    let moved = sqlx::query(
+        "UPDATE kernel.jobs SET run_at = $2
+          WHERE kind = $1 AND state = 'pending' AND run_at > $2",
+    )
+    .bind(J::NAME)
+    .bind(run_at)
+    .execute(&mut *conn)
+    .await?
+    .rows_affected();
+    if moved > 0 {
+        return Ok(true);
+    }
+    let states = if running_counts {
+        "state IN ('pending', 'running')"
+    } else {
+        "state = 'pending'"
+    };
+    let waiting: bool = sqlx::query_scalar(&format!(
+        "SELECT EXISTS (SELECT 1 FROM kernel.jobs WHERE kind = $1 AND {states})"
+    ))
+    .bind(J::NAME)
+    .fetch_one(&mut *conn)
+    .await?;
+    if waiting {
+        return Ok(false);
+    }
+    enqueue_at(conn, job, run_at).await?;
+    Ok(true)
+}
+
 /// A claimed job.
 #[derive(sqlx::FromRow)]
 struct Claimed {
@@ -776,6 +838,61 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(pending, 1);
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_pending_job_is_pulled_forward_when_its_schedule_got_shorter(db: PgPool) {
+        let now = chrono::Utc::now();
+        let week = now + chrono::TimeDelta::days(7);
+        let day = now + chrono::TimeDelta::days(1);
+        let run_at = |db: PgPool| async move {
+            sqlx::query_scalar::<_, chrono::DateTime<chrono::Utc>>(
+                "SELECT run_at FROM kernel.jobs WHERE kind = 'test.count' AND state = 'pending'",
+            )
+            .fetch_one(&db)
+            .await
+            .unwrap()
+        };
+        let mut tx = db.begin().await.unwrap();
+        assert!(
+            enqueue_unique_at_or_earlier(&mut tx, &Count { by: 1 }, week)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !enqueue_unique_at_or_earlier(&mut tx, &Count { by: 1 }, week)
+                .await
+                .unwrap(),
+            "the same time changes nothing"
+        );
+        tx.commit().await.unwrap();
+        let mut tx = db.begin().await.unwrap();
+        assert!(
+            enqueue_unique_at_or_earlier(&mut tx, &Count { by: 1 }, day)
+                .await
+                .unwrap(),
+            "the daily time moves the weekly one"
+        );
+        assert!(
+            !enqueue_unique_at_or_earlier(&mut tx, &Count { by: 1 }, week)
+                .await
+                .unwrap(),
+            "a later time never pushes it back"
+        );
+        assert!(
+            !enqueue_next_at_or_earlier(&mut tx, &Count { by: 1 }, day)
+                .await
+                .unwrap()
+        );
+        tx.commit().await.unwrap();
+        let moved = run_at(db.clone()).await;
+        assert!((moved - day).num_seconds().abs() < 2, "{moved}");
+        let all: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM kernel.jobs WHERE kind = 'test.count'")
+                .fetch_one(&db)
+                .await
+                .unwrap();
+        assert_eq!(all, 1);
     }
 
     #[sqlx::test(migrations = "../../migrations")]

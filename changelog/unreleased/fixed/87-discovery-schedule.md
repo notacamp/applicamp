@@ -1,0 +1,1 @@
+- **A shorter schedule takes effect at the next start.** The daily discovery was kept at its old weekly time because a job already waiting was never moved; scheduling now pulls a waiting discovery run forward to the next 04:00 UTC when it is later (a small kernel helper, `enqueue_unique_at_or_earlier`, with a test).

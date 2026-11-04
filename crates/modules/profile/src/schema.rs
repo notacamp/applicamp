@@ -602,6 +602,12 @@ impl Profile {
     /// empty fields of `basics` are filled from the draft, and positions,
     /// schools, skills, languages, certifications, projects and links the
     /// profile does not have yet are added after its own.
+    ///
+    /// A position both have is **repaired**, never overwritten (#72): its
+    /// empty fields are filled (location, end date, summary), the draft's
+    /// highlights it does not have are added, and a summary that is only a
+    /// place (an earlier import's mistake, not the person's edit) gives way to
+    /// the draft's paragraph, the place moving to the location.
     #[must_use]
     pub fn merged_with(mut self, draft: Self) -> Self {
         let basics = &mut self.basics;
@@ -623,11 +629,16 @@ impl Profile {
         // A position is the same one when the company matches and so does
         // its start or its title: editing either by hand never brings the
         // imported one back beside it.
-        add_new(&mut self.work, draft.work, |a, b| {
-            same_opt(a.name.as_deref()) == same_opt(b.name.as_deref())
-                && (same_opt(a.start_date.as_deref()) == same_opt(b.start_date.as_deref())
-                    || same_opt(a.position.as_deref()) == same_opt(b.position.as_deref()))
-        });
+        for theirs in draft.work {
+            match self
+                .work
+                .iter_mut()
+                .find(|mine| same_position(mine, &theirs))
+            {
+                Some(mine) => mine.repair_from(theirs),
+                None => self.work.push(theirs),
+            }
+        }
         add_new(&mut self.education, draft.education, |a, b| {
             same(&a.institution) == same(&b.institution)
                 && same_opt(a.study_type.as_deref()) == same_opt(b.study_type.as_deref())
@@ -646,6 +657,51 @@ impl Profile {
         });
         self.cap_lists();
         self
+    }
+}
+
+/// Whether `a` and `b` are the same position: the same company, and the same
+/// start or the same title.
+fn same_position(a: &Work, b: &Work) -> bool {
+    same_opt(a.name.as_deref()) == same_opt(b.name.as_deref())
+        && (same_opt(a.start_date.as_deref()) == same_opt(b.start_date.as_deref())
+            || same_opt(a.position.as_deref()) == same_opt(b.position.as_deref()))
+}
+
+impl Work {
+    /// This position, repaired from `theirs` (the same position, read again):
+    /// what it has stays; what it lacks is filled; a summary that is only a
+    /// place gives way to a real one.
+    fn repair_from(&mut self, theirs: Self) {
+        use crate::features::imports::repair::{add_highlight, is_place};
+        let fill = |mine: &mut Option<String>, theirs: Option<String>| {
+            if mine.as_deref().is_none_or(|m| m.trim().is_empty()) {
+                *mine = theirs;
+            }
+        };
+        let placed = self
+            .summary
+            .as_deref()
+            .is_some_and(|s| is_place(s, self.location.as_deref()));
+        let real = theirs
+            .summary
+            .as_deref()
+            .is_some_and(|s| !s.trim().is_empty() && !is_place(s, theirs.location.as_deref()));
+        if placed {
+            // Never a place in a summary: it moves to the location, and the
+            // draft's paragraph, if it has one, takes its place.
+            let place = self.summary.take();
+            fill(&mut self.location, place);
+            self.summary = theirs.summary.filter(|_| real);
+        } else if real {
+            fill(&mut self.summary, theirs.summary);
+        }
+        fill(&mut self.location, theirs.location);
+        fill(&mut self.end_date, theirs.end_date);
+        fill(&mut self.start_date, theirs.start_date);
+        for highlight in theirs.highlights {
+            add_highlight(&mut self.highlights, highlight);
+        }
     }
 }
 
@@ -727,6 +783,90 @@ mod tests {
         assert_eq!(merged.work[1].name.as_deref(), Some("Sample Labs"));
         let skills: Vec<_> = merged.skills.iter().map(|s| s.name.as_str()).collect();
         assert_eq!(skills, ["Rust", "SQL"]);
+    }
+
+    #[test]
+    fn merging_repairs_a_position_read_again() {
+        let mine = Profile {
+            work: vec![
+                Work {
+                    summary: Some("Lisboa, Lisboa, Portugal".into()),
+                    highlights: vec!["Cut refunds by half".into()],
+                    ..work("Example Org", "Staff Engineer", "2023-07")
+                },
+                Work {
+                    summary: Some("Ran the platform team, by hand.".into()),
+                    location: Some("Porto".into()),
+                    ..work("Sample Labs", "Engineer", "2019-01")
+                },
+            ],
+            ..Profile::default()
+        };
+        let draft = Profile {
+            work: vec![
+                Work {
+                    location: Some("Lisboa, Lisboa, Portugal".into()),
+                    end_date: Some("2024-04".into()),
+                    summary: Some("Built the billing platform for 40 shops.".into()),
+                    highlights: vec![
+                        "cut refunds  by half".into(),
+                        "Moved billing to Rust".into(),
+                    ],
+                    ..work("Example Org", "Staff Engineer", "2023-07")
+                },
+                Work {
+                    summary: Some("Ran the platform team.".into()),
+                    location: Some("Lisbon".into()),
+                    end_date: Some("2021-02".into()),
+                    ..work("Sample Labs", "Engineer", "2019-01")
+                },
+            ],
+            ..Profile::default()
+        };
+        let merged = mine.merged_with(draft);
+        assert_eq!(merged.work.len(), 2, "no position twice");
+        let first = &merged.work[0];
+        assert_eq!(
+            first.summary.as_deref(),
+            Some("Built the billing platform for 40 shops."),
+            "a place gives way to the paragraph"
+        );
+        assert_eq!(first.location.as_deref(), Some("Lisboa, Lisboa, Portugal"));
+        assert_eq!(
+            first.end_date.as_deref(),
+            Some("2024-04"),
+            "an empty end date fills"
+        );
+        assert_eq!(
+            first.highlights,
+            ["Cut refunds by half", "Moved billing to Rust"],
+            "highlights add, once each"
+        );
+        // A place with nothing to replace it still leaves the summary.
+        let placed_only = Profile {
+            work: vec![Work {
+                summary: Some("Porto, Portugal".into()),
+                ..work("Sample Labs", "Engineer", "2019-01")
+            }],
+            ..Profile::default()
+        }
+        .merged_with(Profile {
+            work: vec![work("Sample Labs", "Engineer", "2019-01")],
+            ..Profile::default()
+        });
+        assert_eq!(placed_only.work[0].summary, None);
+        assert_eq!(
+            placed_only.work[0].location.as_deref(),
+            Some("Porto, Portugal")
+        );
+        let second = &merged.work[1];
+        assert_eq!(
+            second.summary.as_deref(),
+            Some("Ran the platform team, by hand."),
+            "an edit stays"
+        );
+        assert_eq!(second.location.as_deref(), Some("Porto"));
+        assert_eq!(second.end_date.as_deref(), Some("2021-02"));
     }
 
     #[test]

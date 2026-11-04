@@ -84,6 +84,25 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_linkedin_profile_keeps_its_lines() {
+        use crate::features::imports::testkit::LINKEDIN_PROFILE_LINES;
+        let text = text_of(pdf_saying(&LINKEDIN_PROFILE_LINES)).await.unwrap();
+        let lines: Vec<&str> = text.lines().map(str::trim).collect();
+        for heading in [
+            "Top Skills",
+            "Languages",
+            "About",
+            "Experience",
+            "Education",
+        ] {
+            assert!(
+                lines.contains(&heading),
+                "{heading} on its own line: {text}"
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn a_scan_has_no_text() {
         let err = text_of(pdf_saying(&[])).await.unwrap_err();
         assert_eq!(err.code(), "pdf_no_text");

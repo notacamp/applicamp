@@ -113,7 +113,10 @@ describe("the profile workspace", () => {
     await user.click(screen.getByTestId("import-submit"));
 
     const review = await screen.findByTestId("import-review");
-    expect(review).toHaveTextContent("Review what was found");
+    expect(review).toHaveTextContent("Check what we found");
+    expect(screen.getByTestId("review-found")).toHaveTextContent(
+      "Found 2 jobs, 2 skills, 1 degree, and 1 language.",
+    );
     expect(screen.getByTestId("review-work")).toHaveTextContent("Senior Engineer");
     expect(screen.getByTestId("review-work")).toHaveTextContent("New");
     expect(screen.getByTestId("review-basics")).toHaveTextContent("Alex Demo");
@@ -170,6 +173,29 @@ describe("the profile workspace", () => {
     await user.upload(await screen.findByTestId("import-file"), zip());
     await user.click(screen.getByTestId("import-submit"));
     expect(await screen.findByTestId("import-error")).toHaveTextContent("That didn’t work");
+  });
+
+  it("reads a PDF picked as the LinkedIn export as a PDF", async () => {
+    stub({
+      "GET /api/v1/profile": {
+        body: { ...EMPTY_VIEW, import_kinds: ["linkedin_zip", "pdf", "text"] },
+      },
+      "POST /api/v1/profile/imports": async (request) => {
+        const form = await request.formData();
+        expect(form.get("kind")).toBe("pdf");
+        return { status: 201, body: { ...draftOf(FILLED), kind: "pdf" } };
+      },
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<Workspace />);
+
+    const kinds = await screen.findByTestId("import-kinds");
+    expect(kinds.querySelectorAll("input").item(0)).toBeChecked();
+    const pdf = new File(["%PDF-1.4"], "Profile.pdf", { type: "application/pdf" });
+    await user.upload(screen.getByTestId("import-file"), pdf);
+    expect(kinds.querySelectorAll("input").item(1)).toBeChecked();
+    await user.click(screen.getByTestId("import-submit"));
+    expect(await screen.findByTestId("import-review")).toBeInTheDocument();
   });
 
   it("reads pasted text with a model, and says what it left out", async () => {

@@ -55,8 +55,25 @@
     }
   },
   "review": {
-    "title": "Review what was found",
-    "lead": "Nothing is saved until you choose. Replace makes this your profile; Merge keeps yours as it is and adds only what’s new.",
+    "title": "Check what we found",
+    "lead": "Nothing is saved until you choose. Replace makes this your profile. Merge keeps your profile and adds what is new.",
+    "found": "Found {{list}}.",
+    "counts": {
+      "jobs_one": "{{count}} job",
+      "jobs_other": "{{count}} jobs",
+      "achievements_one": "{{count}} achievement",
+      "achievements_other": "{{count}} achievements",
+      "skills_one": "{{count}} skill",
+      "skills_other": "{{count}} skills",
+      "degrees_one": "{{count}} degree",
+      "degrees_other": "{{count}} degrees",
+      "languages_one": "{{count}} language",
+      "languages_other": "{{count}} languages",
+      "certificates_one": "{{count}} certification",
+      "certificates_other": "{{count}} certifications",
+      "projects_one": "{{count}} project",
+      "projects_other": "{{count}} projects"
+    },
     "loading": "Loading the draft…",
     "loadFailed": "The draft couldn’t be loaded.",
     "gone": "This draft is no longer here: drafts last 24 hours.",

@@ -6,6 +6,7 @@
 
 pub mod linkedin;
 pub mod pdf;
+pub(crate) mod repair;
 pub(crate) mod source_check;
 pub mod structure;
 
@@ -419,7 +420,10 @@ pub enum ApplyMode {
     Replace,
     /// The profile keeps everything it has, fills its empty fields from the
     /// draft and gains the draft's positions, schools, skills, languages,
-    /// certifications and projects it does not have yet.
+    /// certifications and projects it does not have yet. A position both
+    /// have is repaired: its empty fields are filled, the draft's
+    /// achievements it lacks are added, and a summary that is only a place
+    /// moves to the location, the draft's summary taking its place.
     Merge,
 }
 

@@ -55,8 +55,25 @@
     }
   },
   "review": {
-    "title": "Reveja o que foi encontrado",
-    "lead": "Nada é guardado até escolher. Substituir faz disto o seu perfil; Juntar mantém o seu como está e acrescenta só o que é novo.",
+    "title": "Veja o que encontrámos",
+    "lead": "Nada é guardado até escolher. Substituir faz disto o seu perfil. Juntar mantém o seu perfil e acrescenta o que é novo.",
+    "found": "Encontrámos {{list}}.",
+    "counts": {
+      "jobs_one": "{{count}} emprego",
+      "jobs_other": "{{count}} empregos",
+      "achievements_one": "{{count}} conquista",
+      "achievements_other": "{{count}} conquistas",
+      "skills_one": "{{count}} competência",
+      "skills_other": "{{count}} competências",
+      "degrees_one": "{{count}} curso",
+      "degrees_other": "{{count}} cursos",
+      "languages_one": "{{count}} língua",
+      "languages_other": "{{count}} línguas",
+      "certificates_one": "{{count}} certificação",
+      "certificates_other": "{{count}} certificações",
+      "projects_one": "{{count}} projeto",
+      "projects_other": "{{count}} projetos"
+    },
     "loading": "A carregar o rascunho…",
     "loadFailed": "Não foi possível carregar o rascunho.",
     "gone": "Este rascunho já não existe: os rascunhos duram 24 horas.",

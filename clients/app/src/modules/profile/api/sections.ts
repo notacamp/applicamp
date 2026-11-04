@@ -290,3 +290,28 @@ export function emptySections(draft: Profile): EmptySection[] {
   }
   return empty;
 }
+
+/** A part of a draft counted for the review's "Found …" line. */
+export type FoundKey =
+  "jobs" | "achievements" | "skills" | "degrees" | "languages" | "certificates" | "projects";
+
+/**
+ * What a draft holds, part by part, in the order the review says it, the
+ * empty ones left out: "Found 13 jobs, 31 achievements, 14 skills, 1 degree
+ * and 3 languages."
+ */
+export function foundIn(draft: Profile): { key: FoundKey; count: number }[] {
+  const counts: { key: FoundKey; count: number }[] = [
+    { key: "jobs", count: draft.work.length },
+    {
+      key: "achievements",
+      count: draft.work.reduce((sum, work) => sum + work.highlights.length, 0),
+    },
+    { key: "skills", count: draft.skills.length },
+    { key: "degrees", count: draft.education.length },
+    { key: "languages", count: draft.languages.length },
+    { key: "certificates", count: draft.certificates.length },
+    { key: "projects", count: draft.projects.length },
+  ];
+  return counts.filter(({ count }) => count > 0);
+}

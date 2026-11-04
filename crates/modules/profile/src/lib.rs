@@ -20,6 +20,11 @@
 //!   questions about the gaps (decided in code, worded by the model), then
 //!   saved in one write.
 //!
+//! - **Your LinkedIn** ([`features::linkedin`]): a check-up of the LinkedIn
+//!   profile the person uploads, against the profile and goals, with what to
+//!   change on LinkedIn as proposals to keep or drop (one model call, every
+//!   proposal claim-checked). Nothing is fetched from LinkedIn.
+//!
 //! - **Matching** ([`matching`]): how far a person is, and what a job search
 //!   matches against, for the ports the server wires to other modules.
 //!
@@ -64,11 +69,12 @@ pub struct ProfileDeps {
 
 /// The profile module, composed with `deps`.
 pub fn module(deps: ProfileDeps) -> Module {
-    use features::{about, completion, goals, grill, imports, profile};
+    use features::{about, completion, goals, grill, imports, linkedin, profile};
     // Uploads take up to a 20 MB export; every other route keeps axum's
     // default body limit.
     let uploads = OpenApiRouter::new()
         .routes(routes!(imports::create))
+        .routes(routes!(linkedin::get, linkedin::check, linkedin::discard))
         .layer(DefaultBodyLimit::max(imports::UPLOAD_BODY_LIMIT));
     let router = OpenApiRouter::new()
         .routes(routes!(profile::get, profile::update))
@@ -96,6 +102,7 @@ pub fn module(deps: ProfileDeps) -> Module {
         .routes(routes!(imports::get))
         .routes(routes!(imports::apply))
         .routes(routes!(imports::discard))
+        .routes(routes!(linkedin::decide))
         .merge(uploads)
         .layer(Extension(Ai(deps.ai.clone())))
         .layer(Extension(deps.research.clone()));

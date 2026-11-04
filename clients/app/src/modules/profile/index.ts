@@ -23,3 +23,4 @@ export {
 } from "./components/StrengthNudge/StrengthNudge";
 export { JobAnswerFacts, type JobAnswerFactsProps } from "./components/Grill/JobAnswerFacts";
 export { AboutYouPage, type AboutYouPageProps } from "./components/AboutYou/AboutYouPage";
+export { LinkedInPage, type LinkedInPageProps } from "./components/LinkedIn/LinkedInPage";

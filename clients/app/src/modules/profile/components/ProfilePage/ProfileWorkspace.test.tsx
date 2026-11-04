@@ -74,6 +74,7 @@ function Workspace({ startImporting = false }: { startImporting?: boolean }) {
         onStartGoals={vi.fn()}
         onAction={vi.fn()}
         onAbout={vi.fn()}
+        onLinkedIn={vi.fn()}
       />
     </UndoProvider>
   );

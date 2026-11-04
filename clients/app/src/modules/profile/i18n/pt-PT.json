@@ -687,5 +687,141 @@
       "numberHint": "Um número aproximado ajuda, mas deixe-o de fora se não souber.",
       "answerLabelChoices": "Outra coisa? Diga-o por palavras suas"
     }
+  },
+  "linkedin": {
+    "title": "O seu LinkedIn",
+    "sectionTitle": "O seu LinkedIn",
+    "sectionLead": "O seu perfil do LinkedIn é o que um recrutador vê primeiro. O Applicamp lê-o e diz o que mudar para os empregos que quer.",
+    "sectionOpen": "Verificar o meu LinkedIn",
+    "sectionList": "Ver o que mudar",
+    "sectionCounts": "{{open}} por decidir · {{kept}} para mudar no LinkedIn · {{done}} feitas",
+    "back": "Voltar a Perfil e objetivos",
+    "loading": "A carregar…",
+    "loadFailed": "Isto não pôde ser carregado.",
+    "noProfileTitle": "Adicione primeiro o seu perfil",
+    "noProfileLead": "O seu LinkedIn é comparado com o seu perfil e objetivos, por isso esses vêm primeiro.",
+    "noAiTitle": "Isto precisa de um modelo de IA",
+    "noAiLead": "Este Applicamp não tem um modelo de IA configurado, por isso não consegue ler o seu perfil do LinkedIn.",
+    "upload": {
+      "lead": "Dê ao Applicamp o seu perfil do LinkedIn como ficheiro. O ficheiro não é guardado, e o seu perfil e objetivos ficam como estão.",
+      "choose": "O que tem?",
+      "kinds": {
+        "linkedin_zip": {
+          "title": "A exportação de dados do LinkedIn",
+          "description": "O ZIP que o LinkedIn lhe envia a partir de Definições, Privacidade dos dados, Obter uma cópia dos seus dados. Lido aqui, sem IA."
+        },
+        "pdf": {
+          "title": "O seu perfil guardado em PDF",
+          "description": "Na página do seu perfil do LinkedIn, escolha Mais e depois Guardar em PDF. Um modelo de IA lê-o."
+        }
+      },
+      "zipLabel": "A sua exportação do LinkedIn (.zip)",
+      "zipHint": "Até 20 MB. Só são lidos o seu perfil, cargos, formação, competências, idiomas, certificações e projetos.",
+      "pdfLabel": "O seu perfil do LinkedIn (.pdf)",
+      "pdfHint": "Até 8 MB e 30 páginas, com texto real (não digitalizado).",
+      "chooseFile": "Escolher um ficheiro",
+      "submit": "Verificar o meu LinkedIn",
+      "reading": "A ler o seu LinkedIn…",
+      "cancel": "Manter a revisão que tenho",
+      "capReached": "Fez {{cap}} verificações hoje, o máximo num dia. Continua amanhã."
+    },
+    "review": {
+      "lead": "Como o seu LinkedIn se lê para os empregos que quer, parte a parte. Guarde o que quer mudar; o texto a colar fica na sua lista abaixo.",
+      "staleTitle": "O seu perfil mudou desde esta revisão.",
+      "stale": "Verifique de novo quando quiser que a revisão use o que mudou. Tudo aqui continua a funcionar.",
+      "overall": "Em resumo",
+      "madeFrom": {
+        "linkedin_zip": "A partir da sua exportação de dados do LinkedIn.",
+        "pdf": "A partir do seu perfil guardado em PDF."
+      },
+      "parts": {
+        "headline": "Título",
+        "summary": "Sobre",
+        "position": "Cargo",
+        "skills": "Competências",
+        "education": "Formação",
+        "languages": "Idiomas",
+        "certifications": "Certificações",
+        "projects": "Projetos"
+      },
+      "states": {
+        "good": "Bom",
+        "could_be_better": "Pode melhorar",
+        "missing": "Em falta"
+      },
+      "now": "No LinkedIn agora: {{text}}",
+      "nothing": "Ainda não há nada aqui.",
+      "again": "Verificar de novo",
+      "startOver": "Recomeçar"
+    },
+    "proposal": {
+      "fields": {
+        "headline": "Novo título",
+        "summary": "Novo texto Sobre",
+        "position_description": "Nova descrição",
+        "skill": "Competência a adicionar"
+      },
+      "keep": "Guardar",
+      "keepLabel": "Guardar: {{text}}",
+      "drop": "Descartar",
+      "dropLabel": "Descartar: {{text}}",
+      "edit": "Editar",
+      "takeBack": "Voltar atrás",
+      "kept": "Guardada",
+      "dropped": "Descartada",
+      "done": "Feita no LinkedIn",
+      "keepOff": "Guardar está desligado enquanto isto disser algo que o seu perfil não diz. Edite ou descarte.",
+      "sources": "De onde isto veio",
+      "noSources": "Nada do seu perfil: isto só diz o que não precisa de prova.",
+      "sourceKinds": {
+        "profile": "O seu perfil",
+        "told": "Disse-me",
+        "linkedin": "O seu LinkedIn"
+      },
+      "flag": {
+        "claim": "O seu perfil não diz “{{claim}}”.",
+        "buzzword": "“{{claim}}” é uma palavra que ninguém escreveu sobre si."
+      },
+      "editLabel": "O que deve dizer",
+      "editHint": "Diga só o que o seu perfil diz. É verificado de novo quando guardar.",
+      "save": "Guardar alteração",
+      "cancel": "Cancelar"
+    },
+    "todo": {
+      "title": "Para mudar no LinkedIn",
+      "lead": "Copie cada texto para o LinkedIn você mesmo e marque-o como feito. O Applicamp nunca escreve no LinkedIn.",
+      "empty": "Guarde uma proposta acima e ela aparece aqui com o texto para copiar.",
+      "copy": "Copiar",
+      "copied": "Copiado",
+      "copyFailed": "Selecione o texto e copie-o",
+      "done": "Feito",
+      "notDone": "Ainda não está feito"
+    },
+    "errors": {
+      "generic": "Isso não funcionou. Tente de novo.",
+      "invalid_upload": "Escolha primeiro um ficheiro.",
+      "file_too_large": "Este ficheiro é demasiado grande: até 20 MB para um ZIP, 8 MB para um PDF.",
+      "text_too_long": "Este PDF tem texto a mais: até 60.000 caracteres.",
+      "not_a_zip": "Isto não é um arquivo ZIP. Carregue o ZIP que o LinkedIn lhe enviou.",
+      "archive_too_many_entries": "Este arquivo tem ficheiros a mais para ser uma exportação do LinkedIn.",
+      "archive_entry_too_large": "Um ficheiro neste arquivo é demasiado grande para fazer parte de uma exportação do LinkedIn.",
+      "archive_too_large": "Este arquivo é demasiado grande depois de descompactado para ser uma exportação do LinkedIn.",
+      "archive_unsafe_path": "Este arquivo tem um ficheiro guardado fora dele, por isso não foi aberto.",
+      "not_a_pdf": "Isto não é um PDF. Carregue um PDF, ou a sua exportação do LinkedIn.",
+      "pdf_unreadable": "Este PDF não pôde ser lido. Tente outro ficheiro, ou a sua exportação do LinkedIn.",
+      "pdf_too_many_pages": "Este PDF tem mais de 30 páginas.",
+      "pdf_no_text": "Este PDF não tem texto que possamos ler (pode ser uma digitalização). Carregue antes a sua exportação do LinkedIn.",
+      "nothing_found": "Não foi encontrado nenhum perfil nisto. Confirme que é o ficheiro certo.",
+      "profile_needed": "Adicione primeiro o seu perfil e depois verifique o seu LinkedIn.",
+      "linkedin_daily_cap": "São 10 verificações hoje, o máximo num dia. Continua amanhã.",
+      "ai_unavailable": "Este Applicamp não tem um modelo de IA configurado, por isso não consegue ler o seu LinkedIn.",
+      "ai_daily_limit_reached": "Atingiu o limite de IA de hoje. Tente de novo amanhã.",
+      "ai_budget_reached": "Atingiu o limite de despesa com IA, por isso nada foi enviado.",
+      "ai_failed": "O modelo de IA não conseguiu responder agora. Tente de novo daqui a um minuto.",
+      "proposal_flagged": "Isto ainda diz algo que o seu perfil não diz. Edite ou descarte.",
+      "proposal_not_kept": "Guarde primeiro e marque como feito quando estiver no LinkedIn.",
+      "invalid_text": "Escreva algo, dentro do tamanho do LinkedIn para esta parte.",
+      "not_found": "Isso já não está aqui. Volte atrás e veja de novo."
+    }
   }
 }

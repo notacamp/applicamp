@@ -53,6 +53,8 @@ import type { LineActions } from "./LineRow";
 import { VersionsSection } from "./PdfPanel";
 import { PreviewPane } from "./PreviewPane";
 import { ReviewAside } from "./ReviewAside";
+import { SiteNote } from "./SiteNote";
+import { WritingState } from "./WritingState";
 
 export interface ReviewPageProps {
   /** The opportunity. */
@@ -124,7 +126,9 @@ export function ReviewPage({ id, onBack, onPipeline, spend, onLetter }: ReviewPa
       </Tagged>
     );
   } else if (cv.data.draft === undefined || cv.data.draft === null) {
-    body = (
+    body = cv.data.writing ? (
+      <WritingState company={company} />
+    ) : (
       <Tagged testId="cv-empty">
         <Stack>
           <Text tone="secondary">{t("cv.empty.body")}</Text>
@@ -370,6 +374,7 @@ function Review({
             </Banner>
           </Tagged>
         )}
+        <SiteNote id={id} cv={cv} draft={draft} />
         {onLetter === undefined || newest === undefined ? null : (
           <Tagged testId="cv-letter">
             <Section title={t("letter.fromCv.title")} description={t("letter.fromCv.body")}>
@@ -427,7 +432,9 @@ function Review({
           }
         >
           <Stack>
-            {editable ? (
+            {again.isPending ? (
+              <WritingState company={company} />
+            ) : editable ? (
               <>
                 <PreviewPane
                   opportunity={id}

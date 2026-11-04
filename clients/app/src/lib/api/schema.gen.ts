@@ -686,6 +686,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/opportunities/{id}/brief/paste": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Read what the person pasted from the company's site.
+         * @description When the site cannot be read (it asks apps not to, or does not answer),
+         *     the person can paste what it says. The text is read like one of the
+         *     site's pages (**one model call**): each fact must quote it, or it is left
+         *     out; it replaces the company's facts as a read does. It counts toward the
+         *     20 company reads a day. The text is data, never instructions. A CV made
+         *     before does not change: Write it again uses the facts.
+         */
+        post: operations["pipeline.brief_paste"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/opportunities/{id}/brief/questions/{question_id}/answer": {
         parameters: {
             query?: never;
@@ -3156,6 +3181,12 @@ export interface components {
             can_draft: components["schemas"]["CanDraft"];
             caps: components["schemas"]["CvCaps"];
             /**
+             * @description Why the company's site could not be read, when it could not:
+             *     `robots_disallows`, `no_pages_readable` or `site_unreachable`. The
+             *     person can paste what it says (`…/brief/paste`).
+             */
+            company_read_failure?: string | null;
+            /**
              * @description What the app did by itself for this CV, in order: the job's
              *     preparation (when it prepared it) and the draft.
              */
@@ -3170,12 +3201,22 @@ export interface components {
             /** Format: uuid */
             opportunity_id: string;
             /**
+             * Format: double
+             * @description About what reading pasted text costs, in euros.
+             */
+            read_eur: number;
+            /**
              * @description The posting's language, when the CV is in another: offered, never
              *     chosen for the person.
              */
             suggested_language?: string | null;
             /** @description The PDF versions, newest first. */
             versions: components["schemas"]["CvVersion"][];
+            /**
+             * @description The app is getting this CV ready by itself right now (reading the
+             *     company or writing the draft): the page waits for it.
+             */
+            writing: boolean;
         };
         /** @description The caps and the spend. */
         CvCaps: {
@@ -3234,6 +3275,12 @@ export interface components {
             /** @description Approve is on: nothing is flagged and it is still a draft. */
             can_approve: boolean;
             changes: components["schemas"]["Changes"];
+            /**
+             * Format: int32
+             * @description The company facts the draft could use: none means it was written
+             *     from the posting and the profile only.
+             */
+            company_facts: number;
             contact: components["schemas"]["ContactView"];
             /**
              * Format: double
@@ -4397,6 +4444,11 @@ export interface components {
          * @enum {string}
          */
         Outcome: "succeeded" | "nothing_new" | "needs_you" | "ended_max_steps" | "ended_budget" | "ended_timeout" | "ended_loop" | "failed" | "cancelled";
+        /** @description What the company's site says, pasted by the person. */
+        PasteRequest: {
+            /** @description The site's words, 1 to 20,000 characters. */
+            text: string;
+        };
         /** @description What was checked on a PDF, kept with its version. */
         PdfChecks: {
             contact: components["schemas"]["ContactCheck"];
@@ -7147,6 +7199,78 @@ export interface operations {
             };
             /** @description `not_found` */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.brief_paste": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasteRequest"];
+            };
+        };
+        responses: {
+            /** @description The brief, with the facts of the pasted text. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Brief"];
+                };
+            };
+            /** @description `invalid_text`; `company_unknown` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `company_reads_daily_cap` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed` */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

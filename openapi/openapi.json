@@ -2331,6 +2331,105 @@
         ]
       }
     },
+    "/api/v1/opportunities/{id}/brief/paste": {
+      "post": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Read what the person pasted from the company's site.",
+        "description": "When the site cannot be read (it asks apps not to, or does not answer),\nthe person can paste what it says. The text is read like one of the\nsite's pages (**one model call**): each fact must quote it, or it is left\nout; it replaces the company's facts as a read does. It counts toward the\n20 company reads a day. The text is data, never instructions. A CV made\nbefore does not change: Write it again uses the facts.",
+        "operationId": "pipeline.brief_paste",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The brief, with the facts of the pasted text.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Brief"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_text`; `company_unknown`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`company_reads_daily_cap`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/v1/opportunities/{id}/brief/questions/{question_id}/answer": {
       "post": {
         "tags": [
@@ -9957,7 +10056,9 @@
           "can_draft",
           "caps",
           "draft_eur",
-          "done"
+          "done",
+          "read_eur",
+          "writing"
         ],
         "properties": {
           "can_draft": {
@@ -9965,6 +10066,13 @@
           },
           "caps": {
             "$ref": "#/components/schemas/CvCaps"
+          },
+          "company_read_failure": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the company's site could not be read, when it could not:\n`robots_disallows`, `no_pages_readable` or `site_unreachable`. The\nperson can paste what it says (`…/brief/paste`)."
           },
           "done": {
             "type": "array",
@@ -10004,6 +10112,11 @@
             "type": "string",
             "format": "uuid"
           },
+          "read_eur": {
+            "type": "number",
+            "format": "double",
+            "description": "About what reading pasted text costs, in euros."
+          },
           "suggested_language": {
             "type": [
               "string",
@@ -10017,6 +10130,10 @@
               "$ref": "#/components/schemas/CvVersion"
             },
             "description": "The PDF versions, newest first."
+          },
+          "writing": {
+            "type": "boolean",
+            "description": "The app is getting this CV ready by itself right now (reading the\ncompany or writing the draft): the page waits for it."
           }
         }
       },
@@ -10145,7 +10262,8 @@
           "fixed_by_app",
           "waiting",
           "needs_version",
-          "wants"
+          "wants",
+          "company_facts"
         ],
         "properties": {
           "approved_at": {
@@ -10161,6 +10279,12 @@
           },
           "changes": {
             "$ref": "#/components/schemas/Changes"
+          },
+          "company_facts": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The company facts the draft could use: none means it was written\nfrom the posting and the profile only.",
+            "minimum": 0
           },
           "contact": {
             "$ref": "#/components/schemas/ContactView"
@@ -13162,6 +13286,20 @@
           "failed",
           "cancelled"
         ]
+      },
+      "PasteRequest": {
+        "type": "object",
+        "description": "What the company's site says, pasted by the person.",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The site's words, 1 to 20,000 characters."
+          }
+        },
+        "additionalProperties": false
       },
       "PdfChecks": {
         "type": "object",

@@ -470,7 +470,8 @@
       "invalid_layout": "Elige una plantilla y 1 o 2 páginas.",
       "cannot_keep": "Esta línea trata de la empresa, no de ti. Cámbiala o quítala.",
       "not_flagged": "Esta línea ya coincide con tu perfil.",
-      "too_late": "Ya es tarde para deshacerlo. Vuelve a hacer el CV para cambiarlo."
+      "too_late": "Ya es tarde para deshacerlo. Vuelve a hacer el CV para cambiarlo.",
+      "company_reads_daily_cap": "Puedes leer 20 empresas al día. La lectura sigue mañana."
     },
     "layout": {
       "template": "Estilo",
@@ -598,6 +599,22 @@
       "title_other": "Corregido por la app · {{count}} líneas",
       "now": "«{{text}}»",
       "was": "Decía: «{{text}}»"
+    },
+    "site": {
+      "robots": "La web pide a las apps que no la lean. El CV se escribió solo con la oferta y tu perfil.",
+      "unread": "No se ha podido leer la web de la empresa. El CV se escribió solo con la oferta y tu perfil.",
+      "paste": "Pegar lo que dice la web",
+      "cost": "Leerlo cuesta unos {{cost}}.",
+      "dialogTitle": "Pega lo que dice la web de la empresa",
+      "hint": "Copia el texto de las páginas de la propia empresa. Los datos se sacan solo de estas palabras.",
+      "label": "Las palabras de la web",
+      "read": "Leer este texto",
+      "reading": "Leyendo…",
+      "cancel": "Cancelar",
+      "done": "Leído. Escríbelo de nuevo para usar lo que dice la web."
+    },
+    "writing": {
+      "title": "Escribiendo tu CV para {{company}}. Suele tardar menos de un minuto. Aparece en Hoy cuando esté listo."
     }
   },
   "cvs": {

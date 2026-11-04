@@ -345,6 +345,44 @@ describe("Review the CV", () => {
     });
   });
 
+  it("says when the company's site asks apps not to read it, and reads what the person pastes", async () => {
+    let pasted: unknown;
+    renderReview({
+      [CV]: {
+        body: cv({
+          draft: cvDraft({ company_facts: 0 }),
+          company_read_failure: "robots_disallows",
+        }),
+      },
+      [`POST /api/v1/opportunities/${ID}/brief/paste`]: async (request) => {
+        pasted = await request.json();
+        return { status: 200, body: {} };
+      },
+    });
+    expect(await screen.findByTestId("cv-site")).toHaveTextContent(
+      "The site asks apps not to read it. The CV was written from the job posting and your profile only.",
+    );
+    expect(screen.getByTestId("cv-site-paste")).not.toHaveTextContent("€");
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("cv-site-paste"));
+    await user.type(screen.getByTestId("cv-site-text"), "Example Co builds ledgers.");
+    await user.click(screen.getByTestId("cv-site-read"));
+    await waitFor(() => {
+      expect(pasted).toEqual({ text: "Example Co builds ledgers." });
+    });
+    expect(await screen.findByTestId("cv-site-done")).toHaveTextContent(
+      "Write it again to use what the site says.",
+    );
+  });
+
+  it("waits while the app writes the CV, with no button to press", async () => {
+    renderReview({ [CV]: { body: cv({ writing: true }) } });
+    expect(await screen.findByTestId("cv-writing")).toHaveTextContent(
+      "Writing your CV for Example Co. Usually under a minute.",
+    );
+    expect(screen.queryByTestId("cv-draft")).toBeNull();
+  });
+
   it("offers to make the PDF of a CV approved without one", async () => {
     let asked: unknown;
     renderReview({

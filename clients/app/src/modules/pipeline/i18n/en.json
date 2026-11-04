@@ -470,7 +470,8 @@
       "invalid_layout": "Choose a template and 1 or 2 pages.",
       "cannot_keep": "This line is about the company, not about you. Change it or remove it.",
       "not_flagged": "This line already matches your profile.",
-      "too_late": "It’s too late to undo. Make the CV again to change it."
+      "too_late": "It’s too late to undo. Make the CV again to change it.",
+      "company_reads_daily_cap": "You can read 20 companies a day. Reading continues tomorrow."
     },
     "layout": {
       "template": "Style",
@@ -598,6 +599,22 @@
       "title_other": "Fixed by the app · {{count}} lines",
       "now": "“{{text}}”",
       "was": "It said: “{{text}}”"
+    },
+    "site": {
+      "robots": "The site asks apps not to read it. The CV was written from the job posting and your profile only.",
+      "unread": "The company's site could not be read. The CV was written from the job posting and your profile only.",
+      "paste": "Paste what the site says",
+      "cost": "Reading it costs about {{cost}}.",
+      "dialogTitle": "Paste what the company's site says",
+      "hint": "Copy the text from the company's own pages. Facts are taken only from these words.",
+      "label": "The site's words",
+      "read": "Read this text",
+      "reading": "Reading…",
+      "cancel": "Cancel",
+      "done": "Read. Write it again to use what the site says."
+    },
+    "writing": {
+      "title": "Writing your CV for {{company}}. Usually under a minute. It appears on Today when it is ready."
     }
   },
   "cvs": {

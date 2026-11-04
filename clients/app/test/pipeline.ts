@@ -266,6 +266,7 @@ export function cvDraft(overrides: Partial<CvDraft> = {}): CvDraft {
       { text: "Kafka", level: "nice", covered: false, reason: "not_in_profile" },
     ],
     cost_eur: 0.004,
+    company_facts: 1,
     ...overrides,
   };
 }
@@ -293,6 +294,9 @@ export function cv(overrides: Partial<Cv> = {}): Cv {
       { step: "draft", eur: 0.004, at: "2026-10-31T10:00:00Z" },
     ],
     suggested_language: null,
+    company_read_failure: null,
+    read_eur: 0.002,
+    writing: false,
     ...overrides,
   };
 }

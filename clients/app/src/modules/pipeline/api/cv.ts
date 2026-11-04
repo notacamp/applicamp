@@ -86,12 +86,16 @@ const cvKey = (id: string) => [...PIPELINE_QUERY_KEY, "cv", id] as const;
 /** Every CV of the account (`GET /api/v1/cvs`). */
 export const CVS_QUERY_KEY = [...PIPELINE_QUERY_KEY, "cvs"] as const;
 
-/** Reading the CV never calls the model. */
+/** How often the CV is read again while the app writes it. */
+const WRITING_MS = 4000;
+
+/** Reading the CV never calls the model; while the app writes it, it is read again. */
 export function useCv(id: string) {
   return useQuery({
     queryKey: cvKey(id),
     queryFn: async ({ signal }): Promise<Cv> =>
       unwrap(await api.GET("/api/v1/opportunities/{id}/cv", { params: { path: { id } }, signal })),
+    refetchInterval: (query) => (query.state.data?.writing === true ? WRITING_MS : false),
   });
 }
 
@@ -292,6 +296,7 @@ const ERROR_CODES = [
   "cannot_keep",
   "not_flagged",
   "too_late",
+  "company_reads_daily_cap",
   "profile_changed",
   "draft_frozen",
   "lines_flagged",

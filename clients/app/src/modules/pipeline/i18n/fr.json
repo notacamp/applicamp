@@ -470,7 +470,8 @@
       "invalid_layout": "Choisissez un modèle et 1 ou 2 pages.",
       "cannot_keep": "Cette ligne concerne l’entreprise, pas vous. Modifiez-la ou retirez-la.",
       "not_flagged": "Cette ligne correspond déjà à votre profil.",
-      "too_late": "Il est trop tard pour annuler. Refaites le CV pour le modifier."
+      "too_late": "Il est trop tard pour annuler. Refaites le CV pour le modifier.",
+      "company_reads_daily_cap": "Vous pouvez lire 20 entreprises par jour. La lecture reprend demain."
     },
     "layout": {
       "template": "Style",
@@ -598,6 +599,22 @@
       "title_other": "Corrigé par l’app · {{count}} lignes",
       "now": "« {{text}} »",
       "was": "Elle disait : « {{text}} »"
+    },
+    "site": {
+      "robots": "Le site demande aux apps de ne pas le lire. Le CV a été écrit à partir de l’offre et de votre profil seulement.",
+      "unread": "Le site de l’entreprise n’a pas pu être lu. Le CV a été écrit à partir de l’offre et de votre profil seulement.",
+      "paste": "Coller ce que dit le site",
+      "cost": "Le lire coûte environ {{cost}}.",
+      "dialogTitle": "Collez ce que dit le site de l’entreprise",
+      "hint": "Copiez le texte des pages de l’entreprise. Les faits sont tirés de ces mots seulement.",
+      "label": "Les mots du site",
+      "read": "Lire ce texte",
+      "reading": "Lecture…",
+      "cancel": "Annuler",
+      "done": "Lu. Réécrivez le CV pour utiliser ce que dit le site."
+    },
+    "writing": {
+      "title": "Rédaction de votre CV pour {{company}}. En général moins d’une minute. Il apparaît dans Aujourd’hui quand il est prêt."
     }
   },
   "cvs": {

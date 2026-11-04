@@ -261,6 +261,7 @@ async fn the_next_download_is_conditional_and_a_304_changes_nothing(db: PgPool) 
         .and(header("if-none-match", "\"v1\""))
         .and(header("if-modified-since", "Wed, 04 Nov 2026 16:18:18 GMT"))
         .respond_with(ResponseTemplate::new(304))
+        .with_priority(1)
         .mount(&server)
         .await;
     Mock::given(method("GET"))

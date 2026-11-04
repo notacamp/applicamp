@@ -61,7 +61,10 @@ export function DonePanel({ cv }: { cv: Cv }) {
       eur: step.eur,
     })),
     { key: "checked", label: t("cv.done.steps.checked"), eur: 0 },
-    { key: "pdf", label: t("cv.done.steps.pdf"), eur: 0 },
+    // The PDF only once it is there.
+    ...(cv.draft?.preview?.ready === true
+      ? [{ key: "pdf", label: t("cv.done.steps.pdf"), eur: 0 }]
+      : []),
   ];
   return (
     <Tagged testId="cv-done">

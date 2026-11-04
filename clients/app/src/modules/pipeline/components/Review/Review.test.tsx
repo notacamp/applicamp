@@ -299,6 +299,7 @@ describe("Review the CV", () => {
               role === undefined ? [] : [{ ...role, bullets: [...role.bullets, fixedLine] }],
           },
           suggested_language: "fr",
+          work_languages: ["en", "es-ES"],
         }),
       },
     });
@@ -312,9 +313,10 @@ describe("Review the CV", () => {
     expect(screen.getByTestId("cv-fixed-l8")).toHaveTextContent(
       "It said: “Led a team of 4 engineers building ledgers for small shops”",
     );
-    // Style, Length, Language: the CV's and the posting's.
+    // Style, Length, Language: the CV's, the person's next language for work, the posting's.
     expect(screen.getByTestId("cv-layout-language")).toHaveTextContent("Style");
     expect(screen.getByTestId("cv-language-en")).toBeVisible();
+    expect(screen.getByTestId("cv-language-es-ES")).toBeVisible();
     await userEvent.setup().click(screen.getByTestId("cv-language-fr"));
     expect(screen.getByTestId("cv-language-next")).toHaveTextContent("Press Write it again");
     expect(screen.getByTestId("cv-make-again")).toHaveTextContent("Write it again");
@@ -347,6 +349,8 @@ describe("Review the CV", () => {
     expect(await screen.findByTestId("cv-preview-error")).toHaveTextContent(
       "Could not make the PDF for Example Co. The text of the CV is saved.",
     );
+    // Nothing says the PDF was made.
+    expect(screen.queryByTestId("cv-done-pdf")).toBeNull();
     const text = screen.getByTestId("cv-preview-text");
     expect(text).toHaveAttribute("download", "CV - Example Co.txt");
     expect(decodeURIComponent(text.getAttribute("href") ?? "")).toContain(
@@ -494,6 +498,51 @@ describe("Review the CV", () => {
       "This draft has no PDF yet.",
     );
     expect(screen.getByTestId("cv-preview-make")).toHaveTextContent("Make the PDF");
+  });
+
+  it("takes a position off Earlier", async () => {
+    let hidden: unknown;
+    renderReview({
+      [CV]: { body: cv({ draft: cvDraft() }) },
+      [`POST /api/v1/opportunities/${ID}/cv/drafts/1/hide-position`]: async (request) => {
+        hidden = await request.json();
+        return { body: cv({ draft: cvDraft({ earlier: [] }) }) };
+      },
+    });
+    const user = userEvent.setup();
+    await openLines(user);
+    expect(await screen.findByTestId("cv-earlier-2")).toHaveTextContent(
+      "Junior Developer, Tiny Co (2015–2017)",
+    );
+    await user.click(screen.getByTestId("cv-earlier-remove-2"));
+    await waitFor(() => {
+      expect(hidden).toEqual({ position: 2 });
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId("cv-earlier")).toBeNull();
+    });
+  });
+
+  it("says the cover letter is being written once Undo is over", async () => {
+    const earlier = new Date(Date.now() - 60_000).toISOString();
+    renderReview({
+      [CV]: {
+        body: cv({
+          draft: {
+            ...fixedDraft(),
+            status: "approved",
+            version: 1,
+            can_approve: false,
+            undo_until: earlier,
+          },
+          next: { step: "letter", eur: 0.002, at: earlier },
+        }),
+      },
+    });
+    expect(await screen.findByTestId("cv-letter-started")).toHaveTextContent(
+      "Approved. Your cover letter is being written now.",
+    );
+    expect(screen.queryByTestId("cv-undo")).toBeNull();
   });
 
   it("marks a line the app rewrote", async () => {

@@ -286,7 +286,7 @@
         "letter_approval": "Votre lettre de motivation et vos réponses sont rédigées et attendent votre relecture."
       },
       "steps": {
-        "shortlist": "retenu l’offre ({{date}})",
+        "shortlist": "retenu l’offre le {{date}}",
         "site": "trouvé le site ({{date}})",
         "read": "lu l’entreprise ({{date}})",
         "compare": "comparé l’offre ({{date}})",
@@ -340,7 +340,7 @@
       "draft": "Rédiger le CV",
       "drafting": "Rédaction…",
       "review": "Relire le CV",
-      "hint": "Un appel d’IA. Ensuite, chaque ligne est vérifiée par rapport à votre profil, sans IA.",
+      "hint": "Jusqu’à quatre appels d’IA : le brouillon et les corrections de l’app elle-même. Ensuite, chaque ligne est vérifiée par rapport à votre profil, sans IA.",
       "blocked": {
         "stage_too_early": "Présélectionnez d’abord ce poste : on fait un CV pour les postes que vous visez.",
         "per_opportunity_cap": "Vous avez déjà fait 10 brouillons pour ce poste. Relisez-en un.",
@@ -357,7 +357,8 @@
       "education": "Formation",
       "languages": "Langues",
       "now": "en cours",
-      "earlier": "Expérience antérieure"
+      "earlier": "Expérience antérieure",
+      "earlierRemove": "Retirer du CV"
     },
     "marks": {
       "as_in_profile": "Comme dans le profil",
@@ -577,7 +578,8 @@
       "approved": "Approuvé",
       "undo": "Annuler",
       "undoing": "Annulation…",
-      "next": "Nous écrivons ensuite votre lettre de motivation, environ {{cost}}. Annuler l’arrête."
+      "next": "Nous écrivons ensuite votre lettre de motivation, environ {{cost}}. Annuler l’arrête.",
+      "started": "Approuvé. Votre lettre de motivation est en cours de rédaction."
     },
     "wants": {
       "title": "Ce que l’offre demande",

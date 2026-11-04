@@ -39,34 +39,13 @@ function span(
   return `${start ?? ""} – ${end ?? now}`;
 }
 
-/** A position the CV names only, as the PDF does: "Title, Company (2015–2017)". */
-function earlierLine(role: {
-  title?: string | null;
-  company?: string | null;
-  start_date?: string | null;
-  end_date?: string | null;
-}): string {
-  const head = [role.title, role.company]
-    .filter((part): part is string => part !== undefined && part !== null && part !== "")
-    .join(", ");
-  const year = (date: string | null | undefined) =>
-    date !== undefined && date !== null && /^\d{4}/.test(date) ? date.slice(0, 4) : undefined;
-  const start = year(role.start_date);
-  const end = year(role.end_date);
-  let years = "";
-  if (start !== undefined && end !== undefined) {
-    years = start === end ? ` (${start})` : ` (${start}–${end})`;
-  } else if (start !== undefined || end !== undefined) {
-    years = ` (${start ?? end ?? ""})`;
-  }
-  return `${head}${years}`;
-}
-
 export interface CvSheetProps {
   draft: CvDraft;
   actions: LineActions;
   /** Put back a position, or a line, as the profile has it. */
   onPutBack: (what: { position: number } | { source: string }) => void;
+  /** Take a position off "Earlier": named nowhere until it is put back. */
+  onHidePosition: (position: number) => void;
 }
 
 /**
@@ -74,7 +53,7 @@ export interface CvSheetProps {
  * and summary, the positions with their lines, the skills, education and
  * languages, and what was left out. Every line can show where it came from.
  */
-export function CvSheet({ draft, actions, onPutBack }: CvSheetProps) {
+export function CvSheet({ draft, actions, onPutBack, onHidePosition }: CvSheetProps) {
   const { t } = useTranslation("pipeline");
   const { contact } = draft;
   const contactLine = [
@@ -142,9 +121,31 @@ export function CvSheet({ draft, actions, onPutBack }: CvSheetProps) {
           </PaperRole>
         ))}
       </PaperSection>
-      {draft.left_out.roles.length === 0 ? null : (
+      {draft.earlier.length === 0 ? null : (
         <PaperSection title={t("cv.sheet.earlier")} testId="cv-earlier">
-          <Text size="sm">{draft.left_out.roles.map((role) => earlierLine(role)).join(" · ")}</Text>
+          <Stack gap="sm">
+            {draft.earlier.map((line) => (
+              <Cluster key={line.position}>
+                <Tagged testId={`cv-earlier-${String(line.position)}`}>
+                  <Text size="sm">{line.text}</Text>
+                </Tagged>
+                {actions.editable ? (
+                  <Button
+                    variant="ghost"
+                    icon="close"
+                    disabled={actions.busy}
+                    data-testid={`cv-earlier-remove-${String(line.position)}`}
+                    aria-label={`${t("cv.sheet.earlierRemove")}: ${line.text}`}
+                    onClick={() => {
+                      onHidePosition(line.position);
+                    }}
+                  >
+                    {t("cv.sheet.earlierRemove")}
+                  </Button>
+                ) : null}
+              </Cluster>
+            ))}
+          </Stack>
         </PaperSection>
       )}
       {draft.skills.length === 0 ? null : (

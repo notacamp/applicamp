@@ -36,6 +36,7 @@ import {
   useMakeDraft,
   useMakeVersion,
   usePreview,
+  useHidePosition,
   usePutBack,
   useUnapprove,
   type Cv,
@@ -190,6 +191,7 @@ function Review({
   const change = useChangeLine(id, draft.n);
   const confirm = useConfirmLine(id, draft.n);
   const putBack = usePutBack(id, draft.n);
+  const hidePosition = useHidePosition(id, draft.n);
   const approve = useApprove(id, draft.n);
   const makeVersion = useMakeVersion(id);
   const preview = usePreview(id, draft.n);
@@ -212,14 +214,23 @@ function Review({
     change.isPending ||
     confirm.isPending ||
     putBack.isPending ||
+    hidePosition.isPending ||
     approve.isPending ||
     makeVersion.isPending ||
     preview.isPending ||
     unapprove.isPending ||
     again.isPending;
-  const failure = [change, confirm, putBack, approve, makeVersion, preview, unapprove, again].find(
-    (action) => action.isError,
-  )?.error;
+  const failure = [
+    change,
+    confirm,
+    putBack,
+    hidePosition,
+    approve,
+    makeVersion,
+    preview,
+    unapprove,
+    again,
+  ].find((action) => action.isError)?.error;
   const failedLength = preview.isError
     ? preview.variables.length
     : approve.isError
@@ -231,6 +242,7 @@ function Review({
       change,
       confirm,
       putBack,
+      hidePosition,
       approve,
       makeVersion,
       preview,
@@ -263,11 +275,20 @@ function Review({
   };
   const version = draft.version ?? (newest?.version ?? 0) + 1;
   const waiting = draft.waiting.length;
-  // The CV's language and one other: the posting's when it differs, else
-  // English (or Portuguese for a CV in English).
+  // The CV's language first, then the others the person works in (their
+  // goals, in their order), then the posting's, else English (or Portuguese
+  // for a CV in English): three at most.
   const current = cvLanguage(draft.language);
-  const other = cvLanguage(cv.suggested_language ?? (current === "en" ? "pt-PT" : "en"));
-  const languages = other === current ? [current] : [current, other];
+  const languages = [
+    current,
+    ...cv.work_languages.map(cvLanguage),
+    ...(cv.suggested_language === undefined || cv.suggested_language === null
+      ? []
+      : [cvLanguage(cv.suggested_language)]),
+    current === "en" ? "pt-PT" : "en",
+  ]
+    .filter((tag, index, all) => all.indexOf(tag) === index)
+    .slice(0, 3);
   const writeAgain = (
     <Button
       variant="secondary"
@@ -296,6 +317,10 @@ function Review({
       onPutBack={(what) => {
         resetErrors();
         putBack.mutate(what);
+      }}
+      onHidePosition={(position) => {
+        resetErrors();
+        hidePosition.mutate(position);
       }}
     />
   );
@@ -529,6 +554,16 @@ function Review({
                   </Text>
                 </Tagged>
               )
+            }
+          />
+        ) : draft.status === "approved" && cv.next !== undefined && cv.next !== null ? (
+          // Undo is over and the letter starts: say so until it shows.
+          <ActionDock
+            testId="cv-dock"
+            actions={
+              <Tagged testId="cv-letter-started">
+                <Text weight="semibold">{t("cv.dock.started")}</Text>
+              </Tagged>
             }
           />
         ) : null}

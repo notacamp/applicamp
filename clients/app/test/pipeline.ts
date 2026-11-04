@@ -213,6 +213,7 @@ export function cvDraft(overrides: Partial<CvDraft> = {}): CvDraft {
       ],
       lines: [],
     },
+    earlier: [{ position: 2, text: "Junior Developer, Tiny Co (2015–2017)" }],
     flagged: 2,
     first_flagged: "l5",
     can_approve: false,
@@ -299,6 +300,7 @@ export function cv(overrides: Partial<Cv> = {}): Cv {
     company_read_failure: null,
     read_eur: 0.002,
     writing: false,
+    work_languages: ["en", "fr"],
     ...overrides,
   };
 }

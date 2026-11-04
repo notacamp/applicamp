@@ -286,7 +286,7 @@
         "letter_approval": "Tu carta de presentación y tus respuestas están escritas y esperan tu revisión."
       },
       "steps": {
-        "shortlist": "añadió la oferta a tu lista ({{date}})",
+        "shortlist": "añadió la oferta a tu lista el {{date}}",
         "site": "encontró la web ({{date}})",
         "read": "leyó la empresa ({{date}})",
         "compare": "comparó la oferta ({{date}})",
@@ -340,7 +340,7 @@
       "draft": "Redactar el CV",
       "drafting": "Redactando…",
       "review": "Revisar el CV",
-      "hint": "Una llamada de IA. Después, cada línea se comprueba contra tu perfil, sin IA.",
+      "hint": "Hasta cuatro llamadas de IA: el borrador y las correcciones de la propia app. Después, cada línea se comprueba contra tu perfil, sin IA.",
       "blocked": {
         "stage_too_early": "Preselecciona antes esta oferta: el CV se hace para las ofertas que persigues.",
         "per_opportunity_cap": "Ya has hecho 10 borradores para esta oferta. Revisa uno de ellos.",
@@ -357,7 +357,8 @@
       "education": "Formación",
       "languages": "Idiomas",
       "now": "actual",
-      "earlier": "Experiencia anterior"
+      "earlier": "Experiencia anterior",
+      "earlierRemove": "Quitar del CV"
     },
     "marks": {
       "as_in_profile": "Como en el perfil",
@@ -577,7 +578,8 @@
       "approved": "Aprobado",
       "undo": "Deshacer",
       "undoing": "Deshaciendo…",
-      "next": "Ahora escribimos tu carta de presentación, unos {{cost}}. Deshacer lo detiene."
+      "next": "Ahora escribimos tu carta de presentación, unos {{cost}}. Deshacer lo detiene.",
+      "started": "Aprobado. Tu carta de presentación se está escribiendo ahora."
     },
     "wants": {
       "title": "Lo que pide la oferta",

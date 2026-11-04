@@ -286,7 +286,7 @@
         "letter_approval": "A carta de apresentação e as respostas estão escritas e esperam pela sua revisão."
       },
       "steps": {
-        "shortlist": "pôs a vaga na lista ({{date}})",
+        "shortlist": "pôs a vaga na lista a {{date}}",
         "site": "encontrou o site ({{date}})",
         "read": "leu a empresa ({{date}})",
         "compare": "comparou a vaga ({{date}})",
@@ -340,7 +340,7 @@
       "draft": "Redigir o CV",
       "drafting": "A redigir…",
       "review": "Rever o CV",
-      "hint": "Uma chamada de IA. Depois, cada linha é verificada contra o seu perfil, sem IA.",
+      "hint": "Até quatro chamadas de IA: o rascunho e as correções da própria app. Depois, cada linha é verificada contra o seu perfil, sem IA.",
       "blocked": {
         "stage_too_early": "Selecione primeiro esta vaga: o CV faz-se para as vagas a que se candidata.",
         "per_opportunity_cap": "Já fez 10 rascunhos para esta vaga. Reveja um deles.",
@@ -357,7 +357,8 @@
       "education": "Formação",
       "languages": "Línguas",
       "now": "atual",
-      "earlier": "Experiência anterior"
+      "earlier": "Experiência anterior",
+      "earlierRemove": "Retirar do CV"
     },
     "marks": {
       "as_in_profile": "Como no perfil",
@@ -577,7 +578,8 @@
       "approved": "Aprovado",
       "undo": "Desfazer",
       "undoing": "A desfazer…",
-      "next": "A seguir escrevemos a sua carta de apresentação, cerca de {{cost}}. Desfazer para isto."
+      "next": "A seguir escrevemos a sua carta de apresentação, cerca de {{cost}}. Desfazer para isto.",
+      "started": "Aprovado. A sua carta de apresentação está a ser escrita agora."
     },
     "wants": {
       "title": "O que a vaga pede",

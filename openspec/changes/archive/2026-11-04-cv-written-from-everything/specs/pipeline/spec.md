@@ -4,10 +4,11 @@
 A job a search finds with a match of 75 or more, not ruled out by a requirement and open to the
 person, SHALL be proposed to them, listed best match first; moving its stage or setting it aside
 SHALL withdraw it. After a search, when the person's Autonomy goal is "Prepare" or not answered, the
-app SHALL shortlist the best proposals by itself, at most three per UTC day per account, and start
-their preparation; each SHALL say it was shortlisted by the app. It SHALL shortlist nothing with the
-goal "Find only", without a model, when the day's CV drafts are used, or when a spending limit is
-reached. No model SHALL be called to propose or to shortlist.
+app SHALL shortlist the best proposals by itself, at most three per UTC day per account even when two
+searches end at once, never a posting that has closed, and start their preparation; each SHALL say
+it was shortlisted by the app. It SHALL shortlist nothing with the goal "Find only", without a model,
+when the day's CV drafts are used, or when the account's or the instance's spending limits have no
+room for one more preparation at its worst. No model SHALL be called to propose or to shortlist.
 
 #### Scenario: A proposal
 - **WHEN** a search finds a job with a match of 82 that is open to the person
@@ -20,6 +21,10 @@ reached. No model SHALL be called to propose or to shortlist.
 #### Scenario: Find only
 - **WHEN** a search ends for someone whose goal is "Find only"
 - **THEN** the proposals stay Found
+
+#### Scenario: A closed posting
+- **WHEN** the best proposal's posting has closed
+- **THEN** it is not shortlisted, and the next three are
 
 ### Requirement: The CV page says what could not be done, and offers the way on
 When the company's site could not be read and the CV was written without its facts, the page SHALL
@@ -44,6 +49,28 @@ cost SHALL be on the line under it.
 - **THEN** the page says it is being written and shows it when it is ready
 
 ## MODIFIED Requirements
+
+### Requirement: A cover letter needs an approved CV and one model call
+For an opportunity whose CV is approved, a click, or approving the CV of a job being prepared by
+itself, SHALL write a cover letter with exactly one model call that is
+shown the posting, what the job wants, the company facts the person kept, the profile with every kept fact, the
+words of the approved CV, the language (the one asked for, else the approved CV's), the length (short, about 180 words, by default; standard, about 300) and
+the job's own questions. It SHALL never be shown a name or contact details: the server prints the greeting, the
+name and the contact. The prompt SHALL ban "I am writing to apply", flattery, clichés and superlatives the sources
+do not support. Without an approved CV the action SHALL be off and say why.
+
+#### Scenario: No approved CV
+- **WHEN** the CV of a job is not approved
+- **THEN** "Write the cover letter" is off with "Approve your CV for this job first", and no model is called
+
+#### Scenario: Nothing private is sent
+- **WHEN** a letter is drafted
+- **THEN** the model's message holds no name, email, address or link of the person
+
+#### Scenario: The CV's language
+- **WHEN** the CV was approved in Portuguese and the letter is written by itself, with no language asked for
+- **THEN** the letter is in Portuguese
+
 
 ### Requirement: A blocked line is fixed, said to be true, or removed
 What the app could not fix SHALL wait on the person as a question: "Is this true?" with the line,
@@ -103,15 +130,20 @@ SHALL be shown unless it is both of no help for the job and more than ten years
 old, with 3 to 6 bullets for the two most recent and 1 to 3 for older ones;
 positions SHALL be printed newest first whatever order the model gives, and the
 ones left out SHALL be named in one "Earlier" line (title, company, years) by
-the app. The model SHALL be shown the posting, what the job wants, the company
+the app, newest first, the page showing the same line as the PDF. A position the
+person took off (its last line removed, or removed from "Earlier") SHALL be
+named nowhere until it is put back. Before the cap on bullets, positions SHALL be
+taken newest first, so the cap cuts the oldest. The model SHALL be shown the posting, what the job wants, the company
 facts and the profile as data, and SHALL never be shown the person's name,
 email, address, links or any contact detail: the server SHALL print those
 itself. The draft SHALL be written in the language asked for, else the first
-language of the person's goals, else one their profile says they speak well,
-else English; the posting's language SHALL only be offered. When the job wants
-something the profile shows and the draft does not say, one more call SHALL ask
-for up to three bullets from the person's own sources, each checked like any
-line.
+language of the person's goals, else one their profile says they speak well (a
+first language before a working one, LinkedIn's "Native or bilingual" and "Full
+professional" included), else English; the posting's language and the person's
+other languages for work SHALL only be offered. When the job wants something a
+position's own words or the skills show and the draft does not say, one more
+call SHALL ask for up to three bullets from those sources, each checked like any
+line and within the caps on bullets.
 
 #### Scenario: A draft
 - **WHEN** someone drafts a CV for a Shortlisted opportunity
@@ -128,6 +160,10 @@ line.
 #### Scenario: The person's language
 - **WHEN** someone who works in Portuguese drafts a CV for a posting in English
 - **THEN** the CV is in Portuguese and English is offered
+
+#### Scenario: Taken off
+- **WHEN** the person removes the last line of a position, or removes a position from "Earlier"
+- **THEN** neither the PDF nor the page names it, and putting it back shows it again
 
 #### Scenario: What the job wants
 - **WHEN** the job wants partner feeds, the profile shows them and the draft does not say it

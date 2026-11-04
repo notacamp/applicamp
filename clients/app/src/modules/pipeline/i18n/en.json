@@ -286,7 +286,7 @@
         "letter_approval": "Your cover letter and answers are written and wait for your review."
       },
       "steps": {
-        "shortlist": "shortlisted the job ({{date}})",
+        "shortlist": "shortlisted the job on {{date}}",
         "site": "found the website ({{date}})",
         "read": "read the company ({{date}})",
         "compare": "compared the job ({{date}})",
@@ -340,7 +340,7 @@
       "draft": "Draft the CV",
       "drafting": "Drafting…",
       "review": "Review the CV",
-      "hint": "One AI call. Then every line is checked against your profile, without AI.",
+      "hint": "Up to four AI calls: the draft and the app’s own fixes. Then every line is checked against your profile, without AI.",
       "blocked": {
         "stage_too_early": "Shortlist this job first: a CV is made for the jobs you’re going after.",
         "per_opportunity_cap": "You’ve made 10 drafts for this job. Review one of them.",
@@ -357,7 +357,8 @@
       "education": "Education",
       "languages": "Languages",
       "now": "now",
-      "earlier": "Earlier"
+      "earlier": "Earlier",
+      "earlierRemove": "Remove from the CV"
     },
     "marks": {
       "as_in_profile": "As in profile",
@@ -577,7 +578,8 @@
       "approved": "Approved",
       "undo": "Undo",
       "undoing": "Undoing…",
-      "next": "Writing your cover letter next, about {{cost}}. Undo stops it."
+      "next": "Writing your cover letter next, about {{cost}}. Undo stops it.",
+      "started": "Approved. Your cover letter is being written now."
     },
     "wants": {
       "title": "What the job wants",

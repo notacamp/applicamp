@@ -858,7 +858,10 @@ export interface paths {
         put?: never;
         /**
          * Draft a CV for this job.
-         * @description **One model call.** From the posting, what the job wants, the company
+         * @description **Up to four model calls**: the draft on the `write` role (again with more
+         *     room only when its answer is cut off), the second look at what the job
+         *     wants, and the app's fix of what the check flags. From the posting, what
+         *     the job wants, the company
          *     facts not removed and the profile; each line cites the profile sources it
          *     comes from, and the server then checks that it says nothing they do not.
          *     The model never sees a name or contact details. Needs the opportunity at
@@ -919,6 +922,28 @@ export interface paths {
          * @description An approved version cannot be discarded. No model call.
          */
         post: operations["pipeline.cv_discard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/cv/drafts/{n}/hide-position": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Take a position off "Earlier".
+         * @description The position is no longer named under "Earlier", in the PDF or on the
+         *     page. It stays among what the CV left out, and putting it back shows it
+         *     again. The preview is made again. No model call. Only a draft can change.
+         */
+        post: operations["pipeline.cv_hide_position"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2629,12 +2654,20 @@ export interface components {
          * @description How a board is read.
          * @enum {string}
          */
-        BoardKind: "json_api" | "rss" | "jsonld_sitemap" | "hn";
+        BoardKind: "json_api" | "rss" | "jsonld_sitemap" | "hn" | "hiring_system" | "company_page";
         /** @description The job boards, highest average salary first (none last). */
         BoardList: {
+            /**
+             * @description The boards and the hiring systems, with the company pages that wait
+             *     first and the newest (at most [`SHOWN_COMPANY_PAGES`]).
+             */
             boards: components["schemas"]["BoardSummary"][];
             /** @description The signed-in person manages the boards. */
             can_manage: boolean;
+            /** @description Every company page there is. */
+            company_pages: components["schemas"]["CompanyPageCounts"];
+            /** @description The web search. */
+            web_search: components["schemas"]["WebSearchState"];
         };
         /**
          * @description Where a board came from.
@@ -2763,6 +2796,8 @@ export interface components {
             approved_by?: string | null;
             /** @description How its jobs are credited ("From Himalayas"). */
             attribution: string;
+            /** @description For a company page, the company on its system (`acme`). */
+            company_token?: string | null;
             /** @description Where to ask it for permission. */
             contact_email?: string | null;
             /** @description What its site rules say about use of its content (search, ai-train). */
@@ -2798,6 +2833,8 @@ export interface components {
             /** @description Its stable name: the source its jobs carry. */
             slug: string;
             status: components["schemas"]["BoardStatus"];
+            /** @description For a hiring system and a company page, the system (`lever`). */
+            system?: string | null;
             /** @description Plain lowercase words that describe it ("tech", "europe"). */
             tags: string[];
             /** @description The sentence of its terms that decided the verdict. */
@@ -3088,6 +3125,23 @@ export interface components {
             suggested: components["schemas"]["CompanySuggestion"][];
             watching: components["schemas"]["WatchedCompany"][];
         };
+        /** @description How many company pages there are, by where they stand. */
+        CompanyPageCounts: {
+            /**
+             * Format: int32
+             * @description Read by the app or the owner.
+             */
+            approved: number;
+            /** Format: int32 */
+            declined: number;
+            /** Format: int32 */
+            total: number;
+            /**
+             * Format: int32
+             * @description Not approved yet: their system waits, or no recent job was seen.
+             */
+            waiting: number;
+        };
         /** @description The last read of the company's pages. */
         CompanyRead: {
             /**
@@ -3296,6 +3350,11 @@ export interface components {
             /** @description The PDF versions, newest first. */
             versions: components["schemas"]["CvVersion"][];
             /**
+             * @description The languages the person works in (their goals), in their order: what
+             *     the CV's language choice offers first.
+             */
+            work_languages: string[];
+            /**
              * @description The app is getting this CV ready by itself right now (reading the
              *     company or writing the draft): the page waits for it.
              */
@@ -3346,8 +3405,9 @@ export interface components {
         /** @description What to make a draft of. */
         CvDraftRequest: {
             /**
-             * @description A language tag such as `pt-PT`; the posting's when it says, else
-             *     English.
+             * @description A language tag such as `pt-PT`; when left out, the first language the
+             *     person works in (their goals), else one their profile says they speak
+             *     well enough, else English. The posting's is only offered.
              */
             language?: string | null;
         };
@@ -3373,6 +3433,12 @@ export interface components {
             cost_eur?: number | null;
             /** Format: date-time */
             created_at: string;
+            /**
+             * @description The positions named under "Earlier", newest first, as in the PDF:
+             *     every one left out that has a title or a company and that the person
+             *     did not take off.
+             */
+            earlier: components["schemas"]["EarlierLine"][];
             education: components["schemas"]["EducationView"][];
             experience: components["schemas"]["RoleView"][];
             /**
@@ -3572,6 +3638,16 @@ export interface components {
          * @enum {string}
          */
         DraftStatus: "draft" | "approved" | "discarded";
+        /** @description A position the CV names only, under "Earlier", as the PDF prints it. */
+        EarlierLine: {
+            /**
+             * Format: int32
+             * @description For `…/hide-position` and `…/put-back`.
+             */
+            position: number;
+            /** @description "Title, Company (2015–2017)". */
+            text: string;
+        };
         /** @description A school or degree. */
         Education: {
             /** @description The field ("Computer science"). */
@@ -3873,6 +3949,15 @@ export interface components {
          * @enum {string}
          */
         HiddenReason: "not_remote" | "not_open_to_location" | "language" | "below_floor";
+        /** @description A position to take off the CV. */
+        HidePositionRequest: {
+            /**
+             * Format: int32
+             * @description A position the CV names under "Earlier" (its place in the profile's
+             *     `work`).
+             */
+            position: number;
+        };
         /** @description A draft profile waiting for review. */
         Import: {
             /**
@@ -4124,10 +4209,7 @@ export interface components {
         };
         /** @description What to make a draft of. */
         LetterDraftRequest: {
-            /**
-             * @description A language tag such as `pt-PT`; the posting's when it says, else
-             *     English.
-             */
+            /** @description A language tag such as `pt-PT`; when left out, the approved CV's. */
             language?: string | null;
             size?: components["schemas"]["LetterSize"] | null;
         };
@@ -5709,7 +5791,7 @@ export interface components {
          * @description What a company's jobs are read from.
          * @enum {string}
          */
-        WatchBoardKind: "greenhouse" | "lever" | "ashby" | "jsonld" | "none";
+        WatchBoardKind: "greenhouse" | "lever" | "ashby" | "workable" | "recruitee" | "teamtailor" | "personio" | "jsonld" | "none";
         /** @description A company the person watches. */
         WatchedCompany: {
             /** @description How its jobs are read; `none` when no board was found. */
@@ -5741,6 +5823,21 @@ export interface components {
             /** Format: date-time */
             watching_since?: string | null;
             website?: string | null;
+        };
+        /** @description The optional web search that finds company pages. */
+        WebSearchState: {
+            /**
+             * Format: int32
+             * @description The most a month asks.
+             */
+            monthly_limit: number;
+            /** @description A key is set on the server. */
+            on: boolean;
+            /**
+             * Format: int32
+             * @description Queries asked this calendar month.
+             */
+            queries_this_month: number;
         };
         /** @description A position. */
         Work: {
@@ -8098,6 +8195,71 @@ export interface operations {
                 };
             };
             /** @description `draft_frozen` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.cv_hide_position": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+                /** @description The draft. */
+                n: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HidePositionRequest"];
+            };
+        };
+        responses: {
+            /** @description The CV, without that position. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cv"];
+                };
+            };
+            /** @description `invalid_request` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: no such draft or position */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `draft_frozen`; `already_on_cv` */
             409: {
                 headers: {
                     [name: string]: unknown;

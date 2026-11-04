@@ -211,6 +211,22 @@ export function usePutBack(id: string, n: number) {
   });
 }
 
+/** Takes a position off "Earlier": the CV names it nowhere until it is put back. */
+export function useHidePosition(id: string, n: number) {
+  const store = useStore(id);
+  return useMutation({
+    mutationFn: async (position: number): Promise<Cv> =>
+      unwrap(
+        await api.POST("/api/v1/opportunities/{id}/cv/drafts/{n}/hide-position", {
+          params: { path: { id, n } },
+          headers: CSRF_HEADERS,
+          body: { position },
+        }),
+      ),
+    onSuccess: store,
+  });
+}
+
 /**
  * Approves a draft: its text becomes a PDF (Clean on 1 page unless the
  * `layout` says otherwise), read back and kept as the next version.
@@ -321,11 +337,6 @@ export function cvErrorCode(error: unknown): CvErrorCode {
   return ERROR_CODES.find((known) => known === code) ?? "generic";
 }
 
-/**
- * What "Draft the CV" costs, about, in euros: the draft and the wants pass and, at worst, the
- * app's fix round (the server's own figure is `Cv.draft_eur`).
- */
-export const DRAFT_ESTIMATE_EUR = 0.01;
 
 /** Where a flag can be fixed with "It's true": not for a company fact used as an achievement. */
 export function canConfirm(flags: readonly CvReason[]): boolean {

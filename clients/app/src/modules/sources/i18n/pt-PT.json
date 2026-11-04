@@ -109,7 +109,7 @@
       "suggestion_limit_reached": "Já são 10 sugestões hoje. Tente de novo amanhã.",
       "terms_forbid": "Os termos do portal proíbem a leitura automática, por isso não pode ser aprovado.",
       "needs_key": "Precisa primeiro de uma chave de API: defina-a abaixo.",
-      "needs_permission": "Pede primeiro autorização. Peça-a ao portal e depois aprove-o.",
+      "needs_permission": "Pede primeiro autorização. Peça-a ao site e depois aprove-o.",
       "no_endpoint": "Ainda não tem endereço de feed. Verifique o portal para procurar um.",
       "invalid_key": "Essa chave não pode ser usada.",
       "no_key_needed": "Este portal não precisa de chave.",

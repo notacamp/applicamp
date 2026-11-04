@@ -10,7 +10,9 @@ use uuid::Uuid;
 
 use super::{CAP_PER_DAY, CAP_PER_OPPORTUNITY};
 use crate::{
-    ports::{CvContact, CvEducation, CvFact, CvLanguage, CvPosition, CvProfile},
+    ports::{
+        CvCertificate, CvContact, CvEducation, CvFact, CvLanguage, CvPosition, CvProfile, CvProject,
+    },
     testkit::{Fake, Fixer, Harness, Model},
 };
 
@@ -78,6 +80,18 @@ pub(crate) fn profile() -> CvProfile {
             language: "English".into(),
             fluency: Some("Fluent".into()),
         }],
+        background: Some("Ran a small hotel for six years before engineering".into()),
+        projects: vec![CvProject {
+            name: "Ledgerly".into(),
+            description: Some("An open-source billing toolkit".into()),
+            ..CvProject::default()
+        }],
+        certificates: vec![CvCertificate {
+            name: "Cloud Practitioner".into(),
+            issuer: Some("Example Academy".into()),
+            date: Some("2022".into()),
+        }],
+        work_languages: vec!["en".into()],
         latest: Some(0),
     }
 }
@@ -805,7 +819,14 @@ async fn approving_keeps_a_pdf_that_was_read_back_and_serves_it_inline_then_as_a
     assert_eq!(checks["sections"]["missing"], json!([]));
     assert_eq!(
         checks["sections"]["expected"],
-        json!(["Summary", "Experience", "Skills", "Education", "Languages"])
+        json!([
+            "Summary",
+            "Experience",
+            "Earlier",
+            "Skills",
+            "Education",
+            "Languages"
+        ])
     );
     assert_eq!(checks["lines"]["missing"], json!([]));
     assert_eq!(checks["keywords"]["missing"], json!([]));

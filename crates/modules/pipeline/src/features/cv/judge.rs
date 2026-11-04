@@ -11,8 +11,8 @@ pub const MAX_HEADLINE: usize = 200;
 pub const MAX_SUMMARY: usize = 700;
 pub const MAX_BULLET: usize = 400;
 /// Bullets for one position, and for the whole CV.
-pub const MAX_ROLE_BULLETS: usize = 8;
-pub const MAX_BULLETS: usize = 16;
+pub const MAX_ROLE_BULLETS: usize = 6;
+pub const MAX_BULLETS: usize = 30;
 /// Skills shown, and the longest skill name.
 pub const MAX_SKILLS: usize = 16;
 pub const MAX_SKILL: usize = 80;
@@ -108,6 +108,8 @@ pub fn judge(raw: RawCv, frame: &Frame, profile: &CvProfile) -> Option<Content> 
         }
         content.experience.push(Role { position, bullets });
     }
+    // Newest first, whatever order the model gave.
+    content.sort_experience(frame);
     let mut skills: Vec<String> = Vec::new();
     for skill in raw.skills {
         let skill = skill.trim();

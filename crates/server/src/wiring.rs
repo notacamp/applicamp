@@ -8,9 +8,9 @@ use std::collections::HashSet;
 use applicamp_kernel::{AppState, BoxFuture, EventBus, Result};
 use applicamp_pipeline::{
     ports::{
-        AnswerFacts, Autonomy, CvContact, CvEducation, CvFact, CvLanguage, CvPosition, CvProfile,
-        Posting, ProfileDigest, ProfileStatus, ProposedFact, RoleDigest, SearchLine, SiteFailure,
-        SitePage, SiteReading,
+        AnswerFacts, Autonomy, CvCertificate, CvContact, CvEducation, CvFact, CvLanguage,
+        CvPosition, CvProfile, CvProject, Posting, ProfileDigest, ProfileStatus, ProposedFact,
+        RoleDigest, SearchLine, SiteFailure, SitePage, SiteReading,
     },
     store::{self as pipeline_store, Eligibility, Found, UncheckedRow},
 };
@@ -737,7 +737,9 @@ impl applicamp_pipeline::Neighbours for PipelineWiring {
             let Some(profile) = matching::current_profile(db, account).await? else {
                 return Ok(None);
             };
-            Ok(Some(cv_profile_of(profile)))
+            let mut cv = cv_profile_of(profile);
+            cv.work_languages = matching::languages_for_work(db, account).await?;
+            Ok(Some(cv))
         })
     }
 
@@ -900,6 +902,27 @@ fn cv_profile_of(profile: applicamp_profile::schema::Profile) -> CvProfile {
                 fluency: l.fluency,
             })
             .collect(),
+        background: profile.basics.background,
+        projects: profile
+            .projects
+            .into_iter()
+            .map(|p| CvProject {
+                name: p.name,
+                description: p.description,
+                start_date: p.start_date,
+                end_date: p.end_date,
+            })
+            .collect(),
+        certificates: profile
+            .certificates
+            .into_iter()
+            .map(|c| CvCertificate {
+                name: c.name,
+                issuer: c.issuer,
+                date: c.date,
+            })
+            .collect(),
+        work_languages: Vec::new(),
         latest,
     }
 }

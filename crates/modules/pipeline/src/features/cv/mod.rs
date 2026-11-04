@@ -46,6 +46,7 @@ pub mod prompt;
 pub(crate) mod tests;
 pub mod versions;
 pub mod view;
+pub mod wants;
 
 use applicamp_ai::Role;
 use applicamp_kernel::{
@@ -527,17 +528,60 @@ fn neighbours(deps: &PipelineDeps) -> Result<&dyn Neighbours> {
         .ok_or(Error::Unavailable("neighbours_unavailable"))
 }
 
-/// The language a draft is written in: the one asked for, else the posting's
-/// first working language, else English.
-fn language_of(asked: Option<&str>, opp: &Opp) -> String {
+/// The `max_tokens` a draft is given, then given again when it is cut off.
+const DRAFT_BUDGETS: [u32; 2] = [6_000, 10_000];
+
+/// Fluencies that are enough to write a CV in.
+const WORKING: &[&str] = &[
+    "native", "fluent", "professional", "full professional", "bilingual", "c1", "c2",
+    "nativo", "nativa", "fluente", "fluido", "fluida", "natif", "native speaker", "courant",
+    "materna", "langue maternelle", "língua materna", "lengua materna",
+];
+
+/// The language tag of a language's name, for the CV's languages.
+fn tag_of_name(name: &str) -> Option<&'static str> {
+    match name.trim().to_lowercase().as_str() {
+        "english" | "inglês" | "ingles" | "inglés" | "anglais" => Some("en"),
+        "portuguese" | "português" | "portugues" | "portugués" | "portugais" => Some("pt-PT"),
+        "spanish" | "espanhol" | "español" | "espagnol" | "castellano" => Some("es-ES"),
+        "french" | "francês" | "frances" | "francés" | "français" => Some("fr"),
+        _ => None,
+    }
+}
+
+/// The language a draft is written in: the one asked for, else the first
+/// the person works in (their goals), else a language their profile says
+/// they speak well enough, else English. The posting's is only offered.
+fn language_of(asked: Option<&str>, profile: &CvProfile) -> String {
     brief::prompt::language(asked)
         .or_else(|| {
-            opp.working_languages
-                .as_ref()
-                .and_then(|l| l.first())
-                .and_then(|l| brief::prompt::language(Some(l)))
+            profile
+                .work_languages
+                .iter()
+                .find_map(|tag| brief::prompt::language(Some(tag)))
+        })
+        .or_else(|| {
+            profile.languages.iter().find_map(|l| {
+                let fluency = l.fluency.as_deref().unwrap_or_default().trim().to_lowercase();
+                WORKING
+                    .contains(&fluency.as_str())
+                    .then(|| tag_of_name(&l.language))
+                    .flatten()
+                    .map(str::to_owned)
+            })
         })
         .unwrap_or_else(|| "en".to_owned())
+}
+
+/// The posting's language, when it is not the CV's: offered as a choice.
+fn suggested_language(opp: &Opp, current: &str) -> Option<String> {
+    let posting = opp
+        .working_languages
+        .as_ref()
+        .and_then(|l| l.first())
+        .and_then(|l| brief::prompt::language(Some(l)))?;
+    let base = |tag: &str| tag.split(['-', '_']).next().unwrap_or_default().to_lowercase();
+    (base(&posting) != base(current)).then_some(posting)
 }
 
 // ---- the sweep ------------------------------------------------------------
@@ -1368,12 +1412,8 @@ pub async fn put_back(
                     ..Line::default()
                 })
                 .collect();
-            let at = content
-                .experience
-                .iter()
-                .position(|r| r.position > position)
-                .unwrap_or(content.experience.len());
-            content.experience.insert(at, CvRole { position, bullets });
+            content.experience.push(CvRole { position, bullets });
+            content.sort_experience(frame);
         }
         (None, Some(source)) => {
             let found = frame.get(&source).ok_or(Error::NotFound)?;
@@ -1412,18 +1452,11 @@ pub async fn put_back(
             {
                 Some(role) => role.bullets.push(line),
                 None => {
-                    let at = content
-                        .experience
-                        .iter()
-                        .position(|r| r.position > position)
-                        .unwrap_or(content.experience.len());
-                    content.experience.insert(
-                        at,
-                        CvRole {
-                            position,
-                            bullets: vec![line],
-                        },
-                    );
+                    content.experience.push(CvRole {
+                        position,
+                        bullets: vec![line],
+                    });
+                    content.sort_experience(frame);
                 }
             }
         }

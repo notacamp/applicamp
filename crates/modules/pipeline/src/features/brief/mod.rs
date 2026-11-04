@@ -785,14 +785,48 @@ pub(crate) async fn ask<T: DeserializeOwned>(
     system: &str,
     user: &str,
 ) -> Result<T> {
+    ask_as(
+        gateway,
+        Role::Complete,
+        &BUDGETS,
+        db,
+        account,
+        now,
+        name,
+        schema,
+        system,
+        user,
+    )
+    .await
+    .map(|(read, _)| read)
+}
+
+/// [`ask`] on `role`, trying each of `budgets` (`max_tokens`) in turn while
+/// the answer is cut off or unusable. Returns the answer and what the calls
+/// cost, in US dollars.
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn ask_as<T: DeserializeOwned>(
+    gateway: &Gateway,
+    role: Role,
+    budgets: &[u32],
+    db: &PgPool,
+    account: Uuid,
+    now: DateTime<Utc>,
+    name: &str,
+    schema: &Value,
+    system: &str,
+    user: &str,
+) -> Result<(T, f64)> {
     let mut last = Error::Unavailable(applicamp_ai::AI_FAILED);
-    for max_tokens in BUDGETS {
-        match ask_attempt(
-            gateway, db, account, now, name, schema, system, user, max_tokens,
+    let mut cost = 0.0;
+    for &max_tokens in budgets {
+        let (attempt, spent) = ask_attempt_as(
+            gateway, role, db, account, now, name, schema, system, user, max_tokens,
         )
-        .await?
-        {
-            Attempt::Done(read) => return Ok(read),
+        .await?;
+        cost += spent;
+        match attempt {
+            Attempt::Done(read) => return Ok((read, cost)),
             Attempt::Retry(error) => last = error,
         }
     }
@@ -821,6 +855,36 @@ pub(crate) async fn ask_attempt<T: DeserializeOwned>(
     user: &str,
     max_tokens: u32,
 ) -> Result<Attempt<T>> {
+    ask_attempt_as(
+        gateway,
+        Role::Complete,
+        db,
+        account,
+        now,
+        name,
+        schema,
+        system,
+        user,
+        max_tokens,
+    )
+    .await
+    .map(|(attempt, _)| attempt)
+}
+
+/// [`ask_attempt`] on `role`, with what the call cost in US dollars.
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn ask_attempt_as<T: DeserializeOwned>(
+    gateway: &Gateway,
+    role: Role,
+    db: &PgPool,
+    account: Uuid,
+    now: DateTime<Utc>,
+    name: &str,
+    schema: &Value,
+    system: &str,
+    user: &str,
+    max_tokens: u32,
+) -> Result<(Attempt<T>, f64)> {
     let caller = Caller { db, account, now };
     let request = ChatRequest {
         temperature: Some(0.0),
@@ -828,16 +892,20 @@ pub(crate) async fn ask_attempt<T: DeserializeOwned>(
         response_format: Some(ResponseFormat::json_schema(name, schema.clone())),
         ..ChatRequest::new(vec![Message::system(system), Message::user(user)])
     };
-    let reply = gateway.complete(caller, request).await?;
+    let reply = gateway.complete_as(role, caller, request).await?;
+    let cost = reply.cost_usd.unwrap_or_default();
     if reply.finish_reason.as_deref() == Some("length") {
         tracing::warn!(max_tokens, call = name, "an answer was cut off");
-        return Ok(Attempt::Retry(Error::Unavailable(applicamp_ai::AI_FAILED)));
+        return Ok((
+            Attempt::Retry(Error::Unavailable(applicamp_ai::AI_FAILED)),
+            cost,
+        ));
     }
     match reply.json::<T>() {
-        Ok(read) => Ok(Attempt::Done(read)),
+        Ok(read) => Ok((Attempt::Done(read), cost)),
         Err(error) => {
             tracing::warn!(%error, call = name, "an answer was unusable");
-            Ok(Attempt::Retry(Error::from(error)))
+            Ok((Attempt::Retry(Error::from(error)), cost))
         }
     }
 }

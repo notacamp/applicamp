@@ -20,6 +20,8 @@ pub struct Labels {
     pub skills: &'static str,
     pub education: &'static str,
     pub languages: &'static str,
+    /// The positions the CV shows only by name.
+    pub earlier: &'static str,
 }
 
 /// The language a PDF is set in: `en`, `pt`, `es` or `fr`.
@@ -47,6 +49,7 @@ pub fn labels(lang: &str) -> Labels {
             skills: "Competências",
             education: "Formação",
             languages: "Línguas",
+            earlier: "Experiência anterior",
         },
         "es" => Labels {
             summary: "Resumen",
@@ -54,6 +57,7 @@ pub fn labels(lang: &str) -> Labels {
             skills: "Competencias",
             education: "Formación",
             languages: "Idiomas",
+            earlier: "Experiencia anterior",
         },
         "fr" => Labels {
             summary: "Résumé",
@@ -61,6 +65,7 @@ pub fn labels(lang: &str) -> Labels {
             skills: "Compétences",
             education: "Formation",
             languages: "Langues",
+            earlier: "Expérience antérieure",
         },
         _ => Labels {
             summary: "Summary",
@@ -68,6 +73,7 @@ pub fn labels(lang: &str) -> Labels {
             skills: "Skills",
             education: "Education",
             languages: "Languages",
+            earlier: "Earlier",
         },
     }
 }
@@ -172,6 +178,8 @@ struct Document {
     contact: Vec<ContactItem>,
     summary: String,
     roles: Vec<RoleOut>,
+    /// The positions left out, by name only: "Title, Company (2015–2017)".
+    earlier: Vec<String>,
     skills: Vec<String>,
     education: Vec<SchoolOut>,
     languages: Vec<String>,
@@ -210,6 +218,37 @@ pub struct Prepared {
 /// Why a document could not be made.
 #[derive(Debug, PartialEq, Eq)]
 pub struct TooLarge;
+
+/// The year of a `YYYY…` date.
+fn year(date: Option<&str>) -> Option<&str> {
+    let date = date?.trim();
+    (date.len() >= 4 && date[..4].chars().all(|c| c.is_ascii_digit())).then(|| &date[..4])
+}
+
+/// A position the CV leaves out, by name: "Title, Company (2015–2017)".
+fn earlier_line(position: &crate::features::cv::model::PositionInfo) -> Option<String> {
+    let head = [position.title.as_deref(), position.company.as_deref()]
+        .into_iter()
+        .flatten()
+        .map(clean)
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join(", ");
+    if head.is_empty() {
+        return None;
+    }
+    let years = match (
+        year(position.start_date.as_deref()),
+        year(position.end_date.as_deref()),
+    ) {
+        (Some(start), Some(end)) if start == end => format!(" ({start})"),
+        (Some(start), Some(end)) => format!(" ({start}–{end})"),
+        (Some(start), None) => format!(" ({start})"),
+        (None, Some(end)) => format!(" ({end})"),
+        (None, None) => String::new(),
+    };
+    Some(format!("{head}{years}"))
+}
 
 /// The CV `content` (the positions it heads from `frame`), set in `language`.
 pub fn prepare(content: &Content, frame: &Frame, language: &str) -> Result<Prepared, TooLarge> {
@@ -323,6 +362,25 @@ pub fn prepare(content: &Content, frame: &Frame, language: &str) -> Result<Prepa
         expect.headings.push(labels.experience.to_owned());
     }
 
+    // The positions the CV leaves out, by name only: no text of the model's,
+    // nothing to check.
+    let mut left_out: Vec<&crate::features::cv::model::PositionInfo> = frame
+        .positions
+        .iter()
+        .filter(|p| !content.experience.iter().any(|r| r.position == p.index))
+        .collect();
+    left_out.sort_by_key(|p| std::cmp::Reverse(crate::features::cv::model::started(Some(p))));
+    let earlier: Vec<String> = left_out.into_iter().filter_map(earlier_line).collect();
+    if !earlier.is_empty() {
+        expect.headings.push(labels.earlier.to_owned());
+        for (i, line) in earlier.iter().enumerate() {
+            expect.lines.push(Expected {
+                id: format!("earlier{i}"),
+                text: line.clone(),
+            });
+        }
+    }
+
     let skills: Vec<String> = content
         .skills
         .iter()
@@ -397,6 +455,7 @@ pub fn prepare(content: &Content, frame: &Frame, language: &str) -> Result<Prepa
         contact: items,
         summary,
         roles,
+        earlier,
         skills,
         education,
         languages,

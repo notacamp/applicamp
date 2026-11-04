@@ -150,9 +150,7 @@ pub fn items(body: &[u8]) -> Vec<FeedItem> {
             };
             let inside_start = start + tag_end + 1;
             let next = find_open(&lower, open, inside_start);
-            let closed = lower[inside_start..]
-                .find(close)
-                .map(|i| i + inside_start);
+            let closed = lower[inside_start..].find(close).map(|i| i + inside_start);
             let (end, resume) = match (closed, next) {
                 (Some(c), Some(n)) if n < c => (n, n),
                 (Some(c), _) => (c, c + close.len()),
@@ -274,7 +272,10 @@ mod tests {
             items[1].raw("title").as_deref(),
             Some("Platform Engineer at Other Co")
         );
-        assert_eq!(items[2].raw("link").as_deref(), Some("https://board.example/jobs/3"));
+        assert_eq!(
+            items[2].raw("link").as_deref(),
+            Some("https://board.example/jobs/3")
+        );
     }
 
     #[test]

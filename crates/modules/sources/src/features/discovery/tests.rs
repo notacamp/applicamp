@@ -401,7 +401,11 @@ fn numbered_items_and_contact_addresses_are_read() {
         Some("hello@board.example")
     );
     assert_eq!(
-        contact_email("<html></html>", Some("<p>Write to legal@board.example.</p>")).as_deref(),
+        contact_email(
+            "<html></html>",
+            Some("<p>Write to legal@board.example.</p>")
+        )
+        .as_deref(),
         Some("legal@board.example")
     );
     assert_eq!(contact_email("<html></html>", None), None);
@@ -414,7 +418,10 @@ async fn a_live_board_site(jobs: usize, terms: Option<&str>) -> MockServer {
     let server = MockServer::start().await;
     let page =
         |body: String, kind: &str| ResponseTemplate::new(200).set_body_raw(body.into_bytes(), kind);
-    let list = format!("## Remote\n\n- [Live Board]({}/) - Remote jobs.\n", server.uri());
+    let list = format!(
+        "## Remote\n\n- [Live Board]({}/) - Remote jobs.\n",
+        server.uri()
+    );
     let items: String = (1..=jobs)
         .map(|n| {
             format!(
@@ -426,7 +433,8 @@ async fn a_live_board_site(jobs: usize, terms: Option<&str>) -> MockServer {
             )
         })
         .collect();
-    let feed = format!("<?xml version=\"1.0\"?><rss version=\"2.0\"><channel>{items}</channel></rss>");
+    let feed =
+        format!("<?xml version=\"1.0\"?><rss version=\"2.0\"><channel>{items}</channel></rss>");
     let home = format!(
         "<html lang=\"en\"><head><link rel=\"alternate\" type=\"application/rss+xml\" \
          href=\"/feed.xml\"></head><body>{}</body></html>",
@@ -438,7 +446,11 @@ async fn a_live_board_site(jobs: usize, terms: Option<&str>) -> MockServer {
     );
     for (route, body, kind) in [
         ("/list.md", list, "text/markdown"),
-        ("/robots.txt", "User-agent: *\nDisallow: /private\n".to_owned(), "text/plain"),
+        (
+            "/robots.txt",
+            "User-agent: *\nDisallow: /private\n".to_owned(),
+            "text/plain",
+        ),
         ("/", home, "text/html"),
         ("/feed.xml", feed, "application/rss+xml"),
     ] {
@@ -522,7 +534,8 @@ async fn a_board_that_is_not_a_job_board_waits(db: PgPool) {
 async fn terms_that_invite_apps_are_read_by_the_model_and_the_board_approves(db: PgPool) {
     let terms = "You may use our feed with an app or aggregator through our API. Cookies keep you signed in.";
     let site = a_live_board_site(6, Some(terms)).await;
-    let model = model_reading_terms("allow", "You may use our feed with an app or aggregator").await;
+    let model =
+        model_reading_terms("allow", "You may use our feed with an app or aggregator").await;
     let h = discovered(db, &site, Some(&model)).await;
     let detail = the_board(&h).await;
     assert_eq!(detail["board"]["status"], "approved", "{detail}");
@@ -537,9 +550,14 @@ async fn terms_that_invite_apps_are_read_by_the_model_and_the_board_approves(db:
             .unwrap()
             .starts_with("You may use our feed")
     );
-    assert_eq!(model.received_requests().await.unwrap().len(), 1, "one call");
+    assert_eq!(
+        model.received_requests().await.unwrap().len(),
+        1,
+        "one call"
+    );
     // The terms are fenced as data in the request.
-    let body = String::from_utf8_lossy(&model.received_requests().await.unwrap()[0].body).into_owned();
+    let body =
+        String::from_utf8_lossy(&model.received_requests().await.unwrap()[0].body).into_owned();
     assert!(body.contains("<terms>"), "{body}");
 }
 
@@ -547,7 +565,11 @@ async fn terms_that_invite_apps_are_read_by_the_model_and_the_board_approves(db:
 async fn terms_that_forbid_reading_block_the_board_with_their_quote(db: PgPool) {
     let terms = "You may not scrape this site with automated tools.";
     let site = a_live_board_site(6, Some(terms)).await;
-    let model = model_reading_terms("forbid", "You may not scrape this site with automated tools").await;
+    let model = model_reading_terms(
+        "forbid",
+        "You may not scrape this site with automated tools",
+    )
+    .await;
     let h = discovered(db, &site, Some(&model)).await;
     let detail = the_board(&h).await;
     assert_eq!(detail["board"]["status"], "candidate", "{detail}");
@@ -565,7 +587,11 @@ async fn terms_that_forbid_reading_block_the_board_with_their_quote(db: PgPool) 
 async fn terms_that_ask_for_permission_wait_as_needs_permission(db: PgPool) {
     let terms = "Automated access to our listings needs our written permission first.";
     let site = a_live_board_site(6, Some(terms)).await;
-    let model = model_reading_terms("ask_first", "Automated access to our listings needs our written permission").await;
+    let model = model_reading_terms(
+        "ask_first",
+        "Automated access to our listings needs our written permission",
+    )
+    .await;
     let h = discovered(db, &site, Some(&model)).await;
     let detail = the_board(&h).await;
     assert_eq!(detail["board"]["status"], "candidate", "{detail}");
@@ -582,14 +608,18 @@ async fn a_model_that_invents_a_quote_approves_nothing(db: PgPool) {
     let detail = the_board(&h).await;
     assert_eq!(detail["board"]["status"], "candidate", "{detail}");
     assert!(detail["board"]["terms_verdict"].is_null(), "not read");
-    assert_eq!(detail["approvable"], true, "no verdict, no blocker: the owner decides");
+    assert_eq!(
+        detail["approvable"], true,
+        "no verdict, no blocker: the owner decides"
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_spending_limit_stops_discovery_cleanly_and_nothing_is_approved(db: PgPool) {
     let terms = "You may use our feed with an app or aggregator through our API.";
     let site = a_live_board_site(6, Some(terms)).await;
-    let model = model_reading_terms("allow", "You may use our feed with an app or aggregator").await;
+    let model =
+        model_reading_terms("allow", "You may use our feed with an app or aggregator").await;
     let mut settings = boards_config();
     settings.discovery_list_url = format!("{}/list.md", site.uri()).parse().unwrap();
     let budget = applicamp_ai::BudgetConfig {
@@ -599,7 +629,11 @@ async fn a_spending_limit_stops_discovery_cleanly_and_nothing_is_approved(db: Pg
     };
     let h = Harness::new(db, settings, Some(gateway(&model, budget)), Fake::ready()).await;
     discover(&h.deps, &h.db).await.unwrap();
-    assert_eq!(model.received_requests().await.unwrap().len(), 0, "refused, never sent");
+    assert_eq!(
+        model.received_requests().await.unwrap().len(),
+        0,
+        "refused, never sent"
+    );
     let run: (Option<String>, i32) =
         sqlx::query_as("SELECT error_kind, checked FROM sources.discovery_runs")
             .fetch_one(&h.db)

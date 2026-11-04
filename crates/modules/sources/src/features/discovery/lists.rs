@@ -186,11 +186,7 @@ pub fn parse_wikidata(text: &str) -> Vec<ListEntry> {
         return Vec::new();
     };
     let value = |binding: &Value, key: &str| -> Option<String> {
-        binding
-            .get(key)?
-            .get("value")?
-            .as_str()
-            .map(str::to_owned)
+        binding.get(key)?.get("value")?.as_str().map(str::to_owned)
     };
     answer
         .pointer("/results/bindings")

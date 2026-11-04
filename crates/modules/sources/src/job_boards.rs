@@ -643,7 +643,9 @@ impl BoardConfig {
         if let Some(divisor) = self.salary_divisor
             && !(divisor.is_finite() && (1.0..=1_000_000.0).contains(&divisor))
         {
-            return Err("`salary_divisor` is a number from 1 to 1000000 (`100` for cents)".to_owned());
+            return Err(
+                "`salary_divisor` is a number from 1 to 1000000 (`100` for cents)".to_owned(),
+            );
         }
         if let Some(currency) = &self.salary_currency
             && !(currency.len() == 3 && currency.chars().all(|c| c.is_ascii_uppercase()))

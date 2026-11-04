@@ -411,17 +411,14 @@ pub async fn discover(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
                 Err(_) => continue,
             }
         };
-        match reader.visit(db, &url).await {
-            Ok(Some(body)) => {
-                read_any = true;
-                let through = source.found_through();
-                listed.extend(
-                    lists::entries(source, &String::from_utf8_lossy(&body))
-                        .into_iter()
-                        .map(|entry| (entry, through.clone())),
-                );
-            }
-            Ok(None) | Err(_) => {}
+        if let Ok(Some(body)) = reader.visit(db, &url).await {
+            read_any = true;
+            let through = source.found_through();
+            listed.extend(
+                lists::entries(source, &String::from_utf8_lossy(&body))
+                    .into_iter()
+                    .map(|entry| (entry, through.clone())),
+            );
         }
     }
     if asked_any && !read_any {
@@ -554,7 +551,10 @@ async fn add_candidate(
         .or_else(|| (country.len() == 1).then(|| country[0].to_owned()));
     // A feed the list names is where the check looks first.
     let (kind, config) = match &entry.feed {
-        Some(feed) => ("rss", serde_json::json!({ "endpoint": feed.as_str(), "fields": {} })),
+        Some(feed) => (
+            "rss",
+            serde_json::json!({ "endpoint": feed.as_str(), "fields": {} }),
+        ),
         None => ("json_api", serde_json::json!({})),
     };
     let priority = if entry.section.eq_ignore_ascii_case("remote") {
@@ -673,9 +673,9 @@ async fn read_terms(
             state.read_for = key;
             state.cost_eur = cost_usd * ai.usd_to_eur();
         }
-        Err(
-            applicamp_ai::Error::OverBudget { .. } | applicamp_ai::Error::OverDailyCap { .. },
-        ) => state.budget_reached = true,
+        Err(applicamp_ai::Error::OverBudget { .. } | applicamp_ai::Error::OverDailyCap { .. }) => {
+            state.budget_reached = true
+        }
         Err(e) => {
             tracing::warn!(board = %row.slug, error = %e, "a board's terms could not be read");
         }
@@ -729,9 +729,10 @@ pub const MIN_POSTINGS: usize = 5;
 /// postings, and one posted in the last 30 days.
 pub fn is_a_live_job_board(sample: &[crate::job::Job], now: DateTime<Utc>) -> bool {
     postings(sample) >= MIN_POSTINGS
-        && sample
-            .iter()
-            .any(|job| job.posted_at.is_some_and(|at| at >= now - TimeDelta::days(30)))
+        && sample.iter().any(|job| {
+            job.posted_at
+                .is_some_and(|at| at >= now - TimeDelta::days(30))
+        })
 }
 
 /// Pages one check reads, each path once.
@@ -1433,30 +1434,32 @@ pub async fn check(
     )
     .await?;
     let note = match &found {
-        Some(f) if !f.sample.is_empty() => format!(
-            "{} at {} · {} sample jobs · robots {}{}",
-            match f.kind {
-                Kind::Rss => "Feed",
-                Kind::JsonldSitemap => "Sitemap",
-                Kind::JsonApi | Kind::Hn => "API",
-            },
-            f.url.path(),
-            f.sample.len(),
-            if report.robots.endpoint_allowed == Some(false) {
-                "disallow it"
-            } else {
-                "allow it"
-            },
-            if report.proposal.is_some() {
-                " · config proposed"
+        Some(f) if !f.sample.is_empty() => {
+            format!(
+                "{} at {} · {} sample jobs · robots {}{}",
+                match f.kind {
+                    Kind::Rss => "Feed",
+                    Kind::JsonldSitemap => "Sitemap",
+                    Kind::JsonApi | Kind::Hn => "API",
+                },
+                f.url.path(),
+                f.sample.len(),
+                if report.robots.endpoint_allowed == Some(false) {
+                    "disallow it"
+                } else {
+                    "allow it"
+                },
+                if report.proposal.is_some() {
+                    " · config proposed"
+                } else {
+                    ""
+                }
+            ) + if approved {
+                " · approved by the app"
             } else {
                 ""
             }
-        ) + if approved {
-            " · approved by the app"
-        } else {
-            ""
-        },
+        }
         _ if secret.is_err() => "Needs an API key".to_owned(),
         _ => "No feed or API found".to_owned(),
     };
@@ -1624,7 +1627,10 @@ pub async fn recheck(
     let read_for = reread
         .as_ref()
         .filter(|state| state.verdict.is_some())
-        .map_or_else(|| old.terms_read_for.clone(), |state| state.read_for.clone());
+        .map_or_else(
+            || old.terms_read_for.clone(),
+            |state| state.read_for.clone(),
+        );
     let report = Report {
         checked_at: Some(now),
         robots,
@@ -1640,7 +1646,9 @@ pub async fn recheck(
           WHERE id = $1",
     )
     .bind(row.id)
-    .bind(sqlx::types::Json(serde_json::to_value(&report).map_err(Error::internal)?))
+    .bind(sqlx::types::Json(
+        serde_json::to_value(&report).map_err(Error::internal)?,
+    ))
     .bind(now + RECHECK)
     .bind(now)
     .bind(content_signal.as_ref().map(sqlx::types::Json))

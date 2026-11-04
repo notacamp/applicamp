@@ -17,8 +17,7 @@ use crate::{
 const FOUR_DAY_WEEK: &str = include_str!("fixtures/boards/4dayweek.json");
 const REMOTE_FIRST_JOBS: &[u8] = include_bytes!("fixtures/boards/remotefirstjobs.rss");
 const REMOTEYEAH: &[u8] = include_bytes!("fixtures/boards/remoteyeah.rss");
-const REAL_WORK_FROM_ANYWHERE: &[u8] =
-    include_bytes!("fixtures/boards/realworkfromanywhere.rss");
+const REAL_WORK_FROM_ANYWHERE: &[u8] = include_bytes!("fixtures/boards/realworkfromanywhere.rss");
 const RAILS_JOBS: &[u8] = include_bytes!("fixtures/boards/railsjobs.rss");
 const ELIXIR_JOBS: &[u8] = include_bytes!("fixtures/boards/elixirjobs.rss");
 const GET_ON_BOARD: &str = include_str!("fixtures/boards/getonboard.json");
@@ -44,7 +43,11 @@ fn board_ref(board: &SeedBoard) -> BoardRef {
 fn json_jobs(slug: &str, answer: &str) -> Vec<Job> {
     let board = seed_board(slug);
     let value: Value = serde_json::from_str(answer).expect("the fixture is JSON");
-    let pointer = board.config.items.clone().expect("the board names its items");
+    let pointer = board
+        .config
+        .items
+        .clone()
+        .expect("the board names its items");
     let items = value
         .pointer(&pointer)
         .and_then(Value::as_array)
@@ -88,7 +91,9 @@ fn four_day_week_is_read_with_pay_in_dollars_not_cents() {
     assert_postings(&jobs);
     let value: Value = serde_json::from_str(FOUR_DAY_WEEK).unwrap();
     let first = &value["data"][0];
-    let cents = first["salary_min"].as_f64().expect("the fixture states a salary");
+    let cents = first["salary_min"]
+        .as_f64()
+        .expect("the fixture states a salary");
     let pay = jobs[0]
         .board
         .as_ref()
@@ -147,7 +152,12 @@ fn elixir_jobs_reads_titles_and_links_but_no_company() {
     for job in &jobs {
         assert!(!job.title.trim().is_empty());
         assert!(job.url.starts_with("https://"), "{}", job.url);
-        assert!(job.company.is_empty(), "{} names {}", job.title, job.company);
+        assert!(
+            job.company.is_empty(),
+            "{} names {}",
+            job.title,
+            job.company
+        );
         assert!(job.board.as_ref().unwrap().apply_url.is_none());
     }
 }

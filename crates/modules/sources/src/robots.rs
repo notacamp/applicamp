@@ -268,7 +268,11 @@ mod tests {
         assert!(content_signal("User-agent: *\nAllow: /").is_none());
         let url: url::Url = "https://board.example/feed".parse().unwrap();
         let report = report(Some(text), Some(&url));
-        assert_eq!(report.endpoint_allowed, Some(true), "ai-train=no never blocks");
+        assert_eq!(
+            report.endpoint_allowed,
+            Some(true),
+            "ai-train=no never blocks"
+        );
         assert!(report.content_signal.is_some());
     }
 

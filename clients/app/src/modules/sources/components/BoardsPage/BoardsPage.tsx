@@ -19,6 +19,8 @@ import {
 
 import {
   boardErrorOf,
+  hiringLine,
+  isHiring,
   salaryLine,
   skillsFitLine,
   useBoards,
@@ -143,6 +145,26 @@ function BoardsList() {
           </Section>
         );
       })}
+      <Tagged testId="boards-company-pages">
+        <Stack gap="sm">
+          <Text tone="secondary">
+            {t("boards.hiring.companyPages", {
+              total: String(boards.data.company_pages.total),
+              approved: String(boards.data.company_pages.approved),
+              waiting: String(boards.data.company_pages.waiting),
+              declined: String(boards.data.company_pages.declined),
+            })}
+          </Text>
+          <Text tone="secondary">
+            {boards.data.web_search.on
+              ? t("boards.hiring.webSearchOn", {
+                  used: String(boards.data.web_search.queries_this_month),
+                  limit: String(boards.data.web_search.monthly_limit),
+                })
+              : t("boards.hiring.webSearchOff")}
+          </Text>
+        </Stack>
+      </Tagged>
       <BoardPeek
         id={open}
         onClose={() => {
@@ -158,7 +180,15 @@ function BoardRow({ board, onOpen }: { board: BoardSummary; onOpen: () => void }
   const { t, i18n } = useTranslation("sources");
   const salary = salaryLine(board.ranking, i18n.language, t);
   const fit = skillsFitLine(board, t);
+  const hiring = hiringLine(board, t);
   const meta: ReactNode[] = [];
+  if (isHiring(board)) {
+    meta.push(
+      <Label key="kind" hue="blue">
+        {t(`boards.hiring.${board.kind === "company_page" ? "company_page" : "hiring_system"}`)}
+      </Label>,
+    );
+  }
   if (board.status === "paused") {
     meta.push(
       <Label key="paused" hue="yellow">
@@ -166,11 +196,13 @@ function BoardRow({ board, onOpen }: { board: BoardSummary; onOpen: () => void }
       </Label>,
     );
   }
-  meta.push(
-    <Label key="priority" hue={board.priority === "high" ? "green" : "gray"}>
-      {t(`boards.priority.${board.priority}`)}
-    </Label>,
-  );
+  if (!isHiring(board)) {
+    meta.push(
+      <Label key="priority" hue={board.priority === "high" ? "green" : "gray"}>
+        {t(`boards.priority.${board.priority}`)}
+      </Label>,
+    );
+  }
   if (board.country !== undefined && board.country !== null) {
     meta.push(
       <Label key="country" hue="blue">
@@ -178,7 +210,7 @@ function BoardRow({ board, onOpen }: { board: BoardSummary; onOpen: () => void }
       </Label>,
     );
   }
-  if (salary.muted) {
+  if (salary.muted && !isHiring(board)) {
     meta.push(
       <Label key="muted" hue="gray">
         {board.ranking.basis === "few" ? t("boards.salary.fewLabel") : t("boards.salary.noneLabel")}
@@ -196,7 +228,7 @@ function BoardRow({ board, onOpen }: { board: BoardSummary; onOpen: () => void }
   return (
     <BoardCard
       title={board.name}
-      subtitle={fit === null ? salary.text : `${salary.text} · ${fit}`}
+      subtitle={hiring ?? (fit === null ? salary.text : `${salary.text} · ${fit}`)}
       meta={
         <Stack gap="sm">
           <Cluster>{meta}</Cluster>

@@ -1,7 +1,8 @@
 //! Reading jobs from the boards' public APIs and feeds, and nothing else.
 //!
-//! - **Company boards** (Greenhouse, Lever, Ashby; off by default, kept for
-//!   company watchers, #20) and HN: one HTTP client, a 10 s timeout, a 2 MB
+//! - **Company boards** (Greenhouse, Lever, Ashby, Workable, Recruitee,
+//!   Teamtailor, Personio; off in searches by default, read for company
+//!   watchers, #20, and for the company pages' first read) and HN: one HTTP client, a 10 s timeout, a 2 MB
 //!   cap, no redirects, `applicamp/<version>` as its user agent, at most
 //!   [`SourcesConfig::request_spacing`] between two requests to one host,
 //!   answers kept in `sources.cache` for [`SourcesConfig::cache_ttl`]. Only
@@ -22,7 +23,11 @@ pub mod hn;
 pub mod jsonld;
 pub mod lever;
 pub mod mapping;
+pub mod personio;
+pub mod recruitee;
 pub mod rss;
+pub mod teamtailor;
+pub mod workable;
 
 #[cfg(test)]
 mod seed_tests;
@@ -712,9 +717,54 @@ impl Reader {
                 let list: Option<ashby::List> = self.get_json(db, &url).await?;
                 list.map(|list| ashby::jobs(list, board))
             }
+            Source::Workable => {
+                let url = Self::url(
+                    &config.workable_url,
+                    &["api", "v1", "widget", "accounts", board.token.as_str()],
+                    &[],
+                )?;
+                let list: Option<workable::List> = self.get_json(db, &url).await?;
+                list.map(|list| workable::jobs(&list, board))
+            }
+            Source::Recruitee => {
+                let base = config
+                    .company_host(&config.recruitee_url, &board.token)
+                    .ok_or(FetchError::BadUrl)?;
+                let url = Self::url(&base, &["api", "offers"], &[])?;
+                let list: Option<recruitee::List> = self.get_json(db, &url).await?;
+                list.map(|list| recruitee::jobs(&list, board))
+            }
+            Source::Teamtailor => {
+                let base = config
+                    .company_host(&config.teamtailor_url, &board.token)
+                    .ok_or(FetchError::BadUrl)?;
+                let url = Self::url(&base, &["jobs.rss"], &[])?;
+                self.get(db, &url)
+                    .await?
+                    .map(|body| teamtailor::jobs(&body, board))
+            }
+            Source::Personio => {
+                let base = config
+                    .company_host(&config.personio_url, &board.token)
+                    .ok_or(FetchError::BadUrl)?;
+                let url = Self::url(&base, &["xml"], &[])?;
+                self.get(db, &url)
+                    .await?
+                    .map(|body| personio::jobs(&body, board))
+            }
             Source::Arbeitnow | Source::Hn | Source::Board => return Err(FetchError::BadUrl),
         };
-        jobs.ok_or(FetchError::Status(404))
+        let jobs = jobs.ok_or(FetchError::Status(404))?;
+        // Every apply link may name another company's page (#87): noted, with
+        // no request.
+        crate::company_pages::note_links(
+            db,
+            &jobs,
+            &format!("{} careers", board.company),
+            Utc::now(),
+        )
+        .await;
+        Ok(jobs)
     }
 
     /// The top-level comments of the latest "Ask HN: Who is hiring?",
@@ -851,6 +901,7 @@ impl Reader {
                     };
                     (jobs, outcome, None)
                 } else {
+                    crate::company_pages::note_links(db, &jobs, &row.name, now).await;
                     let kept = async {
                         job_boards::record_fetch(db, row.id, now, Some(jobs.len()), None, None)
                             .await?;
@@ -960,6 +1011,7 @@ impl Reader {
             }
             Kind::Rss => self.feed(db, &config, board, ttl, &secret).await,
             Kind::JsonldSitemap => self.sitemap(db, &config, row, board, ttl, &secret).await,
+            Kind::HiringSystem | Kind::CompanyPage => Err(FetchError::BadConfig),
             Kind::Hn => {
                 let (mut jobs, cached) = self.hn_with(db, ttl).await?;
                 for job in &mut jobs {
@@ -1193,7 +1245,13 @@ impl Reader {
                 .await?
                 .into_iter()
                 .find(|job| job.source_ref == id),
-            Source::Arbeitnow | Source::Hn | Source::Board => None,
+            Source::Workable
+            | Source::Recruitee
+            | Source::Teamtailor
+            | Source::Personio
+            | Source::Arbeitnow
+            | Source::Hn
+            | Source::Board => None,
         };
         Ok(job.map(|job| (job, board)))
     }

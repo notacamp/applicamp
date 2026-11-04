@@ -288,6 +288,7 @@ pub async fn check_seeded(deps: &SourcesDeps, db: &PgPool) -> Result<usize> {
         board_columns!(),
         " FROM sources.job_boards
           WHERE origin = 'seed' AND status = 'candidate'
+            AND kind NOT IN ('hiring_system', 'company_page')
           ORDER BY created_at, slug"
     ))
     .fetch_all(db)
@@ -312,6 +313,8 @@ pub async fn check_seeded(deps: &SourcesDeps, db: &PgPool) -> Result<usize> {
         }
     }
     finish_run(db, run, (0, checked, 0), stopped, deps.clock.now()).await?;
+    // The apply links of their samples may name company pages (#87).
+    super::company_pages::schedule_soon(db, deps).await?;
     tracing::info!(checked, "seeded job boards checked");
     Ok(checked)
 }
@@ -323,7 +326,9 @@ pub async fn schedule(db: &PgPool, deps: &SourcesDeps) -> Result<bool> {
         return Ok(false);
     }
     let mut tx = db.begin().await?;
-    let added = jobs::enqueue_unique_at(&mut tx, &Discover {}, next_run(deps.clock.now())).await?;
+    let added =
+        jobs::enqueue_unique_at_or_earlier(&mut tx, &Discover {}, next_run(deps.clock.now()))
+            .await?;
     tx.commit().await?;
     Ok(added)
 }
@@ -335,12 +340,13 @@ async fn schedule_next(db: &PgPool, deps: &SourcesDeps) -> Result<bool> {
         return Ok(false);
     }
     let mut tx = db.begin().await?;
-    let added = jobs::enqueue_next_at(&mut tx, &Discover {}, next_run(deps.clock.now())).await?;
+    let added =
+        jobs::enqueue_next_at_or_earlier(&mut tx, &Discover {}, next_run(deps.clock.now())).await?;
     tx.commit().await?;
     Ok(added)
 }
 
-async fn start_run(db: &PgPool, now: DateTime<Utc>) -> Result<Uuid> {
+pub(crate) async fn start_run(db: &PgPool, now: DateTime<Utc>) -> Result<Uuid> {
     let id = Uuid::now_v7();
     sqlx::query("INSERT INTO sources.discovery_runs (id, started_at) VALUES ($1, $2)")
         .bind(id)
@@ -350,7 +356,7 @@ async fn start_run(db: &PgPool, now: DateTime<Utc>) -> Result<Uuid> {
     Ok(id)
 }
 
-async fn finish_run(
+pub(crate) async fn finish_run(
     db: &PgPool,
     id: Uuid,
     counts: (usize, usize, usize),
@@ -424,7 +430,7 @@ pub async fn discover(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
         error = Some("list_unreachable");
     }
     let known: HashSet<String> =
-        sqlx::query_scalar::<_, String>("SELECT host FROM sources.job_boards")
+        sqlx::query_scalar::<_, String>("SELECT DISTINCT host FROM sources.job_boards")
             .fetch_all(db)
             .await?
             .into_iter()
@@ -459,6 +465,7 @@ pub async fn discover(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
             board_columns!(),
             " FROM sources.job_boards
               WHERE status = 'candidate' AND (report IS NULL OR report->>'checked_at' IS NULL)
+                AND kind NOT IN ('hiring_system', 'company_page')
                 AND config ? 'endpoint' AND blockers = '[]'::jsonb
               ORDER BY created_at LIMIT $1"
         ))
@@ -480,6 +487,7 @@ pub async fn discover(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
         board_columns!(),
         " FROM sources.job_boards
           WHERE status = 'approved' AND (recheck_after IS NULL OR recheck_after <= $1)
+            AND kind NOT IN ('hiring_system', 'company_page')
           ORDER BY recheck_after NULLS FIRST LIMIT $2"
     ))
     .bind(now)
@@ -493,6 +501,8 @@ pub async fn discover(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
     }
 
     scans::prune(db, deps.clock.now()).await?;
+    // What it read may name company pages (#87).
+    super::company_pages::schedule_soon(db, deps).await?;
     if stopped {
         error = Some("ai_budget_reached");
     }
@@ -520,6 +530,10 @@ pub async fn check_one(deps: &SourcesDeps, db: &PgPool, id: Uuid) -> Result<()> 
     let Some(row) = job_boards::get(db, id).await? else {
         return Ok(());
     };
+    if row.kind().is_some_and(Kind::is_hiring) {
+        // A hiring system or a company page: its own check.
+        return crate::features::company_pages::check_row(deps, db, &row).await;
+    }
     let now = deps.clock.now();
     let run = start_run(db, now).await?;
     let (counts, outcome) = if row.status() == Status::Approved {
@@ -781,7 +795,7 @@ async fn robots_of(visits: &mut Visits<'_>, base: &Url) -> Option<String> {
 }
 
 /// The link to the terms on `html`, on `home`'s site.
-fn terms_link(html: &str, home: &Url) -> Option<Url> {
+pub(crate) fn terms_link(html: &str, home: &Url) -> Option<Url> {
     let host = host_of(home)?;
     ANCHOR
         .captures_iter(html)
@@ -1035,7 +1049,7 @@ fn read_own(kind: Kind, config: &BoardConfig, url: &Url, body: &[u8], board: &Bo
             .filter_map(|item| mapping::job_of(item, config, board))
             .take(SAMPLE)
             .collect(),
-        Kind::JsonldSitemap | Kind::Hn => Vec::new(),
+        Kind::JsonldSitemap | Kind::Hn | Kind::HiringSystem | Kind::CompanyPage => Vec::new(),
     };
     Found {
         kind,
@@ -1423,6 +1437,8 @@ pub async fn check(
     .execute(db)
     .await?;
     job_boards::keep_listed(db, row.id, &crate::readers::listed(sample), true, now).await?;
+    // The sample's apply links may name company pages (#87).
+    crate::company_pages::note_links(db, sample, &row.name, now).await;
     let approved = reading_allows_and_approve(
         db,
         row,
@@ -1439,7 +1455,7 @@ pub async fn check(
                 match f.kind {
                     Kind::Rss => "Feed",
                     Kind::JsonldSitemap => "Sitemap",
-                    Kind::JsonApi | Kind::Hn => "API",
+                    Kind::JsonApi | Kind::Hn | Kind::HiringSystem | Kind::CompanyPage => "API",
                 },
                 f.url.path(),
                 f.sample.len(),

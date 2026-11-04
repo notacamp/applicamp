@@ -53,6 +53,15 @@ services:
           - ask-first-site.test
           - feed-site-desktop.test
           - feed-site-phone.test
+          # The hiring systems (#87), each at the address the server reads it
+          # at: Lever's robots.txt says ai-train=no, so it waits for the owner.
+          - greenhouse.hiring.test
+          - lever.hiring.test
+          - ashby.hiring.test
+          - workable.hiring.test
+          - recruitee.hiring.test
+          - teamtailor.hiring.test
+          - personio.hiring.test
           # A company's own site (#34): a posting pasted at
           # http://example-co.test:9020/jobs/staff-engineer.
           - example-co.test
@@ -103,7 +112,18 @@ services:
       APPLICAMP_SOURCES__ALLOW_PRIVATE_HOSTS: "true"
       APPLICAMP_SOURCES__DISCOVERY: "false"
       APPLICAMP_SOURCES__BOARD_OWNERS: demo@example.com
-      APPLICAMP_SOURCES__GREENHOUSE_URL: http://fake-jobs:9020
+      # The hiring systems (#87) are read at the fake's host names: the apply
+      # links of clean-site.test name company pages on them, which the check
+      # at start registers; Greenhouse and Workable are approved by the app,
+      # Lever waits for the owner (its robots.txt says ai-train=no).
+      APPLICAMP_SOURCES__GREENHOUSE_URL: http://greenhouse.hiring.test:9020
+      APPLICAMP_SOURCES__LEVER_URL: http://lever.hiring.test:9020
+      APPLICAMP_SOURCES__LEVER_EU_URL: http://lever.hiring.test:9020
+      APPLICAMP_SOURCES__ASHBY_URL: http://ashby.hiring.test:9020
+      APPLICAMP_SOURCES__WORKABLE_URL: http://workable.hiring.test:9020
+      APPLICAMP_SOURCES__RECRUITEE_URL: http://recruitee.hiring.test:9020
+      APPLICAMP_SOURCES__TEAMTAILOR_URL: http://teamtailor.hiring.test:9020
+      APPLICAMP_SOURCES__PERSONIO_URL: http://personio.hiring.test:9020
       APPLICAMP_SOURCES__BOARDS_FILE: /fake-jobs/boards.toml
       APPLICAMP_SOURCES__CACHE_SECS: "0"
       APPLICAMP_SOURCES__MANUAL_PER_DAY: "0"

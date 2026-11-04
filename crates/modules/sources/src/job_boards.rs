@@ -91,6 +91,12 @@ pub enum Kind {
     JsonldSitemap,
     /// HN "Who is hiring": free-text comments the model reads.
     Hn,
+    /// A hiring system (Greenhouse, Lever…): its robots rules, terms and
+    /// content signal, decided once for every company on it.
+    HiringSystem,
+    /// A company's hiring page on a hiring system, found through an apply
+    /// link: read through the system's reader, never through a config.
+    CompanyPage,
 }
 
 impl Kind {
@@ -101,14 +107,29 @@ impl Kind {
             Self::Rss => "rss",
             Self::JsonldSitemap => "jsonld_sitemap",
             Self::Hn => "hn",
+            Self::HiringSystem => "hiring_system",
+            Self::CompanyPage => "company_page",
         }
     }
 
     /// The kind named `raw`.
     pub fn parse(raw: &str) -> Option<Self> {
-        [Self::JsonApi, Self::Rss, Self::JsonldSitemap, Self::Hn]
-            .into_iter()
-            .find(|k| k.as_str() == raw)
+        [
+            Self::JsonApi,
+            Self::Rss,
+            Self::JsonldSitemap,
+            Self::Hn,
+            Self::HiringSystem,
+            Self::CompanyPage,
+        ]
+        .into_iter()
+        .find(|k| k.as_str() == raw)
+    }
+
+    /// A hiring system or one of its company pages: read by its system's
+    /// reader, never by a search of the registry's job boards.
+    pub const fn is_hiring(self) -> bool {
+        matches!(self, Self::HiringSystem | Self::CompanyPage)
     }
 }
 
@@ -507,7 +528,7 @@ impl BoardConfig {
         match kind {
             Kind::JsonApi | Kind::Rss => self.endpoint.as_ref(),
             Kind::JsonldSitemap => self.sitemap.as_ref(),
-            Kind::Hn => None,
+            Kind::Hn | Kind::HiringSystem | Kind::CompanyPage => None,
         }
     }
 
@@ -959,6 +980,14 @@ pub struct BoardRow {
     /// The host the key was set for: it is sent nowhere else.
     pub api_key_host: Option<String>,
     pub api_key_set_at: Option<DateTime<Utc>>,
+    /// The hiring system of a hiring system or a company page (`lever`).
+    pub system: Option<String>,
+    /// A company page's company on its system.
+    pub company_token: Option<String>,
+    /// A company page on Lever's EU instance.
+    pub eu: bool,
+    /// A company page's hiring system row.
+    pub system_id: Option<Uuid>,
 }
 
 /// The columns a [`BoardRow`] reads.
@@ -968,7 +997,7 @@ macro_rules! board_columns {
          config_edited, terms, report, decline_reason, approved_at, recheck_after, last_fetch_at, \
          last_fetch_jobs, last_error, backoff_until, created_at, approved_by, tags, terms_verdict, \
          terms_quote, terms_url, content_signal, contact_email, found_through, blockers, api_key, \
-         api_key_host, api_key_set_at"
+         api_key_host, api_key_set_at, system, company_token, eu, system_id"
     };
 }
 pub(crate) use board_columns;
@@ -1269,12 +1298,52 @@ pub async fn all(db: &PgPool) -> Result<Vec<BoardRow>> {
     .await?)
 }
 
+/// Every board and hiring system, and the company pages that wait first then
+/// the newest, `pages` of them at most: what the list shows.
+pub async fn shown(db: &PgPool, pages: i64) -> Result<Vec<BoardRow>> {
+    Ok(sqlx::query_as(concat!(
+        "SELECT ",
+        board_columns!(),
+        " FROM sources.job_boards
+          WHERE kind <> 'company_page'
+             OR id IN (SELECT id FROM sources.job_boards WHERE kind = 'company_page'
+                        ORDER BY (status = 'candidate') DESC, created_at DESC LIMIT $1)
+          ORDER BY created_at, slug"
+    ))
+    .bind(pages)
+    .fetch_all(db)
+    .await?)
+}
+
+/// How many company pages there are, by where they stand.
+pub async fn company_page_counts(
+    db: &PgPool,
+) -> Result<crate::features::boards::CompanyPageCounts> {
+    let (total, approved, waiting, declined): (i64, i64, i64, i64) = sqlx::query_as(
+        "SELECT count(*), count(*) FILTER (WHERE status IN ('approved', 'paused')),
+                count(*) FILTER (WHERE status = 'candidate'),
+                count(*) FILTER (WHERE status = 'declined')
+           FROM sources.job_boards WHERE kind = 'company_page'",
+    )
+    .fetch_one(db)
+    .await?;
+    let n = |v: i64| u32::try_from(v).unwrap_or(u32::MAX);
+    Ok(crate::features::boards::CompanyPageCounts {
+        total: n(total),
+        approved: n(approved),
+        waiting: n(waiting),
+        declined: n(declined),
+    })
+}
+
 /// The approved boards: the only ones a search reads.
 pub async fn approved(db: &PgPool) -> Result<Vec<BoardRow>> {
     Ok(sqlx::query_as(concat!(
         "SELECT ",
         board_columns!(),
-        " FROM sources.job_boards WHERE status = 'approved' ORDER BY created_at, slug"
+        " FROM sources.job_boards
+          WHERE status = 'approved' AND kind NOT IN ('hiring_system', 'company_page')
+          ORDER BY created_at, slug"
     ))
     .fetch_all(db)
     .await?)

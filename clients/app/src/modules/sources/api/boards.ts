@@ -179,6 +179,7 @@ export const BOARD_ERRORS = [
   "invalid_key",
   "no_key_needed",
   "kind_locked",
+  "system_waiting",
 ] as const;
 export type BoardErrorCode = (typeof BOARD_ERRORS)[number] | "generic";
 
@@ -201,6 +202,42 @@ export function boardErrorOf(error: unknown): BoardError {
   };
 }
 
+/** A hiring system or a company page on one, read by its system's own reader. */
+export function isHiring(board: Pick<BoardSummary, "kind">): boolean {
+  return board.kind === "hiring_system" || board.kind === "company_page";
+}
+
+/** The hiring systems the app names, as they are written on their own sites. */
+const SYSTEM_NAMES = [
+  "greenhouse",
+  "lever",
+  "ashby",
+  "workable",
+  "recruitee",
+  "teamtailor",
+  "personio",
+] as const;
+
+/**
+ * What a hiring system or a company page says under its name: "Hires through
+ * Lever" for a company page, where companies post their jobs for a system;
+ * `null` for any other board.
+ */
+export function hiringLine(
+  board: Pick<BoardSummary, "kind" | "system">,
+  t: TFunction<"sources">,
+): string | null {
+  if (board.kind === "hiring_system") {
+    return t("boards.hiring.systemLine");
+  }
+  if (board.kind !== "company_page") {
+    return null;
+  }
+  const known = SYSTEM_NAMES.find((name) => name === board.system);
+  const system = known === undefined ? (board.system ?? "") : t(`boards.hiring.systems.${known}`);
+  return t("boards.hiring.through", { system });
+}
+
 /** The reasons a board can't be approved that the app words itself; any other shows its detail. */
 export const BLOCKER_CODES = [
   "terms_forbid",
@@ -210,6 +247,8 @@ export const BLOCKER_CODES = [
   "no_endpoint",
   "config_invalid",
   "check_needed",
+  "needs_choice",
+  "system_waiting",
 ] as const;
 export type BlockerCode = (typeof BLOCKER_CODES)[number] | "unknown";
 

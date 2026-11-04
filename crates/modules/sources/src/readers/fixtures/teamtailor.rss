@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:tt="https://teamtailor.com/locations">
+  <channel>
+    <title>Teamtailor</title>
+    <description>Current job openings</description>
+    <link>https://career.teamtailor.com/jobs</link>
+    <item>
+      <title>Customer Success Manager - Finnish speaking</title>
+      <description>&lt;p&gt;An invented description of the job.&lt;/p&gt;</description>
+      <pubDate>Tue, 03 Nov 2026 19:37:57 +0100</pubDate>
+      <link>https://career.teamtailor.com/jobs/8660969-customer-success-manager-finnish-speaking</link>
+      <remoteStatus>none</remoteStatus>
+      <guid>7b9dec76-cac2-489b-bc00-aab47097947f</guid>
+      <tt:locations>
+        <tt:location>
+          <tt:name>Stockholm</tt:name>
+          <tt:address>Östgötagatan 16</tt:address>
+          <tt:zip>116 21</tt:zip>
+          <tt:city>Stockholm</tt:city>
+          <tt:country>Sweden</tt:country>
+        </tt:location>
+      </tt:locations>
+      <tt:department>Customer Success</tt:department>
+      <tt:role>Customer Success Manager</tt:role>
+      <tt:division/>
+    </item>
+    <item>
+      <title>Solution Architect (Bilingual French/English)</title>
+      <description>&lt;p&gt;An invented description of the job.&lt;/p&gt;</description>
+      <pubDate>Thu, 29 Oct 2026 13:25:57 +0100</pubDate>
+      <link>https://career.teamtailor.com/jobs/8636263-solution-architect-bilingual-french-english</link>
+      <remoteStatus>hybrid</remoteStatus>
+      <guid>5c189e36-797b-4e58-8540-defb85b3668a</guid>
+      <tt:locations>
+        <tt:location>
+          <tt:name>Stockholm</tt:name>
+          <tt:address>Östgötagatan 16</tt:address>
+          <tt:zip>116 21</tt:zip>
+          <tt:city>Stockholm</tt:city>
+          <tt:country>Sweden</tt:country>
+        </tt:location>
+        <tt:location>
+          <tt:name/>
+          <tt:address>33 Rue La Fayette</tt:address>
+          <tt:zip>75009</tt:zip>
+          <tt:city>Paris</tt:city>
+          <tt:country>France</tt:country>
+        </tt:location>
+      </tt:locations>
+      <tt:department>Product Specialists</tt:department>
+      <tt:role/>
+      <tt:division/>
+    </item>
+  </channel>
+</rss>

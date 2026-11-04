@@ -1,0 +1,13 @@
+# Tasks
+- [x] 1 migration: kinds, system, company token, system row, unique keys, query counts, companies.page_id
+- [x] 2 readers for Workable, Recruitee, Teamtailor and Personio, with fixtures from public accounts
+- [x] 3 `hiring_systems`: the seven systems, their public addresses, `company_link`
+- [x] 4 registry: `ensure_systems`, `register` (batched, no request), `link_company`, hooks where jobs are read
+- [x] 5 system check: robots, content signal, terms, `needs_choice`, approval by the app
+- [x] 6 company page check: one sample read, approval by the app, the day's limit, turns across systems
+- [x] 7 weekly web search with weekly and monthly caps
+- [x] 8 API: summary fields, counts, web search state, approving over a choice, declining with pages
+- [x] 9 watchers: the four systems, link to the registry page
+- [x] 10 client: kinds in plain words in four languages
+- [x] 11 fakes and e2e: apply links on hiring systems, Lever's signal
+- [x] 12 tests, changelog; recording by the reviewer

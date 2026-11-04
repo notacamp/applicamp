@@ -36,6 +36,8 @@ pub struct Row {
     pub board_eu: bool,
     pub detected_at: Option<DateTime<Utc>>,
     pub origin: String,
+    /// Its board as a company page of the registry, when it is one.
+    pub page_id: Option<Uuid>,
 }
 
 impl Row {
@@ -58,7 +60,7 @@ macro_rules! select {
                     w.reasons, w.created_at, w.watching_since, w.finding_since,
                     w.last_checked_at, w.last_error, w.open_jobs, w.seeded_at, c.name, c.key,
                     c.website, c.careers_url, c.board_kind, c.board_token, c.board_eu,
-                    c.detected_at, c.origin
+                    c.detected_at, c.origin, c.page_id
                FROM sources.company_watches w JOIN sources.companies c ON c.id = w.company_id ",
             $tail
         )

@@ -25,6 +25,14 @@ pub enum Source {
     Lever,
     /// Ashby's public posting API.
     Ashby,
+    /// Workable's public widget API.
+    Workable,
+    /// Recruitee's public offers API.
+    Recruitee,
+    /// Teamtailor's public job feed.
+    Teamtailor,
+    /// Personio's public XML feed.
+    Personio,
     /// Arbeitnow, as opportunities found before the job-board registry name
     /// it; its jobs are now read as the `arbeitnow` job board.
     Arbeitnow,
@@ -36,10 +44,14 @@ pub enum Source {
 
 impl Source {
     /// Every source.
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 10] = [
         Self::Greenhouse,
         Self::Lever,
         Self::Ashby,
+        Self::Workable,
+        Self::Recruitee,
+        Self::Teamtailor,
+        Self::Personio,
         Self::Arbeitnow,
         Self::Hn,
         Self::Board,
@@ -51,6 +63,10 @@ impl Source {
             Self::Greenhouse => "greenhouse",
             Self::Lever => "lever",
             Self::Ashby => "ashby",
+            Self::Workable => "workable",
+            Self::Recruitee => "recruitee",
+            Self::Teamtailor => "teamtailor",
+            Self::Personio => "personio",
             Self::Arbeitnow => "arbeitnow",
             Self::Hn => "hn",
             Self::Board => "board",
@@ -59,7 +75,16 @@ impl Source {
 
     /// A company board on an applicant tracking system.
     pub const fn is_company_board(self) -> bool {
-        matches!(self, Self::Greenhouse | Self::Lever | Self::Ashby)
+        matches!(
+            self,
+            Self::Greenhouse
+                | Self::Lever
+                | Self::Ashby
+                | Self::Workable
+                | Self::Recruitee
+                | Self::Teamtailor
+                | Self::Personio
+        )
     }
 
     /// The source named `name`.

@@ -17,7 +17,18 @@
 //! | `APPLICAMP_SOURCES__LEVER_URL` | `https://api.lever.co` |
 //! | `APPLICAMP_SOURCES__LEVER_EU_URL` | `https://api.eu.lever.co` |
 //! | `APPLICAMP_SOURCES__ASHBY_URL` | `https://api.ashbyhq.com` |
+//! | `APPLICAMP_SOURCES__WORKABLE_URL` | `https://apply.workable.com` |
+//! | `APPLICAMP_SOURCES__RECRUITEE_URL` | `https://{token}.recruitee.com` (`{token}` is the company's) |
+//! | `APPLICAMP_SOURCES__TEAMTAILOR_URL` | `https://{token}.teamtailor.com` |
+//! | `APPLICAMP_SOURCES__PERSONIO_URL` | `https://{token}.jobs.personio.de` |
 //! | `APPLICAMP_SOURCES__HN_URL` | `https://hn.algolia.com` |
+//! | `APPLICAMP_SOURCES__COMPANY_PAGES` | `true`: company hiring pages found through apply links are checked every day |
+//! | `APPLICAMP_SOURCES__COMPANY_PAGE_CHECKS` | `300` (new company pages one daily run checks, at most) |
+//! | `APPLICAMP_SOURCES__SEARCH_COMPANY_PAGES` | `false`: a search reads only the company pages of companies the person watches |
+//! | `APPLICAMP_SEARCH__BRAVE_API_KEY_FILE` | unset: web search is off (a file holding the key) |
+//! | `APPLICAMP_SEARCH__BRAVE_URL` | `https://api.search.brave.com` |
+//! | `APPLICAMP_SEARCH__BRAVE_WEEKLY_QUERIES` | `50` (queries one weekly run asks, at most) |
+//! | `APPLICAMP_SEARCH__BRAVE_MONTHLY_QUERIES` | `1000` (queries a month, at most: Brave bills each) |
 //! | `APPLICAMP_SOURCES__BOARDS_FILE` | the company boards built in (`boards.toml`) |
 //! | `APPLICAMP_SOURCES__CACHE_SECS` | `21600` (6 hours; `0` never caches; job boards keep to their own polling interval) |
 //! | `APPLICAMP_SOURCES__REQUESTS_PER_SECOND` | `2` (per host) |
@@ -101,6 +112,76 @@ pub struct SourcesConfig {
     /// Seconds between two reads of one watched company's job board.
     #[serde(default, deserialize_with = "number")]
     pub watch_every_secs: Option<u64>,
+    /// Workable's widget API.
+    #[serde(default = "workable_url")]
+    pub workable_url: Url,
+    /// Recruitee's offers API: the address of a company's, `{token}` standing
+    /// for the company (a fake in tests has none).
+    #[serde(default = "recruitee_url")]
+    pub recruitee_url: String,
+    /// Teamtailor's job feed, the same way.
+    #[serde(default = "teamtailor_url")]
+    pub teamtailor_url: String,
+    /// Personio's XML feed, the same way.
+    #[serde(default = "personio_url")]
+    pub personio_url: String,
+    /// Check the company pages found through apply links every day.
+    #[serde(default, deserialize_with = "flag")]
+    pub company_pages: Option<bool>,
+    /// New company pages one daily run checks, at most.
+    #[serde(default, deserialize_with = "number")]
+    pub company_page_checks: Option<u64>,
+    /// A search reads the company pages of the companies the person watches.
+    #[serde(default, deserialize_with = "flag")]
+    pub search_company_pages: Option<bool>,
+    /// The web search (`APPLICAMP_SEARCH__…`).
+    #[serde(skip)]
+    pub search: SearchConfig,
+}
+
+/// The optional web search that finds company pages (`APPLICAMP_SEARCH__…`).
+#[derive(Debug, Clone, Deserialize)]
+pub struct SearchConfig {
+    /// A file holding the Brave Search API key; unset is off.
+    #[serde(default)]
+    pub brave_api_key_file: Option<PathBuf>,
+    /// Brave Search's API.
+    #[serde(default = "brave_url")]
+    pub brave_url: Url,
+    /// Queries one weekly run asks, at most.
+    #[serde(default, deserialize_with = "number")]
+    pub brave_weekly_queries: Option<u64>,
+    /// Queries a calendar month, at most.
+    #[serde(default, deserialize_with = "number")]
+    pub brave_monthly_queries: Option<u64>,
+}
+
+impl Default for SearchConfig {
+    fn default() -> Self {
+        Self {
+            brave_api_key_file: None,
+            brave_url: brave_url(),
+            brave_weekly_queries: None,
+            brave_monthly_queries: None,
+        }
+    }
+}
+
+impl SearchConfig {
+    /// Whether the web search is on: a key file is named.
+    pub fn brave(&self) -> bool {
+        self.brave_api_key_file.is_some()
+    }
+
+    /// Queries one weekly run asks, at most.
+    pub fn weekly_queries(&self) -> u64 {
+        self.brave_weekly_queries.unwrap_or(50).min(1_000)
+    }
+
+    /// Queries a calendar month, at most.
+    pub fn monthly_queries(&self) -> u64 {
+        self.brave_monthly_queries.unwrap_or(1_000).min(100_000)
+    }
 }
 
 impl Default for SourcesConfig {
@@ -127,6 +208,14 @@ impl Default for SourcesConfig {
             manual_every_secs: None,
             nightly: None,
             watch_every_secs: None,
+            workable_url: workable_url(),
+            recruitee_url: recruitee_url(),
+            teamtailor_url: teamtailor_url(),
+            personio_url: personio_url(),
+            company_pages: None,
+            company_page_checks: None,
+            search_company_pages: None,
+            search: SearchConfig::default(),
         }
     }
 }
@@ -147,6 +236,21 @@ fn lever_eu_url() -> Url {
 fn ashby_url() -> Url {
     url("https://api.ashbyhq.com")
 }
+fn workable_url() -> Url {
+    url("https://apply.workable.com")
+}
+fn recruitee_url() -> String {
+    "https://{token}.recruitee.com".to_owned()
+}
+fn teamtailor_url() -> String {
+    "https://{token}.teamtailor.com".to_owned()
+}
+fn personio_url() -> String {
+    "https://{token}.jobs.personio.de".to_owned()
+}
+fn brave_url() -> Url {
+    url("https://api.search.brave.com")
+}
 fn discovery_list_url() -> Url {
     url("https://raw.githubusercontent.com/emredurukn/awesome-job-boards/main/README.md")
 }
@@ -162,12 +266,34 @@ impl SourcesConfig {
 
     /// The `sources` section of `figment`.
     pub fn from_figment(figment: &Figment) -> Result<Self, String> {
+        let search: SearchConfig = if figment.contains("search") {
+            figment
+                .extract_inner("search")
+                .map_err(|e| format!("APPLICAMP_SEARCH__…: {e}"))?
+        } else {
+            SearchConfig::default()
+        };
         if !figment.contains("sources") {
-            return Ok(Self::default());
+            return Ok(Self {
+                search,
+                ..Self::default()
+            });
         }
-        let config: Self = figment
+        let mut config: Self = figment
             .extract_inner("sources")
             .map_err(|e| format!("APPLICAMP_SOURCES__…: {e}"))?;
+        config.search = search;
+        for (name, template) in [
+            ("RECRUITEE_URL", &config.recruitee_url),
+            ("TEAMTAILOR_URL", &config.teamtailor_url),
+            ("PERSONIO_URL", &config.personio_url),
+        ] {
+            if Url::parse(&template.replace("{token}", "example")).is_err() {
+                return Err(format!(
+                    "APPLICAMP_SOURCES__{name}: `{template}` is not an address"
+                ));
+            }
+        }
         if let Some(unknown) = config.enabled.iter().flatten().find(|name| !is_slug(name)) {
             return Err(format!(
                 "APPLICAMP_SOURCES__ENABLED: `{unknown}` is not a job board's slug or a company \
@@ -198,6 +324,37 @@ impl SourcesConfig {
     /// Whether the company boards are searched (off: kept for watchers, #20).
     pub fn company_boards(&self) -> bool {
         self.company_boards.unwrap_or(false)
+    }
+
+    /// Whether the company pages found through apply links are checked every
+    /// day.
+    pub fn company_pages(&self) -> bool {
+        self.company_pages.unwrap_or(true)
+    }
+
+    /// New company pages one daily run checks, at most (300 when left out).
+    pub fn company_page_checks(&self) -> usize {
+        usize::try_from(self.company_page_checks.unwrap_or(300).clamp(1, 10_000)).unwrap_or(300)
+    }
+
+    /// Whether a search reads the company pages of the companies the person
+    /// watches (off by default: a job store comes first).
+    pub fn search_company_pages(&self) -> bool {
+        self.search_company_pages.unwrap_or(false)
+    }
+
+    /// The address of a company's page on a system whose address holds
+    /// `{token}` (Recruitee, Teamtailor, Personio); `None` for a token that is
+    /// not a safe name for a host.
+    pub fn company_host(&self, template: &str, token: &str) -> Option<Url> {
+        if token.is_empty()
+            || token.len() > 63
+            || token.starts_with('-')
+            || !token.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+        {
+            return None;
+        }
+        Url::parse(&template.replace("{token}", &token.to_ascii_lowercase())).ok()
     }
 
     /// Whether job boards may be read at private hosts.

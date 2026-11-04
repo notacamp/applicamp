@@ -1694,7 +1694,8 @@ async fn a_site_that_asks_apps_not_to_read_it_is_said_and_what_it_says_can_be_pa
     let facts = json!({ "facts": [{
         "text": "Runs payroll for bakeries",
         "quote": "payroll for bakeries",
-        "url": "https://example-co.test",
+        // The site as the read kept it, an origin: what the pasted text is shown under.
+        "url": "https://example-co.test/",
     }]});
     let s = stack_reading(
         db.clone(),

@@ -181,20 +181,24 @@ export function PdfPages({ url, labels, testId, enabled = true, minWidth = 200 }
         </p>
       ) : null}
       {Array.from({ length: pages }, (_, index) => index + 1).map((number) => (
-        <canvas
+        <div
           key={`${state?.url ?? url}#${String(number)}`}
-          ref={(element) => {
-            if (element === null) {
-              canvases.current.delete(number);
-            } else {
-              canvases.current.set(number, element);
-            }
-          }}
-          className={styles["page"]}
           role="img"
           aria-label={labels.page(number, pages)}
-          data-testid={`${testId}-page-${String(number)}`}
-        />
+        >
+          <canvas
+            ref={(element) => {
+              if (element === null) {
+                canvases.current.delete(number);
+              } else {
+                canvases.current.set(number, element);
+              }
+            }}
+            className={styles["page"]}
+            aria-hidden="true"
+            data-testid={`${testId}-page-${String(number)}`}
+          />
+        </div>
       ))}
     </div>
   );

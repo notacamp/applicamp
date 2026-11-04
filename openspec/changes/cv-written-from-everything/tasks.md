@@ -1,0 +1,10 @@
+# Tasks
+- [x] 1 `Role::Write`, `AiConfig.write`, `Gateway::complete_as` and `writer()`; ledger migration; config tests; `.env.example`
+- [x] 2 The port and the server: background, projects, certificates, the languages for work
+- [x] 3 The frame's new sources; prompt version 2; budgets; the judge sorts positions; Put back keeps the order
+- [x] 4 "Earlier" in the PDF data and both templates, four languages; read-back; test
+- [x] 5 The person's language; `suggested_language`
+- [x] 6 The wants pass; `draft.wants`; cost on the draft and `done`; tests
+- [x] 7 Proposals: migration, insert, eligibility, PATCH, list filter; the after-search handler and job; tests
+- [x] 8 Client: the review page of the prototype, four languages; the fake model's richer draft and Earlier; the e2e spec filmed
+- [ ] 9 OpenAPI regenerated, client types regenerated, changelog entry file (changelog/unreleased/added/73-cv-written-from-everything.md), gates green in CI, recording (UI at 375px and desktop)

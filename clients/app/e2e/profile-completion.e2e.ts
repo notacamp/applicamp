@@ -127,7 +127,8 @@ test("someone sees how strong their profile is, is led to Tell me about you from
  * text comes out: the sidebar, then the name, the About text, each position
  * with its dates line, its place line and its bullets, and education. The
  * fake model reads it wrong the known ways (#72): the first position's place
- * as its summary, and no education or languages until it is asked again.
+ * on the first line of its summary, and no education or languages until it is
+ * asked again.
  */
 const LINKEDIN_PDF = [
   "Contact",
@@ -149,6 +150,7 @@ const LINKEDIN_PDF = [
   "Staff Engineer",
   "Jul 2023 - Present (1 year 4 months)",
   "Lisbon, Portugal",
+  "Runs the billing platform for 40 shops.",
   "- Moved billing to Rust",
   "- Cut refunds by half",
   "Sample Labs",
@@ -227,8 +229,9 @@ test("someone reads their LinkedIn PDF again: every section is found, no place i
   await expectNoSidewaysScroll(page);
   await expectAccessible(page);
 
-  // Merge repairs each position: the places leave the summaries, the end
-  // date and the achievements are added, and nothing else changes.
+  // Merge repairs each position: a summary that was only a place gives way
+  // to the description read now (the place goes to the empty location), the
+  // end date and the achievements are added, and nothing else changes.
   await page.getByTestId("review-merge").click();
   const work = page.getByTestId("section-work");
   await expect(work).toContainText("Lisbon, Portugal");
@@ -236,10 +239,11 @@ test("someone reads their LinkedIn PDF again: every section is found, no place i
   const saved = await callApiJson(page, "GET", "/api/v1/profile");
   const positions = (saved.body as { profile: { work: WorkAnswer[] } }).profile.work;
   expect(positions).toHaveLength(2);
-  expect(positions[0]?.summary).toBeUndefined();
+  expect(positions[0]?.summary).toBe("Runs the billing platform for 40 shops.");
   expect(positions[0]?.location).toBe("Lisbon, Portugal");
   expect(positions[0]?.highlights).toEqual(["Moved billing to Rust", "Cut refunds by half"]);
   expect(positions[1]?.summary).toBe("Built the data pipeline for 40 shops.");
+  expect(positions[1]?.location).toBe("Porto, Portugal");
   expect(positions[1]?.endDate).toBe("2023-04");
   await expectNoSidewaysScroll(page);
 });

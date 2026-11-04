@@ -56,7 +56,7 @@
   },
   "review": {
     "title": "Check what we found",
-    "lead": "Nothing is saved until you choose. Replace makes this your profile. Merge keeps your profile and adds what is new.",
+    "lead": "Nothing is saved until you choose. Replace makes this your profile. Merge keeps what you edited, fills in what is missing and moves a place out of a job’s summary.",
     "found": "Found {{list}}.",
     "counts": {
       "jobs_one": "{{count}} job",
@@ -93,6 +93,7 @@
       "label": "No headline found in this file",
       "summary": "No summary found in this file",
       "work": "No positions found in this file",
+      "achievements": "No achievements found in this file",
       "education": "No education found in this file",
       "skills": "No skills found in this file",
       "languages": "No languages found in this file",
@@ -100,6 +101,10 @@
       "projects": "No projects found in this file",
       "hint": "Add them by hand after you apply this, or import your LinkedIn data export, which carries skills, education and languages.",
       "hintZip": "Add them by hand after you apply this."
+    },
+    "stopped": {
+      "title": "Your AI limit stopped us reading the missing parts again.",
+      "body": "Below is what we found. Add the missing parts by hand, or try again tomorrow."
     }
   },
   "source": {
@@ -657,7 +662,9 @@
       "title": "Saved",
       "banner": "Saved to your profile.",
       "lead": "Your profile is now {{score}}% strong. Agents and CVs use it from now on. You can come back any time to add more.",
-      "done": "Back to Profile & goals"
+      "done": "Back to Profile & goals",
+      "facts_one": "{{count}} fact is waiting on Complete your profile.",
+      "facts_other": "{{count}} facts are waiting on Complete your profile."
     },
     "errors": {
       "generic": "That didn’t work. Try again.",

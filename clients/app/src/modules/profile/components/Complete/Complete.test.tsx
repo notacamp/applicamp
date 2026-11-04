@@ -26,6 +26,7 @@ function fact(id: string, text: string, rest: Partial<FactProposal>): FactPropos
     basis: null,
     area: "results",
     state: "open",
+    said_right: false,
     decided_at: null,
     undo_until: null,
     ...rest,
@@ -78,14 +79,15 @@ function view(states: Record<string, FactProposal["state"]> = {}): FactProposals
     dropped: count("dropped"),
     cv_read: {
       applied_at: "2026-11-04T09:00:00Z",
-      jobs: 13,
-      achievements: 31,
-      skills: 14,
-      degrees: 1,
-      languages: 3,
+      jobs: 6,
+      achievements: 18,
+      skills: 9,
+      degrees: 2,
+      languages: 2,
       certificates: 0,
       projects: 0,
     },
+    batch: null,
   };
 }
 
@@ -103,7 +105,7 @@ describe("Complete your profile", () => {
     renderWithProviders(<CompletePage onBack={vi.fn()} />);
 
     expect(await screen.findByTestId("complete-cv-read")).toHaveTextContent(
-      "Found 13 jobs, 31 achievements, 14 skills, 1 degree, and 3 languages.",
+      "Found 6 jobs, 18 achievements, 9 skills, 2 degrees, and 2 languages.",
     );
     expect(screen.getByTestId("profile-complete")).toHaveTextContent(
       "We found 3 facts about your work. Keep the right ones.",
@@ -138,12 +140,17 @@ describe("Complete your profile", () => {
     ).toBe("1");
   });
 
-  it("keeps all at once and says how many were added, with a day to undo", async () => {
+  it("keeps all at once and says how many were added, with one Undo for a day", async () => {
+    const BATCH = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a09";
     stubApi({
       [`GET ${PROPOSALS}`]: { body: view() },
       [`POST ${PROPOSALS}/keep-all`]: {
-        body: view({ [LEAD]: "kept", [SITE]: "kept", [SKILL]: "kept" }),
+        body: {
+          ...view({ [LEAD]: "kept", [SITE]: "kept", [SKILL]: "kept" }),
+          batch: { id: BATCH, kept: 3, undo_until: "2026-11-05T10:00:00Z" },
+        },
       },
+      [`POST ${PROPOSALS}/batches/${BATCH}/undo`]: { body: view() },
     });
     const user = userEvent.setup();
     renderWithProviders(<CompletePage onBack={vi.fn()} />);
@@ -152,12 +159,52 @@ describe("Complete your profile", () => {
       "3 facts added to your profile. You can undo this for a day.",
     );
     expect(screen.getByTestId("complete-keep-all")).toBeDisabled();
+    await user.click(screen.getByTestId("complete-undo-all"));
+    expect(await screen.findByTestId(`complete-keep-${LEAD}`)).toBeInTheDocument();
+    expect(screen.queryByTestId("complete-done")).toBeNull();
+  });
+
+  it("says “You said this was right” only under an assumption marked right", async () => {
+    stubApi({
+      [`GET ${PROPOSALS}`]: {
+        body: {
+          ...view(),
+          groups: [
+            {
+              target: "position",
+              position: 0,
+              title: "Lead Engineer",
+              company: "Example Co",
+              start_date: "2021-03",
+              end_date: null,
+              proposals: [
+                fact(LEAD, "Led a small team", { source: "you_confirmed", said_right: true }),
+                fact(SITE, "Worked on payments", {
+                  source: "you_confirmed",
+                  basis: "Platforms like this run on payments.",
+                }),
+                fact(SKILL, "Runs billing on Kafka", { source: "you_confirmed" }),
+              ],
+            },
+          ],
+        },
+      },
+    });
+    renderWithProviders(<CompletePage onBack={vi.fn()} />);
+    expect(await screen.findByTestId(`complete-fact-${LEAD}`)).toHaveTextContent(
+      "You said this was right.",
+    );
+    expect(screen.getByTestId(`complete-fact-${SITE}`)).toHaveTextContent(
+      "Platforms like this run on payments.",
+    );
+    expect(screen.getByTestId(`complete-fact-${SITE}`)).not.toHaveTextContent("You said");
+    expect(screen.getByTestId(`complete-fact-${SKILL}`)).not.toHaveTextContent("You said");
   });
 
   it("says when there is nothing to add, and goes back", async () => {
     stubApi({
       [`GET ${PROPOSALS}`]: {
-        body: { groups: [], open: 0, kept: 0, dropped: 0, cv_read: null },
+        body: { groups: [], open: 0, kept: 0, dropped: 0, cv_read: null, batch: null },
       },
     });
     const user = userEvent.setup();

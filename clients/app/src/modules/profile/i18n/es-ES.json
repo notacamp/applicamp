@@ -56,7 +56,7 @@
   },
   "review": {
     "title": "Mira lo que hemos encontrado",
-    "lead": "No se guarda nada hasta que elijas. Sustituir convierte esto en tu perfil. Combinar mantiene tu perfil y añade lo nuevo.",
+    "lead": "No se guarda nada hasta que elijas. Sustituir convierte esto en tu perfil. Combinar mantiene lo que editaste, completa lo que falta y saca un lugar del resumen de un empleo.",
     "found": "Hemos encontrado {{list}}.",
     "counts": {
       "jobs_one": "{{count}} empleo",
@@ -93,6 +93,7 @@
       "label": "No se encontró ningún titular en este archivo",
       "summary": "No se encontró ningún resumen en este archivo",
       "work": "No se encontró ningún puesto en este archivo",
+      "achievements": "No se encontró ningún logro en este archivo",
       "education": "No se encontró ninguna formación en este archivo",
       "skills": "No se encontró ninguna habilidad en este archivo",
       "languages": "No se encontró ningún idioma en este archivo",
@@ -100,6 +101,10 @@
       "projects": "No se encontró ningún proyecto en este archivo",
       "hint": "Añádelos a mano después de aplicar, o importa tu exportación de datos de LinkedIn, que incluye habilidades, formación e idiomas.",
       "hintZip": "Añádelos a mano después de aplicar."
+    },
+    "stopped": {
+      "title": "Tu límite de IA no nos dejó volver a leer las partes que faltan.",
+      "body": "Abajo está lo que encontramos. Añade a mano las partes que faltan, o inténtalo de nuevo mañana."
     }
   },
   "source": {
@@ -657,7 +662,9 @@
       "title": "Guardado",
       "banner": "Guardado en tu perfil.",
       "lead": "Tu perfil está ahora al {{score}}% de fuerza. Los agentes y los CV lo usarán desde ahora. Puedes volver cuando quieras para añadir más.",
-      "done": "Volver a Perfil y objetivos"
+      "done": "Volver a Perfil y objetivos",
+      "facts_one": "{{count}} dato te espera en Completa tu perfil.",
+      "facts_other": "{{count}} datos te esperan en Completa tu perfil."
     },
     "errors": {
       "generic": "No funcionó. Inténtalo de nuevo.",

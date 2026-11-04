@@ -4,17 +4,21 @@
 //! a CV they imported, and keeps those words as its quote.
 //!
 //! - **Tell me about you**: an assumption the person confirmed (*That's
-//!   right*, or left unanswered when they said the portrait is accurate);
-//!   a sentence from the profile that names something its position does not
-//!   hold yet (a number, a tool), when they said the portrait is accurate and
-//!   it was made for this very profile; and what they wrote, under "Anything
-//!   else" or answering a question, as a fact on a position, a skill or their
-//!   background. A change whose claim check failed and that they did not
-//!   settle is left out and counted, never proposed.
+//!   right*, or left unanswered when they said this very portrait is
+//!   accurate); a sentence the portrait took from the position or the
+//!   person's own words that names something the position does not hold yet
+//!   (a number, a tool), when they said the portrait is accurate and it was
+//!   made for this very profile; and what they wrote, under "Anything else" or
+//!   answering a question, as a fact on a position, a skill or their
+//!   background. A change whose quote is not their words, or whose claim
+//!   check failed and that they did not settle, is left out and counted,
+//!   never proposed.
 //! - **Their own website**: what the portrait assumed from it, confirmed the
 //!   same way, with the page it was read on.
 //! - **A CV read again**: an achievement of a position that the position does
 //!   not hold.
+//!
+//! An item about no position goes on the newest one.
 
 use std::collections::BTreeMap;
 
@@ -24,11 +28,12 @@ use crate::{
     features::{
         about::{
             Choice,
-            judge::{self, Change, Field, Sentence, SentenceKind},
+            judge::{self, Change, Field, FlagKind, Resolution, Sentence, SentenceKind},
         },
         grill::role_key,
     },
-    schema::{Area, Profile, Work, same_position},
+    matching::latest_position,
+    schema::{Area, Profile, Work, match_positions},
 };
 
 use super::{FactSource, FactTarget};
@@ -47,9 +52,48 @@ pub(crate) struct AboutKnown<'a> {
     pub(crate) version: Option<i32>,
     pub(crate) portrait: &'a [Sentence],
     pub(crate) choices: &'a BTreeMap<String, Choice>,
-    /// `yes`, `some` or `no`.
+    /// `yes`, `some` or `no`, for this portrait.
     pub(crate) accuracy: Option<&'a str>,
     pub(crate) changes: &'a [Change],
+}
+
+/// What a fact was found in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Origin {
+    /// An assumption the person marked *That's right*.
+    AssumedRight,
+    /// An assumption left unanswered when the person said the portrait is
+    /// accurate.
+    AssumedAccurate,
+    /// A sentence the portrait took from the position or the person's words.
+    Known,
+    /// A change taken from the person's words.
+    Change,
+    /// A CV read again.
+    Cv,
+}
+
+impl Origin {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::AssumedRight => "assumed_right",
+            Self::AssumedAccurate => "assumed_accurate",
+            Self::Known => "known",
+            Self::Change => "change",
+            Self::Cv => "cv",
+        }
+    }
+
+    pub(crate) fn parse(raw: &str) -> Option<Self> {
+        match raw {
+            "assumed_right" => Some(Self::AssumedRight),
+            "assumed_accurate" => Some(Self::AssumedAccurate),
+            "known" => Some(Self::Known),
+            "change" => Some(Self::Change),
+            "cv" => Some(Self::Cv),
+            _ => None,
+        }
+    }
 }
 
 /// A fact to propose.
@@ -61,15 +105,59 @@ pub(crate) struct Candidate {
     pub(crate) text: String,
     pub(crate) quote: String,
     pub(crate) source: FactSource,
+    pub(crate) origin: Origin,
     pub(crate) basis: Option<String>,
     pub(crate) area: Area,
+}
+
+impl Candidate {
+    /// What it is the same as another by: [`key_of`].
+    pub(crate) fn key(&self) -> Key {
+        key_of(
+            self.target,
+            self.position.as_ref().map(|(_, k)| k.as_str()),
+            &self.text,
+        )
+    }
+}
+
+/// What a proposal is the same as another by: where it goes (a position by
+/// its company and start, so a renamed title changes nothing) and its words
+/// (no case, no spacing, no closing full stop).
+pub(crate) type Key = (FactTarget, String, String);
+
+/// `text` as proposals are compared: squashed, without closing punctuation
+/// ("Led 4 engineers." is "Led 4 engineers").
+pub(crate) fn norm(text: &str) -> String {
+    squash(text)
+        .trim_end_matches(['.', '!', ';', ',', ':', '…'])
+        .to_owned()
+}
+
+/// A position's company and start, from its key (`company|title|start`).
+pub(crate) fn place_key(role_key: &str) -> String {
+    match role_key.split('|').collect::<Vec<_>>().as_slice() {
+        [company, _, start] => format!("{company}|{start}"),
+        _ => role_key.to_owned(),
+    }
+}
+
+/// The key of a proposal for `target`, at the position `role_key` names, saying
+/// `text`.
+pub(crate) fn key_of(target: FactTarget, role_key: Option<&str>, text: &str) -> Key {
+    (
+        target,
+        role_key.map(place_key).unwrap_or_default(),
+        norm(text),
+    )
 }
 
 /// What [`candidates`] found.
 #[derive(Debug, Default)]
 pub(crate) struct Found {
     pub(crate) candidates: Vec<Candidate>,
-    /// Changes left out because their claim check failed and was not settled.
+    /// Changes left out because their quote is not the person's words, or
+    /// their claim check failed and was not settled.
     pub(crate) left_out: u32,
 }
 
@@ -98,21 +186,39 @@ fn position_text(work: &Work) -> Vec<String> {
 
 /// Whether `work` already says `text` (as a fact or an achievement).
 pub(crate) fn holds(work: &Work, text: &str) -> bool {
-    let key = squash(text);
+    let key = norm(text);
     !key.is_empty()
-        && (work.facts.iter().any(|f| squash(&f.text) == key)
-            || work.highlights.iter().any(|h| squash(h) == key))
+        && (work.facts.iter().any(|f| norm(&f.text) == key)
+            || work.highlights.iter().any(|h| norm(h) == key))
+}
+
+/// The position of `profile` that `key` (a position's key) names: by the
+/// whole key, else by its company and start (its title renamed since).
+pub(crate) fn position_by_key(profile: &Profile, key: &str) -> Option<usize> {
+    profile
+        .work
+        .iter()
+        .position(|w| role_key(w) == key)
+        .or_else(|| {
+            let place = place_key(key);
+            let mut found = profile
+                .work
+                .iter()
+                .enumerate()
+                .filter(|(_, w)| place_key(&role_key(w)) == place);
+            match (found.next(), found.next()) {
+                (Some((at, _)), None) => Some(at),
+                _ => None,
+            }
+        })
 }
 
 /// The position an item made for `key` is about now: by its key, else (an
-/// item about no position) the first one, as Save places it.
+/// item about no position) the newest one.
 fn place_of(profile: &Profile, key: Option<&str>) -> Option<usize> {
-    if profile.work.is_empty() {
-        return None;
-    }
     match key {
-        Some(key) => profile.work.iter().position(|w| role_key(w) == key),
-        None => Some(0),
+        Some(key) => position_by_key(profile, key),
+        None => latest_position(&profile.work),
     }
 }
 
@@ -120,18 +226,28 @@ fn on_position(profile: &Profile, at: usize) -> Option<(usize, String)> {
     profile.work.get(at).map(|work| (at, role_key(work)))
 }
 
-/// The one position the sources `ids` cite (`w2`, `w2f0`); none when they cite
-/// none or more than one.
+/// The one position a sentence's sources name, when it may be read for a
+/// fact: every source is a position (`w2`), a fact the person kept on it
+/// (`w2f0`) or their own words (`p.summary`, `p.background`), and the
+/// positions they name are one. Never the goals, the years, the skills list,
+/// the headline, education, or anything read on a website.
 fn cited_position(ids: &[String]) -> Option<usize> {
     let mut found: Option<usize> = None;
     for id in ids {
-        let Some(rest) = id.strip_prefix('w') else {
+        if id == "p.summary" || id == "p.background" {
             continue;
-        };
+        }
+        let rest = id.strip_prefix('w')?;
         let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
-        let Ok(at) = digits.parse::<usize>() else {
-            continue;
-        };
+        let tail = &rest[digits.len()..];
+        if !(tail.is_empty()
+            || tail
+                .strip_prefix('f')
+                .is_some_and(|f| f.parse::<u32>().is_ok()))
+        {
+            return None;
+        }
+        let at = digits.parse::<usize>().ok()?;
         match found {
             Some(seen) if seen != at => return None,
             _ => found = Some(at),
@@ -140,13 +256,13 @@ fn cited_position(ids: &[String]) -> Option<usize> {
     found
 }
 
-/// Whether the person confirmed the assumption `sentence`: *That's right*, or
-/// no answer at all when they said the portrait is accurate.
-fn confirmed(sentence: &Sentence, about: &AboutKnown<'_>) -> bool {
+/// How the person confirmed the assumption `sentence`, if they did: *That's
+/// right*, or no answer at all when they said this portrait is accurate.
+fn confirmed(sentence: &Sentence, about: &AboutKnown<'_>) -> Option<Origin> {
     match about.choices.get(&sentence.id) {
-        Some(Choice::Right) => true,
-        Some(Choice::Wrong | Choice::Later) => false,
-        None => about.accuracy == Some("yes"),
+        Some(Choice::Right) => Some(Origin::AssumedRight),
+        Some(Choice::Wrong | Choice::Later) => None,
+        None => (about.accuracy == Some("yes")).then_some(Origin::AssumedAccurate),
     }
 }
 
@@ -161,9 +277,9 @@ fn from_portrait(profile: &Profile, version: i32, about: &AboutKnown<'_>, out: &
     for sentence in about.portrait {
         match sentence.kind {
             SentenceKind::Assumed => {
-                if !confirmed(sentence, about) {
+                let Some(origin) = confirmed(sentence, about) else {
                     continue;
-                }
+                };
                 let Some(at) = place_of(profile, sentence.role_key.as_deref()) else {
                     continue;
                 };
@@ -188,6 +304,7 @@ fn from_portrait(profile: &Profile, version: i32, about: &AboutKnown<'_>, out: &
                     quote: claim.clone(),
                     text: claim,
                     source,
+                    origin,
                     basis: basis.map(|b| cut(&b, MAX_BASIS)),
                     area: sentence.topic,
                 });
@@ -220,6 +337,7 @@ fn from_portrait(profile: &Profile, version: i32, about: &AboutKnown<'_>, out: &
                     quote: text.clone(),
                     text,
                     source: FactSource::YouConfirmed,
+                    origin: Origin::Known,
                     basis: None,
                     area: sentence.topic,
                 });
@@ -230,19 +348,23 @@ fn from_portrait(profile: &Profile, version: i32, about: &AboutKnown<'_>, out: &
     }
 }
 
-/// Whether a change may be proposed: no flag, or one the person settled, or
-/// only claims their profile says (never a quote that is not theirs).
-fn passes(change: &Change, profile: &serde_json::Value) -> bool {
-    if !change.open() {
-        return true;
+/// The words a change is proposed with, when it may be: theirs, quoted from
+/// what they wrote. A quote the check could not find in their words is never
+/// proposed, settled or not; "Use my own words" makes their words the value
+/// and the quote. A claim their words do not say must be settled, or said by
+/// their profile.
+fn quote_of(change: &Change, profile: &serde_json::Value) -> Option<String> {
+    if change.resolution == Some(Resolution::OwnWords) {
+        return Some(change.value.clone());
     }
-    change
-        .flags
-        .iter()
-        .all(|f| f.kind == judge::FlagKind::Claim)
-        && Evidence::of(&change.quote, profile)
+    if change.flags.iter().any(|f| f.kind == FlagKind::Quote) {
+        return None;
+    }
+    let settled = !change.open()
+        || Evidence::of(&change.quote, profile)
             .unsupported(&change.value)
-            .is_empty()
+            .is_empty();
+    settled.then(|| change.quote.clone())
 }
 
 /// What the person wrote, as facts on positions, skills and a background.
@@ -260,10 +382,10 @@ fn from_changes(profile: &Profile, changes: &[Change], out: &mut Found) {
             // languages, education.
             _ => continue,
         };
-        if !passes(change, &evidence) {
+        let Some(quote) = quote_of(change, &evidence) else {
             out.left_out += 1;
             continue;
-        }
+        };
         let max = if target == FactTarget::Skills {
             judge::MAX_SKILL
         } else {
@@ -277,8 +399,9 @@ fn from_changes(profile: &Profile, changes: &[Change], out: &mut Found) {
             target,
             position,
             text,
-            quote: cut(&change.quote, MAX_TEXT),
+            quote: cut(&quote, MAX_TEXT),
             source: FactSource::YouSaid,
+            origin: Origin::Change,
             basis: None,
             area: change.area,
         });
@@ -286,14 +409,10 @@ fn from_changes(profile: &Profile, changes: &[Change], out: &mut Found) {
 }
 
 /// A CV read again: the achievements its positions have that the profile's
-/// do not.
+/// do not, each position matched as Merge matches it.
 fn from_cv(profile: &Profile, cv: &Profile, out: &mut Found) {
-    for theirs in &cv.work {
-        let Some(at) = profile
-            .work
-            .iter()
-            .position(|mine| same_position(mine, theirs))
-        else {
+    for (theirs, mine) in cv.work.iter().zip(match_positions(&profile.work, &cv.work)) {
+        let Some(at) = mine else {
             continue;
         };
         for highlight in &theirs.highlights {
@@ -307,6 +426,7 @@ fn from_cv(profile: &Profile, cv: &Profile, out: &mut Found) {
                 quote: text.clone(),
                 text,
                 source: FactSource::YourCv,
+                origin: Origin::Cv,
                 basis: None,
                 area: Area::Results,
             });
@@ -321,7 +441,8 @@ pub(crate) fn already_held(profile: &Profile, candidate: &Candidate) -> bool {
         FactTarget::Position => candidate
             .position
             .as_ref()
-            .and_then(|(_, key)| profile.work.iter().find(|w| role_key(w) == *key))
+            .and_then(|(_, key)| position_by_key(profile, key))
+            .and_then(|at| profile.work.get(at))
             .is_none_or(|work| holds(work, &candidate.text)),
         FactTarget::Skills => profile
             .skills
@@ -331,7 +452,7 @@ pub(crate) fn already_held(profile: &Profile, candidate: &Candidate) -> bool {
             .basics
             .background
             .as_deref()
-            .is_some_and(|b| squash(b).contains(&squash(&candidate.text))),
+            .is_some_and(|b| norm(b).contains(&norm(&candidate.text))),
     }
 }
 
@@ -352,16 +473,12 @@ pub(crate) fn candidates(
     if let Some(cv) = cv {
         from_cv(profile, cv, &mut found);
     }
-    let mut seen: Vec<(FactTarget, Option<String>, String)> = Vec::new();
+    let mut seen: Vec<Key> = Vec::new();
     found.candidates.retain(|candidate| {
         if already_held(profile, candidate) {
             return false;
         }
-        let key = (
-            candidate.target,
-            candidate.position.as_ref().map(|(_, key)| key.clone()),
-            squash(&candidate.text),
-        );
+        let key = candidate.key();
         if seen.contains(&key) {
             return false;
         }
@@ -375,7 +492,7 @@ pub(crate) fn candidates(
 mod tests {
     use super::*;
     use crate::{
-        features::about::judge::{Flag, FlagKind, Resolution},
+        features::about::judge::Flag,
         schema::{Basics, FactStatus, ProfileFact, Skill},
     };
 
@@ -393,6 +510,7 @@ mod tests {
         Profile {
             basics: Basics {
                 background: Some("Six years in events.".into()),
+                summary: Some("I run billing on Kafka.".into()),
                 ..Basics::default()
             },
             work: vec![
@@ -410,6 +528,7 @@ mod tests {
                 },
                 Work {
                     highlights: vec!["Built the data pipeline".into()],
+                    end_date: Some("2021-02".into()),
                     ..work("Sample Labs", "Engineer", "2017-06")
                 },
             ],
@@ -519,6 +638,7 @@ mod tests {
         );
         let first = &found.candidates[0];
         assert_eq!(first.position, Some((0, role_key(&p.work[0]))));
+        assert_eq!(first.origin, Origin::AssumedRight);
         assert_eq!(
             first.basis.as_deref(),
             Some("Lead titles usually mean a team.")
@@ -542,31 +662,68 @@ mod tests {
                 ),
             ]
         );
+        assert_eq!(found.candidates[1].origin, Origin::AssumedAccurate);
         let site = &found.candidates[2];
         assert_eq!(
             site.basis.as_deref(),
             Some("https://alex.example.com/projects"),
             "the page it was read on"
         );
-        assert_eq!(site.position.as_ref().map(|p| p.0), Some(0), "as Save does");
+        assert_eq!(
+            site.position.as_ref().map(|p| p.0),
+            Some(0),
+            "about no position: on the newest one"
+        );
     }
 
     #[test]
-    fn a_profile_sentence_that_adds_a_number_or_a_tool_is_proposed() {
+    fn an_item_about_no_position_goes_on_the_newest_one() {
+        // The newest position listed second.
+        let mut p = profile();
+        p.work.reverse();
+        let portrait = vec![assumed("s1", "Ran the on-call rota", None, &[])];
+        let choices = BTreeMap::from([("s1".to_owned(), Choice::Right)]);
+        let about = AboutKnown {
+            version: Some(3),
+            portrait: &portrait,
+            choices: &choices,
+            accuracy: None,
+            changes: &[],
+        };
+        let found = candidates(&p, 3, Some(&about), None);
+        assert_eq!(found.candidates[0].position.as_ref().map(|p| p.0), Some(1));
+    }
+
+    #[test]
+    fn a_profile_sentence_adds_only_from_the_position_or_the_persons_words() {
         let p = profile();
         let portrait = vec![
             // Says only what the position says.
             known("s1", "At Example Co you run the billing platform.", &["w0"]),
-            // Names a tool the position does not.
+            // A tool from the person's own About text, about this position.
             known(
                 "s2",
-                "At Sample Labs you used Kafka for the pipeline.",
+                "At Example Co you run billing on Kafka.",
+                &["w0", "p.summary"],
+            ),
+            // A tool from the skills list, the goals or the years: never.
+            known(
+                "s3",
+                "At Sample Labs you used Rust for the pipeline.",
                 &["w1", "skills"],
             ),
-            // A number, but about no one position.
-            known("s3", "You have worked for about 9 years.", &["p.years"]),
+            known(
+                "s4",
+                "At Sample Labs the job must have Rust.",
+                &["w1", "goals"],
+            ),
+            known(
+                "s5",
+                "You worked at Sample Labs for about 4 years.",
+                &["w1", "p.years"],
+            ),
             // Two positions: whose would it be?
-            known("s4", "You used Rust at both, for 4 years.", &["w0", "w1"]),
+            known("s6", "You used Kafka at both, for 4 years.", &["w0", "w1"]),
         ];
         let choices = BTreeMap::new();
         let about = AboutKnown {
@@ -580,11 +737,11 @@ mod tests {
         assert_eq!(
             texts(&found),
             [(
-                "At Sample Labs you used Kafka for the pipeline.",
+                "At Example Co you run billing on Kafka.",
                 FactSource::YouConfirmed
             )]
         );
-        assert_eq!(found.candidates[0].position.as_ref().map(|p| p.0), Some(1));
+        assert_eq!(found.candidates[0].origin, Origin::Known);
         // A portrait of another profile version names positions by places that
         // may have moved: nothing from it.
         assert!(candidates(&p, 4, Some(&about), None).candidates.is_empty());
@@ -618,6 +775,19 @@ mod tests {
             kind: FlagKind::Quote,
             claim: String::new(),
         }];
+        // "It's true" on a quote that is not theirs: still not their words.
+        let mut not_theirs_settled = not_theirs.clone();
+        not_theirs_settled.id = "not-theirs-settled".into();
+        not_theirs_settled.value = "Ran the platform team".into();
+        not_theirs_settled.resolution = Some(Resolution::True);
+        // "Use my own words": their words are the fact and the quote.
+        let mut own = change(
+            Field::RoleFact,
+            "I ran on-call for two years",
+            "ran on-call",
+            Some(1),
+        );
+        own.resolution = Some(Resolution::OwnWords);
         let changes = vec![
             change(
                 Field::RoleFact,
@@ -628,6 +798,8 @@ mod tests {
             flagged,
             settled,
             not_theirs,
+            not_theirs_settled,
+            own,
             change(
                 Field::Skill,
                 "Elixir",
@@ -667,13 +839,18 @@ mod tests {
             [
                 ("Led 4 engineers", FactSource::YouSaid),
                 ("Cut refunds by half", FactSource::YouSaid),
+                ("I ran on-call for two years", FactSource::YouSaid),
                 ("Elixir", FactSource::YouSaid),
                 ("Ran a restaurant for 6 years", FactSource::YouSaid),
             ],
             "Postgres is PostgreSQL; a summary is the wizard's"
         );
-        assert_eq!(found.left_out, 2, "an unsettled claim, a quote not theirs");
-        let skill = &found.candidates[2];
+        assert_eq!(
+            found.left_out, 3,
+            "an unsettled claim, a quote not theirs, settled or not"
+        );
+        assert_eq!(found.candidates[2].quote, "I ran on-call for two years");
+        let skill = &found.candidates[3];
         assert_eq!(skill.target, FactTarget::Skills);
         assert_eq!(skill.position, None);
         assert_eq!(skill.quote, "I use Rails, Elixir and Postgres");
@@ -686,7 +863,7 @@ mod tests {
         let cv = Profile {
             work: vec![
                 Work {
-                    highlights: vec!["Built the data pipeline".into(), "Cut costs by 30%".into()],
+                    highlights: vec!["Built the data pipeline.".into(), "Cut costs by 30%".into()],
                     ..work("Sample Labs", "Engineer", "2017-06")
                 },
                 Work {
@@ -707,7 +884,7 @@ mod tests {
         let changes = vec![
             change(
                 Field::RoleFact,
-                "Moved invoicing onto PostgreSQL",
+                "Moved invoicing onto PostgreSQL.",
                 "Moved invoicing onto PostgreSQL",
                 Some(0),
             ),
@@ -719,7 +896,7 @@ mod tests {
             ),
             change(
                 Field::RoleFact,
-                "led 4  engineers",
+                "led 4  engineers.",
                 "I led 4 engineers",
                 Some(0),
             ),
@@ -743,10 +920,27 @@ mod tests {
     }
 
     #[test]
-    fn the_cited_position_is_the_one_position_cited() {
+    fn keys_ignore_closing_punctuation_and_titles() {
+        let key = role_key(&profile().work[1]);
+        let renamed = role_key(&work("Sample Labs", "Senior Engineer", "2017-06"));
+        assert_eq!(
+            key_of(FactTarget::Position, Some(&key), "Cut costs by 30%."),
+            key_of(FactTarget::Position, Some(&renamed), "cut costs by 30%")
+        );
+        // A renamed title still finds its position.
+        let mut p = profile();
+        p.work[1].position = Some("Senior Engineer".into());
+        assert_eq!(position_by_key(&p, &key), Some(1));
+    }
+
+    #[test]
+    fn the_cited_position_is_one_position_from_its_own_words() {
         let ids = |list: &[&str]| -> Vec<String> { list.iter().map(|s| (*s).to_owned()).collect() };
-        assert_eq!(cited_position(&ids(&["w2", "w2f0", "skills"])), Some(2));
+        assert_eq!(cited_position(&ids(&["w2", "w2f0", "p.summary"])), Some(2));
         assert_eq!(cited_position(&ids(&["w1", "w2"])), None);
-        assert_eq!(cited_position(&ids(&["skills", "p.years"])), None);
+        assert_eq!(cited_position(&ids(&["w2", "skills"])), None);
+        assert_eq!(cited_position(&ids(&["w2", "goals"])), None);
+        assert_eq!(cited_position(&ids(&["w2", "p.years"])), None);
+        assert_eq!(cited_position(&ids(&["p.summary"])), None);
     }
 }

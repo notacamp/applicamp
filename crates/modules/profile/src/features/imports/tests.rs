@@ -697,10 +697,9 @@ async fn an_answer_that_stays_cut_off_saves_nothing(db: PgPool) {
 }
 
 /// What a model answers for the invented LinkedIn profile when it gets it
-/// wrong in the known ways (#72): the first position's place as its summary
-/// and its bullets in it too, the dates as words; then everything else but
-/// education and languages; then, asked again on the text under those
-/// headings, both.
+/// wrong in the known ways (#72): the first position's place as its summary,
+/// the dates as words; then everything else but education and languages;
+/// then, asked again on the text under those headings, both.
 fn wrong_linkedin_answers() -> [Value; 3] {
     [
         json!({ "work": [
@@ -841,4 +840,65 @@ async fn merging_a_new_read_repairs_a_place_summary_and_keeps_the_rest(db: PgPoo
         "kept facts stay"
     );
     assert_eq!(merged["profile"]["work"].as_array().unwrap().len(), 1);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn asking_again_that_fails_keeps_the_draft_and_its_empty_sections(db: PgPool) {
+    let [work, rest, _] = wrong_linkedin_answers();
+    // The third call is cut off, and so is its one retry.
+    let model = scripted_model(vec![
+        ("stop", work.to_string()),
+        ("stop", rest.to_string()),
+        ("length", "{\"education\":[".to_owned()),
+    ])
+    .await;
+    let h = Harness::new(db, Some(gateway(&model, None)));
+    let pdf = pdf_saying(&LINKEDIN_PROFILE_LINES);
+    let (status, import) = h
+        .upload(&[
+            Part::Text("kind", "pdf"),
+            Part::File("file", "Profile.pdf", &pdf),
+        ])
+        .await;
+    assert_eq!(status, 201, "the two answers make a draft: {import}");
+    assert_eq!(import["draft"]["work"].as_array().unwrap().len(), 2);
+    assert_eq!(
+        import["draft"]["education"],
+        json!([]),
+        "not found, as the review says"
+    );
+    assert_eq!(import["draft"]["languages"], json!([]));
+    assert_eq!(import["stopped"], Value::Null, "no limit stopped it");
+    assert_eq!(model.received_requests().await.unwrap().len(), 4);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_limit_on_asking_again_keeps_what_was_paid_for_and_says_so(db: PgPool) {
+    let [work, rest, again] = wrong_linkedin_answers();
+    let model = scripted_model(vec![
+        ("stop", work.to_string()),
+        ("stop", rest.to_string()),
+        ("stop", again.to_string()),
+    ])
+    .await;
+    // Each call uses 1,200 tokens: the day's 2,400 end before the third.
+    let h = Harness::new(db, Some(gateway(&model, Some(2_400))));
+    let pdf = pdf_saying(&LINKEDIN_PROFILE_LINES);
+    let (status, import) = h
+        .upload(&[
+            Part::Text("kind", "pdf"),
+            Part::File("file", "Profile.pdf", &pdf),
+        ])
+        .await;
+    assert_eq!(status, 201, "{import}");
+    assert_eq!(import["stopped"], "ai_daily_limit_reached");
+    assert_eq!(import["draft"]["work"].as_array().unwrap().len(), 2);
+    assert_eq!(import["draft"]["education"], json!([]));
+    assert_eq!(model.received_requests().await.unwrap().len(), 2);
+    // The draft says so when it is read again.
+    let (status, again) = h
+        .get(&format!("/api/v1/profile/imports/{}", id_of(&import)))
+        .await;
+    assert_eq!(status, 200);
+    assert_eq!(again["stopped"], "ai_daily_limit_reached");
 }

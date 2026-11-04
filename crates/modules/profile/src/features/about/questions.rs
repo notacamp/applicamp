@@ -237,7 +237,7 @@ pub(super) async fn state(
     // The strength as if everything told so far were saved.
     let mut profile = seen.profile.clone();
     let mut goals = seen.goals.clone();
-    super::apply(row, &mut profile, &mut goals, now);
+    super::apply(row, &mut profile, &mut goals, &[], now);
     let strength_now = strength::compute(&profile, &goals).score;
 
     let progress = &row.questions.0;

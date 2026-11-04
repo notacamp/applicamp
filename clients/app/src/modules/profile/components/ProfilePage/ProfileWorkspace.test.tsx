@@ -123,8 +123,11 @@ describe("the profile workspace", () => {
     expect(screen.getByTestId("review-basics")).toHaveTextContent("Alex Demo");
     expect(screen.queryByTestId("review-dropped")).toBeNull();
     expect(screen.queryByTestId("review-merge")).toBeNull();
-    // FILLED has no summary, certifications or projects: only those are listed.
-    expect(screen.getByTestId("review-empty")).toHaveTextContent("3 parts");
+    // FILLED has no summary, achievements, certifications or projects: only those are listed.
+    expect(screen.getByTestId("review-empty")).toHaveTextContent("4 parts");
+    expect(screen.getByTestId("review-empty-achievements")).toHaveTextContent(
+      "No achievements found in this file",
+    );
     expect(screen.getByTestId("review-empty")).toHaveTextContent("Add them by hand");
     expect(screen.queryByTestId("review-empty-skills")).toBeNull();
 
@@ -479,13 +482,14 @@ describe("a draft's review", () => {
     );
 
     const empty = await screen.findByTestId("review-empty");
-    expect(empty).toHaveTextContent("Not found in this file: 7 parts");
+    expect(empty).toHaveTextContent("Not found in this file: 8 parts");
     expect(screen.getByTestId("review-empty-skills")).toHaveTextContent(
       "No skills found in this file",
     );
     for (const section of [
       "label",
       "summary",
+      "achievements",
       "education",
       "languages",
       "certificates",
@@ -495,5 +499,20 @@ describe("a draft's review", () => {
     }
     expect(screen.queryByTestId("review-empty-work")).toBeNull();
     expect(empty).toHaveTextContent("import your LinkedIn data export");
+    expect(screen.queryByTestId("review-stopped")).toBeNull();
+  });
+
+  it("says when the AI limit stopped reading the missing parts again", async () => {
+    stub({
+      [`GET /api/v1/profile/imports/${IMPORT_ID}`]: {
+        body: { ...draftOf(FILLED), kind: "pdf", stopped: "ai_daily_limit_reached" },
+      },
+    });
+    renderWithProviders(
+      <ImportReview id={IMPORT_ID} current={EMPTY_PROFILE} onDone={vi.fn()} onRestart={vi.fn()} />,
+    );
+    expect(await screen.findByTestId("review-stopped")).toHaveTextContent(
+      "Your AI limit stopped us reading the missing parts again.",
+    );
   });
 });

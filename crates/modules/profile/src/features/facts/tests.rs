@@ -127,7 +127,7 @@ async fn seed_about(h: &Harness) {
             SentenceKind::Known,
             "At Example Co you run the billing platform on Kafka.",
             None,
-            &["w0", "skills"],
+            &["w0", "p.summary"],
         ),
     ];
     let changes = vec![
@@ -330,6 +330,7 @@ async fn what_tell_me_about_you_learned_is_proposed_then_kept_dropped_and_undone
         (view["open"].as_u64(), view["kept"].as_u64()),
         (Some(0), Some(7))
     );
+    assert_eq!(view["batch"]["kept"], 7, "one Undo for all of them");
     assert_eq!(version(&h).await, before + 1);
     let (_, saved) = h.get("/api/v1/profile").await;
     let profile = &saved["profile"];
@@ -480,4 +481,248 @@ async fn the_accounts_that_existed_before_are_proposed_for_once(db: PgPool) {
     // Scheduling it at start is once too.
     assert!(super::schedule_backfill(&db).await.unwrap());
     assert!(!super::schedule_backfill(&db).await.unwrap());
+}
+
+async fn proposals(h: &Harness) -> Value {
+    h.get(PROPOSALS).await.1
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn what_is_taken_back_in_tell_me_about_you_is_closed(db: PgPool) {
+    let h = Harness::new(db, None);
+    assert_eq!(h.json("PUT", "/api/v1/profile", &profile()).await.0, 200);
+    seed_about(&h).await;
+    h.json(
+        "PUT",
+        "/api/v1/profile/about/accuracy",
+        &json!({ "accuracy": "yes" }),
+    )
+    .await;
+    h.work().await;
+    let view = proposals(&h).await;
+    assert!(
+        texts(&view).contains(&"Led 4 engineers".to_owned()),
+        "{view}"
+    );
+    assert!(texts(&view).contains(&"You ran the on-call rota".to_owned()));
+
+    // A change edited: the old words are closed, the new ones proposed.
+    let (status, _) = h
+        .json(
+            "PUT",
+            "/api/v1/profile/about/changes/c-Led%204%20engineers",
+            &json!({ "action": "edit", "value": "Led 4 people" }),
+        )
+        .await;
+    assert_eq!(status, 200);
+    // An assumption switched to wrong, another to later.
+    for (id, choice) in [("s2", "wrong"), ("s1", "later")] {
+        let (status, _) = h
+            .json(
+                "PUT",
+                &format!("/api/v1/profile/about/sentences/{id}"),
+                &json!({ "choice": choice }),
+            )
+            .await;
+        assert_eq!(status, 200);
+    }
+    // A change removed.
+    let (status, _) = h
+        .send(
+            axum::http::Request::delete("/api/v1/profile/about/changes/c-Elixir")
+                .body(axum::body::Body::empty())
+                .unwrap(),
+        )
+        .await;
+    assert_eq!(status, 200);
+    h.work().await;
+    let left = texts(&proposals(&h).await);
+    for gone in [
+        "Led 4 engineers",
+        "You ran the on-call rota",
+        "Led a team of 3 to 6 engineers",
+        "Elixir",
+    ] {
+        assert!(!left.contains(&gone.to_owned()), "{gone} in {left:?}");
+    }
+    assert!(left.contains(&"Led 4 people".to_owned()), "{left:?}");
+
+    // "Not really": what was only accurate goes too, and so does the sentence
+    // taken from the profile.
+    h.json(
+        "PUT",
+        "/api/v1/profile/about/accuracy",
+        &json!({ "accuracy": "no" }),
+    )
+    .await;
+    h.work().await;
+    let left = texts(&proposals(&h).await);
+    assert!(!left.contains(&"Built an open-source billing toolkit".to_owned()));
+    assert!(
+        !left.contains(&"At Example Co you run the billing platform on Kafka.".to_owned()),
+        "{left:?}"
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn save_never_writes_what_was_dropped_and_undo_keeps_what_save_wrote(db: PgPool) {
+    let h = Harness::new(db, None);
+    assert_eq!(h.json("PUT", "/api/v1/profile", &profile()).await.0, 200);
+    seed_about(&h).await;
+    h.json(
+        "PUT",
+        "/api/v1/profile/about/sentences/s1",
+        &json!({ "choice": "right" }),
+    )
+    .await;
+    h.work().await;
+    let view = proposals(&h).await;
+    // Drop two facts and a skill, keep the background.
+    for text in [
+        "Led 4 engineers",
+        "Elixir",
+        "Led a team of 3 to 6 engineers",
+    ] {
+        let id = find(&view, text)["id"].as_str().unwrap().to_owned();
+        assert_eq!(h.post(&format!("{PROPOSALS}/{id}/drop")).await.0, 200);
+    }
+    let background = find(&view, "Ran a restaurant for 6 years")["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert_eq!(
+        h.post(&format!("{PROPOSALS}/{background}/keep")).await.0,
+        200
+    );
+
+    // Save writes the wizard's changes, but not what was dropped here.
+    let (status, saved) = h.post("/api/v1/profile/about/save").await;
+    assert_eq!(status, 200, "{saved}");
+    let (_, now) = h.get("/api/v1/profile").await;
+    let facts: Vec<&str> = now["profile"]["work"][0]["facts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| f["text"].as_str().unwrap())
+        .collect();
+    assert!(!facts.contains(&"Led 4 engineers"), "{facts:?}");
+    assert!(
+        !facts.contains(&"Led a team of 3 to 6 engineers"),
+        "{facts:?}"
+    );
+    let skills: Vec<&str> = now["profile"]["skills"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(skills, ["PostgreSQL"]);
+    assert_eq!(
+        now["profile"]["basics"]["background"],
+        "Ran a restaurant for 6 years"
+    );
+
+    // The background changed since (Save, or a hand edit): Undo of the Keep
+    // leaves it as it is, and the fact waits again.
+    sqlx::query(
+        "UPDATE profile.profiles
+            SET data = jsonb_set(data, '{basics,background}',
+                '\"Ran a restaurant for 6 years and a bar\"')
+          WHERE account_id = $1",
+    )
+    .bind(h.account)
+    .execute(&h.db)
+    .await
+    .unwrap();
+    let (status, view) = h.post(&format!("{PROPOSALS}/{background}/undo")).await;
+    assert_eq!(status, 200, "{view}");
+    let (_, now) = h.get("/api/v1/profile").await;
+    assert_eq!(
+        now["profile"]["basics"]["background"],
+        "Ran a restaurant for 6 years and a bar"
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn keep_all_is_undone_at_once_and_a_held_fact_is_closed(db: PgPool) {
+    let h = Harness::new(db, None);
+    assert_eq!(h.json("PUT", "/api/v1/profile", &profile()).await.0, 200);
+    seed_about(&h).await;
+    // Elixir was said not to be theirs, once.
+    sqlx::query(
+        "INSERT INTO profile.skill_dismissals (account_id, name_key, created_at)
+         VALUES ($1, 'elixir', now())",
+    )
+    .bind(h.account)
+    .execute(&h.db)
+    .await
+    .unwrap();
+    h.json(
+        "PUT",
+        "/api/v1/profile/about/sentences/s1",
+        &json!({ "choice": "right" }),
+    )
+    .await;
+    h.work().await;
+    let view = proposals(&h).await;
+    assert_eq!(view["open"], 4, "{view}");
+
+    // The profile gains one of the facts by hand: keeping it writes nothing.
+    let mut edited = profile();
+    edited["work"][0]["facts"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({
+            "id": "f2", "text": "Led 4 engineers.", "quote": "I led 4 engineers",
+            "area": "people", "kept_at": "2026-10-30T09:00:00Z"
+        }));
+    assert_eq!(h.json("PUT", "/api/v1/profile", &edited).await.0, 200);
+    let before = version(&h).await;
+    let led = find(&view, "Led 4 engineers")["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let (status, view) = h.post(&format!("{PROPOSALS}/{led}/keep")).await;
+    assert_eq!(status, 200, "{view}");
+    assert!(
+        !texts(&view).contains(&"Led 4 engineers".to_owned()),
+        "closed"
+    );
+    assert_eq!(view["kept"], 0, "not counted as added");
+    assert_eq!(version(&h).await, before, "no new version");
+
+    // Keep all, then one Undo for all of them.
+    let (_, view) = h.post(&format!("{PROPOSALS}/keep-all")).await;
+    assert_eq!(view["kept"], 3, "{view}");
+    let batch = view["batch"]["id"].as_str().unwrap().to_owned();
+    assert_eq!(view["batch"]["kept"], 3);
+    assert_eq!(
+        h.count("SELECT count(*) FROM profile.skill_dismissals")
+            .await,
+        0,
+        "keeping Elixir forgot the \"not mine\""
+    );
+    let before = version(&h).await;
+    let (status, view) = h.post(&format!("{PROPOSALS}/batches/{batch}/undo")).await;
+    assert_eq!(status, 200, "{view}");
+    assert_eq!(
+        (view["open"].as_u64(), view["kept"].as_u64()),
+        (Some(3), Some(0))
+    );
+    assert_eq!(view["batch"], Value::Null);
+    assert_eq!(version(&h).await, before + 1, "one version for the undo");
+    let (_, now) = h.get("/api/v1/profile").await;
+    assert_eq!(now["profile"]["skills"].as_array().unwrap().len(), 1);
+    assert_eq!(now["profile"]["basics"].get("background"), None);
+    assert_eq!(
+        h.count("SELECT count(*) FROM profile.skill_dismissals")
+            .await,
+        1,
+        "and Undo says it again"
+    );
+    assert_eq!(
+        h.post(&format!("{PROPOSALS}/batches/{batch}/undo")).await.0,
+        404,
+        "nothing left to undo"
+    );
 }

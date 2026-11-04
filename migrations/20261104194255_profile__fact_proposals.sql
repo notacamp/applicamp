@@ -20,11 +20,20 @@ CREATE TABLE IF NOT EXISTS profile.fact_proposals (
     source text NOT NULL CHECK (source IN ('you_said', 'you_confirmed', 'your_website', 'your_cv')),
     -- For a confirmed assumption: what it was based on (its reason, or a page).
     basis text,
+    -- What it was found in: an assumption marked right, one left unanswered
+    -- when the portrait was said to be accurate, a sentence of the portrait
+    -- taken from the profile, a change from the person's words, a CV.
+    origin text NOT NULL CHECK (origin IN
+        ('assumed_right', 'assumed_accurate', 'known', 'change', 'cv')),
     area text NOT NULL CHECK (area IN
         ('context', 'your_part', 'stack_scale', 'results', 'hard_problems', 'people', 'stories')),
     state text NOT NULL DEFAULT 'open' CHECK (state IN ('open', 'kept', 'dropped')),
-    -- For a kept fact: the fact's id on the position, so Undo removes it.
+    -- What Keep wrote, so Undo takes back that and nothing else: the fact's
+    -- id on the position; `added` for a skill or background words it added
+    -- (`added_undismissed` when it also forgot an earlier "not mine").
     fact_id text,
+    -- The Keep all it was kept with: one Undo for all of them.
+    batch uuid,
     created_at timestamptz NOT NULL,
     decided_at timestamptz,
     CHECK ((target = 'position') = (position IS NOT NULL AND role_key IS NOT NULL))
@@ -39,3 +48,7 @@ CREATE TABLE IF NOT EXISTS profile.markers (
     name text PRIMARY KEY,
     done_at timestamptz NOT NULL
 );
+
+-- When an import was applied: the page says it read the CV again for a day
+-- after that, not after the upload.
+ALTER TABLE profile.imports ADD COLUMN IF NOT EXISTS applied_at timestamptz;

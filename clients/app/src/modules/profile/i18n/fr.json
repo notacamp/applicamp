@@ -56,7 +56,7 @@
   },
   "review": {
     "title": "Vérifiez ce que nous avons trouvé",
-    "lead": "Rien n’est enregistré tant que vous n’avez pas choisi. Remplacer en fait votre profil. Fusionner garde votre profil et ajoute ce qui est nouveau.",
+    "lead": "Rien n’est enregistré tant que vous n’avez pas choisi. Remplacer en fait votre profil. Fusionner garde vos modifications, complète ce qui manque et retire un lieu du résumé d’un poste.",
     "found": "Nous avons trouvé {{list}}.",
     "counts": {
       "jobs_one": "{{count}} poste",
@@ -93,6 +93,7 @@
       "label": "Aucun titre trouvé dans ce fichier",
       "summary": "Aucun résumé trouvé dans ce fichier",
       "work": "Aucun poste trouvé dans ce fichier",
+      "achievements": "Aucune réalisation trouvée dans ce fichier",
       "education": "Aucune formation trouvée dans ce fichier",
       "skills": "Aucune compétence trouvée dans ce fichier",
       "languages": "Aucune langue trouvée dans ce fichier",
@@ -100,6 +101,10 @@
       "projects": "Aucun projet trouvé dans ce fichier",
       "hint": "Ajoutez-les à la main après avoir appliqué, ou importez votre export de données LinkedIn, qui contient compétences, formation et langues.",
       "hintZip": "Ajoutez-les à la main après avoir appliqué."
+    },
+    "stopped": {
+      "title": "Votre limite d’IA nous a empêchés de relire les parties manquantes.",
+      "body": "Voici ce que nous avons trouvé. Ajoutez les parties manquantes à la main, ou réessayez demain."
     }
   },
   "source": {
@@ -657,7 +662,9 @@
       "title": "Enregistré",
       "banner": "Enregistré dans votre profil.",
       "lead": "Votre profil est maintenant solide à {{score}} %. Les agents et les CV l’utilisent désormais. Vous pouvez revenir quand vous voulez pour en ajouter.",
-      "done": "Retour à Profil et objectifs"
+      "done": "Retour à Profil et objectifs",
+      "facts_one": "{{count}} fait vous attend dans Complétez votre profil.",
+      "facts_other": "{{count}} faits vous attendent dans Complétez votre profil."
     },
     "errors": {
       "generic": "Cela n’a pas marché. Réessayez.",

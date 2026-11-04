@@ -56,7 +56,7 @@
   },
   "review": {
     "title": "Veja o que encontrámos",
-    "lead": "Nada é guardado até escolher. Substituir faz disto o seu perfil. Juntar mantém o seu perfil e acrescenta o que é novo.",
+    "lead": "Nada é guardado até escolher. Substituir faz disto o seu perfil. Juntar mantém o que editou, preenche o que falta e tira um local do resumo de um emprego.",
     "found": "Encontrámos {{list}}.",
     "counts": {
       "jobs_one": "{{count}} emprego",
@@ -93,6 +93,7 @@
       "label": "Nenhum título profissional encontrado neste ficheiro",
       "summary": "Nenhum resumo encontrado neste ficheiro",
       "work": "Nenhuma posição encontrada neste ficheiro",
+      "achievements": "Nenhuma conquista encontrada neste ficheiro",
       "education": "Nenhuma formação encontrada neste ficheiro",
       "skills": "Nenhuma competência encontrada neste ficheiro",
       "languages": "Nenhum idioma encontrado neste ficheiro",
@@ -100,6 +101,10 @@
       "projects": "Nenhum projeto encontrado neste ficheiro",
       "hint": "Adicione-os à mão depois de aplicar, ou importe a exportação de dados do LinkedIn, que inclui competências, formação e idiomas.",
       "hintZip": "Adicione-os à mão depois de aplicar."
+    },
+    "stopped": {
+      "title": "O seu limite de IA não nos deixou ler outra vez as partes em falta.",
+      "body": "Abaixo está o que encontrámos. Acrescente as partes em falta à mão, ou tente de novo amanhã."
     }
   },
   "source": {
@@ -657,7 +662,9 @@
       "title": "Guardado",
       "banner": "Guardado no seu perfil.",
       "lead": "O seu perfil está agora {{score}}% forte. Os agentes e os CV passam a usá-lo. Pode voltar quando quiser para acrescentar mais.",
-      "done": "Voltar a Perfil e objetivos"
+      "done": "Voltar a Perfil e objetivos",
+      "facts_one": "{{count}} facto espera por si em Complete o seu perfil.",
+      "facts_other": "{{count}} factos esperam por si em Complete o seu perfil."
     },
     "errors": {
       "generic": "Não funcionou. Tente outra vez.",

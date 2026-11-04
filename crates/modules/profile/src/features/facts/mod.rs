@@ -11,13 +11,15 @@
 //! or adds to the background: one new profile version per call (Keep all is
 //! one). Drop marks it. Either can be undone for a day.
 //!
-//! Proposals are made by a job (`profile.propose_facts`, ids only) queued when
-//! the portrait is made (the own website is read with it), when an assumption
-//! is confirmed or the portrait is said to be accurate, and when an import is
-//! applied; at Save, Tell me about you proposes what it did not save itself in
-//! the same transaction, before its pending state is deleted. Once per
-//! instance, `profile.backfill_facts` does it for every account that existed
-//! before (a marker keeps it from running twice).
+//! Proposals follow what the person does in Tell me about you: one they take
+//! back there (an assumption switched to wrong, an answer changed, a change
+//! edited or removed, a new portrait) is closed while it waits; a fact they
+//! dropped here is never written by Save. They are made by a job
+//! (`profile.propose_facts`, ids only) queued whenever the wizard's state
+//! changes and when an import is applied; at Save, Tell me about you proposes
+//! what it did not save itself in the same transaction, before its pending
+//! state is deleted. Once per instance, `profile.backfill_facts` does it for
+//! every account that existed before (a marker keeps it from running twice).
 
 pub(crate) mod propose;
 #[cfg(test)]
@@ -26,8 +28,7 @@ mod tests;
 use std::collections::BTreeMap;
 
 use applicamp_kernel::{
-    AppState, Error, Job, JobContext, JobError, Problem, Result, auth::SignedIn, claims::squash,
-    jobs,
+    AppState, Error, Job, JobContext, JobError, Problem, Result, auth::SignedIn, jobs,
 };
 use axum::{
     Json,
@@ -39,7 +40,9 @@ use sqlx::{PgConnection, PgPool, Row as _};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use self::propose::{AboutKnown, Candidate, already_held, candidates};
+use self::propose::{
+    AboutKnown, Candidate, Key, Origin, already_held, candidates, key_of, norm, position_by_key,
+};
 use crate::{
     features::{
         about::{
@@ -47,8 +50,6 @@ use crate::{
             judge::{Change, Sentence},
         },
         completion,
-        grill::role_key,
-        imports::DRAFT_LIFETIME,
     },
     schema::{Area, FactStatus, Profile, ProfileFact, Skill},
 };
@@ -174,6 +175,9 @@ pub struct FactProposalView {
     /// What it is about.
     pub area: Area,
     pub state: FactProposalState,
+    /// An assumption the person marked *That's right* in Tell me about you
+    /// (not one left unanswered, nor a sentence taken from the profile).
+    pub said_right: bool,
     /// When it was kept or dropped.
     pub decided_at: Option<DateTime<Utc>>,
     /// Until when that can be undone.
@@ -222,6 +226,18 @@ pub struct FactProposalsView {
     pub dropped: u32,
     /// An import applied in the last day, and what it found.
     pub cv_read: Option<CvRead>,
+    /// The last Keep all, while it can be undone in one go.
+    pub batch: Option<KeptBatch>,
+}
+
+/// A Keep all: the facts it kept, undone together.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct KeptBatch {
+    pub id: Uuid,
+    /// Facts it added to the profile, still there.
+    pub kept: u32,
+    /// Until when it can be undone.
+    pub undo_until: DateTime<Utc>,
 }
 
 // ---- making proposals -------------------------------------------------------------
@@ -281,17 +297,17 @@ async fn about_of(
 }
 
 /// The draft of the import `account` applied most recently, while it is
-/// kept (a day), and when it was made.
+/// kept, and when it was applied.
 async fn applied_import(
     conn: &mut PgConnection,
     account: Uuid,
     now: DateTime<Utc>,
 ) -> Result<Option<(Profile, DateTime<Utc>)>> {
     let row: Option<(sqlx::types::Json<Profile>, DateTime<Utc>)> = sqlx::query_as(
-        "SELECT draft, created_at FROM profile.imports
-          WHERE account_id = $1 AND status = 'applied' AND expires_at > $2
-            AND draft IS NOT NULL
-          ORDER BY created_at DESC LIMIT 1",
+        "SELECT draft, applied_at FROM profile.imports
+          WHERE account_id = $1 AND status = 'applied' AND applied_at IS NOT NULL
+            AND expires_at > $2 AND draft IS NOT NULL
+          ORDER BY applied_at DESC LIMIT 1",
     )
     .bind(account)
     .bind(now)
@@ -305,25 +321,20 @@ async fn applied_import(
 pub(crate) struct Proposed {
     /// New proposals.
     pub(crate) added: u32,
-    /// Open proposals the profile now holds, taken away.
+    /// Open proposals closed: the profile holds them now, or the person took
+    /// them back in Tell me about you.
     pub(crate) closed: u32,
     /// Changes left out because their check failed.
     pub(crate) left_out: u32,
 }
 
-/// The key a proposal is the same by: its place and its words.
-fn key_of(target: FactTarget, role_key: Option<&str>, text: &str) -> (FactTarget, String, String) {
-    (
-        target,
-        role_key.unwrap_or_default().to_owned(),
-        squash(text),
-    )
-}
-
 /// Propose for `account` what `profile` (at `version`) lacks of what `about`
 /// and `cv` say, inside `conn`'s transaction: never one already proposed (in
 /// any state, so a dropped fact is not proposed again), never one the profile
-/// holds; open proposals the profile now holds are taken away.
+/// holds. An open proposal is closed when the profile holds it now, or when
+/// what it came from no longer says it: the person took it back in Tell me
+/// about you (only while its state is there to say so), or the CV read again
+/// is another.
 pub(crate) async fn propose_with(
     conn: &mut PgConnection,
     account: Uuid,
@@ -334,61 +345,74 @@ pub(crate) async fn propose_with(
     now: DateTime<Utc>,
 ) -> Result<Proposed> {
     let found = candidates(profile, version, about, cv);
+    let wanted: Vec<Key> = found.candidates.iter().map(Candidate::key).collect();
+    let portrait_current = about.is_some_and(|a| a.version == Some(version));
+    let accurate = about.is_some_and(|a| a.accuracy == Some("yes"));
     let rows = sqlx::query(
-        "SELECT id, target, role_key, text, state, position FROM profile.fact_proposals
+        "SELECT id, target, role_key, text, state, origin FROM profile.fact_proposals
           WHERE account_id = $1",
     )
     .bind(account)
     .fetch_all(&mut *conn)
     .await?;
-    let mut known = Vec::with_capacity(rows.len());
-    let mut redundant: Vec<Uuid> = Vec::new();
+    let mut known: Vec<Key> = Vec::with_capacity(rows.len());
+    let mut closing: Vec<Uuid> = Vec::new();
     for row in rows {
         let target = FactTarget::parse(row.try_get("target")?)
             .ok_or_else(|| Error::internal("a fact proposal of an unknown kind"))?;
         let role: Option<String> = row.try_get("role_key")?;
         let text: String = row.try_get("text")?;
         let state: String = row.try_get("state")?;
-        let position: Option<i32> = row.try_get("position")?;
-        if state == "open" {
-            let candidate = Candidate {
-                target,
-                position: role.clone().map(|k| {
-                    (
-                        position.and_then(|p| usize::try_from(p).ok()).unwrap_or(0),
-                        k,
-                    )
-                }),
-                text: text.clone(),
-                quote: String::new(),
-                source: FactSource::YouSaid,
-                basis: None,
-                area: Area::Results,
-            };
-            // Gone positions keep their proposals out of sight, not deleted.
-            let gone = target == FactTarget::Position
-                && !profile
-                    .work
-                    .iter()
-                    .any(|w| Some(role_key(w)) == role.clone());
-            if !gone && already_held(profile, &candidate) {
-                redundant.push(row.try_get("id")?);
+        let origin = Origin::parse(row.try_get("origin")?)
+            .ok_or_else(|| Error::internal("a fact proposal of an unknown origin"))?;
+        let key = key_of(target, role.as_deref(), &text);
+        // A job removed since keeps its proposals out of sight, not deleted.
+        let gone = target == FactTarget::Position
+            && role
+                .as_deref()
+                .and_then(|r| position_by_key(profile, r))
+                .is_none();
+        if state == "open" && !gone {
+            let held = already_held(
+                profile,
+                &Candidate {
+                    target,
+                    position: role.clone().map(|k| (0, k)),
+                    text: text.clone(),
+                    quote: String::new(),
+                    source: FactSource::YouSaid,
+                    origin,
+                    basis: None,
+                    area: Area::Results,
+                },
+            );
+            let still = wanted.contains(&key);
+            let taken_back = !still
+                && match origin {
+                    Origin::Change | Origin::AssumedRight | Origin::AssumedAccurate => {
+                        about.is_some()
+                    }
+                    Origin::Known => about.is_some() && (!accurate || portrait_current),
+                    Origin::Cv => cv.is_some(),
+                };
+            if held || taken_back {
+                closing.push(row.try_get("id")?);
             }
         }
-        known.push(key_of(target, role.as_deref(), &text));
+        known.push(key);
     }
     let mut added = 0;
     for candidate in found.candidates {
-        let role = candidate.position.as_ref().map(|(_, k)| k.as_str());
-        let key = key_of(candidate.target, role, &candidate.text);
+        let key = candidate.key();
         if known.contains(&key) {
             continue;
         }
+        let role = candidate.position.as_ref().map(|(_, k)| k.as_str());
         sqlx::query(
             "INSERT INTO profile.fact_proposals
-                (id, account_id, target, position, role_key, text, quote, source, basis, area,
-                 state, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'open', $11)",
+                (id, account_id, target, position, role_key, text, quote, source, basis, origin,
+                 area, state, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'open', $12)",
         )
         .bind(Uuid::now_v7())
         .bind(account)
@@ -404,6 +428,7 @@ pub(crate) async fn propose_with(
         .bind(&candidate.quote)
         .bind(candidate.source.as_str())
         .bind(&candidate.basis)
+        .bind(candidate.origin.as_str())
         .bind(candidate.area.as_str())
         .bind(now)
         .execute(&mut *conn)
@@ -411,15 +436,15 @@ pub(crate) async fn propose_with(
         known.push(key);
         added += 1;
     }
-    if !redundant.is_empty() {
+    if !closing.is_empty() {
         sqlx::query("DELETE FROM profile.fact_proposals WHERE id = ANY($1) AND state = 'open'")
-            .bind(&redundant)
+            .bind(&closing)
             .execute(&mut *conn)
             .await?;
     }
     Ok(Proposed {
         added,
-        closed: u32::try_from(redundant.len()).unwrap_or(u32::MAX),
+        closed: counted(closing.len()),
         left_out: found.left_out,
     })
 }
@@ -452,6 +477,24 @@ pub(crate) async fn propose_for(
         now,
     )
     .await
+}
+
+/// The keys of the facts `account` dropped on Complete your profile: Tell me
+/// about you's Save never writes them.
+pub(crate) async fn dropped(conn: &mut PgConnection, account: Uuid) -> Result<Vec<Key>> {
+    let rows: Vec<(String, Option<String>, String)> = sqlx::query_as(
+        "SELECT target, role_key, text FROM profile.fact_proposals
+          WHERE account_id = $1 AND state = 'dropped'",
+    )
+    .bind(account)
+    .fetch_all(&mut *conn)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .filter_map(|(target, role, text)| {
+            FactTarget::parse(&target).map(|t| key_of(t, role.as_deref(), &text))
+        })
+        .collect())
 }
 
 /// Queue proposing for `account` once `conn`'s transaction commits.
@@ -508,7 +551,9 @@ impl Job for BackfillFacts {
     }
 }
 
-/// The backfill; how many accounts it went through (none once done).
+/// The backfill; how many accounts it went through (none once done). An
+/// account that fails is logged (its id only) and skipped, so the others get
+/// their facts and the marker is written.
 pub(crate) async fn backfill(db: &PgPool, now: DateTime<Utc>) -> Result<u32> {
     let done: Option<DateTime<Utc>> =
         sqlx::query_scalar("SELECT done_at FROM profile.markers WHERE name = $1")
@@ -525,9 +570,15 @@ pub(crate) async fn backfill(db: &PgPool, now: DateTime<Utc>) -> Result<u32> {
     let mut count = 0;
     for account in accounts {
         let mut tx = db.begin().await?;
-        propose_for(&mut tx, account, now).await?;
-        tx.commit().await?;
-        count += 1;
+        match propose_for(&mut tx, account, now).await {
+            Ok(_) => {
+                tx.commit().await?;
+                count += 1;
+            }
+            Err(error) => {
+                tracing::warn!(%account, error = error.code(), "facts could not be proposed");
+            }
+        }
     }
     sqlx::query(
         "INSERT INTO profile.markers (name, done_at) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING",
@@ -557,10 +608,12 @@ struct ProposalRow {
     text: String,
     quote: String,
     source: FactSource,
+    origin: Origin,
     basis: Option<String>,
     area: Area,
     state: FactProposalState,
     fact_id: Option<String>,
+    batch: Option<Uuid>,
     decided_at: Option<DateTime<Utc>>,
 }
 
@@ -574,65 +627,83 @@ impl ProposalRow {
             basis: self.basis.clone(),
             area: self.area,
             state: self.state,
+            said_right: self.origin == Origin::AssumedRight,
             decided_at: self.decided_at,
             undo_until: self.decided_at.map(|at| at + UNDO_LIFETIME),
         }
     }
 }
 
-/// `account`'s proposals: open ones, and those decided since `since`; or the
-/// one `id`, in any state. Locked when `lock`.
+fn row_of(row: &sqlx::postgres::PgRow) -> Result<ProposalRow> {
+    let target: String = row.try_get("target")?;
+    let source: String = row.try_get("source")?;
+    let origin: String = row.try_get("origin")?;
+    let area: String = row.try_get("area")?;
+    let state: String = row.try_get("state")?;
+    Ok(ProposalRow {
+        id: row.try_get("id")?,
+        target: FactTarget::parse(&target)
+            .ok_or_else(|| Error::internal("a fact proposal of an unknown kind"))?,
+        role_key: row.try_get("role_key")?,
+        text: row.try_get("text")?,
+        quote: row.try_get("quote")?,
+        source: FactSource::parse(&source)
+            .ok_or_else(|| Error::internal("a fact proposal of an unknown source"))?,
+        origin: Origin::parse(&origin)
+            .ok_or_else(|| Error::internal("a fact proposal of an unknown origin"))?,
+        basis: row.try_get("basis")?,
+        area: Area::parse(&area).ok_or_else(|| Error::internal("an unknown fact area"))?,
+        state: FactProposalState::parse(&state),
+        fact_id: row.try_get("fact_id")?,
+        batch: row.try_get("batch")?,
+        decided_at: row.try_get("decided_at")?,
+    })
+}
+
+/// `account`'s proposals: open ones and those decided since `since`, locked
+/// when `lock`.
 async fn rows_of(
     conn: &mut PgConnection,
     account: Uuid,
     since: DateTime<Utc>,
-    id: Option<Uuid>,
     lock: bool,
 ) -> Result<Vec<ProposalRow>> {
-    const READ: &str =
-        "SELECT id, target, role_key, text, quote, source, basis, area, state, fact_id,
-            decided_at
+    let sql = if lock {
+        "SELECT id, target, role_key, text, quote, source, origin, basis, area, state, fact_id,
+                batch, decided_at
            FROM profile.fact_proposals
-          WHERE account_id = $1
-            AND ($3::uuid IS NULL AND (state = 'open' OR decided_at > $2) OR id = $3)
-          ORDER BY created_at, id";
-    const LOCK: &str =
-        "SELECT id, target, role_key, text, quote, source, basis, area, state, fact_id,
-            decided_at
+          WHERE account_id = $1 AND (state = 'open' OR decided_at > $2)
+          ORDER BY created_at, id FOR UPDATE"
+    } else {
+        "SELECT id, target, role_key, text, quote, source, origin, basis, area, state, fact_id,
+                batch, decided_at
            FROM profile.fact_proposals
-          WHERE account_id = $1
-            AND ($3::uuid IS NULL AND (state = 'open' OR decided_at > $2) OR id = $3)
-          ORDER BY created_at, id
-            FOR UPDATE";
-    let rows = sqlx::query(if lock { LOCK } else { READ })
+          WHERE account_id = $1 AND (state = 'open' OR decided_at > $2)
+          ORDER BY created_at, id"
+    };
+    sqlx::query(sql)
         .bind(account)
         .bind(since)
-        .bind(id)
         .fetch_all(&mut *conn)
-        .await?;
-    rows.into_iter()
-        .map(|row| {
-            let target: String = row.try_get("target")?;
-            let source: String = row.try_get("source")?;
-            let area: String = row.try_get("area")?;
-            let state: String = row.try_get("state")?;
-            Ok(ProposalRow {
-                id: row.try_get("id")?,
-                target: FactTarget::parse(&target)
-                    .ok_or_else(|| Error::internal("a fact proposal of an unknown kind"))?,
-                role_key: row.try_get("role_key")?,
-                text: row.try_get("text")?,
-                quote: row.try_get("quote")?,
-                source: FactSource::parse(&source)
-                    .ok_or_else(|| Error::internal("a fact proposal of an unknown source"))?,
-                basis: row.try_get("basis")?,
-                area: Area::parse(&area).ok_or_else(|| Error::internal("an unknown fact area"))?,
-                state: FactProposalState::parse(&state),
-                fact_id: row.try_get("fact_id")?,
-                decided_at: row.try_get("decided_at")?,
-            })
-        })
+        .await?
+        .iter()
+        .map(row_of)
         .collect()
+}
+
+/// The one proposal `id` of `account`, locked; 404 for anyone else's.
+async fn one(tx: &mut PgConnection, account: Uuid, id: Uuid) -> Result<ProposalRow> {
+    let row = sqlx::query(
+        "SELECT id, target, role_key, text, quote, source, origin, basis, area, state, fact_id,
+                batch, decided_at
+           FROM profile.fact_proposals WHERE account_id = $1 AND id = $2 FOR UPDATE",
+    )
+    .bind(account)
+    .bind(id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or(Error::NotFound)?;
+    row_of(&row)
 }
 
 /// Whether a kept proposal is still what the profile says: one whose fact,
@@ -649,19 +720,18 @@ fn still_true(profile: &Profile, row: &ProposalRow) -> bool {
         FactTarget::Skills => profile
             .skills
             .iter()
-            .any(|s| applicamp_kernel::tech::same_skill(&s.name, &row.text)),
+            .any(|s| norm(&s.name) == norm(&row.text)),
         FactTarget::Background => profile
             .basics
             .background
             .as_deref()
-            .is_some_and(|b| squash(b).contains(&squash(&row.text))),
+            .is_some_and(|b| norm(b).contains(&norm(&row.text))),
     }
 }
 
 /// The position `key` names in `profile` now.
 fn position_of(profile: &Profile, key: Option<&str>) -> Option<usize> {
-    let key = key?;
-    profile.work.iter().position(|w| role_key(w) == key)
+    position_by_key(profile, key?)
 }
 
 fn counted(n: usize) -> u32 {
@@ -700,20 +770,32 @@ async fn view_for(state: &AppState, account: Uuid) -> Result<FactProposalsView> 
         .await?
         .map(|c| c.profile)
         .unwrap_or_default();
-    let rows = rows_of(&mut conn, account, now - UNDO_LIFETIME, None, false).await?;
+    let rows: Vec<ProposalRow> = rows_of(&mut conn, account, now - UNDO_LIFETIME, false)
+        .await?
+        .into_iter()
+        .filter(|row| still_true(&profile, row))
+        .collect();
     let mut positions: BTreeMap<usize, Vec<FactProposalView>> = BTreeMap::new();
     let mut skills = Vec::new();
     let mut background = Vec::new();
-    for row in rows.iter().filter(|row| still_true(&profile, row)) {
+    let mut shown: Vec<&ProposalRow> = Vec::new();
+    for row in &rows {
         match row.target {
             FactTarget::Position => {
-                // A position removed or renamed since: not shown.
+                // A position removed since: not shown.
                 if let Some(at) = position_of(&profile, row.role_key.as_deref()) {
                     positions.entry(at).or_default().push(row.view());
+                    shown.push(row);
                 }
             }
-            FactTarget::Skills => skills.push(row.view()),
-            FactTarget::Background => background.push(row.view()),
+            FactTarget::Skills => {
+                skills.push(row.view());
+                shown.push(row);
+            }
+            FactTarget::Background => {
+                background.push(row.view());
+                shown.push(row);
+            }
         }
     }
     let mut order: Vec<usize> = positions.keys().copied().collect();
@@ -749,16 +831,33 @@ async fn view_for(state: &AppState, account: Uuid) -> Result<FactProposalsView> 
             });
         }
     }
-    let shown = || groups.iter().flat_map(|g| g.proposals.iter());
-    let count = |state: FactProposalState| counted(shown().filter(|p| p.state == state).count());
+    let count =
+        |state: FactProposalState| counted(shown.iter().filter(|p| p.state == state).count());
     let (open, kept, dropped) = (
         count(FactProposalState::Open),
         count(FactProposalState::Kept),
         count(FactProposalState::Dropped),
     );
+    // The last Keep all, while its facts are on the profile and a day has not
+    // passed.
+    let batch = shown
+        .iter()
+        .filter(|p| p.state == FactProposalState::Kept)
+        .filter_map(|p| Some((p.batch?, p.decided_at?)))
+        .max_by_key(|(_, at)| *at)
+        .map(|(id, at)| KeptBatch {
+            id,
+            kept: counted(
+                shown
+                    .iter()
+                    .filter(|p| p.state == FactProposalState::Kept && p.batch == Some(id))
+                    .count(),
+            ),
+            undo_until: at + UNDO_LIFETIME,
+        });
     let cv_read = applied_import(&mut conn, account, now)
         .await?
-        .filter(|(_, at)| *at > now - CV_READ_SHOWN && *at > now - DRAFT_LIFETIME)
+        .filter(|(_, at)| *at > now - CV_READ_SHOWN)
         .map(|(draft, at)| cv_read_of(&draft, at));
     Ok(FactProposalsView {
         groups,
@@ -766,6 +865,7 @@ async fn view_for(state: &AppState, account: Uuid) -> Result<FactProposalsView> 
         kept,
         dropped,
         cv_read,
+        batch,
     })
 }
 
@@ -821,26 +921,35 @@ async fn locked_profile(tx: &mut PgConnection, account: Uuid) -> Result<Profile>
     Ok(row.ok_or(Error::NotFound)?.0.0)
 }
 
-/// What Undo takes back of a kept skill or background: what Keep added
-/// (nothing, when the profile had it already).
+/// What Undo takes back of a kept skill or background: what Keep added.
 const ADDED: &str = "added";
+/// A skill Keep added that the person had said was not theirs: Undo says so
+/// again.
+const ADDED_UNDISMISSED: &str = "added_undismissed";
 
-/// Write `proposal` into `profile`: the id of the fact written, or [`ADDED`]
-/// for a skill or words added to the background; none when the profile had
-/// it already. `Err(profile_changed)` when its position is gone.
+/// What Keep did with one proposal.
+enum Kept {
+    /// Wrote it: the fact's id, or [`ADDED`] / [`ADDED_UNDISMISSED`].
+    Wrote(String),
+    /// The profile had it already: nothing was written.
+    Held,
+}
+
+/// Write `proposal` into `profile`. `Err(profile_changed)` when its position is
+/// gone. `dismissed` are the skills the person said are not theirs.
 fn keep_into(
     profile: &mut Profile,
     proposal: &ProposalRow,
+    dismissed: &[String],
     now: DateTime<Utc>,
-) -> Result<Option<String>> {
+) -> Result<Kept> {
     match proposal.target {
         FactTarget::Position => {
             let at =
                 position_of(profile, proposal.role_key.as_deref()).ok_or_else(profile_changed)?;
             let work = &mut profile.work[at];
-            let key = squash(&proposal.text);
-            if work.facts.iter().any(|f| squash(&f.text) == key) {
-                return Ok(None);
+            if propose::holds(work, &proposal.text) {
+                return Ok(Kept::Held);
             }
             let id = proposal.id.to_string();
             work.facts.push(ProfileFact {
@@ -852,7 +961,7 @@ fn keep_into(
                 status: proposal.source.status(),
                 basis: proposal.basis.clone(),
             });
-            Ok(Some(id))
+            Ok(Kept::Wrote(id))
         }
         FactTarget::Skills => {
             if profile
@@ -860,70 +969,119 @@ fn keep_into(
                 .iter()
                 .any(|s| applicamp_kernel::tech::same_skill(&s.name, &proposal.text))
             {
-                return Ok(None);
+                return Ok(Kept::Held);
             }
             profile.skills.push(Skill {
-                name: proposal.text.clone(),
+                name: proposal.text.trim().to_owned(),
                 level: None,
             });
-            Ok(Some(ADDED.to_owned()))
+            let undismissed = dismissed.contains(&proposal.text.trim().to_lowercase());
+            Ok(Kept::Wrote(
+                if undismissed {
+                    ADDED_UNDISMISSED
+                } else {
+                    ADDED
+                }
+                .to_owned(),
+            ))
         }
         FactTarget::Background => {
             let words = proposal.text.trim();
             let background = &mut profile.basics.background;
             match background.as_deref().map(str::trim) {
-                Some(had) if squash(had).contains(&squash(words)) => return Ok(None),
+                Some(had) if norm(had).contains(&norm(words)) => return Ok(Kept::Held),
                 Some(had) if !had.is_empty() => {
                     *background = Some(format!("{had}\n\n{words}"));
                 }
                 _ => *background = Some(words.to_owned()),
             }
-            Ok(Some(ADDED.to_owned()))
+            Ok(Kept::Wrote(ADDED.to_owned()))
         }
     }
 }
 
-/// Keep `proposals` (all open): one profile write, one new version. Those
-/// whose position is gone are refused when `strict`, else skipped.
+/// Whether `profile`, as saved, still has what Keep wrote for `proposal`.
+fn wrote_it(profile: &Profile, proposal: &ProposalRow, fact: &str) -> bool {
+    match proposal.target {
+        FactTarget::Position => profile
+            .work
+            .iter()
+            .any(|w| w.facts.iter().any(|f| f.id == fact)),
+        FactTarget::Skills => profile
+            .skills
+            .iter()
+            .any(|s| norm(&s.name) == norm(&proposal.text)),
+        FactTarget::Background => profile.basics.background.is_some(),
+    }
+}
+
+/// What a Keep did, counted.
+struct KeepOutcome {
+    /// Facts written to the profile.
+    kept: u32,
+}
+
+/// Keep `proposals` (all open): at most one profile write, one new version,
+/// and none when nothing changed. Those whose position is gone are refused
+/// when `strict`, else left as they are. One the profile held already is
+/// closed, not kept; one the profile's tidying dropped is left open.
 async fn keep(
     state: &AppState,
     account: Uuid,
     proposals: &[ProposalRow],
     strict: bool,
+    batch: Option<Uuid>,
     tx: &mut PgConnection,
-) -> Result<u32> {
+) -> Result<KeepOutcome> {
     let now = state.clock.now();
     let mut profile = locked_profile(tx, account).await?;
-    let mut kept: Vec<(Uuid, Option<String>)> = Vec::new();
+    let dismissed: Vec<String> =
+        sqlx::query_scalar("SELECT name_key FROM profile.skill_dismissals WHERE account_id = $1")
+            .bind(account)
+            .fetch_all(&mut *tx)
+            .await?;
+    let before = profile.clone();
+    let mut wrote: Vec<(&ProposalRow, String)> = Vec::new();
+    let mut held: Vec<Uuid> = Vec::new();
     for proposal in proposals {
-        match keep_into(&mut profile, proposal, now) {
-            Ok(fact) => kept.push((proposal.id, fact)),
+        match keep_into(&mut profile, proposal, &dismissed, now) {
+            Ok(Kept::Wrote(fact)) => wrote.push((proposal, fact)),
+            Ok(Kept::Held) => held.push(proposal.id),
             Err(error) if strict => return Err(error),
             Err(_) => {}
         }
     }
-    if kept.is_empty() {
-        return Ok(0);
+    if profile != before {
+        let profile = profile.tidied();
+        profile.validate()?;
+        wrote.retain(|(proposal, fact)| wrote_it(&profile, proposal, fact));
+        completion::write_profile(state, tx, account, &profile, Some("answer")).await?;
     }
-    let profile = profile.tidied();
-    profile.validate()?;
-    completion::write_profile(state, tx, account, &profile, Some("answer")).await?;
-    for (id, fact) in &kept {
+    for (proposal, fact) in &wrote {
         sqlx::query(
-            "UPDATE profile.fact_proposals SET state = 'kept', decided_at = $2, fact_id = $3
+            "UPDATE profile.fact_proposals
+                SET state = 'kept', decided_at = $2, fact_id = $3, batch = $4
               WHERE id = $1",
         )
-        .bind(id)
+        .bind(proposal.id)
         .bind(now)
         .bind(fact)
+        .bind(batch)
         .execute(&mut *tx)
         .await?;
     }
-    // A skill kept is the person's: an earlier "not mine" is forgotten.
-    let skills: Vec<String> = proposals
+    if !held.is_empty() {
+        sqlx::query("DELETE FROM profile.fact_proposals WHERE id = ANY($1) AND state = 'open'")
+            .bind(&held)
+            .execute(&mut *tx)
+            .await?;
+    }
+    // A skill kept is the person's: an earlier "not mine" is forgotten (and
+    // said again if the Keep is undone).
+    let skills: Vec<String> = wrote
         .iter()
-        .filter(|p| p.target == FactTarget::Skills && kept.iter().any(|(id, _)| *id == p.id))
-        .map(|p| p.text.to_lowercase())
+        .filter(|(p, fact)| p.target == FactTarget::Skills && fact == ADDED_UNDISMISSED)
+        .map(|(p, _)| p.text.trim().to_lowercase())
         .collect();
     if !skills.is_empty() {
         sqlx::query(
@@ -934,23 +1092,17 @@ async fn keep(
         .execute(&mut *tx)
         .await?;
     }
-    Ok(counted(kept.len()))
-}
-
-/// The one proposal `id` of `account`, locked; 404 for anyone else's.
-async fn one(tx: &mut PgConnection, account: Uuid, id: Uuid) -> Result<ProposalRow> {
-    rows_of(tx, account, Utc::now(), Some(id), true)
-        .await?
-        .into_iter()
-        .next()
-        .ok_or(Error::NotFound)
+    Ok(KeepOutcome {
+        kept: counted(wrote.len()),
+    })
 }
 
 /// Keep a fact.
 ///
 /// Writes it on its position (with its quote; a confirmed assumption keeps
 /// what it was based on), adds the skill or adds to the background: one new
-/// profile version. Can be undone for a day.
+/// profile version. Can be undone for a day. A fact the profile already holds
+/// is closed, and nothing is written.
 #[utoipa::path(
     post,
     path = "/api/v1/profile/facts/proposals/{id}/keep",
@@ -960,6 +1112,8 @@ async fn one(tx: &mut PgConnection, account: Uuid, id: Uuid) -> Result<ProposalR
     params(("id" = Uuid, Path, description = "The proposal.")),
     responses(
         (status = 200, description = "The proposals, after it was kept.", body = FactProposalsView),
+        (status = 400, description = "`invalid_profile`: the profile would break a limit",
+            body = Problem, content_type = "application/problem+json"),
         (status = 401, description = "`session_required`", body = Problem,
             content_type = "application/problem+json"),
         (status = 404, description = "`not_found`", body = Problem,
@@ -980,23 +1134,25 @@ pub async fn keep_one(
     if proposal.state != FactProposalState::Open {
         return Err(not_open());
     }
-    keep(
+    let done = keep(
         &state,
         account,
         std::slice::from_ref(&proposal),
         true,
+        None,
         &mut tx,
     )
     .await?;
     tx.commit().await?;
-    tracing::info!("a proposed fact kept");
+    tracing::info!(kept = done.kept, "a proposed fact kept");
     Ok(Json(view_for(&state, account).await?))
 }
 
 /// Keep every open fact.
 ///
-/// One profile write, one new version. Facts whose job is no longer on the
-/// profile are left as they are.
+/// One profile write, one new version, and one Undo for all of them for a day
+/// (`…/batches/{id}/undo`). Facts whose job is no longer on the profile are
+/// left as they are.
 #[utoipa::path(
     post,
     path = "/api/v1/profile/facts/proposals/keep-all",
@@ -1005,6 +1161,8 @@ pub async fn keep_one(
     security(("session" = [])),
     responses(
         (status = 200, description = "The proposals, after they were kept.", body = FactProposalsView),
+        (status = 400, description = "`invalid_profile`: the profile would break a limit",
+            body = Problem, content_type = "application/problem+json"),
         (status = 401, description = "`session_required`", body = Problem,
             content_type = "application/problem+json"),
     ),
@@ -1016,7 +1174,7 @@ pub async fn keep_all(
     let account = principal.account_id;
     let now = state.clock.now();
     let mut tx = state.db.begin().await?;
-    let open: Vec<ProposalRow> = rows_of(&mut tx, account, now, None, true)
+    let open: Vec<ProposalRow> = rows_of(&mut tx, account, now, true)
         .await?
         .into_iter()
         .filter(|p| p.state == FactProposalState::Open)
@@ -1024,15 +1182,17 @@ pub async fn keep_all(
     let kept = if open.is_empty() {
         0
     } else {
-        keep(&state, account, &open, false, &mut tx).await?
+        keep(&state, account, &open, false, Some(Uuid::now_v7()), &mut tx)
+            .await?
+            .kept
     };
     tx.commit().await?;
     tracing::info!(kept, "proposed facts kept");
     Ok(Json(view_for(&state, account).await?))
 }
 
-/// Drop a fact: it is not written, and not proposed again. Can be undone for
-/// a day.
+/// Drop a fact: it is not written, not proposed again, and never written by
+/// Tell me about you's Save. Can be undone for a day.
 #[utoipa::path(
     post,
     path = "/api/v1/profile/facts/proposals/{id}/drop",
@@ -1075,11 +1235,105 @@ pub async fn drop_one(
     Ok(Json(view_for(&state, account).await?))
 }
 
+/// Take back from `profile` exactly what Keep wrote for `proposal`: the fact
+/// it wrote, the skill it added, the words it added to the background (only
+/// while the background still ends with them). The skills to say "not mine"
+/// about again.
+fn take_back(profile: &mut Profile, proposal: &ProposalRow) -> Vec<String> {
+    let Some(fact) = proposal.fact_id.as_deref() else {
+        return Vec::new();
+    };
+    match proposal.target {
+        FactTarget::Position => {
+            for work in &mut profile.work {
+                work.facts.retain(|f| f.id != fact);
+            }
+            Vec::new()
+        }
+        FactTarget::Skills => {
+            if let Some(at) = profile
+                .skills
+                .iter()
+                .position(|s| norm(&s.name) == norm(&proposal.text))
+            {
+                profile.skills.remove(at);
+            }
+            if fact == ADDED_UNDISMISSED {
+                vec![proposal.text.trim().to_lowercase()]
+            } else {
+                Vec::new()
+            }
+        }
+        FactTarget::Background => {
+            let words = proposal.text.trim();
+            if let Some(background) = profile.basics.background.as_deref() {
+                let background = background.trim();
+                if background == words {
+                    profile.basics.background = None;
+                } else if let Some(rest) = background.strip_suffix(words)
+                    && let Some(rest) = rest.strip_suffix("\n\n")
+                {
+                    profile.basics.background = Some(rest.trim_end().to_owned());
+                }
+            }
+            Vec::new()
+        }
+    }
+}
+
+/// Undo `proposals` (all decided): kept ones taken back in one profile write
+/// (none when nothing changed), all of them open again.
+async fn undo_all(
+    state: &AppState,
+    account: Uuid,
+    proposals: &[ProposalRow],
+    tx: &mut PgConnection,
+) -> Result<()> {
+    let kept: Vec<&ProposalRow> = proposals
+        .iter()
+        .filter(|p| p.state == FactProposalState::Kept)
+        .collect();
+    if !kept.is_empty() {
+        let mut profile = locked_profile(tx, account).await?;
+        let before = profile.clone();
+        let mut dismiss: Vec<String> = Vec::new();
+        for proposal in kept {
+            dismiss.extend(take_back(&mut profile, proposal));
+        }
+        if profile != before {
+            let profile = profile.tidied();
+            profile.validate()?;
+            completion::write_profile(state, tx, account, &profile, None).await?;
+        }
+        for name in dismiss {
+            sqlx::query(
+                "INSERT INTO profile.skill_dismissals (account_id, name_key, created_at)
+                 VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+            )
+            .bind(account)
+            .bind(name)
+            .bind(state.clock.now())
+            .execute(&mut *tx)
+            .await?;
+        }
+    }
+    let ids: Vec<Uuid> = proposals.iter().map(|p| p.id).collect();
+    sqlx::query(
+        "UPDATE profile.fact_proposals
+            SET state = 'open', decided_at = NULL, fact_id = NULL, batch = NULL
+          WHERE id = ANY($1)",
+    )
+    .bind(&ids)
+    .execute(&mut *tx)
+    .await?;
+    Ok(())
+}
+
 /// Undo a Keep or a Drop, within a day.
 ///
-/// A kept fact is taken off its position again (the skill out of the skills,
-/// its words out of the background): one new profile version. A dropped one is
-/// open again.
+/// A kept fact is taken off its position again (the skill it added out of the
+/// skills, its words out of the background while it still ends with them):
+/// one new profile version. A dropped one is open again.
 #[utoipa::path(
     post,
     path = "/api/v1/profile/facts/proposals/{id}/undo",
@@ -1089,6 +1343,8 @@ pub async fn drop_one(
     params(("id" = Uuid, Path, description = "The proposal.")),
     responses(
         (status = 200, description = "The proposals, after the undo.", body = FactProposalsView),
+        (status = 400, description = "`invalid_profile`: the profile would break a limit",
+            body = Problem, content_type = "application/problem+json"),
         (status = 401, description = "`session_required`", body = Problem,
             content_type = "application/problem+json"),
         (status = 404, description = "`not_found`", body = Problem,
@@ -1114,46 +1370,69 @@ pub async fn undo(
         ));
     };
     if decided_at + UNDO_LIFETIME <= now {
-        return Err(Error::Conflict(
-            "undo_expired",
-            "This can only be undone for a day.".to_owned(),
-        ));
+        return Err(undo_expired());
     }
-    // Only what Keep added is taken back: never a fact, skill or words the
-    // profile had before.
-    if let (FactProposalState::Kept, Some(fact)) = (proposal.state, proposal.fact_id.as_deref()) {
-        let mut profile = locked_profile(&mut tx, account).await?;
-        let before = profile.clone();
-        match proposal.target {
-            FactTarget::Position => {
-                for work in &mut profile.work {
-                    work.facts.retain(|f| f.id != fact);
-                }
-            }
-            FactTarget::Skills => profile
-                .skills
-                .retain(|s| !applicamp_kernel::tech::same_skill(&s.name, &proposal.text)),
-            FactTarget::Background => {
-                let words = proposal.text.trim();
-                profile.basics.background = profile.basics.background.take().and_then(|b| {
-                    let rest = b.replacen(words, "", 1).trim().to_owned();
-                    (!rest.is_empty()).then_some(rest)
-                });
-            }
-        }
-        if profile != before {
-            let profile = profile.tidied();
-            profile.validate()?;
-            completion::write_profile(&state, &mut tx, account, &profile, None).await?;
-        }
-    }
-    sqlx::query(
-        "UPDATE profile.fact_proposals SET state = 'open', decided_at = NULL, fact_id = NULL
-          WHERE id = $1",
-    )
-    .bind(id)
-    .execute(&mut *tx)
-    .await?;
+    undo_all(&state, account, std::slice::from_ref(&proposal), &mut tx).await?;
     tx.commit().await?;
+    Ok(Json(view_for(&state, account).await?))
+}
+
+fn undo_expired() -> Error {
+    Error::Conflict(
+        "undo_expired",
+        "This can only be undone for a day.".to_owned(),
+    )
+}
+
+/// Undo a Keep all, within a day.
+///
+/// Every fact it kept is taken back, in one profile write, and waits again.
+#[utoipa::path(
+    post,
+    path = "/api/v1/profile/facts/proposals/batches/{id}/undo",
+    tag = "profile",
+    operation_id = "profile.fact_undo_batch",
+    security(("session" = [])),
+    params(("id" = Uuid, Path, description = "The Keep all (`batch.id`).")),
+    responses(
+        (status = 200, description = "The proposals, after the undo.", body = FactProposalsView),
+        (status = 400, description = "`invalid_profile`: the profile would break a limit",
+            body = Problem, content_type = "application/problem+json"),
+        (status = 401, description = "`session_required`", body = Problem,
+            content_type = "application/problem+json"),
+        (status = 404, description = "`not_found`: no such Keep all", body = Problem,
+            content_type = "application/problem+json"),
+        (status = 409, description = "`undo_expired`: kept more than a day ago", body = Problem,
+            content_type = "application/problem+json"),
+    ),
+)]
+pub async fn undo_batch(
+    State(state): State<AppState>,
+    SignedIn(principal): SignedIn,
+    Path(id): Path<Uuid>,
+) -> Result<Json<FactProposalsView>> {
+    let account = principal.account_id;
+    let now = state.clock.now();
+    let mut tx = state.db.begin().await?;
+    let rows = sqlx::query(
+        "SELECT id, target, role_key, text, quote, source, origin, basis, area, state, fact_id,
+                batch, decided_at
+           FROM profile.fact_proposals
+          WHERE account_id = $1 AND batch = $2 AND state = 'kept' FOR UPDATE",
+    )
+    .bind(account)
+    .bind(id)
+    .fetch_all(&mut *tx)
+    .await?;
+    let kept: Vec<ProposalRow> = rows.iter().map(row_of).collect::<Result<_>>()?;
+    let Some(decided_at) = kept.iter().filter_map(|p| p.decided_at).max() else {
+        return Err(Error::NotFound);
+    };
+    if decided_at + UNDO_LIFETIME <= now {
+        return Err(undo_expired());
+    }
+    undo_all(&state, account, &kept, &mut tx).await?;
+    tx.commit().await?;
+    tracing::info!(facts = kept.len(), "a Keep all undone");
     Ok(Json(view_for(&state, account).await?))
 }

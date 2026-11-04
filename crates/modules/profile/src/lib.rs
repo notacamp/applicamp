@@ -113,6 +113,7 @@ pub fn module(deps: ProfileDeps) -> Module {
         .routes(routes!(facts::keep_all))
         .routes(routes!(facts::drop_one))
         .routes(routes!(facts::undo))
+        .routes(routes!(facts::undo_batch))
         .merge(uploads)
         .layer(Extension(Ai(deps.ai.clone())))
         .layer(Extension(deps.research.clone()));

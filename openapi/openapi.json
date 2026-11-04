@@ -6249,13 +6249,92 @@
         ]
       }
     },
+    "/api/v1/profile/facts/proposals/batches/{id}/undo": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Undo a Keep all, within a day.",
+        "description": "Every fact it kept is taken back, in one profile write, and waits again.",
+        "operationId": "profile.fact_undo_batch",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The Keep all (`batch.id`).",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The proposals, after the undo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactProposalsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_profile`: the profile would break a limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such Keep all",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`undo_expired`: kept more than a day ago",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/v1/profile/facts/proposals/keep-all": {
       "post": {
         "tags": [
           "profile"
         ],
         "summary": "Keep every open fact.",
-        "description": "One profile write, one new version. Facts whose job is no longer on the\nprofile are left as they are.",
+        "description": "One profile write, one new version, and one Undo for all of them for a day\n(`…/batches/{id}/undo`). Facts whose job is no longer on the profile are\nleft as they are.",
         "operationId": "profile.fact_keep_all",
         "responses": {
           "200": {
@@ -6264,6 +6343,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/FactProposalsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_profile`: the profile would break a limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -6291,7 +6380,7 @@
         "tags": [
           "profile"
         ],
-        "summary": "Drop a fact: it is not written, and not proposed again. Can be undone for\na day.",
+        "summary": "Drop a fact: it is not written, not proposed again, and never written by\nTell me about you's Save. Can be undone for a day.",
         "operationId": "profile.fact_drop",
         "parameters": [
           {
@@ -6360,7 +6449,7 @@
           "profile"
         ],
         "summary": "Keep a fact.",
-        "description": "Writes it on its position (with its quote; a confirmed assumption keeps\nwhat it was based on), adds the skill or adds to the background: one new\nprofile version. Can be undone for a day.",
+        "description": "Writes it on its position (with its quote; a confirmed assumption keeps\nwhat it was based on), adds the skill or adds to the background: one new\nprofile version. Can be undone for a day. A fact the profile already holds\nis closed, and nothing is written.",
         "operationId": "profile.fact_keep",
         "parameters": [
           {
@@ -6381,6 +6470,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/FactProposalsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_profile`: the profile would break a limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -6429,7 +6528,7 @@
           "profile"
         ],
         "summary": "Undo a Keep or a Drop, within a day.",
-        "description": "A kept fact is taken off its position again (the skill out of the skills,\nits words out of the background): one new profile version. A dropped one is\nopen again.",
+        "description": "A kept fact is taken off its position again (the skill it added out of the\nskills, its words out of the background while it still ends with them):\none new profile version. A dropped one is open again.",
         "operationId": "profile.fact_undo",
         "parameters": [
           {
@@ -6450,6 +6549,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/FactProposalsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_profile`: the profile would break a limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -11943,7 +12052,8 @@
           "quote",
           "source",
           "area",
-          "state"
+          "state",
+          "said_right"
         ],
         "properties": {
           "area": {
@@ -11972,6 +12082,10 @@
           "quote": {
             "type": "string",
             "description": "The words it comes from: the person's, the confirmed assumption, the\nwebsite's or the CV's."
+          },
+          "said_right": {
+            "type": "boolean",
+            "description": "An assumption the person marked *That's right* in Tell me about you\n(not one left unanswered, nor a sentence taken from the profile)."
           },
           "source": {
             "$ref": "#/components/schemas/FactSource"
@@ -12003,6 +12117,17 @@
           "dropped"
         ],
         "properties": {
+          "batch": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/KeptBatch",
+                "description": "The last Keep all, while it can be undone in one go."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "cv_read": {
             "oneOf": [
               {
@@ -12623,6 +12748,13 @@
           "status": {
             "$ref": "#/components/schemas/ImportStatus",
             "description": "Where it is."
+          },
+          "stopped": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What stopped reading the sections that came back empty a second time\n(`ai_budget_reached`, `ai_daily_limit_reached`), if anything: the draft\nhas what the first reads found."
           }
         }
       },
@@ -12724,6 +12856,32 @@
               "null"
             ],
             "description": "The fact, fixed. Left out, the fact is kept as it is. Whatever is\nwritten must still be said by the quote or the profile; the quote\nitself never changes."
+          }
+        }
+      },
+      "KeptBatch": {
+        "type": "object",
+        "description": "A Keep all: the facts it kept, undone together.",
+        "required": [
+          "id",
+          "kept",
+          "undo_until"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kept": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Facts it added to the profile, still there.",
+            "minimum": 0
+          },
+          "undo_until": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Until when it can be undone."
           }
         }
       },

@@ -82,6 +82,21 @@ export function useKeepAllFacts() {
   });
 }
 
+/** Undo the last Keep all: every fact it kept waits again. One profile version. */
+export function useUndoKeepAll() {
+  const store = useStore();
+  return useMutation({
+    mutationFn: async (id: string): Promise<FactProposalsView> =>
+      unwrap(
+        await api.POST("/api/v1/profile/facts/proposals/batches/{id}/undo", {
+          params: { path: { id } },
+          headers: CSRF_HEADERS,
+        }),
+      ),
+    onSuccess: store,
+  });
+}
+
 /** How many proposals there are, and how many are decided. */
 export function progressOf(view: FactProposalsView): { decided: number; total: number } {
   const decided = view.kept + view.dropped;

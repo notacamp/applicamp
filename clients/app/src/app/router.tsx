@@ -368,6 +368,9 @@ const profileAboutRoute = createRoute({
         onBack={() => {
           void navigate({ to: "/profile" });
         }}
+        onComplete={() => {
+          void navigate({ to: "/profile/complete" });
+        }}
       />
     );
   },

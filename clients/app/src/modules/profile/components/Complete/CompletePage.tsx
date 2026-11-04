@@ -26,6 +26,7 @@ import {
   useDecideFact,
   useFactProposals,
   useKeepAllFacts,
+  useUndoKeepAll,
   type FactGroup,
   type FactProposal,
   type FactSource,
@@ -87,14 +88,15 @@ function FactMeta({ fact }: { fact: FactProposal }) {
         return fact.basis ?? t("complete.website");
       }
       case "you_confirmed": {
-        return fact.basis ?? t("complete.confirmed");
+        // "You said this was right" only under an assumption marked right.
+        return fact.said_right ? t("complete.confirmed") : (fact.basis ?? null);
       }
     }
   })();
   return (
     <>
       <Label hue={HUES[fact.source]}>{t(`complete.sources.${fact.source}`)}</Label>
-      <span>{words}</span>
+      {words === null ? null : <span>{words}</span>}
     </>
   );
 }
@@ -182,10 +184,11 @@ export function CompletePage({ onBack }: CompletePageProps) {
   const proposals = useFactProposals();
   const decide = useDecideFact();
   const keepAll = useKeepAllFacts();
+  const undoAll = useUndoKeepAll();
   const groupTitle = useGroupTitle();
   const foundList = useFoundList();
   const view = proposals.data;
-  const busy = decide.isPending || keepAll.isPending;
+  const busy = decide.isPending || keepAll.isPending || undoAll.isPending;
   const { decided, total } = view === undefined ? { decided: 0, total: 0 } : progressOf(view);
 
   const body = () => {
@@ -206,6 +209,7 @@ export function CompletePage({ onBack }: CompletePageProps) {
             action={
               <Button
                 variant="secondary"
+                data-testid="complete-retry"
                 onClick={() => {
                   void proposals.refetch();
                 }}
@@ -218,7 +222,8 @@ export function CompletePage({ onBack }: CompletePageProps) {
       );
     }
     const read = view.cv_read ?? null;
-    const failed = decide.error ?? keepAll.error;
+    const batch = view.batch ?? null;
+    const failed = decide.error ?? keepAll.error ?? undoAll.error;
     return (
       <Stack gap="lg">
         {read === null ? null : (
@@ -297,6 +302,7 @@ export function CompletePage({ onBack }: CompletePageProps) {
                         busy={busy}
                         onDecide={(decision) => {
                           keepAll.reset();
+                          undoAll.reset();
                           decide.mutate({ id: fact.id, decision });
                         }}
                       />
@@ -314,6 +320,22 @@ export function CompletePage({ onBack }: CompletePageProps) {
                     view.kept === 0
                       ? t("complete.doneNone")
                       : t("complete.done", { count: view.kept })
+                  }
+                  action={
+                    batch === null ? undefined : (
+                      <Button
+                        variant="secondary"
+                        disabled={busy}
+                        data-testid="complete-undo-all"
+                        onClick={() => {
+                          decide.reset();
+                          keepAll.reset();
+                          undoAll.mutate(batch.id);
+                        }}
+                      >
+                        {t("complete.undo")}
+                      </Button>
+                    )
                   }
                 >
                   {view.kept === 0 ? null : t("complete.doneUndo")}

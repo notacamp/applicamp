@@ -706,9 +706,10 @@ function linkedinReview(userContent: string) {
  * A profile import (#72, system prompt "You turn the document between
  * <document>…"), for the invented LinkedIn profile the e2e uploads as a PDF.
  * It answers wrong in the known ways the server must survive: the first
- * position's place as its summary and its dates as words, then everything
- * else but education and languages; asked again on the text under those
- * headings (`profile_again`), it gives both. Every value is in that PDF.
+ * position's place on the first line of its summary and its dates as words,
+ * then everything else but education and languages; asked again on the text
+ * under those headings (`profile_again`), it gives both. Every value is in
+ * that PDF.
  */
 function profileImport(part: string) {
   if (part === "profile_work") {
@@ -718,7 +719,7 @@ function profileImport(part: string) {
           name: "Example Org",
           position: "Staff Engineer",
           startDate: "Jul 2023",
-          summary: "Lisbon, Portugal",
+          summary: "Lisbon, Portugal\nRuns the billing platform for 40 shops.",
           highlights: ["Moved billing to Rust", "Cut refunds by half"],
         },
         {

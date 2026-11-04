@@ -1728,6 +1728,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/profile/facts/proposals/batches/{id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo a Keep all, within a day.
+         * @description Every fact it kept is taken back, in one profile write, and waits again.
+         */
+        post: operations["profile.fact_undo_batch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/profile/facts/proposals/keep-all": {
         parameters: {
             query?: never;
@@ -1739,8 +1759,9 @@ export interface paths {
         put?: never;
         /**
          * Keep every open fact.
-         * @description One profile write, one new version. Facts whose job is no longer on the
-         *     profile are left as they are.
+         * @description One profile write, one new version, and one Undo for all of them for a day
+         *     (`…/batches/{id}/undo`). Facts whose job is no longer on the profile are
+         *     left as they are.
          */
         post: operations["profile.fact_keep_all"];
         delete?: never;
@@ -1759,8 +1780,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Drop a fact: it is not written, and not proposed again. Can be undone for
-         *     a day.
+         * Drop a fact: it is not written, not proposed again, and never written by
+         *     Tell me about you's Save. Can be undone for a day.
          */
         post: operations["profile.fact_drop"];
         delete?: never;
@@ -1782,7 +1803,8 @@ export interface paths {
          * Keep a fact.
          * @description Writes it on its position (with its quote; a confirmed assumption keeps
          *     what it was based on), adds the skill or adds to the background: one new
-         *     profile version. Can be undone for a day.
+         *     profile version. Can be undone for a day. A fact the profile already holds
+         *     is closed, and nothing is written.
          */
         post: operations["profile.fact_keep"];
         delete?: never;
@@ -1802,9 +1824,9 @@ export interface paths {
         put?: never;
         /**
          * Undo a Keep or a Drop, within a day.
-         * @description A kept fact is taken off its position again (the skill out of the skills,
-         *     its words out of the background): one new profile version. A dropped one is
-         *     open again.
+         * @description A kept fact is taken off its position again (the skill it added out of the
+         *     skills, its words out of the background while it still ends with them):
+         *     one new profile version. A dropped one is open again.
          */
         post: operations["profile.fact_undo"];
         delete?: never;
@@ -3924,6 +3946,11 @@ export interface components {
              *     website's or the CV's.
              */
             quote: string;
+            /**
+             * @description An assumption the person marked *That's right* in Tell me about you
+             *     (not one left unanswered, nor a sentence taken from the profile).
+             */
+            said_right: boolean;
             source: components["schemas"]["FactSource"];
             state: components["schemas"]["FactProposalState"];
             /** @description The fact (for a skill, its name). */
@@ -3939,6 +3966,7 @@ export interface components {
          *     last day (they can still be undone).
          */
         FactProposalsView: {
+            batch?: components["schemas"]["KeptBatch"] | null;
             cv_read?: components["schemas"]["CvRead"] | null;
             /**
              * Format: int32
@@ -4201,6 +4229,12 @@ export interface components {
             kind: components["schemas"]["ImportKind"];
             /** @description Where it is. */
             status: components["schemas"]["ImportStatus"];
+            /**
+             * @description What stopped reading the sections that came back empty a second time
+             *     (`ai_budget_reached`, `ai_daily_limit_reached`), if anything: the draft
+             *     has what the first reads found.
+             */
+            stopped?: string | null;
         };
         /**
          * @description What an import is made from.
@@ -4254,6 +4288,21 @@ export interface components {
              *     itself never changes.
              */
             text?: string | null;
+        };
+        /** @description A Keep all: the facts it kept, undone together. */
+        KeptBatch: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * Format: int32
+             * @description Facts it added to the profile, still there.
+             */
+            kept: number;
+            /**
+             * Format: date-time
+             * @description Until when it can be undone.
+             */
+            undo_until: string;
         };
         /** @description A keyword of the job. */
         Keyword: {
@@ -10475,6 +10524,65 @@ export interface operations {
             };
         };
     };
+    "profile.fact_undo_batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The Keep all (`batch.id`). */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The proposals, after the undo. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactProposalsView"];
+                };
+            };
+            /** @description `invalid_profile`: the profile would break a limit */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: no such Keep all */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `undo_expired`: kept more than a day ago */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "profile.fact_keep_all": {
         parameters: {
             query?: never;
@@ -10491,6 +10599,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FactProposalsView"];
+                };
+            };
+            /** @description `invalid_profile`: the profile would break a limit */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
             /** @description `session_required` */
@@ -10575,6 +10692,15 @@ export interface operations {
                     "application/json": components["schemas"]["FactProposalsView"];
                 };
             };
+            /** @description `invalid_profile`: the profile would break a limit */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             /** @description `session_required` */
             401: {
                 headers: {
@@ -10623,6 +10749,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FactProposalsView"];
+                };
+            };
+            /** @description `invalid_profile`: the profile would break a limit */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
             /** @description `session_required` */

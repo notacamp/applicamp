@@ -1035,9 +1035,10 @@ pub async fn portrait(
     row.profile_version = Some(seen.version);
     row.portrait = sqlx::types::Json(judged.sentences);
     row.employers = sqlx::types::Json(employers);
-    // Choices belong to the portrait they were made on, and so do the
-    // questions asked and skipped for this profile version.
+    // Choices belong to the portrait they were made on, and so do "Is this
+    // accurate?" and the questions asked and skipped for this profile version.
     row.choices = sqlx::types::Json(BTreeMap::new());
+    row.accuracy = None;
     row.questions = sqlx::types::Json(questions::Progress::default());
     put(&mut tx, account, &row, now).await?;
     // What the own website and the portrait say, proposed for the profile
@@ -1097,9 +1098,8 @@ pub async fn choose(
         }
     }
     put(&mut tx, account, &row, now).await?;
-    if choice == Some(Choice::Right) {
-        facts::queue(&mut tx, account).await?;
-    }
+    // Confirmed, or taken back: Complete your profile follows.
+    facts::queue(&mut tx, account).await?;
     tx.commit().await?;
     respond(&state, &research, account).await
 }
@@ -1137,9 +1137,7 @@ pub async fn accuracy(
         .unwrap_or_else(Row::empty);
     row.accuracy = Some(accuracy.as_str().to_owned());
     put(&mut tx, account, &row, now).await?;
-    if accuracy == Accuracy::Yes {
-        facts::queue(&mut tx, account).await?;
-    }
+    facts::queue(&mut tx, account).await?;
     tx.commit().await?;
     respond(&state, &research, account).await
 }
@@ -1501,6 +1499,7 @@ pub async fn remove_change(
         return Err(Error::NotFound);
     }
     put(&mut tx, account, &row, now).await?;
+    facts::queue(&mut tx, account).await?;
     tx.commit().await?;
     respond(&state, &research, account).await
 }
@@ -1579,14 +1578,11 @@ fn position_title(profile: &Profile, index: usize) -> String {
 }
 
 /// The position of `profile` a pending item is about: by its key, else the
-/// latest.
+/// newest.
 fn place_of(profile: &Profile, key: Option<&str>) -> Option<usize> {
-    if profile.work.is_empty() {
-        return None;
-    }
     match key {
         Some(key) => profile.work.iter().position(|w| grill::role_key(w) == key),
-        None => Some(0),
+        None => crate::matching::latest_position(&profile.work),
     }
 }
 
@@ -1771,16 +1767,36 @@ fn education_of(value: &str) -> Education {
 }
 
 /// Apply `row` to `profile` and `goals`: the number written and the number
-/// that no longer fit.
+/// that no longer fit or that the person dropped on Complete your profile
+/// (`dropped`: their correction wins).
 fn apply(
     row: &Row,
     profile: &mut Profile,
     goals: &mut Goals,
+    dropped: &[facts::propose::Key],
     now: DateTime<Utc>,
 ) -> (u32, u32, bool) {
+    use facts::{FactTarget, propose::key_of};
     let (mut saved, mut skipped, mut goals_changed) = (0, 0, false);
+    let was_dropped = |profile: &Profile, target: FactTarget, at: Option<usize>, text: &str| {
+        let role = at.and_then(|at| profile.work.get(at)).map(grill::role_key);
+        dropped.contains(&key_of(target, role.as_deref(), text))
+    };
     for change in &row.changes.0 {
         let value = change.value.trim().to_owned();
+        let target = match change.field {
+            Field::RoleFact => Some((
+                FactTarget::Position,
+                place_of(profile, change.role_key.as_deref()),
+            )),
+            Field::Skill => Some((FactTarget::Skills, None)),
+            Field::Background => Some((FactTarget::Background, None)),
+            _ => None,
+        };
+        if target.is_some_and(|(target, at)| was_dropped(profile, target, at, &value)) {
+            skipped += 1;
+            continue;
+        }
         let ok = match change.field {
             Field::Summary => {
                 profile.basics.summary = Some(value);
@@ -1876,7 +1892,17 @@ fn apply(
             .why
             .clone()
             .or_else(|| sentence.urls.first().cloned());
-        let placed = place_of(profile, sentence.role_key.as_deref())
+        let at = place_of(profile, sentence.role_key.as_deref());
+        if was_dropped(
+            profile,
+            FactTarget::Position,
+            at,
+            &judge::claim_of(sentence),
+        ) {
+            skipped += 1;
+            continue;
+        }
+        let placed = at
             .and_then(|at| profile.work.get_mut(at))
             .is_some_and(|work| {
                 let claim = judge::claim_of(sentence);
@@ -1984,7 +2010,8 @@ pub async fn save(
             .await?;
     let mut goals = goals_row.map_or_else(Goals::default, |g| g.0.0);
 
-    let (saved, skipped, goals_changed) = apply(&row, &mut profile, &mut goals, now);
+    let dropped = facts::dropped(&mut tx, account).await?;
+    let (saved, skipped, goals_changed) = apply(&row, &mut profile, &mut goals, &dropped, now);
     let profile = profile.tidied();
     profile.validate()?;
     let version =

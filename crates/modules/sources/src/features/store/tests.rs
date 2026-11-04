@@ -90,7 +90,7 @@ async fn harness(db: PgPool, config: SourcesConfig) -> Harness {
     Harness::new(db, config, None, Fake::ready()).await
 }
 
-async fn count(db: &PgPool, sql: &str) -> i64 {
+async fn count(db: &PgPool, sql: &'static str) -> i64 {
     sqlx::query_scalar(sql).fetch_one(db).await.unwrap()
 }
 

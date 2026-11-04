@@ -24,7 +24,7 @@ test("an approved board is read into the job store without a search, and the own
         expect(status).toBe(200);
         return (body as StoreTotals).jobs_stored;
       },
-      { timeout: 120_000, intervals: [2_000] },
+      { timeout: 120_000, intervals: [2000] },
     )
     .toBeGreaterThan(0);
   const { body } = await callApiJson(page, "GET", "/api/v1/boards/store");

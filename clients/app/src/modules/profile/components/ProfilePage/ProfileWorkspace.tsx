@@ -6,6 +6,7 @@ import { Banner, Button, Stack, Tagged, Text } from "~/lib/ui";
 import type { Action } from "../../api/completion";
 import { isEmptyProfile, useProfile } from "../../api/profile";
 import type { Question } from "../../api/questions";
+import { FactsNudge } from "../Complete/FactsNudge";
 import { ImportPanel } from "../ImportPanel/ImportPanel";
 import { ImportReview } from "../ImportReview/ImportReview";
 import { GoalsSection } from "../GoalsSection/GoalsSection";
@@ -26,6 +27,8 @@ export interface ProfileWorkspaceProps {
   onAbout: () => void;
   /** Open "Your LinkedIn": the check-up of the LinkedIn profile. */
   onLinkedIn: () => void;
+  /** Open "Complete your profile": the facts the app found, to keep or drop. */
+  onComplete: () => void;
 }
 
 /**
@@ -40,6 +43,7 @@ export function ProfileWorkspace({
   onAction,
   onAbout,
   onLinkedIn,
+  onComplete,
 }: ProfileWorkspaceProps) {
   const { t } = useTranslation("profile");
   const profile = useProfile();
@@ -115,6 +119,7 @@ export function ProfileWorkspace({
   }
   return (
     <Stack gap="lg">
+      <FactsNudge onOpen={onComplete} />
       <StrengthCard onAction={onAction} onAbout={onAbout} />
       <LinkedInSection onOpen={onLinkedIn} />
       <ProfileView

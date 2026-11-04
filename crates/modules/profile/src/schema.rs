@@ -662,7 +662,7 @@ impl Profile {
 
 /// Whether `a` and `b` are the same position: the same company, and the same
 /// start or the same title.
-fn same_position(a: &Work, b: &Work) -> bool {
+pub(crate) fn same_position(a: &Work, b: &Work) -> bool {
     same_opt(a.name.as_deref()) == same_opt(b.name.as_deref())
         && (same_opt(a.start_date.as_deref()) == same_opt(b.start_date.as_deref())
             || same_opt(a.position.as_deref()) == same_opt(b.position.as_deref()))

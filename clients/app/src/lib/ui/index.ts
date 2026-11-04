@@ -56,6 +56,12 @@ export {
 export { StatusMark, type StatusMarkProps } from "./components/StatusMark/StatusMark";
 export { Workbench, type WorkbenchProps } from "./components/Workbench/Workbench";
 export { CardList, type CardListProps } from "./components/CardList/CardList";
+export {
+  DecisionCard,
+  DecisionList,
+  type DecisionCardProps,
+  type DecisionState,
+} from "./components/DecisionCard/DecisionCard";
 export { DataTable, type DataColumn, type DataTableProps } from "./components/DataTable/DataTable";
 export { Label, LABEL_HUES, type LabelHue, type LabelProps } from "./components/Label/Label";
 export { MatchBar, type MatchBarProps } from "./components/MatchBar/MatchBar";

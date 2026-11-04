@@ -72,6 +72,7 @@ use crate::{
     events::GoalsUpdated,
     features::{
         completion::{self, current},
+        facts,
         grill::{self, prompt::language},
         imports::{Ai, ExpireImports},
     },
@@ -1039,6 +1040,9 @@ pub async fn portrait(
     row.choices = sqlx::types::Json(BTreeMap::new());
     row.questions = sqlx::types::Json(questions::Progress::default());
     put(&mut tx, account, &row, now).await?;
+    // What the own website and the portrait say, proposed for the profile
+    // (Complete your profile), as far as the person has confirmed it.
+    facts::queue(&mut tx, account).await?;
     tx.commit().await?;
     respond(&state, &research, account).await
 }
@@ -1093,6 +1097,9 @@ pub async fn choose(
         }
     }
     put(&mut tx, account, &row, now).await?;
+    if choice == Some(Choice::Right) {
+        facts::queue(&mut tx, account).await?;
+    }
     tx.commit().await?;
     respond(&state, &research, account).await
 }
@@ -1130,6 +1137,9 @@ pub async fn accuracy(
         .unwrap_or_else(Row::empty);
     row.accuracy = Some(accuracy.as_str().to_owned());
     put(&mut tx, account, &row, now).await?;
+    if accuracy == Accuracy::Yes {
+        facts::queue(&mut tx, account).await?;
+    }
     tx.commit().await?;
     respond(&state, &research, account).await
 }
@@ -1383,6 +1393,7 @@ pub async fn extra(
         .collect();
     row.changes = sqlx::types::Json(changes.into_iter().chain(answered).collect());
     put(&mut tx, account, &row, now).await?;
+    facts::queue(&mut tx, account).await?;
     tx.commit().await?;
     respond(&state, &research, account).await
 }
@@ -1453,6 +1464,7 @@ pub async fn change(
         }
     }
     put(&mut tx, account, &row, now).await?;
+    facts::queue(&mut tx, account).await?;
     tx.commit().await?;
     respond(&state, &research, account).await
 }
@@ -1957,12 +1969,14 @@ pub async fn save(
         ));
     }
     // The profile as it is now, locked: a hand edit in between is kept.
-    let stored: Option<(sqlx::types::Json<Profile>,)> =
-        sqlx::query_as("SELECT data FROM profile.profiles WHERE account_id = $1 FOR UPDATE")
-            .bind(account)
-            .fetch_optional(&mut *tx)
-            .await?;
-    let mut profile = stored.ok_or_else(needs_profile)?.0.0;
+    let stored: Option<(sqlx::types::Json<Profile>, i32)> = sqlx::query_as(
+        "SELECT data, version FROM profile.profiles WHERE account_id = $1 FOR UPDATE",
+    )
+    .bind(account)
+    .fetch_optional(&mut *tx)
+    .await?;
+    let (stored, before) = stored.ok_or_else(needs_profile)?;
+    let mut profile = stored.0;
     let goals_row: Option<(sqlx::types::Json<Goals>,)> =
         sqlx::query_as("SELECT answers FROM profile.goals WHERE account_id = $1 FOR UPDATE")
             .bind(account)
@@ -2002,12 +2016,31 @@ pub async fn save(
             )
             .await?;
     }
+    // What Save does not write itself (a sentence of the portrait that adds a
+    // number or a tool to a position, an assumption left unanswered when the
+    // portrait was said to be accurate) is proposed for the profile before the
+    // pending state goes: Complete your profile. The portrait was made for the
+    // version before Save, whose positions Save does not move.
+    let known = facts::propose::AboutKnown {
+        version: row.profile_version,
+        portrait: &row.portrait.0,
+        choices: &row.choices.0,
+        accuracy: row.accuracy.as_deref(),
+        changes: &row.changes.0,
+    };
+    let proposed =
+        facts::propose_with(&mut tx, account, &profile, before, Some(&known), None, now).await?;
     sqlx::query("DELETE FROM profile.about_you WHERE account_id = $1")
         .bind(account)
         .execute(&mut *tx)
         .await?;
     tx.commit().await?;
-    tracing::info!(saved, skipped, "an about-you saved");
+    tracing::info!(
+        saved,
+        skipped,
+        proposed = proposed.added,
+        "an about-you saved"
+    );
     Ok(Json(Saved {
         profile_version: version,
         strength: strength::compute(&profile, &goals).score,

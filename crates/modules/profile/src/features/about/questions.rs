@@ -661,6 +661,8 @@ pub async fn answer(
     row.questions.0.current = None;
     row.questions.0.updated = added;
     super::put(&mut tx, account, &row, now).await?;
+    // What the answer says, proposed for the profile (Complete your profile).
+    crate::features::facts::queue(&mut tx, account).await?;
     tx.commit().await?;
     super::respond(&state, &research, account).await
 }

@@ -840,5 +840,53 @@
       "invalid_text": "Écrivez quelque chose, dans la longueur LinkedIn de cette partie.",
       "not_found": "Ce n’est plus ici. Revenez en arrière et regardez à nouveau."
     }
+  },
+  "complete": {
+    "eyebrow": "Votre profil",
+    "title": "Complétez votre profil",
+    "lead_one": "Nous avons trouvé {{count}} fait sur votre travail. Gardez-le s’il est juste.",
+    "lead_other": "Nous avons trouvé {{count}} faits sur votre travail. Gardez ceux qui sont justes.",
+    "leadNone": "Les faits que nous trouvons sur votre travail apparaissent ici, pour que vous les gardiez ou les écartiez.",
+    "loading": "Chargement des faits…",
+    "loadFailed": "Impossible de charger les faits.",
+    "cvRead": "Nous avons relu votre CV.",
+    "progress": "{{decided}} sur {{total}} décidés",
+    "keepAll": "Tout garder",
+    "keep": "Garder",
+    "drop": "Écarter",
+    "undo": "Annuler",
+    "kept": "Gardé",
+    "dropped": "Écarté",
+    "keepLabel": "Garder : {{text}}",
+    "dropLabel": "Écarter : {{text}}",
+    "undoLabel": "Annuler : {{text}}",
+    "sources": {
+      "you_said": "vous l’avez dit",
+      "you_confirmed": "vous l’avez confirmé",
+      "your_website": "de votre site",
+      "your_cv": "de votre CV"
+    },
+    "quoted": "« {{quote}} »",
+    "website": "D’une page de votre site.",
+    "confirmed": "Vous avez dit que c’était juste.",
+    "groups": {
+      "skills": "Vos compétences",
+      "background": "Votre parcours"
+    },
+    "now": "aujourd’hui",
+    "years": "{{start}} – {{end}}",
+    "done_one": "{{count}} fait ajouté à votre profil.",
+    "done_other": "{{count}} faits ajoutés à votre profil.",
+    "doneUndo": "Vous pouvez l’annuler pendant une journée.",
+    "doneNone": "Rien n’a été ajouté à votre profil.",
+    "failed": "Cela n’a pas fonctionné. Réessayez.",
+    "profileChanged": "Ce poste a changé dans votre profil. Vérifiez-le, puis réessayez.",
+    "emptyTitle": "Rien de nouveau à ajouter",
+    "emptyLead": "Les nouveaux faits apparaissent ici après vos réponses dans Parlez-moi de vous, ou après l’import de votre CV.",
+    "back": "Retour à votre profil",
+    "nudgeTitle_one": "{{count}} nouveau fait pour votre profil",
+    "nudgeTitle_other": "{{count}} nouveaux faits pour votre profil",
+    "nudgeBody": "Tirés de vos réponses, de votre site et de votre CV. Gardez ceux qui sont justes.",
+    "nudgeOpen": "Voir les faits"
   }
 }

@@ -29,6 +29,7 @@ import {
   type Change,
 } from "../../api/sections";
 import { useDescribe } from "../EntryList/EntryList";
+import { useFoundList } from "./found";
 
 export interface ImportReviewProps {
   /** The draft. */
@@ -53,7 +54,8 @@ function ChangeTag({ change }: { change: Change }) {
  * or Discard. Nothing is saved before a choice.
  */
 export function ImportReview({ id, current, onDone, onRestart }: ImportReviewProps) {
-  const { t, i18n } = useTranslation("profile");
+  const { t } = useTranslation("profile");
+  const foundList = useFoundList();
   const draft = useImport(id);
   const apply = useApplyImport();
   const discard = useDiscardImport();
@@ -86,9 +88,7 @@ export function ImportReview({ id, current, onDone, onRestart }: ImportReviewPro
 
   const { draft: next, dropped, kind } = draft.data;
   const empty = emptySections(next);
-  const found = new Intl.ListFormat(i18n.language, { style: "long", type: "conjunction" }).format(
-    foundIn(next).map(({ key, count }) => t(`review.counts.${key}`, { count })),
-  );
+  const found = foundList(foundIn(next));
   const choose = (mode: ApplyMode) => () => {
     apply.mutate(
       { id, mode },

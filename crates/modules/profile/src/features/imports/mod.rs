@@ -521,6 +521,9 @@ pub async fn apply(
         .bind(id)
         .execute(&mut *tx)
         .await?;
+    // What the app knows that this profile now lacks, proposed to keep or
+    // drop: Complete your profile.
+    crate::features::facts::queue(&mut tx, principal.account_id).await?;
     state
         .events
         .publish(

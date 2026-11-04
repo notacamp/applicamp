@@ -840,5 +840,53 @@
       "invalid_text": "Escribe algo, dentro del tamaño de LinkedIn para esta parte.",
       "not_found": "Eso ya no está aquí. Vuelve atrás y mira de nuevo."
     }
+  },
+  "complete": {
+    "eyebrow": "Tu perfil",
+    "title": "Completa tu perfil",
+    "lead_one": "Hemos encontrado {{count}} dato sobre tu trabajo. Consérvalo si es correcto.",
+    "lead_other": "Hemos encontrado {{count}} datos sobre tu trabajo. Conserva los correctos.",
+    "leadNone": "Los datos que encontramos sobre tu trabajo aparecen aquí, para que los conserves o los descartes.",
+    "loading": "Cargando los datos…",
+    "loadFailed": "No se han podido cargar los datos.",
+    "cvRead": "Hemos leído tu CV otra vez.",
+    "progress": "{{decided}} de {{total}} decididos",
+    "keepAll": "Conservar todos",
+    "keep": "Conservar",
+    "drop": "Descartar",
+    "undo": "Deshacer",
+    "kept": "Conservado",
+    "dropped": "Descartado",
+    "keepLabel": "Conservar: {{text}}",
+    "dropLabel": "Descartar: {{text}}",
+    "undoLabel": "Deshacer: {{text}}",
+    "sources": {
+      "you_said": "lo dijiste tú",
+      "you_confirmed": "lo confirmaste",
+      "your_website": "de tu web",
+      "your_cv": "de tu CV"
+    },
+    "quoted": "«{{quote}}»",
+    "website": "De una página de tu web.",
+    "confirmed": "Dijiste que esto era correcto.",
+    "groups": {
+      "skills": "Tus habilidades",
+      "background": "Tu trayectoria"
+    },
+    "now": "hoy",
+    "years": "{{start}} – {{end}}",
+    "done_one": "{{count}} dato añadido a tu perfil.",
+    "done_other": "{{count}} datos añadidos a tu perfil.",
+    "doneUndo": "Puedes deshacerlo durante un día.",
+    "doneNone": "No se ha añadido nada a tu perfil.",
+    "failed": "No ha funcionado. Inténtalo de nuevo.",
+    "profileChanged": "Ese empleo ha cambiado en tu perfil. Revísalo e inténtalo de nuevo.",
+    "emptyTitle": "Nada nuevo que añadir",
+    "emptyLead": "Los datos nuevos aparecen aquí cuando respondes a las preguntas de Cuéntame de ti o importas tu CV.",
+    "back": "Volver a tu perfil",
+    "nudgeTitle_one": "{{count}} dato nuevo para tu perfil",
+    "nudgeTitle_other": "{{count}} datos nuevos para tu perfil",
+    "nudgeBody": "De tus respuestas, tu web y tu CV. Conserva los correctos.",
+    "nudgeOpen": "Ver los datos"
   }
 }

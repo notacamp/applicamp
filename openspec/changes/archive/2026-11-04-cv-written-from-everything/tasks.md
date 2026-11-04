@@ -8,4 +8,5 @@
 - [x] 7 Proposals: migration, insert, eligibility, PATCH, list filter; the after-search handler and job; tests
 - [x] 8 Client: the review page of the prototype, four languages; the fake model's richer draft and Earlier; the e2e spec filmed
 - [x] 9 The states: the site could not be read (and paste what it says), the PDF could not be made, the CV being written; no price in button labels
-- [ ] 10 OpenAPI regenerated, client types regenerated, changelog entry file (changelog/unreleased/added/73-cv-written-from-everything.md), gates green in CI, recording (UI at 375px and desktop)
+- [x] 10 OpenAPI regenerated, client types regenerated, changelog entry file (changelog/unreleased/added/73-cv-written-from-everything.md), gates green in CI, recording (UI at 375px and desktop)
+- [x] 11 A question card says whose words its quote is (`quote_from`: "You told us about …" or "Your profile says about …"), in all four languages; #93's review fixes merged in

@@ -188,7 +188,7 @@ pub async fn keep(
 
     // A site with more jobs than the limit keeps the newest.
     if rows.len() > limits.max_per_site {
-        rows.sort_by(|a, b| b.posted_at.cmp(&a.posted_at));
+        rows.sort_by_key(|row| std::cmp::Reverse(row.posted_at));
         let over = rows.len() - limits.max_per_site;
         rows.truncate(limits.max_per_site);
         kept.dropped += u32::try_from(over).unwrap_or(u32::MAX);

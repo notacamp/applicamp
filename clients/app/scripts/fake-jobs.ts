@@ -713,9 +713,13 @@ function recentJobs(site: string) {
     jobs: titles.map((title, index) => ({
       id: `${site}-${String(index + 1)}`,
       title,
-      company: ["Harbour Stays", "Northlight Labs", "Wayfarer Co", "Northlight Labs", "Harbour Stays"][
-        index
-      ],
+      company: [
+        "Harbour Stays",
+        "Northlight Labs",
+        "Wayfarer Co",
+        "Northlight Labs",
+        "Harbour Stays",
+      ][index],
       url: `https://example.com/${site}/jobs/${String(index + 1)}`,
       location: "Remote - Europe",
       posted_at: new Date(Date.now() - (index + 1) * 24 * 3600 * 1000).toISOString(),

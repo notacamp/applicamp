@@ -95,6 +95,7 @@ pub fn module(deps: PipelineDeps) -> Module {
         .routes(routes!(brief::get))
         .routes(routes!(brief::set_site))
         .routes(routes!(brief::read))
+        .routes(routes!(brief::paste))
         .routes(routes!(brief::remove_fact))
         .routes(routes!(brief::restore_fact))
         .routes(routes!(brief::answer))

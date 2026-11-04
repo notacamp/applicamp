@@ -215,10 +215,21 @@ async fn stack_full(
     fixer: Option<Fixer>,
     adds: Value,
 ) -> Stack {
+    stack_reading(db, json!({"facts": []}), cv, analysis, fixer, adds).await
+}
+
+/// [`stack_full`] whose model reads a company's pages as `facts`.
+async fn stack_reading(
+    db: PgPool,
+    facts: Value,
+    cv: Value,
+    analysis: Value,
+    fixer: Option<Fixer>,
+    adds: Value,
+) -> Stack {
     let fake = Arc::new(Fake::default());
     *fake.cv_profile.lock().unwrap() = Some(profile());
-    let model =
-        Model::with_adds(json!({"facts": []}), analysis, cv, Value::Null, fixer, adds).await;
+    let model = Model::with_adds(facts, analysis, cv, Value::Null, fixer, adds).await;
     let h = Harness::with_ai(db, Uuid::now_v7(), Arc::clone(&fake), Some(model.gateway()));
     company_fact(&h).await;
     let opp = add(&h, "shortlisted").await;
@@ -295,6 +306,8 @@ async fn a_draft_cites_its_sources_and_the_check_flags_what_they_do_not_say(db: 
     assert_eq!(status, StatusCode::OK, "{cv}");
     assert!(cv["draft"].is_null());
     assert_eq!(cv["can_draft"]["allowed"], true);
+    // Shortlisting started its preparation: the page waits for the CV.
+    assert_eq!(cv["writing"], true);
     assert_eq!(cv["caps"]["drafts_today_cap"], CAP_PER_DAY);
     assert_eq!(cv["caps"]["drafts_here_cap"], CAP_PER_OPPORTUNITY);
     assert_eq!(s.model.calls(CV).await, 0, "a look never calls the model");
@@ -1674,4 +1687,63 @@ async fn what_the_job_wants_and_the_profile_shows_is_added_in_one_more_call(db: 
     assert_eq!(want("Elixir")["covered"], false);
     assert_eq!(want("Elixir")["reason"], "not_in_profile");
     assert_eq!(want("Elixir")["level"], "nice");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_site_that_asks_apps_not_to_read_it_is_said_and_what_it_says_can_be_pasted(db: PgPool) {
+    let facts = json!({ "facts": [{
+        "text": "Runs payroll for bakeries",
+        "quote": "payroll for bakeries",
+        "url": "https://example-co.test",
+    }]});
+    let s = stack_reading(
+        db.clone(),
+        facts,
+        answer(),
+        json!({"wants": [], "questions": []}),
+        None,
+        Value::Null,
+    )
+    .await;
+    sqlx::query(
+        "UPDATE pipeline.companies SET site = 'https://example-co.test', site_source = 'person'",
+    )
+    .execute(&s.h.db)
+    .await
+    .unwrap();
+    *s.fake.site.lock().unwrap() = Some(Err(crate::ports::SiteFailure::RobotsDisallows));
+    let cv = draft(&s).await;
+    assert_eq!(cv["company_read_failure"], "robots_disallows", "{cv}");
+    assert!(cv["read_eur"].as_f64().unwrap() > 0.0);
+
+    // What the site says, pasted: read like one of its pages.
+    let paste = format!("/api/v1/opportunities/{}/brief/paste", s.opp);
+    let (status, body) = s.h.json("POST", &paste, &json!({ "text": "  " })).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+    assert_eq!(body["code"], "invalid_text");
+    let (status, brief) =
+        s.h.json(
+            "POST",
+            &paste,
+            &json!({ "text": "Example Co runs payroll for bakeries in Porto." }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{brief}");
+    let texts: Vec<&str> = brief["facts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|f| f["removed"] != true)
+        .map(|f| f["text"].as_str().unwrap())
+        .collect();
+    assert_eq!(texts, ["Runs payroll for bakeries"]);
+    let (_, cv) = s.h.get(&url(&s.opp, "")).await;
+    assert!(cv["company_read_failure"].is_null(), "{cv}");
+
+    // Someone else's job: not found.
+    let other = Harness::as_account(db, Uuid::now_v7(), Arc::clone(&s.fake));
+    let (status, _) = other
+        .json("POST", &paste, &json!({ "text": "Anything" }))
+        .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
 }

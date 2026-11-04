@@ -180,6 +180,15 @@ pub struct Cv {
     /// The posting's language, when the CV is in another: offered, never
     /// chosen for the person.
     pub suggested_language: Option<String>,
+    /// Why the company's site could not be read, when it could not:
+    /// `robots_disallows`, `no_pages_readable` or `site_unreachable`. The
+    /// person can paste what it says (`…/brief/paste`).
+    pub company_read_failure: Option<String>,
+    /// About what reading pasted text costs, in euros.
+    pub read_eur: f64,
+    /// The app is getting this CV ready by itself right now (reading the
+    /// company or writing the draft): the page waits for it.
+    pub writing: bool,
 }
 
 /// What to make a draft of.
@@ -506,6 +515,19 @@ async fn build(
         .as_ref()
         .and_then(|d| suggested_language(opp, &d.language));
     let done = done_of(db, account, opp.id, draft.as_ref()).await?;
+    let writing: bool = sqlx::query_scalar(
+        "SELECT EXISTS (
+            SELECT 1 FROM pipeline.preparations
+             WHERE opportunity_id = $1 AND account_id = $2
+               AND state IN ('queued', 'running') AND step IN ('read', 'draft'))",
+    )
+    .bind(opp.id)
+    .bind(account)
+    .fetch_one(db)
+    .await?;
+    let company_read_failure = companies::find(db, account, &opp.company)
+        .await?
+        .and_then(|c| c.read_failure);
     let next: Option<(DateTime<Utc>,)> = sqlx::query_as(
         "SELECT updated_at FROM pipeline.preparations
           WHERE opportunity_id = $1 AND account_id = $2 AND state = 'queued' AND step = 'letter'",
@@ -543,6 +565,9 @@ async fn build(
         }),
         done,
         suggested_language,
+        company_read_failure,
+        read_eur: brief::COMPANY_READ_EUR,
+        writing,
     })
 }
 

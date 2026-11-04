@@ -55,7 +55,7 @@ use crate::{
     PipelineDeps,
     companies::{self, Company, ReadPage, SiteSource},
     features::prepare::{self, Preparation},
-    ports::{Neighbours, ProfileDigest, SiteFailure, SitePage},
+    ports::{Neighbours, ProfileDigest, SiteFailure, SitePage, SiteReading},
     store::{MAX_DESCRIPTION, MAX_URL},
 };
 
@@ -1001,10 +1001,9 @@ async fn fetch_and_store(
         Ok(reading) => reading,
         Err(failure) => {
             let (code, error) = match failure {
-                SiteFailure::Unreachable => (
-                    "site_unreachable",
-                    Error::Unavailable("site_unreachable"),
-                ),
+                SiteFailure::Unreachable => {
+                    ("site_unreachable", Error::Unavailable("site_unreachable"))
+                }
                 SiteFailure::RobotsDisallows => (
                     "robots_disallows",
                     Error::Conflict(
@@ -1030,7 +1029,10 @@ async fn fetch_and_store(
             return Err(error);
         }
     };
-    facts_from(gateway, db, account, company, company_id, &reading, opp, now).await
+    facts_from(
+        gateway, db, account, company, company_id, &reading, opp, now,
+    )
+    .await
 }
 
 /// Make and keep the facts of `reading` (**one model call**, a second with
@@ -1568,6 +1570,124 @@ pub async fn read(
     analyze(&deps, &state.db, account, id, query.locale.as_deref(), now).await?;
     let opp = load(&state.db, account, id).await?;
     Ok(Json(build(&deps, &state.db, account, &opp, now).await?))
+}
+
+/// Longest text the person may paste from the company's site, in characters.
+pub const MAX_PASTE: usize = 20_000;
+
+/// What the company's site says, pasted by the person.
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PasteRequest {
+    /// The site's words, 1 to 20,000 characters.
+    pub text: String,
+}
+
+/// Read what the person pasted from the company's site.
+///
+/// When the site cannot be read (it asks apps not to, or does not answer),
+/// the person can paste what it says. The text is read like one of the
+/// site's pages (**one model call**): each fact must quote it, or it is left
+/// out; it replaces the company's facts as a read does. It counts toward the
+/// 20 company reads a day. The text is data, never instructions. A CV made
+/// before does not change: Write it again uses the facts.
+#[utoipa::path(
+    post,
+    path = "/api/v1/opportunities/{id}/brief/paste",
+    tag = "pipeline",
+    operation_id = "pipeline.brief_paste",
+    security(("session" = [])),
+    params(("id" = Uuid, Path, description = "The opportunity.")),
+    request_body = PasteRequest,
+    responses(
+        (status = 200, description = "The brief, with the facts of the pasted text.", body = Brief),
+        (status = 400, description = "`invalid_text`; `company_unknown`", body = Problem,
+            content_type = "application/problem+json"),
+        (status = 401, description = "`session_required`", body = Problem,
+            content_type = "application/problem+json"),
+        (status = 404, description = "`not_found`", body = Problem,
+            content_type = "application/problem+json"),
+        (status = 429, description = "`company_reads_daily_cap`", body = Problem,
+            content_type = "application/problem+json"),
+        (status = 503, description = "`ai_unavailable`; `ai_daily_limit_reached`; \
+            `ai_budget_reached`; `ai_failed`", body = Problem,
+            content_type = "application/problem+json"),
+    ),
+)]
+pub async fn paste(
+    State(state): State<AppState>,
+    SignedIn(principal): SignedIn,
+    Extension(deps): Extension<PipelineDeps>,
+    Path(id): Path<Uuid>,
+    body: std::result::Result<Json<PasteRequest>, JsonRejection>,
+) -> Result<Json<Brief>> {
+    let invalid = || {
+        Error::BadRequest(
+            "invalid_text",
+            format!("Paste between 1 and {MAX_PASTE} characters."),
+        )
+    };
+    let Json(request) = body.map_err(|_| invalid())?;
+    let text = request.text.trim();
+    if text.is_empty() || text.chars().count() > MAX_PASTE {
+        return Err(invalid());
+    }
+    let account = principal.account_id;
+    let db = &state.db;
+    let opp = load(db, account, id).await?;
+    if opp.company.trim().is_empty() {
+        return Err(unknown_company());
+    }
+    let now = state.clock.now();
+    let gateway = gateway(&deps)?;
+    if reads_today(db, account, now).await? >= DAILY_READS_CAP {
+        return Err(Error::TooManyRequests(
+            "company_reads_daily_cap",
+            format!("You can read {DAILY_READS_CAP} companies a day. Reading continues tomorrow."),
+        ));
+    }
+    // The site the text is from, as far as anyone knows: the company's, else
+    // the posting's.
+    let site = companies::find(db, account, &opp.company)
+        .await?
+        .and_then(|c| c.site)
+        .unwrap_or_else(|| opp.url.clone());
+    let mut tx = db.begin().await?;
+    let company_id = companies::ensure(&mut tx, account, &opp.company, now).await?;
+    sqlx::query(
+        "INSERT INTO pipeline.company_reads (id, account_id, company_id, started_at)
+         VALUES ($1, $2, $3, $4)",
+    )
+    .bind(Uuid::now_v7())
+    .bind(account)
+    .bind(company_id)
+    .bind(now)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    let reading = SiteReading {
+        pages: vec![SitePage {
+            url: site,
+            fetched_at: now,
+            kind: "pasted".to_owned(),
+            text: text.to_owned(),
+        }],
+        blocked: 0,
+    };
+    facts_from(
+        gateway,
+        db,
+        account,
+        &opp.company,
+        company_id,
+        &reading,
+        Some(&opp),
+        now,
+    )
+    .await?;
+    tracing::info!("a company read from pasted text");
+    let opp = load(db, account, id).await?;
+    Ok(Json(build(&deps, db, account, &opp, now).await?))
 }
 
 /// The company a fact of opportunity `opp` belongs to, if it does.

@@ -313,6 +313,9 @@ pub struct CvDraftView {
     /// What the app's calls for this draft cost, in euros (the draft, the
     /// second look at what the job wants, the fix of what was flagged).
     pub cost_eur: Option<f64>,
+    /// The company facts the draft could use: none means it was written
+    /// from the posting and the profile only.
+    pub company_facts: u32,
 }
 
 /// An approved version: the approved text as a PDF.
@@ -816,6 +819,13 @@ pub fn draft_view(
         undo_until: None,
         wants: super::wants::wants_view(wants, title, posting, content, frame),
         cost_eur: None,
+        company_facts: to_u32(
+            frame
+                .sources
+                .iter()
+                .filter(|s| s.kind == SourceKind::Company)
+                .count(),
+        ),
     }
 }
 

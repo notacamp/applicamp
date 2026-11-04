@@ -75,6 +75,22 @@ neutral `example.com` defaults. Demo and test data are invented.
   `clients/app/src/lib/`; colours, spacing and type come from tokens only.
   Tests locate elements by `data-testid`. *(CI: ESLint rules.)*
 
+## Product rule: the app does the work first (ADR 0010)
+
+- **If the app can do a step without you, it does it** and shows you the
+  result to approve or correct. An empty field the app could fill, a button
+  for a step whose inputs are ready, or copying text between screens is a
+  defect unless the change's proposal says why the step needs the person.
+- **Approvals and control stay.** Outward actions, anything reaching the
+  profile and anything ready to send still wait for your accept. Every
+  automatic step shows what it did, from what and what it cost; a guess is
+  labelled as a guess until confirmed; your correction always wins; you can
+  stop, undo and turn automation down (the Autonomy goal).
+- **Limits stay.** Budget, daily caps, robots.txt and source terms bound
+  automatic work; when one stops it, the page says so and offers the click.
+  *(Review: every proposal names what it automates and what still waits on
+  the person.)*
+
 ## Agent and sandbox rules (ADR 0002, ADR 0003, ADR 0009)
 
 - **Agents run only inside sandboxes** created per run and always deleted at

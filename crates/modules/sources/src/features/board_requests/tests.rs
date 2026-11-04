@@ -291,3 +291,40 @@ async fn yes_does_not_override_robots_rules(db: PgPool) {
     .unwrap();
     assert_eq!(open, 1);
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_decline_can_be_taken_back(db: PgPool) {
+    let h = harness(db, true).await;
+    let waits = board(&h.db, "waits", "candidate", "/private", terms_forbid()).await;
+    let uri = format!("/api/v1/boards/{waits}/reopen");
+    // Only a declined board.
+    let (status, _) = send(&h, "POST", &uri, None).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    send(
+        &h,
+        "POST",
+        &format!("/api/v1/boards/{waits}/decline"),
+        Some(json!({ "reason": "No." })),
+    )
+    .await;
+    let (status, detail) = send(&h, "POST", &uri, None).await;
+    assert_eq!(status, StatusCode::OK, "{detail}");
+    assert_eq!(detail["board"]["status"], "candidate");
+    assert_eq!(detail["board"]["decline_reason"], Value::Null);
+    // One that was read before goes back to being read.
+    let read = board(&h.db, "read", "approved", "/private", json!([])).await;
+    sqlx::query("UPDATE sources.job_boards SET approved_at = now() WHERE id = $1")
+        .bind(read)
+        .execute(&h.db)
+        .await
+        .unwrap();
+    send(
+        &h,
+        "POST",
+        &format!("/api/v1/boards/{read}/decline"),
+        Some(json!({ "reason": "No." })),
+    )
+    .await;
+    let (_, detail) = send(&h, "POST", &format!("/api/v1/boards/{read}/reopen"), None).await;
+    assert_eq!(detail["board"]["status"], "approved");
+}

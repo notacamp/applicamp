@@ -529,7 +529,7 @@ fn key_of(row: &BoardRow) -> Option<BoardKey> {
     })
 }
 
-async fn detail(
+pub(crate) async fn detail(
     deps: &SourcesDeps,
     state: &AppState,
     account: Uuid,

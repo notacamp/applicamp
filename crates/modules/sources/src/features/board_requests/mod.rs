@@ -669,3 +669,55 @@ pub async fn answer(
         }
     }
 }
+
+/// Take back a decline.
+///
+/// A declined board is put back where it was: approved when it was
+/// approved before (the owner stopped reading it), else waiting for the
+/// owner. Its decline reason is cleared. Board owners only.
+#[utoipa::path(
+    post,
+    path = "/api/v1/boards/{id}/reopen",
+    tag = "sources",
+    operation_id = "sources.reopen_board",
+    security(("session" = [])),
+    params(("id" = Uuid, Path, description = "The board.")),
+    responses(
+        (status = 200, description = "Back where it was.", body = BoardDetail),
+        (status = 401, description = "`session_required`", body = Problem,
+            content_type = "application/problem+json"),
+        (status = 404, description = "`not_found`: no such board, or not a board owner",
+            body = Problem, content_type = "application/problem+json"),
+        (status = 409, description = "`not_declined`", body = Problem,
+            content_type = "application/problem+json"),
+    ),
+)]
+pub async fn reopen(
+    State(state): State<AppState>,
+    SignedIn(principal): SignedIn,
+    Extension(deps): Extension<SourcesDeps>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<BoardDetail>> {
+    let account = principal.account_id;
+    owner_or_missing(&deps, &state.db, account).await?;
+    let row = boards::fetch(&state.db, id).await?;
+    if row.status() != Status::Declined {
+        return Err(Error::Conflict(
+            "not_declined",
+            "Only a declined board can be taken back.".to_owned(),
+        ));
+    }
+    sqlx::query(
+        "UPDATE sources.job_boards
+            SET status = CASE WHEN approved_at IS NOT NULL THEN 'approved' ELSE 'candidate' END,
+                decline_reason = NULL, updated_at = $2
+          WHERE id = $1",
+    )
+    .bind(id)
+    .bind(state.clock.now())
+    .execute(&state.db)
+    .await?;
+    tracing::info!(board = %row.slug, "job board decline taken back");
+    let row = boards::fetch(&state.db, id).await?;
+    Ok(Json(boards::detail(&deps, &state, account, row).await?))
+}

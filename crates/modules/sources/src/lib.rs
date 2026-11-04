@@ -190,6 +190,7 @@ pub fn module(deps: SourcesDeps) -> Module {
         .routes(routes!(requests::draft))
         .routes(routes!(requests::asked))
         .routes(routes!(requests::answer))
+        .routes(routes!(requests::reopen))
         .routes(routes!(board::list))
         .routes(routes!(board::scanned))
         .routes(routes!(board::get))

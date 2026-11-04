@@ -79,6 +79,14 @@
 //                           `wayfarer-co` (the Workable widget answer below).
 // The other four systems answer with clean rules and no jobs.
 //
+// The Workable list (#88): workable.hiring.test also serves Workable's list of every
+// company's jobs at /boards/workable.xml (the stack reads it there,
+// APPLICAMP_SOURCES__WORKABLE_LIST_URL), as the real one is: one XML file whose jobs
+// link to apply.workable.com/j/<code>, a short link that redirects to the company's
+// page (also answered here). Invented companies: Lantern Ferries and Quillfeather
+// Studio have jobs from the last days (the registry gains two Workable company pages),
+// Dust Ledger Press has only a job from 2021 (never added).
+//
 // Company watchers (#20): three companies' own sites per Playwright project
 // (desktop, phone) and one to show by hand (demo), each at its own host name:
 //   northwind-<p>.test  a company whose /careers links its Greenhouse board
@@ -1023,6 +1031,43 @@ function workableList(token: string) {
   };
 }
 
+/** The invented companies of the Workable list (#88): name, token, site, days since each job. */
+const WORKABLE_LIST: { name: string; token: string; site?: string; days: number[] }[] = [
+  {
+    name: "Lantern Ferries",
+    token: "lantern-ferries",
+    site: "https://lantern-ferries.example.com",
+    days: [2, 9],
+  },
+  { name: "Quillfeather Studio", token: "quillfeather-studio", days: [5] },
+  { name: "Dust Ledger Press", token: "dust-ledger-press", days: [1600] },
+];
+
+/** The short code of the `index`th job of a listed company. */
+function workableCode(company: number, index: number): string {
+  return `L${String(company)}${String(index).padStart(2, "0")}FAKE`;
+}
+
+/** Workable's list, in its documented form (`<source>` of `<job>`s, CDATA fields). */
+function workableXml(): string {
+  const jobs = WORKABLE_LIST.flatMap((company, c) =>
+    company.days.map((days, i) => {
+      const code = workableCode(c, i);
+      const date = new Date(Date.now() - days * 86_400_000).toUTCString().replace("GMT", "UTC");
+      const site =
+        company.site === undefined ? "" : `<website><![CDATA[${company.site}]]></website>`;
+      return (
+        `<job><title><![CDATA[Role ${String(i + 1)}]]></title><date><![CDATA[${date}]]></date>` +
+        `<referencenumber><![CDATA[${code}]]></referencenumber>` +
+        `<url><![CDATA[https://apply.workable.com/j/${code}]]></url>` +
+        `<company><![CDATA[${company.name}]]></company><city><![CDATA[Lisbon]]></city>` +
+        `<description><![CDATA[<p>Invented.</p>]]></description>${site}</job>`
+      );
+    }),
+  );
+  return `<?xml version="1.0" encoding="utf-8"?><source><publisher>Workable</publisher>${jobs.join("\n")}</source>`;
+}
+
 /**
  * A hiring system's host: robots rules (Lever's say `ai-train=no`), a home page
  * with no terms, and Workable's widget answer; the other readers' paths are
@@ -1037,6 +1082,20 @@ function hiringSite(site: string, url: URL, response: ServerResponse): boolean {
   if (url.pathname === "/") {
     text(response, "text/html", `<html lang="en"><body>An invented hiring system.</body></html>`);
     return true;
+  }
+  if (site === "workable.hiring.test" && url.pathname === "/boards/workable.xml") {
+    console.log("fake-jobs: served the Workable list");
+    text(response, "application/xml", workableXml());
+    return true;
+  }
+  const short = /^\/j\/L(\d)(\d\d)FAKE$/.exec(url.pathname);
+  if (site === "workable.hiring.test" && short?.[1] !== undefined) {
+    const company = WORKABLE_LIST[Number(short[1])];
+    if (company !== undefined) {
+      response.writeHead(301, { location: `/${company.token}/${url.pathname.slice(1)}` });
+      response.end();
+      return true;
+    }
   }
   const widget = /^\/api\/v1\/widget\/accounts\/([\w-]+)$/.exec(url.pathname);
   if (widget?.[1] !== undefined) {

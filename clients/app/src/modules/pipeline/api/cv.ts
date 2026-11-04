@@ -325,3 +325,52 @@ export function canConfirm(flags: readonly CvReason[]): boolean {
     flags.every((flag) => flag.kind !== "company_fact_outside_summary" && flag.kind !== "no_source")
   );
 }
+
+/**
+ * The CV's text, as plain text: what "Download the text" saves when the PDF
+ * could not be made. The person's own CV, nothing added.
+ */
+export function cvText(draft: CvDraft): string {
+  const present = (part: string | null | undefined): part is string =>
+    part !== undefined && part !== null && part.trim() !== "";
+  const contact = draft.contact;
+  const lines: string[] = [];
+  if (present(contact.name)) {
+    lines.push(contact.name);
+  }
+  if (draft.headline !== undefined && draft.headline !== null) {
+    lines.push(draft.headline.text);
+  }
+  const reach = [contact.email, contact.location, contact.url, ...contact.links.map((l) => l.url)]
+    .filter(present)
+    .join(" · ");
+  if (reach !== "") {
+    lines.push(reach);
+  }
+  if (draft.summary !== undefined && draft.summary !== null) {
+    lines.push("", draft.summary.text);
+  }
+  for (const role of draft.experience) {
+    const head = [role.title, role.company].filter(present).join(" · ");
+    const when = [role.start_date, role.end_date].filter(present).join(" – ");
+    lines.push("", when === "" ? head : `${head} (${when})`);
+    for (const bullet of role.bullets) {
+      lines.push(`- ${bullet.text}`);
+    }
+  }
+  if (draft.skills.length > 0) {
+    lines.push("", draft.skills.map((skill) => skill.name).join(", "));
+  }
+  for (const school of draft.education) {
+    lines.push("", [school.study_type, school.area, school.institution].filter(present).join(", "));
+  }
+  if (draft.languages.length > 0) {
+    lines.push(
+      "",
+      draft.languages
+        .map((l) => (present(l.fluency) ? `${l.language}: ${l.fluency}` : l.language))
+        .join(", "),
+    );
+  }
+  return `${lines.join("\n")}\n`;
+}

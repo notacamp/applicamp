@@ -181,10 +181,10 @@
       }
     },
     "readLead": "Reads the posting and the company’s own website (that site only, where robots.txt allows) and makes the facts: one AI call, reused for 30 days. Then one more compares the job with your profile.",
-    "read": "Read about {{company}} · about {{cost}}",
+    "read": "Read about {{company}}",
     "reading": "Reading…",
     "readingLead": "Reading {{company}}’s pages, then comparing the job with your profile. This takes a few seconds.",
-    "readAgain": "Read again · about {{cost}}",
+    "readAgain": "Read again",
     "noFacts": "Nothing about {{company}} could be quoted from its pages.",
     "facts": {
       "title": "What {{company}}’s own pages say",
@@ -310,7 +310,8 @@
         "profile_needed": "Stopped: add a position to your profile first.",
         "generic": "Something went wrong while preparing this job."
       }
-    }
+    },
+    "readCost": "Reading costs about {{cost}}."
   },
   "cv": {
     "eyebrow": "Tailored CV",
@@ -328,14 +329,15 @@
       "draftPill": "Draft",
       "approvedPill": "Approved · v{{version}}",
       "language": "Written in {{language}}",
-      "makeAgain": "Write it again · about {{cost}}",
+      "makeAgain": "Write it again",
       "making": "Drafting…",
       "approve": "Approve v{{version}}",
       "approving": "Approving…",
-      "approveWhy": "Approve turns on when every blocked line is fixed or removed."
+      "approveWhy": "Approve turns on when every blocked line is fixed or removed.",
+      "cost": "Writing it again costs about {{cost}}."
     },
     "draft": {
-      "draft": "Draft the CV · about {{cost}}",
+      "draft": "Draft the CV",
       "drafting": "Drafting…",
       "review": "Review the CV",
       "hint": "One AI call. Then every line is checked against your profile, without AI.",
@@ -344,7 +346,8 @@
         "per_opportunity_cap": "You’ve made 10 drafts for this job. Review one of them.",
         "daily_cap": "You’ve made 20 drafts today. Drafting continues tomorrow.",
         "ai_unavailable": "The AI isn’t set up on this server, so nothing can be drafted."
-      }
+      },
+      "cost": "Drafting the CV costs about {{cost}}."
     },
     "sheet": {
       "label": "Your tailored CV",
@@ -529,8 +532,11 @@
       "making": "Making the PDF…",
       "note": "Some words may not come out right when a job site reads this PDF.",
       "doesntFit": "The CV doesn’t fit on 2 pages. Remove a few lines.",
-      "unavailable": "The PDF couldn’t be made just now. Change a line or pick a layout to try again.",
-      "lines": "Every line and where it comes from"
+      "unavailable": "Could not make the PDF for {{company}}. The text of the CV is saved.",
+      "lines": "Every line and where it comes from",
+      "retry": "Try again",
+      "downloadText": "Download the text",
+      "textFile": "CV - {{company}}.txt"
     },
     "waiting": {
       "title": "Needs you · {{count}}",
@@ -660,7 +666,7 @@
       "body": "Your CV is approved. Write the letter that goes with it, from the same profile and the same facts."
     },
     "slot": {
-      "write": "Write the cover letter · about {{cost}}",
+      "write": "Write the cover letter",
       "writing": "Writing…",
       "review": "Review the cover letter",
       "hint": "One AI call. Then every sentence is checked against your profile, without AI.",
@@ -670,7 +676,8 @@
         "per_opportunity_cap": "You’ve written 10 letter drafts for this job. Review one of them.",
         "daily_cap": "You’ve written 20 letter drafts today. Writing continues tomorrow.",
         "ai_unavailable": "The AI isn’t set up on this server, so nothing can be written."
-      }
+      },
+      "cost": "Writing it costs about {{cost}}."
     },
     "toolbar": {
       "draft": "Draft {{n}}",
@@ -684,11 +691,12 @@
         "standard": "Standard · about 300"
       },
       "note": "A different length or language is a new draft: Make again.",
-      "makeAgain": "Make again · about {{cost}}",
+      "makeAgain": "Write it again",
       "making": "Writing…",
       "approve": "Approve",
       "approving": "Approving…",
-      "approveWhy": "Approve turns on when every blocked sentence and question is fixed, removed or answered."
+      "approveWhy": "Approve turns on when every blocked sentence and question is fixed, removed or answered.",
+      "cost": "Writing it again costs about {{cost}}."
     },
     "sheet": {
       "label": "Your cover letter"

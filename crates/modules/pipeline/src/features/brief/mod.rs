@@ -997,23 +997,56 @@ async fn fetch_and_store(
     .await?;
     tx.commit().await?;
 
-    let reading =
-        neighbours
-            .read_site(site, posting, now)
-            .await
-            .map_err(|failure| match failure {
-                SiteFailure::Unreachable => Error::Unavailable("site_unreachable"),
-                SiteFailure::RobotsDisallows => Error::Conflict(
+    let reading = match neighbours.read_site(site, posting, now).await {
+        Ok(reading) => reading,
+        Err(failure) => {
+            let (code, error) = match failure {
+                SiteFailure::Unreachable => (
+                    "site_unreachable",
+                    Error::Unavailable("site_unreachable"),
+                ),
+                SiteFailure::RobotsDisallows => (
                     "robots_disallows",
-                    "The company's website asks robots not to read it, so nothing was read."
-                        .to_owned(),
+                    Error::Conflict(
+                        "robots_disallows",
+                        "The company's website asks robots not to read it, so nothing was read."
+                            .to_owned(),
+                    ),
                 ),
-                SiteFailure::NothingReadable => Error::Conflict(
+                SiteFailure::NothingReadable => (
                     "no_pages_readable",
-                    "None of the company's pages had text to read.".to_owned(),
+                    Error::Conflict(
+                        "no_pages_readable",
+                        "None of the company's pages had text to read.".to_owned(),
+                    ),
                 ),
-            })?;
+            };
+            // Why, so the CV page can say so (#73).
+            sqlx::query("UPDATE pipeline.companies SET read_failure = $2 WHERE id = $1")
+                .bind(company_id)
+                .bind(code)
+                .execute(db)
+                .await?;
+            return Err(error);
+        }
+    };
+    facts_from(gateway, db, account, company, company_id, &reading, opp, now).await
+}
 
+/// Make and keep the facts of `reading` (**one model call**, a second with
+/// half the text when the first is cut off): the pages read on the site, or
+/// the text the person pasted.
+#[allow(clippy::too_many_arguments)]
+async fn facts_from(
+    gateway: &Gateway,
+    db: &PgPool,
+    account: Uuid,
+    company: &str,
+    company_id: Uuid,
+    reading: &SiteReading,
+    opp: Option<&Opp>,
+    now: DateTime<Utc>,
+) -> Result<()> {
     // Two attempts at the same answer size: when the first is cut off, the
     // second is shown half the page text (the posting first, then the pages
     // by priority), never the same input with more room.
@@ -1158,7 +1191,8 @@ async fn store_read(
         .collect();
     sqlx::query(
         "UPDATE pipeline.companies
-            SET read_at = $2, pages = $3, pages_blocked = $4, facts_dropped = $5, updated_at = $2
+            SET read_at = $2, pages = $3, pages_blocked = $4, facts_dropped = $5, updated_at = $2,
+                read_failure = NULL
           WHERE id = $1",
     )
     .bind(company)

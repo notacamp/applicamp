@@ -181,10 +181,10 @@
       }
     },
     "readLead": "Lee el anuncio y la web de la propia empresa (solo esa web, donde robots.txt lo permite) y crea los datos: una llamada a la IA, reutilizada durante 30 días. Después, otra compara la oferta con tu perfil.",
-    "read": "Leer sobre {{company}} · unos {{cost}}",
+    "read": "Leer sobre {{company}}",
     "reading": "Leyendo…",
     "readingLead": "Leyendo las páginas de {{company}} y comparando la oferta con tu perfil. Tarda unos segundos.",
-    "readAgain": "Leer otra vez · unos {{cost}}",
+    "readAgain": "Leer otra vez",
     "noFacts": "No se ha podido citar nada sobre {{company}} en sus páginas.",
     "facts": {
       "title": "Lo que dicen las páginas de {{company}}",
@@ -310,7 +310,8 @@
         "profile_needed": "Parado: añade primero un puesto a tu perfil.",
         "generic": "Algo salió mal al preparar esta oferta."
       }
-    }
+    },
+    "readCost": "Leer cuesta unos {{cost}}."
   },
   "cv": {
     "eyebrow": "CV a medida",
@@ -328,14 +329,15 @@
       "draftPill": "Borrador",
       "approvedPill": "Aprobado · v{{version}}",
       "language": "Escrito en {{language}}",
-      "makeAgain": "Escribir de nuevo · unos {{cost}}",
+      "makeAgain": "Escribir de nuevo",
       "making": "Redactando…",
       "approve": "Aprobar v{{version}}",
       "approving": "Aprobando…",
-      "approveWhy": "Aprobar se activa cuando todas las líneas bloqueadas están corregidas o eliminadas."
+      "approveWhy": "Aprobar se activa cuando todas las líneas bloqueadas están corregidas o eliminadas.",
+      "cost": "Escribirlo de nuevo cuesta unos {{cost}}."
     },
     "draft": {
-      "draft": "Redactar el CV · unos {{cost}}",
+      "draft": "Redactar el CV",
       "drafting": "Redactando…",
       "review": "Revisar el CV",
       "hint": "Una llamada de IA. Después, cada línea se comprueba contra tu perfil, sin IA.",
@@ -344,7 +346,8 @@
         "per_opportunity_cap": "Ya has hecho 10 borradores para esta oferta. Revisa uno de ellos.",
         "daily_cap": "Ya has hecho 20 borradores hoy. Puedes seguir mañana.",
         "ai_unavailable": "La IA no está configurada en este servidor, así que no se puede redactar nada."
-      }
+      },
+      "cost": "Redactar el CV cuesta unos {{cost}}."
     },
     "sheet": {
       "label": "Tu CV a medida",
@@ -529,8 +532,11 @@
       "making": "Haciendo el PDF…",
       "note": "Algunas palabras pueden no salir bien cuando un portal de empleo lea este PDF.",
       "doesntFit": "El CV no cabe en 2 páginas. Quita algunas líneas.",
-      "unavailable": "No se ha podido hacer el PDF ahora. Cambia una línea o elige un formato para intentarlo de nuevo.",
-      "lines": "Cada línea y de dónde viene"
+      "unavailable": "No se ha podido hacer el PDF para {{company}}. El texto del CV está guardado.",
+      "lines": "Cada línea y de dónde viene",
+      "retry": "Intentarlo de nuevo",
+      "downloadText": "Descargar el texto",
+      "textFile": "CV - {{company}}.txt"
     },
     "waiting": {
       "title": "Te necesita · {{count}}",
@@ -660,7 +666,7 @@
       "body": "Tu CV está aprobado. Escribe la carta que lo acompaña, con el mismo perfil y los mismos datos."
     },
     "slot": {
-      "write": "Escribir la carta de presentación · unos {{cost}}",
+      "write": "Escribir la carta de presentación",
       "writing": "Escribiendo…",
       "review": "Revisar la carta de presentación",
       "hint": "Una llamada de IA. Después, cada frase se comprueba contra tu perfil, sin IA.",
@@ -670,7 +676,8 @@
         "per_opportunity_cap": "Ya has escrito 10 borradores de carta para esta oferta. Revisa uno de ellos.",
         "daily_cap": "Ya has escrito 20 borradores de carta hoy. Puedes seguir mañana.",
         "ai_unavailable": "La IA no está configurada en este servidor, así que no se puede escribir nada."
-      }
+      },
+      "cost": "Escribirla cuesta unos {{cost}}."
     },
     "toolbar": {
       "draft": "Borrador {{n}}",
@@ -684,11 +691,12 @@
         "standard": "Normal · unas 300"
       },
       "note": "Otra extensión u otro idioma es un borrador nuevo: Rehacer.",
-      "makeAgain": "Rehacer · unos {{cost}}",
+      "makeAgain": "Escribir de nuevo",
       "making": "Escribiendo…",
       "approve": "Aprobar",
       "approving": "Aprobando…",
-      "approveWhy": "Aprobar se activa cuando todas las frases y preguntas bloqueadas están corregidas, eliminadas o respondidas."
+      "approveWhy": "Aprobar se activa cuando todas las frases y preguntas bloqueadas están corregidas, eliminadas o respondidas.",
+      "cost": "Escribirla de nuevo cuesta unos {{cost}}."
     },
     "sheet": {
       "label": "Tu carta de presentación"

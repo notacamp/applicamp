@@ -112,7 +112,10 @@ test("someone drafts a CV, sees it as a PDF at once, says yes to the one questio
 
   // Prepare: read the company's pages (the facts the CV may cite), then draft.
   await page.goto(`/pipeline/${id}/prepare`);
-  await expect(page.getByTestId("prepare-draft")).toContainText("Draft the CV · about €0.002");
+  await expect(page.getByTestId("prepare-draft")).toContainText("Draft the CV");
+  await expect(page.getByTestId("prepare-draft-cost")).toContainText(
+    "Drafting the CV costs about €0.002.",
+  );
   await page.getByTestId("prepare-read").click();
   await expect(page.getByTestId("prepare-facts")).toContainText("Builds ledgers for small shops");
   await page.getByTestId("prepare-draft").click();

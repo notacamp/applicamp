@@ -310,6 +310,39 @@ describe("Review the CV", () => {
     await userEvent.setup().click(screen.getByTestId("cv-language-fr"));
     expect(screen.getByTestId("cv-language-next")).toHaveTextContent("Press Write it again");
     expect(screen.getByTestId("cv-make-again")).toHaveTextContent("Write it again");
+    expect(screen.getByTestId("cv-make-again")).not.toHaveTextContent("€");
+    expect(screen.getByTestId("cv-write-again-cost")).toHaveTextContent(
+      "Writing it again costs about €0.002.",
+    );
+  });
+
+  it("says when the PDF could not be made, keeps the text and tries again", async () => {
+    let asked: unknown;
+    renderReview({
+      [CV]: {
+        body: cv({
+          draft: cvDraft({
+            preview: { ready: false, error: "cv_pdf_unavailable", at: "2026-10-31T10:00:01Z" },
+          }),
+        }),
+      },
+      [`POST /api/v1/opportunities/${ID}/cv/drafts/1/preview`]: async (request) => {
+        asked = await request.json();
+        return { body: cv({ draft: cvDraft() }) };
+      },
+    });
+    expect(await screen.findByTestId("cv-preview-error")).toHaveTextContent(
+      "Could not make the PDF for Example Co. The text of the CV is saved.",
+    );
+    const text = screen.getByTestId("cv-preview-text");
+    expect(text).toHaveAttribute("download", "CV - Example Co.txt");
+    expect(decodeURIComponent(text.getAttribute("href") ?? "")).toContain(
+      "- Led a team of 4 engineers",
+    );
+    await userEvent.setup().click(screen.getByTestId("cv-preview-retry"));
+    await waitFor(() => {
+      expect(asked).toEqual({ template: "clean", length: 1 });
+    });
   });
 
   it("offers to make the PDF of a CV approved without one", async () => {
@@ -419,7 +452,8 @@ describe("Review the CV", () => {
       },
     });
     const write = await screen.findByTestId("cv-letter-write");
-    expect(write).toHaveTextContent("Write the cover letter · about €0.002");
+    expect(write).toHaveTextContent("Write the cover letter");
+    expect(screen.getByTestId("cv-letter-write-cost")).toHaveTextContent("about €0.002");
     await userEvent.setup().click(write);
     await waitFor(() => {
       expect(onLetter).toHaveBeenCalledWith(ID);
@@ -473,7 +507,10 @@ describe("Review the CV", () => {
   it("offers the draft when there is none, and a company fact used as an achievement can't be confirmed", async () => {
     renderReview({ [CV]: { body: cv() } });
     expect(await screen.findByTestId("cv-empty")).toBeVisible();
-    expect(screen.getByTestId("cv-draft")).toHaveTextContent("Draft the CV · about €0.002");
+    expect(screen.getByTestId("cv-draft")).toHaveTextContent("Draft the CV");
+    expect(screen.getByTestId("cv-draft-cost")).toHaveTextContent(
+      "Drafting the CV costs about €0.002.",
+    );
   });
 
   it("offers only Change it and Remove it for a company fact outside the summary", async () => {

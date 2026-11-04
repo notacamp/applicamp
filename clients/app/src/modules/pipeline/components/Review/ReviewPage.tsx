@@ -139,6 +139,7 @@ export function ReviewPage({ id, onBack, onPipeline, spend, onLetter }: ReviewPa
         id={id}
         cv={cv.data}
         draft={cv.data.draft}
+        company={company}
         spend={spend}
         onPipeline={onPipeline}
         onLetter={onLetter}
@@ -168,6 +169,7 @@ function Review({
   id,
   cv,
   draft,
+  company,
   spend,
   onPipeline,
   onLetter,
@@ -175,6 +177,7 @@ function Review({
   id: string;
   cv: Cv;
   draft: CvDraft;
+  company: string;
   spend: ReactNode;
   onPipeline: () => void;
   onLetter: ((id: string) => void) | undefined;
@@ -272,10 +275,15 @@ function Review({
         again.mutate();
       }}
     >
-      {again.isPending
-        ? t("cv.toolbar.making")
-        : t("cv.toolbar.makeAgain", { cost: formatCost(cv.draft_eur, i18n.language) })}
+      {again.isPending ? t("cv.toolbar.making") : t("cv.toolbar.makeAgain")}
     </Button>
+  );
+  const writeAgainCost = (
+    <Tagged testId="cv-write-again-cost">
+      <Text tone="secondary" size="sm">
+        {t("cv.toolbar.cost", { cost: formatCost(cv.draft_eur, i18n.language) })}
+      </Text>
+    </Tagged>
   );
   const sheet = (
     <CvSheet
@@ -313,6 +321,7 @@ function Review({
             {editable ? null : writeAgain}
           </Cluster>
         </Tagged>
+        {editable ? null : writeAgainCost}
         {draft.needs_version ? (
           <Tagged testId="cv-needs-version">
             <Banner
@@ -422,9 +431,13 @@ function Review({
               <>
                 <PreviewPane
                   opportunity={id}
-                  n={draft.n}
-                  language={draft.language}
-                  preview={draft.preview}
+                  company={company}
+                  draft={draft}
+                  busy={busy}
+                  onRetry={() => {
+                    resetErrors();
+                    preview.mutate(layout);
+                  }}
                 />
                 <Tagged testId="cv-lines">
                   <Disclosure
@@ -467,13 +480,16 @@ function Review({
               </>
             }
             note={
-              <Tagged testId={draft.can_approve ? "cv-approve-ready" : "cv-approve-reason"}>
-                <Text tone="secondary" size="sm">
-                  {draft.can_approve
-                    ? t("cv.waiting.ready")
-                    : t("cv.waiting.answer", { count: Math.max(waiting, 1) })}
-                </Text>
-              </Tagged>
+              <>
+                <Tagged testId={draft.can_approve ? "cv-approve-ready" : "cv-approve-reason"}>
+                  <Text tone="secondary" size="sm">
+                    {draft.can_approve
+                      ? t("cv.waiting.ready")
+                      : t("cv.waiting.answer", { count: Math.max(waiting, 1) })}
+                  </Text>
+                </Tagged>
+                {writeAgainCost}
+              </>
             }
           />
         ) : undoing ? (

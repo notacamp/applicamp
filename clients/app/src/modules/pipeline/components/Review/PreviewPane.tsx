@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
 
-import { Banner, ButtonLink, Cluster, PdfPages, Stack, Tagged, Text } from "~/lib/ui";
+import { Banner, Button, ButtonLink, Cluster, PdfPages, Stack, Tagged, Text } from "~/lib/ui";
 
-import { cvPreviewUrl, type CvPreview } from "../../api/cv";
+import { cvPreviewUrl, cvText, type CvDraft } from "../../api/cv";
 import { languageName } from "../../api/labels";
 
 /**
@@ -12,17 +12,23 @@ import { languageName } from "../../api/labels";
  */
 export function PreviewPane({
   opportunity,
-  n,
-  language,
-  preview,
+  company,
+  draft,
+  onRetry,
+  busy,
 }: {
   opportunity: string;
-  /** The draft. */
-  n: number;
-  /** The CV's language tag. */
-  language: string;
-  preview: CvPreview | null | undefined;
+  /** The company, as the job names it. */
+  company: string;
+  draft: CvDraft;
+  /** Make the PDF again, in the same layout. */
+  onRetry: () => void;
+  /** Something is running. */
+  busy: boolean;
 }) {
+  const n = draft.n;
+  const language = draft.language;
+  const preview = draft.preview;
   const { t, i18n } = useTranslation("pipeline");
   const ready = preview?.ready === true;
   const error = preview?.error ?? undefined;
@@ -73,10 +79,32 @@ export function PreviewPane({
             <Banner
               tone="danger"
               icon="warning"
-              title={t(
-                error === "cv_doesnt_fit" ? "cv.preview.doesntFit" : "cv.preview.unavailable",
-              )}
-            />
+              title={
+                error === "cv_doesnt_fit"
+                  ? t("cv.preview.doesntFit")
+                  : t("cv.preview.unavailable", { company })
+              }
+            >
+              <Cluster>
+                <Button
+                  variant="secondary"
+                  disabled={busy}
+                  data-testid="cv-preview-retry"
+                  onClick={onRetry}
+                >
+                  {t("cv.preview.retry")}
+                </Button>
+                <ButtonLink
+                  variant="secondary"
+                  icon="download"
+                  href={`data:text/plain;charset=utf-8,${encodeURIComponent(cvText(draft))}`}
+                  download={t("cv.preview.textFile", { company })}
+                  data-testid="cv-preview-text"
+                >
+                  {t("cv.preview.downloadText")}
+                </ButtonLink>
+              </Cluster>
+            </Banner>
           </Tagged>
         )}
         {ready ? (

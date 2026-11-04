@@ -181,10 +181,10 @@
       }
     },
     "readLead": "Lit l’annonce et le site de l’entreprise elle-même (ce site seulement, là où robots.txt le permet) et en tire les faits : un appel à l’IA, réutilisé pendant 30 jours. Ensuite, un autre compare le poste à votre profil.",
-    "read": "Lire sur {{company}} · environ {{cost}}",
+    "read": "Lire sur {{company}}",
     "reading": "Lecture…",
     "readingLead": "Lecture des pages de {{company}}, puis comparaison du poste avec votre profil. Cela prend quelques secondes.",
-    "readAgain": "Relire · environ {{cost}}",
+    "readAgain": "Relire",
     "noFacts": "Rien sur {{company}} n’a pu être cité à partir de ses pages.",
     "facts": {
       "title": "Ce que disent les pages de {{company}}",
@@ -310,7 +310,8 @@
         "profile_needed": "Arrêté : ajoutez d’abord un poste à votre profil.",
         "generic": "Un problème est survenu pendant la préparation de cette offre."
       }
-    }
+    },
+    "readCost": "Lire coûte environ {{cost}}."
   },
   "cv": {
     "eyebrow": "CV sur mesure",
@@ -328,14 +329,15 @@
       "draftPill": "Brouillon",
       "approvedPill": "Approuvé · v{{version}}",
       "language": "Rédigé en {{language}}",
-      "makeAgain": "Réécrire · environ {{cost}}",
+      "makeAgain": "Réécrire",
       "making": "Rédaction…",
       "approve": "Approuver v{{version}}",
       "approving": "Approbation…",
-      "approveWhy": "Approuver s’active quand toutes les lignes bloquées sont corrigées ou supprimées."
+      "approveWhy": "Approuver s’active quand toutes les lignes bloquées sont corrigées ou supprimées.",
+      "cost": "Le réécrire coûte environ {{cost}}."
     },
     "draft": {
-      "draft": "Rédiger le CV · environ {{cost}}",
+      "draft": "Rédiger le CV",
       "drafting": "Rédaction…",
       "review": "Relire le CV",
       "hint": "Un appel d’IA. Ensuite, chaque ligne est vérifiée par rapport à votre profil, sans IA.",
@@ -344,7 +346,8 @@
         "per_opportunity_cap": "Vous avez déjà fait 10 brouillons pour ce poste. Relisez-en un.",
         "daily_cap": "Vous avez déjà fait 20 brouillons aujourd’hui. Vous pourrez continuer demain.",
         "ai_unavailable": "L’IA n’est pas configurée sur ce serveur : rien ne peut être rédigé."
-      }
+      },
+      "cost": "Rédiger le CV coûte environ {{cost}}."
     },
     "sheet": {
       "label": "Votre CV sur mesure",
@@ -529,8 +532,11 @@
       "making": "Création du PDF…",
       "note": "Certains mots risquent de mal ressortir quand un site d’emploi lit ce PDF.",
       "doesntFit": "Le CV ne tient pas sur 2 pages. Retirez quelques lignes.",
-      "unavailable": "Le PDF n’a pas pu être créé pour l’instant. Modifiez une ligne ou choisissez une mise en page pour réessayer.",
-      "lines": "Chaque ligne et d’où elle vient"
+      "unavailable": "Impossible de faire le PDF pour {{company}}. Le texte du CV est enregistré.",
+      "lines": "Chaque ligne et d’où elle vient",
+      "retry": "Réessayer",
+      "downloadText": "Télécharger le texte",
+      "textFile": "CV - {{company}}.txt"
     },
     "waiting": {
       "title": "À vous de voir · {{count}}",
@@ -660,7 +666,7 @@
       "body": "Votre CV est approuvé. Rédigez la lettre qui l’accompagne, à partir du même profil et des mêmes faits."
     },
     "slot": {
-      "write": "Rédiger la lettre de motivation · environ {{cost}}",
+      "write": "Rédiger la lettre de motivation",
       "writing": "Rédaction…",
       "review": "Relire la lettre de motivation",
       "hint": "Un appel d’IA. Ensuite, chaque phrase est vérifiée par rapport à votre profil, sans IA.",
@@ -670,7 +676,8 @@
         "per_opportunity_cap": "Vous avez déjà rédigé 10 brouillons de lettre pour ce poste. Relisez-en un.",
         "daily_cap": "Vous avez déjà rédigé 20 brouillons de lettre aujourd’hui. Vous pourrez continuer demain.",
         "ai_unavailable": "L’IA n’est pas configurée sur ce serveur : rien ne peut être rédigé."
-      }
+      },
+      "cost": "La rédiger coûte environ {{cost}}."
     },
     "toolbar": {
       "draft": "Brouillon {{n}}",
@@ -684,11 +691,12 @@
         "standard": "Standard · environ 300"
       },
       "note": "Une autre longueur ou une autre langue est un nouveau brouillon : Refaire.",
-      "makeAgain": "Refaire · environ {{cost}}",
+      "makeAgain": "Réécrire",
       "making": "Rédaction…",
       "approve": "Approuver",
       "approving": "Approbation…",
-      "approveWhy": "Approuver s’active quand toutes les phrases et questions bloquées sont corrigées, supprimées ou répondues."
+      "approveWhy": "Approuver s’active quand toutes les phrases et questions bloquées sont corrigées, supprimées ou répondues.",
+      "cost": "La réécrire coûte environ {{cost}}."
     },
     "sheet": {
       "label": "Votre lettre de motivation"

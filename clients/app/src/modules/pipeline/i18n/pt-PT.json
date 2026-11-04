@@ -181,10 +181,10 @@
       }
     },
     "readLead": "Lê o anúncio e o site da própria empresa (só esse site, onde o robots.txt permite) e cria os factos: uma chamada à IA, reutilizada durante 30 dias. Depois, outra compara a vaga com o seu perfil.",
-    "read": "Ler sobre {{company}} · cerca de {{cost}}",
+    "read": "Ler sobre {{company}}",
     "reading": "A ler…",
     "readingLead": "A ler as páginas de {{company}} e a comparar a vaga com o seu perfil. Demora alguns segundos.",
-    "readAgain": "Ler outra vez · cerca de {{cost}}",
+    "readAgain": "Ler outra vez",
     "noFacts": "Não foi possível citar nada sobre {{company}} nas suas páginas.",
     "facts": {
       "title": "O que dizem as páginas de {{company}}",
@@ -310,7 +310,8 @@
         "profile_needed": "Parado: adicione primeiro uma posição ao seu perfil.",
         "generic": "Algo correu mal ao preparar esta vaga."
       }
-    }
+    },
+    "readCost": "Ler custa cerca de {{cost}}."
   },
   "cv": {
     "eyebrow": "CV à medida",
@@ -328,14 +329,15 @@
       "draftPill": "Rascunho",
       "approvedPill": "Aprovado · v{{version}}",
       "language": "Escrito em {{language}}",
-      "makeAgain": "Escrever de novo · cerca de {{cost}}",
+      "makeAgain": "Escrever de novo",
       "making": "A redigir…",
       "approve": "Aprovar v{{version}}",
       "approving": "A aprovar…",
-      "approveWhy": "Aprovar fica disponível quando todas as linhas bloqueadas forem corrigidas ou removidas."
+      "approveWhy": "Aprovar fica disponível quando todas as linhas bloqueadas forem corrigidas ou removidas.",
+      "cost": "Escrever de novo custa cerca de {{cost}}."
     },
     "draft": {
-      "draft": "Redigir o CV · cerca de {{cost}}",
+      "draft": "Redigir o CV",
       "drafting": "A redigir…",
       "review": "Rever o CV",
       "hint": "Uma chamada de IA. Depois, cada linha é verificada contra o seu perfil, sem IA.",
@@ -344,7 +346,8 @@
         "per_opportunity_cap": "Já fez 10 rascunhos para esta vaga. Reveja um deles.",
         "daily_cap": "Já fez 20 rascunhos hoje. Pode continuar amanhã.",
         "ai_unavailable": "A IA não está configurada neste servidor, por isso não é possível redigir nada."
-      }
+      },
+      "cost": "Redigir o CV custa cerca de {{cost}}."
     },
     "sheet": {
       "label": "O seu CV à medida",
@@ -529,8 +532,11 @@
       "making": "A fazer o PDF…",
       "note": "Algumas palavras podem não sair bem quando um site de emprego lê este PDF.",
       "doesntFit": "O CV não cabe em 2 páginas. Retire algumas linhas.",
-      "unavailable": "Não foi possível fazer o PDF agora. Altere uma linha ou escolha um formato para tentar de novo.",
-      "lines": "Cada linha e de onde vem"
+      "unavailable": "Não foi possível fazer o PDF para a {{company}}. O texto do CV está guardado.",
+      "lines": "Cada linha e de onde vem",
+      "retry": "Tentar de novo",
+      "downloadText": "Descarregar o texto",
+      "textFile": "CV - {{company}}.txt"
     },
     "waiting": {
       "title": "Precisa de si · {{count}}",
@@ -660,7 +666,7 @@
       "body": "O seu CV está aprovado. Escreva a carta que o acompanha, a partir do mesmo perfil e dos mesmos factos."
     },
     "slot": {
-      "write": "Escrever a carta de apresentação · cerca de {{cost}}",
+      "write": "Escrever a carta de apresentação",
       "writing": "A escrever…",
       "review": "Rever a carta de apresentação",
       "hint": "Uma chamada de IA. Depois, cada frase é verificada contra o seu perfil, sem IA.",
@@ -670,7 +676,8 @@
         "per_opportunity_cap": "Já escreveu 10 rascunhos de carta para esta vaga. Reveja um deles.",
         "daily_cap": "Já escreveu 20 rascunhos de carta hoje. Pode continuar amanhã.",
         "ai_unavailable": "A IA não está configurada neste servidor, por isso não é possível escrever nada."
-      }
+      },
+      "cost": "Escrevê-la custa cerca de {{cost}}."
     },
     "toolbar": {
       "draft": "Rascunho {{n}}",
@@ -684,11 +691,12 @@
         "standard": "Normal · cerca de 300"
       },
       "note": "Outra extensão ou outro idioma é um novo rascunho: Refazer.",
-      "makeAgain": "Refazer · cerca de {{cost}}",
+      "makeAgain": "Escrever de novo",
       "making": "A escrever…",
       "approve": "Aprovar",
       "approving": "A aprovar…",
-      "approveWhy": "Aprovar fica disponível quando todas as frases e perguntas bloqueadas forem corrigidas, removidas ou respondidas."
+      "approveWhy": "Aprovar fica disponível quando todas as frases e perguntas bloqueadas forem corrigidas, removidas ou respondidas.",
+      "cost": "Escrever de novo custa cerca de {{cost}}."
     },
     "sheet": {
       "label": "A sua carta de apresentação"

@@ -64,9 +64,12 @@ function server() {
       return { body: { boards, next_cursor: null } };
     },
     [`GET /api/v1/boards/${WAITING}`]: () => ({
-      body: detail(waiting(), {
-        blockers: [{ code: "terms_forbid", detail: "You may not scrape this site." }],
-      }),
+      body:
+        lines.get(WAITING)?.status === "approved"
+          ? detail(board({ id: WAITING, name: "Example Remote" }))
+          : detail(waiting(), {
+              blockers: [{ code: "terms_forbid", detail: "You may not scrape this site." }],
+            }),
     }),
     [`GET /api/v1/boards/${HIMALAYAS}`]: () => ({ body: detail(board()) }),
     [`GET /api/v1/boards/${WAITING}/permission-email`]: () => ({

@@ -13,7 +13,7 @@ use super::model::{Frame, Source, SourceKind};
 use crate::features::brief::BriefWant;
 
 /// Raise with every change to the instructions' text.
-pub const VERSION: u32 = 2;
+pub const VERSION: u32 = 3;
 
 /// Positions the model is shown.
 pub const MAX_POSITIONS: usize = 14;
@@ -54,7 +54,8 @@ wants first.\n\
 Rules:\n\
 - Every `text` cites in `sources` the ids it comes from, and says only what those sources say. \
 No number, tool, name, place or result that is not in a cited source.\n\
-- A bullet under a position cites only that position's sources, [sk] or [bg].\n\
+- A bullet under a position cites only that position's sources (ids starting with that \
+position's `w`, like `w3.`) and [sk].\n\
 - You may use the job's words for the same thing (API for backend); never add a fact. You may \
 shorten, join two sources or turn a sentence into a bullet. Keep the numbers exactly.\n\
 - Company facts (ids starting with `c`) may be cited only in `summary`, and only to say how the \

@@ -363,7 +363,8 @@
       "as_in_profile": "Como no perfil",
       "moved_up": "Subiu",
       "reworded": "Reformulada",
-      "edited": "Editada"
+      "edited": "Editada",
+      "fixed_by_app": "Corrigida pela app"
     },
     "from": {
       "show": "Do seu perfil",
@@ -471,7 +472,8 @@
       "cannot_keep": "Esta linha é sobre a empresa, não sobre si. Altere ou retire.",
       "not_flagged": "Esta linha já corresponde ao seu perfil.",
       "too_late": "Já é tarde para desfazer. Faça o CV de novo para o alterar.",
-      "company_reads_daily_cap": "Pode ler 20 empresas por dia. A leitura continua amanhã."
+      "company_reads_daily_cap": "Pode ler 20 empresas por dia. A leitura continua amanhã.",
+      "cv_previews_daily_cap": "Já fez 30 PDFs de rascunhos hoje. Continua amanhã; alterar uma linha faz o PDF na mesma."
     },
     "layout": {
       "template": "Estilo",
@@ -537,14 +539,15 @@
       "lines": "Cada linha e de onde vem",
       "retry": "Tentar de novo",
       "downloadText": "Descarregar o texto",
-      "textFile": "CV - {{company}}.txt"
+      "textFile": "CV - {{company}}.txt",
+      "stale": "O PDF é anterior à sua última alteração.",
+      "make": "Fazer o PDF",
+      "none": "Este rascunho ainda não tem PDF."
     },
     "waiting": {
       "title": "Precisa de si · {{count}}",
       "question": "Isto é verdade? «{{text}}»",
       "skillQuestion": "Tem esta competência? {{skill}}",
-      "where": "Se a mantiver, fica no seu perfil em {{role}}.",
-      "whereNoRole": "Se a mantiver, fica no seu perfil.",
       "skillWhere": "Se a mantiver, é acrescentada às suas competências.",
       "cannotKeep": "Isto é sobre a empresa, não sobre si. Altere ou retire.",
       "yes": "Sim, manter",
@@ -559,7 +562,11 @@
       "ready": "Aprove quando estiver satisfeito.",
       "answer_one": "Responda à pergunta para aprovar.",
       "answer_other": "Responda às {{count}} perguntas para aprovar.",
-      "toldUs": "Disse-nos sobre a {{company}}: «{{quote}}». Se a mantiver, fica no seu perfil."
+      "toldUs": "Disse-nos sobre a {{company}}: «{{quote}}».",
+      "profileSays": "O seu perfil diz sobre a {{company}}: «{{quote}}».",
+      "keeps": "Se a mantiver, isto fica no seu perfil: «{{proposal}}»",
+      "cannotKeepOther": "Esta linha é sobre outro emprego do seu perfil. Altere ou retire.",
+      "cannotKeepLong": "Esta linha é demasiado longa para ficar assim no seu perfil. Encurte ou retire."
     },
     "needsVersion": {
       "title": "Este CV foi aprovado mas ainda não tem PDF",

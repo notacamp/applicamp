@@ -712,6 +712,7 @@ async fn another_accounts_opportunity_is_not_found(db: PgPool) {
         ("POST", "/drafts/1/put-back", json!({ "position": 2 })),
         ("POST", "/drafts/1/approve", json!({})),
         ("POST", "/drafts/1/discard", json!({})),
+        ("POST", "/drafts/1/unapprove", json!({})),
         (
             "POST",
             "/drafts/1/preview",
@@ -1255,6 +1256,158 @@ async fn the_preview_follows_every_change_and_another_layout_needs_no_model(db: 
     );
 }
 
+/// Put `bytes` in place of the draft's preview PDF, as if it had been made
+/// so: what Approve keeps when it reuses the preview.
+async fn mark_preview(s: &Stack, bytes: &[u8]) {
+    sqlx::query("UPDATE pipeline.cv_drafts SET preview_pdf = $1 WHERE status = 'draft'")
+        .bind(bytes)
+        .execute(&s.h.db)
+        .await
+        .unwrap();
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn approve_keeps_the_preview_only_for_the_same_text_in_the_same_layout(db: PgPool) {
+    let s = stack(db).await;
+    ready(&s).await;
+    let marker = b"%PDF-1.7 the preview as it was made".to_vec();
+    let undo = || async {
+        let (status, cv) =
+            s.h.json("POST", &url(&s.opp, "/drafts/1/unapprove"), &json!({}))
+                .await;
+        assert_eq!(status, StatusCode::OK, "{cv}");
+    };
+
+    // Another layout than the preview's: made again.
+    mark_preview(&s, &marker).await;
+    let (status, cv) =
+        s.h.json(
+            "POST",
+            &url(&s.opp, "/drafts/1/approve"),
+            &json!({ "template": "clean", "length": 2 }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    assert_ne!(stored(&s, 1).await, marker, "another layout is rendered");
+    undo().await;
+
+    // The text changed since the preview was made: made again, and the page
+    // says the PDF is older than the change.
+    mark_preview(&s, &marker).await;
+    sqlx::query(
+        "UPDATE pipeline.cv_drafts
+            SET content = jsonb_set(content, '{experience,0,bullets,0,text}',
+                                    '\"Moved invoicing onto PostgreSQL\"')
+          WHERE status = 'draft'",
+    )
+    .execute(&s.h.db)
+    .await
+    .unwrap();
+    let (_, cv) = s.h.get(&url(&s.opp, "")).await;
+    assert_eq!(cv["draft"]["preview"]["stale"], true, "{cv}");
+    let (status, cv) =
+        s.h.json("POST", &url(&s.opp, "/drafts/1/approve"), &json!({}))
+            .await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    assert_ne!(stored(&s, 1).await, marker, "the changed text is rendered");
+    undo().await;
+
+    // The same text in the same layout: the preview's PDF, as it is.
+    let (_, cv) = s.h.get(&url(&s.opp, "")).await;
+    assert_eq!(cv["draft"]["preview"]["stale"], false, "{cv}");
+    mark_preview(&s, &marker).await;
+    let (status, cv) =
+        s.h.json("POST", &url(&s.opp, "/drafts/1/approve"), &json!({}))
+            .await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    assert_eq!(stored(&s, 1).await, marker);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_preview_that_cannot_be_made_keeps_the_draft_and_says_why(db: PgPool) {
+    let s = stack(db).await;
+    let cv = draft(&s).await;
+    // Far more than two pages hold.
+    let bullets: Vec<Value> = (0..400)
+        .map(|i| {
+            json!({ "id": format!("x{i}"), "text": "Led a team of 4 engineers",
+                    "sources": ["w0.h2"], "edited": false })
+        })
+        .collect();
+    sqlx::query(
+        "UPDATE pipeline.cv_drafts SET content = jsonb_set(content, '{experience,0,bullets}', $1)",
+    )
+    .bind(sqlx::types::Json(bullets))
+    .execute(&s.h.db)
+    .await
+    .unwrap();
+    let skill = flagged(&cv)
+        .into_iter()
+        .find(|(_, k)| k == "skill_not_on_profile")
+        .unwrap()
+        .0;
+    let (status, cv) =
+        s.h.json(
+            "PATCH",
+            &url(&s.opp, &format!("/drafts/1/lines/{skill}")),
+            &json!({ "remove": true }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "the change is kept: {cv}");
+    let preview = &cv["draft"]["preview"];
+    assert_eq!(preview["ready"], false, "{preview}");
+    assert!(preview["error"].is_string(), "{preview}");
+    assert_eq!(cv["draft"]["status"], "draft");
+    assert_eq!(
+        cv["draft"]["experience"][0]["bullets"]
+            .as_array()
+            .unwrap()
+            .len(),
+        400
+    );
+    let (status, _, _) = s.h.get_raw(&url(&s.opp, "/drafts/1/preview.pdf")).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn thirty_pdfs_of_drafts_a_day_is_the_limit(db: PgPool) {
+    let s = stack(db).await;
+    draft(&s).await;
+    for _ in 0..super::preview::PREVIEWS_PER_DAY {
+        sqlx::query(
+            "INSERT INTO pipeline.cv_preview_makes (id, account_id, made_at)
+             VALUES ($1, $2, now())",
+        )
+        .bind(Uuid::now_v7())
+        .bind(s.h.account)
+        .execute(&s.h.db)
+        .await
+        .unwrap();
+    }
+    let (status, body) =
+        s.h.json(
+            "POST",
+            &url(&s.opp, "/drafts/1/preview"),
+            &json!({ "template": "compact" }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS, "{body}");
+    assert_eq!(body["code"], "cv_previews_daily_cap");
+    // Yesterday's do not count.
+    sqlx::query("UPDATE pipeline.cv_preview_makes SET made_at = now() - interval '2 days'")
+        .execute(&s.h.db)
+        .await
+        .unwrap();
+    let (status, body) =
+        s.h.json(
+            "POST",
+            &url(&s.opp, "/drafts/1/preview"),
+            &json!({ "template": "compact" }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+}
+
 /// What the fake model answers the fix prompt: a rewrite for the line that
 /// says 20 minutes, a question for the one that says a team of 6, and only a
 /// question for any other.
@@ -1343,8 +1496,10 @@ async fn the_app_fixes_what_it_can_asks_the_rest_and_yes_keeps_the_fact_it_propo
     // model's, are what Change it starts from.
     assert_eq!(team["company"], "Example Org");
     assert_eq!(team["quote"], "Led a team of 4 engineers");
+    assert_eq!(team["quote_from"], "profile", "a highlight of the profile");
     let company = waiting_for(&cv, COMPANY_FACT);
     assert!(company["proposal"].is_null());
+    assert_eq!(company["cannot_keep"], "company");
     let skill = waiting_for(&cv, "Kubernetes");
     assert_eq!(skill["kind"], "skill");
     assert_eq!(skill["proposal"], "Kubernetes");
@@ -1546,6 +1701,51 @@ async fn an_approval_can_be_undone_for_a_moment_and_not_after(db: PgPool) {
             .await;
     assert_eq!(status, StatusCode::OK, "{cv}");
     assert_eq!(cv["versions"][0]["version"], 1);
+    // The first approval's job comes due while the second can still be
+    // undone: the letter does not start, and waits for the newest moment.
+    let opp = Uuid::parse_str(&s.opp).unwrap();
+    let preparation = || async {
+        sqlx::query_as::<_, (String, String)>(
+            "SELECT state, step FROM pipeline.preparations WHERE opportunity_id = $1",
+        )
+        .bind(opp)
+        .fetch_one(&s.h.db)
+        .await
+        .unwrap()
+    };
+    assert_eq!(
+        preparation().await,
+        ("queued".to_owned(), "letter".to_owned())
+    );
+    let neighbours: Arc<dyn crate::ports::Neighbours> = s.fake.clone();
+    let deps = crate::PipelineDeps {
+        neighbours: Some(neighbours),
+        ai: Some(s.model.gateway()),
+    };
+    crate::features::prepare::run(&deps, &s.h.db, opp)
+        .await
+        .unwrap();
+    assert_eq!(
+        preparation().await,
+        ("queued".to_owned(), "letter".to_owned())
+    );
+    let letters: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM pipeline.letter_drafts WHERE opportunity_id = $1")
+            .bind(opp)
+            .fetch_one(&s.h.db)
+            .await
+            .unwrap();
+    assert_eq!(letters, 0, "no letter while Undo is offered");
+    let later: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM kernel.jobs
+          WHERE kind = 'pipeline.prepare' AND state = 'pending' AND run_at > now()
+            AND payload ->> 'opportunity' = $1",
+    )
+    .bind(&s.opp)
+    .fetch_one(&s.h.db)
+    .await
+    .unwrap();
+    assert!(later >= 1, "the letter runs once the moment is over");
     sqlx::query("UPDATE pipeline.cv_drafts SET approved_at = now() - interval '1 minute'")
         .execute(&s.h.db)
         .await

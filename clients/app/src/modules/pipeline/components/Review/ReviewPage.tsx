@@ -440,8 +440,9 @@ function Review({
                   opportunity={id}
                   company={company}
                   draft={draft}
-                  busy={busy}
-                  onRetry={() => {
+                  making={preview.isPending}
+                  disabled={busy}
+                  onMake={() => {
                     resetErrors();
                     preview.mutate(layout);
                   }}

@@ -11,7 +11,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use super::{
-    check::{Checks, Reason, claims_of, flagged_in_order, keepable, usable_sources},
+    check::{CannotKeep, Checks, Reason, cannot_keep, claims_of, flagged_in_order, usable_sources},
     fix::MAX_PROPOSAL,
     model::{Content, Frame, Line, PositionInfo, SourceKind},
     pdf::{Template, readback::PdfChecks},
@@ -76,6 +76,18 @@ pub enum WaitingKind {
     Skill,
 }
 
+/// Where the quote of a waiting line comes from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum QuoteFrom {
+    /// Something the person told the app: a fact of theirs ("You told us
+    /// about …").
+    You,
+    /// Their profile as it came in: a highlight, a summary or a headline of
+    /// their CV ("Your profile says about …").
+    Profile,
+}
+
 /// A line (or skill) the check flagged and the app could not fix: a
 /// question only the person can answer.
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -90,15 +102,23 @@ pub struct Waiting {
     pub question: Option<String>,
     /// What "Yes, keep it" (`{proposal: true}`) keeps on the profile: the
     /// app's sentence, else the line's own words, or the skill. None when it
-    /// cannot be kept (a company fact used as an achievement).
+    /// cannot be kept (`cannot_keep` says why).
     pub proposal: Option<String>,
+    /// Why "Yes, keep it" is not offered: `company` (it is about the
+    /// company), `other_position` (another job's line), `too_long` (longer
+    /// than a fact the profile keeps). None when it is.
+    pub cannot_keep: Option<CannotKeep>,
     /// "Title · Company" of the position a kept fact lands on.
     pub role: Option<String>,
     /// The company of that position ("You told us about …").
     pub company: Option<String>,
     /// The person's own words the line was made from, as the profile has
-    /// them: what "Change it" starts from. None when it cites none.
+    /// them on that position: what "Change it" starts from. None when it
+    /// cites none.
     pub quote: Option<String>,
+    /// Whether the quote is something the person told the app or their
+    /// profile's words. None when there is no quote.
+    pub quote_from: Option<QuoteFrom>,
     /// Why it is flagged.
     pub flags: Vec<Reason>,
 }
@@ -414,34 +434,48 @@ fn waiting(content: &Content, frame: &Frame, checks: &Checks) -> Vec<Waiting> {
                     text: skill.name.clone(),
                     question: None,
                     proposal: Some(skill.name.clone()),
+                    cannot_keep: None,
                     role: None,
                     company: None,
                     quote: None,
+                    quote_from: None,
                     flags,
                 });
             }
             let (line, place) = content.placed_lines().find(|(l, _)| l.id == id)?;
-            let proposal = keepable(&flags)
-                .then(|| {
-                    line.ask
-                        .as_ref()
-                        .and_then(|a| a.proposal.clone())
-                        .unwrap_or_else(|| line.text.clone())
-                })
-                .filter(|p| p.chars().count() <= MAX_PROPOSAL);
-            let position = content
-                .position_of(&id, frame.latest)
-                .and_then(|p| frame.position(p));
+            let mut refused = cannot_keep(&flags, place, frame);
+            let mut proposal = None;
+            if refused.is_none() {
+                let text = line
+                    .ask
+                    .as_ref()
+                    .and_then(|a| a.proposal.clone())
+                    .unwrap_or_else(|| line.text.clone());
+                if text.chars().count() > MAX_PROPOSAL {
+                    refused = Some(CannotKeep::TooLong);
+                } else {
+                    proposal = Some(text);
+                }
+            }
+            let at = content.position_of(&id, frame.latest);
+            let position = at.and_then(|p| frame.position(p));
             let role = position.map(role_of).filter(|r| !r.is_empty());
             let company = position
                 .and_then(|p| p.company.clone())
                 .filter(|c| !c.trim().is_empty());
-            // The person's own words, never the model's or a company's page.
-            let quote = usable_sources(line, place, frame)
+            // The person's own words, never the model's or a company's page,
+            // from the position the card names (or, with none, the profile's
+            // own summary or headline): a fact they told the app, or their
+            // profile's.
+            let source = usable_sources(line, place, frame)
                 .iter()
                 .filter_map(|source| frame.get(source))
                 .find(|source| {
-                    matches!(
+                    let own = match at {
+                        Some(at) => source.position == Some(at),
+                        None => source.position.is_none(),
+                    };
+                    own && matches!(
                         source.kind,
                         SourceKind::Highlight
                             | SourceKind::Fact
@@ -449,17 +483,26 @@ fn waiting(content: &Content, frame: &Frame, checks: &Checks) -> Vec<Waiting> {
                             | SourceKind::Summary
                             | SourceKind::Headline
                     )
-                })
-                .map(|source| source.text.clone());
+                });
+            let quote = source.map(|source| source.text.clone());
+            let quote_from = source.map(|source| {
+                if source.kind == SourceKind::Fact {
+                    QuoteFrom::You
+                } else {
+                    QuoteFrom::Profile
+                }
+            });
             Some(Waiting {
                 line_id: id,
                 kind: WaitingKind::Line,
                 text: line.text.clone(),
                 question: line.ask.as_ref().and_then(|a| a.question.clone()),
                 proposal,
+                cannot_keep: refused,
                 role,
                 company,
                 quote,
+                quote_from,
                 flags,
             })
         })
@@ -862,6 +905,87 @@ mod tests {
             edited: false,
             ..Line::default()
         }
+    }
+
+    #[test]
+    fn a_question_quotes_the_position_it_names_and_says_why_it_cannot_be_kept() {
+        let f = Frame::build(
+            &CvProfile {
+                positions: vec![
+                    CvPosition {
+                        index: 0,
+                        title: Some("Senior Engineer".into()),
+                        company: Some("Example Org".into()),
+                        highlights: vec!["Rebuilt billing in Rust".into()],
+                        facts: vec![crate::ports::CvFact {
+                            id: "11111111-aaaa".into(),
+                            text: "Moved invoicing onto PostgreSQL".into(),
+                        }],
+                        ..CvPosition::default()
+                    },
+                    CvPosition {
+                        index: 1,
+                        title: Some("Engineer".into()),
+                        company: Some("Sample Labs".into()),
+                        highlights: vec!["Built ingestion for 3 partner feeds".into()],
+                        ..CvPosition::default()
+                    },
+                ],
+                skills: vec!["Rust".into()],
+                latest: Some(0),
+                ..CvProfile::default()
+            },
+            "Example Co",
+            &[],
+        );
+        let long = format!("Rebuilt billing in Rust for 12 teams {}", "and more ".repeat(40));
+        let content = Content {
+            summary: Some(line(
+                "s1",
+                "Engineer who built ingestion for 3 partner feeds in 2 weeks",
+                &["w1.h1", "w0.h1"],
+            )),
+            experience: vec![Role {
+                position: 0,
+                bullets: vec![
+                    line("l1", "Rebuilt billing in Rust for 12 teams", &["w0.h1"]),
+                    line("l2", "Built ingestion for 3 partner feeds", &["w1.h1"]),
+                    line("l3", long.trim(), &["w0.h1"]),
+                    line("l4", "Moved invoicing onto PostgreSQL in 3 weeks", &["w0.f11111111"]),
+                ],
+            }],
+            ..Content::default()
+        };
+        let known = super::super::check::Known::new(&f, &Default::default(), "");
+        let checks = super::super::check::check(&content, &f, &known);
+        let items = waiting(&content, &f, &checks);
+        let item = |id: &str| items.iter().find(|w| w.line_id == id).unwrap();
+        // The summary names the latest position, Example Org: its quote is
+        // that position's, not Sample Labs'.
+        assert_eq!(item("s1").company.as_deref(), Some("Example Org"));
+        assert_eq!(item("s1").quote.as_deref(), Some("Rebuilt billing in Rust"));
+        assert_eq!(item("l1").quote.as_deref(), Some("Rebuilt billing in Rust"));
+        // A highlight is the profile's words, not something told to the app.
+        assert_eq!(item("l1").quote_from, Some(QuoteFrom::Profile));
+        // A fact the person kept: what they told the app.
+        assert_eq!(
+            item("l4").quote.as_deref(),
+            Some("Moved invoicing onto PostgreSQL")
+        );
+        assert_eq!(item("l4").quote_from, Some(QuoteFrom::You));
+        assert_eq!(item("l2").quote_from, None);
+        assert_eq!(item("l1").cannot_keep, None);
+        assert_eq!(
+            item("l1").proposal.as_deref(),
+            Some("Rebuilt billing in Rust for 12 teams")
+        );
+        // Another job's line: no yes, and no quote from that other job.
+        assert_eq!(item("l2").cannot_keep, Some(CannotKeep::OtherPosition));
+        assert_eq!(item("l2").proposal, None);
+        assert_eq!(item("l2").quote, None);
+        // Longer than a fact the profile keeps.
+        assert_eq!(item("l3").cannot_keep, Some(CannotKeep::TooLong));
+        assert_eq!(item("l3").proposal, None);
     }
 
     #[test]

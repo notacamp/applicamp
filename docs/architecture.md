@@ -31,7 +31,7 @@ flowchart LR
 | `crates/server` | Composes modules, serves the web client, BFF (session cookie, CSRF), OpenAPI. |
 | `crates/agent` | The runner binary baked into sandbox images: the bounded agent loop (limits, typed end states, tool-call validation), talks only to the agent API, drives Chromium over CDP in the browser image. |
 | `crates/modules/identity` | Accounts, invite list, sign-in with Campbooks and LinkedIn (OIDC), sessions. |
-| `crates/modules/profile` | Master profile (from LinkedIn export ZIP / PDF / pasted CV), goals and the first-run interview. |
+| `crates/modules/profile` | Master profile (from LinkedIn export ZIP / PDF / pasted CV), goals, the first-run interview, and the LinkedIn check-up (what to change on LinkedIn, from a file the person uploads). |
 | `crates/modules/sources` | Job-board readers and their terms (rate limits, attribution). |
 | `crates/modules/pipeline` | Opportunities, stages, matches, notes, activity. |
 | `crates/modules/cvs` | Master CV (JSON Resume–compatible), tailored variants, fact-check gate, Typst PDF rendering, ATS text check. |

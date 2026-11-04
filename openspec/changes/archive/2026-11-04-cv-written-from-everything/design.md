@@ -5,7 +5,7 @@
 `APPLICAMP_AI__WRITE__{BASE_URL,MODEL,API_KEY(_FILE),INCLUDE_USAGE,REASONING_EFFORT,
 REQUIRE_PARAMETERS,PRICE_IN_USD_PER_MTOK,PRICE_OUT_USD_PER_MTOK}`. `Gateway::complete_as(role, …)`
 runs any role with the same daily cap, worst-case reservation and ledger (`ai.usage.role` gains
-`write`, migration `20261104110000_ai__write_role.sql`); `Gateway::complete` is `complete_as(Complete)`.
+`write`, migration `20261104151049_ai__write_role.sql`); `Gateway::complete` is `complete_as(Complete)`.
 `Gateway::writer()` is `write` when configured, else `complete`: the fallback when an instance runs
 one model. No price-table entry is guessed: an unknown model is priced high until the instance sets
 its price.
@@ -27,12 +27,12 @@ its price.
   profile but not on the CV; one call on the writer role (3,000 tokens) asks for up to three bullets
   `{position, text, sources}`; they are added, checked, and go through the fix round with the rest.
   None qualifying, no call. `GET …/cv` carries `draft.wants` (`text`, `level`, `covered`, `reason`).
-- `cv_drafts.cost_eur` keeps what the draft's calls cost (migration `20261104120000_pipeline__cv_cost.sql`);
+- `cv_drafts.cost_eur` keeps what the draft's calls cost (migration `20261104151050_pipeline__cv_cost.sql`);
   `GET …/cv` carries `done` (the preparation's steps, then the draft with that cost).
 
 ## Shortlist proposals (schema `pipeline`)
 - `opportunities.proposed_at`, `shortlisted_by` (`person`, `app`), `shortlisted_at` (migration
-  `20261104130000_pipeline__shortlist_proposals.sql`). `store::insert` proposes a found job with a match
+  `20261104151051_pipeline__shortlist_proposals.sql`). `store::insert` proposes a found job with a match
   of 75 or more whose eligibility is not "not open to the person"; `set_eligibility` withdraws it when
   a requirement rules it out; the stage PATCH and "Not for me" clear it, and a person's shortlist sets
   `shortlisted_by = 'person'`.
@@ -48,7 +48,7 @@ its price.
 
 ## States (owner-approved after the design review)
 - `companies.read_failure` keeps why the last read failed (`robots_disallows`, `no_pages_readable`,
-  `site_unreachable`; cleared by a read; migration `20261104140000_pipeline__pasted_company_text.sql`,
+  `site_unreachable`; cleared by a read; migration `20261104151052_pipeline__pasted_company_text.sql`,
   which also allows pages of kind `pasted`). `GET …/cv` carries `company_read_failure`, `read_eur` and,
   on the draft, `company_facts`.
 - `POST /api/v1/opportunities/{id}/brief/paste` `{text}` (1 to 20,000 characters): the text is read

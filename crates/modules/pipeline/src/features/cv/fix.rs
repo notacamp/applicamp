@@ -11,9 +11,11 @@
 //!   (marked as fixed by the app, its first words kept), one that does not
 //!   is dropped and the line waits on the person;
 //! - a question is kept on the line with its fact when that fact backs the
-//!   line (it says every claim the line makes); otherwise "Yes, keep it"
-//!   keeps the line's own words. A company fact used as an achievement is
-//!   never offered for keeping.
+//!   line (it says every claim the line makes) and claims nothing more than
+//!   the line or its own sources do; otherwise "Yes, keep it" keeps the
+//!   line's own words. A company fact used as an achievement, a summary whose
+//!   flagged words only the company says, and another job's line are never
+//!   offered for keeping.
 //!
 //! One round only, nothing retried. The call goes through the same budget and
 //! spending limits as the draft's; when it cannot be made, or answers nothing
@@ -22,12 +24,13 @@
 //! it" does that.
 
 use applicamp_ai::{Gateway, Role};
+use applicamp_kernel::claims::{Evidence, classified};
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
 
 use super::{
-    check::{Checks, Known, check_line, keepable, usable_sources},
+    check::{Checks, Known, cannot_keep, check_line, usable_sources},
     fix_prompt::{self, Flagged, RawFixes},
     judge::{MAX_BULLET, MAX_HEADLINE, MAX_SUMMARY},
     model::{Ask, Content, Frame, Line, Place, Source, SourceKind},
@@ -67,7 +70,9 @@ fn kept(text: Option<&str>, most: usize) -> Option<String> {
 }
 
 /// Whether `fact`, kept on the line's position as a source beside its usable
-/// sources, would let `line` at `place` pass the check.
+/// sources, would let `line` at `place` pass the check, and claims nothing
+/// that neither the line nor its own (never the company's) sources say: what
+/// the person keeps is what they were asked about.
 pub(super) fn backs(
     fact: &str,
     line: &Line,
@@ -76,6 +81,21 @@ pub(super) fn backs(
     known: &Known,
     latest: Option<usize>,
 ) -> bool {
+    let said: Vec<String> = classified(&line.text)
+        .into_iter()
+        .map(|c| c.text.to_lowercase())
+        .collect();
+    let own: Vec<String> = usable_sources(line, place, frame)
+        .into_iter()
+        .filter(|id| frame.get(id).is_some_and(|s| s.kind != SourceKind::Company))
+        .collect();
+    let sources = Evidence::of_texts(frame.evidence(&own));
+    if classified(fact)
+        .iter()
+        .any(|c| !said.contains(&c.text.to_lowercase()) && !sources.says(&c.text))
+    {
+        return false;
+    }
     let mut with = frame.clone();
     let position = match place {
         Place::Bullet(at) => Some(at),
@@ -142,7 +162,7 @@ pub(super) fn apply(
             }
         }
         let question = kept(answer.question.as_deref(), MAX_QUESTION);
-        let proposal = if keepable(reasons) {
+        let proposal = if cannot_keep(reasons, place, frame).is_none() {
             kept(answer.fact.as_deref(), MAX_PROPOSAL)
                 .filter(|fact| backs(fact, line, place, frame, known, latest))
         } else {
@@ -418,6 +438,43 @@ mod tests {
     }
 
     #[test]
+    fn a_fact_that_claims_more_than_the_line_is_not_proposed() {
+        let f = frame();
+        let known = Known::new(&f, &Contact::default(), "");
+        let l1 = line("l1", "Cut invoice runs to 20 minutes", &["w0.h1"]);
+        // The line's claim, and words its own source says: kept as asked.
+        assert!(backs(
+            "I cut invoice runs from 6 hours to 20 minutes.",
+            &l1,
+            Place::Bullet(0),
+            &f,
+            &known,
+            f.latest
+        ));
+        // A tool, a number or a name nobody asked about: never kept by a yes.
+        for fact in [
+            "I cut invoice runs to 20 minutes with Kafka.",
+            "I cut invoice runs to 20 minutes for 300 clients.",
+            "I cut invoice runs to 20 minutes at Sample Labs.",
+        ] {
+            assert!(
+                !backs(fact, &l1, Place::Bullet(0), &f, &known, f.latest),
+                "{fact}"
+            );
+        }
+        // The company's facts are not the person's sources.
+        let summary = line("s1", "Rust engineer, cut runs to 20 minutes", &["w0.h1", "c99999999"]);
+        assert!(!backs(
+            "I cut runs to 20 minutes for Ledgers of small shops.",
+            &summary,
+            Place::Summary,
+            &f,
+            &known,
+            f.latest
+        ));
+    }
+
+    #[test]
     fn a_company_fact_used_as_an_achievement_is_never_proposed() {
         let (c, _, _) = run(vec![fix(
             "l2",
@@ -486,5 +543,49 @@ mod tests {
         assert!(!message.contains("<source id=\"c99999999\">"));
         assert!(!message.contains("<source id=\"w1.h1\">"));
         assert!(message.contains("it uses what the person did in another job"));
+    }
+
+    #[test]
+    fn the_companys_facts_are_shown_as_the_companys_and_never_kept() {
+        let f = frame();
+        let known = Known::new(&f, &Contact::default(), "");
+        let mut c = Content {
+            summary: Some(line(
+                "s1",
+                "Engineer for Ledgers of 30 small shops",
+                &["w0.h1", "c99999999"],
+            )),
+            ..Content::default()
+        };
+        let checks = check::check(&c, &f, &known);
+        assert!(checks.contains_key("s1"), "{checks:?}");
+        let lines = flagged(&c, &f, &checks);
+        let message = fix_prompt::message(&lines, &f, "en");
+        assert!(
+            message.contains(
+                "<company_source id=\"c99999999\">Builds ledgers for small shops</company_source>"
+            ),
+            "{message}"
+        );
+        assert!(message.contains("<source id=\"w0.h1\">"));
+        // "30" is the person's to say: its question may keep a fact.
+        apply(
+            &mut c,
+            &f,
+            &known,
+            &checks,
+            RawFixes {
+                lines: vec![fix(
+                    "s1",
+                    None,
+                    Some("Did you work for 30 small shops?"),
+                    Some("I worked for 30 small shops."),
+                )],
+            },
+        );
+        assert_eq!(
+            c.summary.as_ref().unwrap().ask.as_ref().unwrap().proposal.as_deref(),
+            Some("I worked for 30 small shops.")
+        );
     }
 }

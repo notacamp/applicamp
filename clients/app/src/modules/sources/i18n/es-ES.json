@@ -109,6 +109,7 @@
       "suggestion_limit_reached": "Ya son 10 sugerencias hoy. Vuelve a intentarlo mañana.",
       "terms_forbid": "Sus condiciones prohíben la lectura automática, así que no se puede aprobar.",
       "needs_key": "Primero necesita una clave de API: añádela abajo.",
+      "needs_permission": "Pide permiso primero. Pídeselo y después apruébalo tú.",
       "no_endpoint": "Aún no tiene dirección de feed. Revisa el portal para buscar una.",
       "invalid_key": "Esa clave no se puede usar.",
       "no_key_needed": "Este portal no necesita clave.",
@@ -134,6 +135,9 @@
     "days30": "30 días",
     "flagsTitle": "Por revisar",
     "homepage": "Abrir el portal",
+    "approvedByApp": "Aprobado por la aplicación el {{when}}",
+    "contentSignalNoTrain": "Su sitio pide que su contenido no se use para entrenar modelos. Applicamp nunca entrena con ofertas.",
+    "foundThrough": "Encontrado a través de {{source}}",
     "robots": {
       "unchecked": "Aún sin revisar.",
       "none": "Sin robots.txt: todo está permitido.",
@@ -166,6 +170,7 @@
       "config_invalid": "Su configuración no funciona: {{detail}}",
       "terms_forbid": "Sus condiciones prohíben la lectura automática: {{detail}}",
       "needs_key": "Necesita una clave de API de {{board}}: {{how}}",
+      "needs_permission": "Pide permiso primero: {{detail}}",
       "no_endpoint": "Aún no tiene dirección de feed. La comprobación busca una y propone una configuración.",
       "unknown": "Aún no se puede aprobar: {{detail}}",
       "source": "Dónde lo dice"
@@ -229,6 +234,36 @@
       "notJson": "Eso no es JSON válido.",
       "notObject": "La configuración es un objeto JSON.",
       "advanced": "Avanzado: editar la configuración en JSON"
+    },
+    "tags": {
+      "kind": {
+        "tech": "Tecnología",
+        "data": "Datos",
+        "design": "Diseño",
+        "product": "Producto",
+        "marketing": "Marketing",
+        "sales": "Ventas",
+        "finance": "Finanzas",
+        "legal": "Jurídico",
+        "people": "Personas y recursos humanos",
+        "operations": "Operaciones",
+        "support": "Atención al cliente",
+        "health-care": "Salud y cuidados",
+        "education": "Educación",
+        "hospitality-travel": "Hoteles y viajes",
+        "retail": "Comercio",
+        "logistics": "Logística",
+        "trades": "Oficios",
+        "climate": "Clima",
+        "nonprofit": "Sin ánimo de lucro",
+        "public-sector": "Sector público",
+        "media": "Medios",
+        "science": "Ciencia"
+      },
+      "remote": {
+        "remote": "Mayormente remoto",
+        "some-remote": "Algo remoto"
+      }
     }
   },
   "scanned": {

@@ -48,6 +48,9 @@ services:
         aliases:
           - seeded-board.test
           - keyed-board.test
+          # Sites of #75: one the app approves by itself, one that asks first.
+          - clean-site.test
+          - ask-first-site.test
           - feed-site-desktop.test
           - feed-site-phone.test
           # A company's own site (#34): a posting pasted at

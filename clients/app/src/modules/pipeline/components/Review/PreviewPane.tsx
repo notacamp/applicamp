@@ -8,23 +8,27 @@ import { languageName } from "../../api/labels";
 /**
  * The draft as the PDF it will be: every page drawn on the page, made again
  * after every change, with its length and language in one line, Download
- * draft, and one plain sentence when a job site might not read it well.
+ * draft, and one plain sentence when a job site might not read it well. When
+ * there is no PDF yet, or it is older than the last change, "Make the PDF".
  */
 export function PreviewPane({
   opportunity,
   company,
   draft,
-  onRetry,
-  busy,
+  onMake,
+  making,
+  disabled,
 }: {
   opportunity: string;
   /** The company, as the job names it. */
   company: string;
   draft: CvDraft;
-  /** Make the PDF again, in the same layout. */
-  onRetry: () => void;
+  /** Make the PDF of the draft as it is now, in the layout chosen (or again after a failure). */
+  onMake: () => void;
+  /** The PDF is being made. */
+  making: boolean;
   /** Something is running. */
-  busy: boolean;
+  disabled: boolean;
 }) {
   const n = draft.n;
   const language = draft.language;
@@ -34,6 +38,16 @@ export function PreviewPane({
   const error = preview?.error ?? undefined;
   const pages = preview?.pages ?? preview?.length ?? 1;
   const checks = preview?.ready === true ? (preview.checks ?? undefined) : undefined;
+  const make = (
+    <Button
+      variant="secondary"
+      disabled={disabled || making}
+      data-testid="cv-preview-make"
+      onClick={onMake}
+    >
+      {making ? t("cv.preview.making") : t("cv.preview.make")}
+    </Button>
+  );
   // What a job site reads out of the PDF: when it would miss something, say so.
   const lacking =
     checks !== undefined &&
@@ -74,6 +88,11 @@ export function PreviewPane({
             </Text>
           </Tagged>
         ) : null}
+        {preview?.stale === true ? (
+          <Tagged testId="cv-preview-stale">
+            <Banner icon="warning" title={t("cv.preview.stale")} action={make} />
+          </Tagged>
+        ) : null}
         {error === undefined ? null : (
           <Tagged testId="cv-preview-error">
             <Banner
@@ -88,9 +107,9 @@ export function PreviewPane({
               <Cluster>
                 <Button
                   variant="secondary"
-                  disabled={busy}
+                  disabled={disabled || making}
                   data-testid="cv-preview-retry"
-                  onClick={onRetry}
+                  onClick={onMake}
                 >
                   {t("cv.preview.retry")}
                 </Button>
@@ -118,8 +137,11 @@ export function PreviewPane({
             }}
           />
         ) : error === undefined ? (
-          <Tagged testId="cv-preview-making">
-            <Text tone="secondary">{t("cv.preview.making")}</Text>
+          <Tagged testId="cv-preview-none">
+            <Stack gap="sm">
+              <Text tone="secondary">{t("cv.preview.none")}</Text>
+              <Cluster>{make}</Cluster>
+            </Stack>
           </Tagged>
         ) : null}
       </Stack>

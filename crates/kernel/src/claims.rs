@@ -130,6 +130,20 @@ impl Evidence {
         self.squashed.contains(&squashed)
     }
 
+    /// Whether the evidence says every word of `claim` as a whole word
+    /// ("Cisco" is not in "San Francisco"): for what a line may say without
+    /// citing it, such as a place or a word of the posting.
+    pub fn says_words(&self, claim: &str) -> bool {
+        let mut any = false;
+        for word in words(claim) {
+            if !self.words.contains(&word) {
+                return false;
+            }
+            any = true;
+        }
+        any
+    }
+
     /// Whether the evidence contains `text` as written (a URL).
     pub fn contains(&self, text: &str) -> bool {
         self.squashed.contains(&squash(text))
@@ -352,6 +366,17 @@ mod tests {
         let e = Evidence::of_texts(["Cut runs from 6 hours to 40 minutes", "Used Rust"]);
         assert!(e.unsupported("Cut runs to 40 minutes with Rust").is_empty());
         assert_eq!(e.unsupported("Cut runs by 30%"), ["30"]);
+    }
+
+    #[test]
+    fn whole_words_are_not_found_inside_other_words() {
+        let e = Evidence::of_texts(["San Francisco, California", "Senior Engineer"]);
+        assert!(e.says("Cisco"), "as written, it is in the text");
+        assert!(!e.says_words("Cisco"), "but not as a word");
+        assert!(e.says_words("Francisco"));
+        assert!(e.says_words("san francisco"));
+        assert!(!e.says_words("Senior Staff"));
+        assert!(!e.says_words(""));
     }
 
     #[test]

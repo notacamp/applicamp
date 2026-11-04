@@ -243,6 +243,7 @@ export function cvDraft(overrides: Partial<CvDraft> = {}): CvDraft {
         role: "Senior Engineer · Example Org",
         company: "Example Org",
         quote: "Cut invoice runs from 6 hours to 40 minutes",
+        quote_from: "profile",
         flags: [{ kind: "claim_not_in_sources", claim: "20", cites: ["w0.h1"] }],
       },
       {
@@ -255,6 +256,7 @@ export function cvDraft(overrides: Partial<CvDraft> = {}): CvDraft {
     ],
     preview: {
       ready: true,
+      stale: false,
       template: "clean",
       length: 1,
       pages: 1,
@@ -288,7 +290,7 @@ export function cv(overrides: Partial<Cv> = {}): Cv {
       month_eur: 0.42,
       month_limit_eur: 5,
     },
-    draft_eur: 0.002,
+    draft_eur: 0.01,
     done: [
       { step: "read", eur: 0.002, at: "2026-10-31T09:59:00Z" },
       { step: "draft", eur: 0.004, at: "2026-10-31T10:00:00Z" },

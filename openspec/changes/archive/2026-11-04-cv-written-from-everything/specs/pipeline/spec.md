@@ -45,6 +45,51 @@ cost SHALL be on the line under it.
 
 ## MODIFIED Requirements
 
+### Requirement: A blocked line is fixed, said to be true, or removed
+What the app could not fix SHALL wait on the person as a question: "Is this true?" with the line,
+the app's own question when it asked one, the person's own words it was made from, from the position
+the card names ("You told us about <company>: …" for a fact they told the app, "Your profile says about
+<company>: …" for their profile's own words), and what a yes keeps word for word ("If you keep it, this
+goes on your profile: …"), and Yes, keep it / Change it / Remove it. When there is no yes,
+the card SHALL say why: it is about the company, it is another job's line, or it is too long to keep
+as a fact. Change it SHALL start from the person's own
+words, never the model's, and an empty line SHALL not be saved. "Yes, keep it" SHALL keep the
+app's proposed fact (else the line's own words) on the line's position of the profile as a confirmed
+assumption based on "The CV draft for <company>", after which the line SHALL be checked again with
+that fact as a source and without another position's or a company's sources. It SHALL be refused
+(`cannot_keep`) for a company fact used as an achievement, a summary whose flagged words only the
+company says, another job's line, and a line longer than a fact. Change it SHALL edit the line, the new text
+being checked against the same sources (a rewritten line no longer cites company facts unless it is
+the summary, nor another position's sources under a position). The person MAY still say it is true in
+their own words, which SHALL be saved as a fact on the line's position with those words as its quote
+(area `results` unless they choose another). For a blocked skill, Yes SHALL add the skill to the
+profile. None of these SHALL call a model; each SHALL make the preview again.
+
+#### Scenario: Yes, keep it
+- **WHEN** a line is blocked for "a team of 6" and the app proposed "I led a team of 6 engineers."
+- **THEN** the card shows "If you keep it, this goes on your profile: “I led a team of 6 engineers.”", and Yes keeps that sentence on the position as a confirmed assumption, the line cites it and passes
+
+#### Scenario: Whose words
+- **WHEN** a blocked line was made from a highlight of the imported profile, and another from a fact the person told the app
+- **THEN** the first card says "Your profile says about <company>: …" and the second "You told us about <company>: …", and Change it starts from those words either way
+
+#### Scenario: A fact that says more
+- **WHEN** the app proposes a fact that names a tool, a number or a name neither the line nor its own sources say
+- **THEN** it is not proposed, and Yes keeps the line's own words
+
+#### Scenario: It's true
+- **WHEN** a line is blocked for a number and the person writes the number in their own words
+- **THEN** the words are a kept fact on that position of their profile, the line cites it and passes
+
+#### Scenario: Edit
+- **WHEN** the person rewrites a blocked line to say only what its sources say
+- **THEN** it passes and is marked as edited
+
+#### Scenario: A company fact
+- **WHEN** the person says yes to a line that uses a company fact as an achievement
+- **THEN** it is refused with `cannot_keep` and nothing reaches the profile
+
+
 ### Requirement: Draft a CV from the profile, every line citing its sources
 From a Shortlisted or later opportunity, one click, or the preparation of a job
 the person shortlisted, SHALL make a draft CV with one model call on the
@@ -120,11 +165,12 @@ UTC day, refused with `cv_drafts_per_opportunity_cap` and `cv_drafts_daily_cap`
 before any call; drafts made by a job's preparation count the same. A draft
 SHALL start only from a click or from the preparation of a job the person or
 the app shortlisted, and SHALL make at most three model calls: the draft, the
-second look at what the job wants, and the fix of what the check flagged. The
-calls SHALL go through the account and instance spending limits, and nothing
-SHALL be retried past a limit or run on a timer. Rendering a preview SHALL call
-no model. A draft nobody approved SHALL be deleted 7 days after its last
-change; approved versions SHALL be kept.
+second look at what the job wants, and the fix of what the check flagged; its
+cost estimate SHALL count the three at their worst. The calls SHALL go through
+the account and instance spending limits, and nothing SHALL be retried past a
+limit or run on a timer. Rendering a preview SHALL call no model. A draft nobody
+approved SHALL be deleted 7 days after its last change; approved versions SHALL
+be kept.
 
 #### Scenario: Over the daily cap
 - **WHEN** an account has made 20 drafts today and drafts another

@@ -15,19 +15,27 @@ function WaitingCard({ item, actions }: { item: CvWaiting; actions: LineActions 
   const [text, setText] = useState(quote ?? "");
   const skill = item.kind === "skill";
   const proposal = item.proposal ?? undefined;
-  const role = item.role ?? undefined;
   const company = item.company ?? undefined;
-  let where: string;
-  if (proposal === undefined) {
-    where = t("cv.waiting.cannotKeep");
-  } else if (skill) {
-    where = t("cv.waiting.skillWhere");
-  } else if (company !== undefined && quote !== undefined) {
-    where = t("cv.waiting.toldUs", { company, quote });
-  } else if (role === undefined) {
-    where = t("cv.waiting.whereNoRole");
+  const question = item.question ?? undefined;
+  // Where the line comes from: what they told the app, or their profile's words.
+  const where =
+    skill || company === undefined || quote === undefined
+      ? undefined
+      : item.quote_from === "you"
+        ? t("cv.waiting.toldUs", { company, quote })
+        : t("cv.waiting.profileSays", { company, quote });
+  // What a yes keeps, word for word, or why there is no yes.
+  let keeps: string;
+  if (skill) {
+    keeps = t("cv.waiting.skillWhere");
+  } else if (proposal !== undefined) {
+    keeps = t("cv.waiting.keeps", { proposal });
+  } else if (item.cannot_keep === "other_position") {
+    keeps = t("cv.waiting.cannotKeepOther");
+  } else if (item.cannot_keep === "too_long") {
+    keeps = t("cv.waiting.cannotKeepLong");
   } else {
-    where = t("cv.waiting.where", { role });
+    keeps = t("cv.waiting.cannotKeep");
   }
   const id = item.line_id;
   return (
@@ -44,9 +52,21 @@ function WaitingCard({ item, actions }: { item: CvWaiting; actions: LineActions 
         }
       >
         <Stack gap="sm">
-          <Tagged testId={`cv-question-where-${id}`}>
+          {question === undefined ? null : (
+            <Tagged testId={`cv-question-ask-${id}`}>
+              <Text>{question}</Text>
+            </Tagged>
+          )}
+          {where === undefined ? null : (
+            <Tagged testId={`cv-question-where-${id}`}>
+              <Text tone="secondary" size="sm">
+                {where}
+              </Text>
+            </Tagged>
+          )}
+          <Tagged testId={`cv-question-keeps-${id}`}>
             <Text tone="secondary" size="sm">
-              {where}
+              {keeps}
             </Text>
           </Tagged>
           {!actions.editable || changing ? null : (

@@ -9,16 +9,20 @@
 //!   (a known technology or a skill of the profile), an **employer** (a
 //!   company the profile names, or the job's), an **acronym**: always;
 //! - a **name** (a word with a capital mid-sentence) only when it is not a
-//!   word that names no fact (Senior, Developer, Stack, a month), nor a place
-//!   or a language the profile names, nor, in the summary, a word of the
-//!   posting (the job's vocabulary, which the summary may use). The headline
-//!   may also say what any position's title says.
+//!   word that names no fact (Developer, Stack, a month), nor a place or a
+//!   language the profile names, nor, in the summary, a word of the posting
+//!   (the job's vocabulary, which the summary may use). A rank or a seniority
+//!   (Senior, Lead, Head, Founder) is a claim unless a position's title says
+//!   it. The headline may also say what any position's title says. Places,
+//!   languages and the posting's words match whole words only ("Cisco" is not
+//!   in "San Francisco").
 //!
 //! And:
 //!
 //! - a source id the frame does not have counts as no source;
-//! - a bullet under a position may cite only that position's sources (and
-//!   the profile-wide ones): another position's is flagged;
+//! - a bullet under a position is backed only by that position's sources and
+//!   the skills: another position's is flagged, and the profile's headline,
+//!   summary, education and languages do not back it;
 //! - a company fact may be cited in the summary only: it says how the
 //!   person's real experience fits the company, never what they achieved;
 //! - every skill must be one the profile lists (aliases count, as in
@@ -36,7 +40,7 @@ use applicamp_kernel::{
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::model::{Contact, Content, Frame, Line, Place, SourceKind};
+use super::model::{Contact, Content, Frame, Line, Place, Source, SourceKind};
 
 /// Most claims named for one line.
 const MAX_CLAIMS: usize = 3;
@@ -44,15 +48,8 @@ const MAX_CLAIMS: usize = 3;
 /// Words written with a capital that name no fact: what a role, a team or a
 /// date is called. Lower case.
 const PLAIN: &[&str] = &[
-    "senior",
-    "junior",
     "mid",
     "intermediate",
-    "lead",
-    "principal",
-    "staff",
-    "head",
-    "chief",
     "engineer",
     "engineers",
     "engineering",
@@ -80,10 +77,7 @@ const PLAIN: &[&str] = &[
     "products",
     "design",
     "designer",
-    "manager",
     "management",
-    "director",
-    "architect",
     "architecture",
     "consultant",
     "analyst",
@@ -103,12 +97,7 @@ const PLAIN: &[&str] = &[
     "security",
     "quality",
     "support",
-    "intern",
-    "associate",
     "assistant",
-    "founder",
-    "co",
-    "owner",
     "freelance",
     "freelancer",
     "contractor",
@@ -133,6 +122,26 @@ const PLAIN: &[&str] = &[
     "december",
 ];
 
+/// Ranks and seniorities: a claim about the person unless a position's title
+/// says it. Lower case.
+const RANK: &[&str] = &[
+    "senior",
+    "junior",
+    "lead",
+    "principal",
+    "staff",
+    "head",
+    "chief",
+    "manager",
+    "director",
+    "architect",
+    "intern",
+    "associate",
+    "founder",
+    "co",
+    "owner",
+];
+
 /// What a line may say without citing it, and which of its words are names
 /// that matter: built once per check from the frame, the person's place and
 /// the posting.
@@ -146,6 +155,9 @@ pub struct Known {
     languages: Evidence,
     /// Every position's title: what the headline may say.
     titles: Vec<String>,
+    /// The words of every position's title, lower case: the ranks a line may
+    /// say.
+    title_words: HashSet<String>,
     /// The words of employers' names (the profile's and the job's), lower
     /// case: a claim wherever they appear.
     employers: HashSet<String>,
@@ -172,7 +184,10 @@ impl Known {
         {
             for word in name.split(|c: char| !c.is_alphanumeric()) {
                 let word = word.to_lowercase();
-                if word.chars().count() >= 2 && !PLAIN.contains(&word.as_str()) {
+                if word.chars().count() >= 2
+                    && !PLAIN.contains(&word.as_str())
+                    && !RANK.contains(&word.as_str())
+                {
                     employers.insert(word);
                 }
             }
@@ -183,15 +198,23 @@ impl Known {
             .filter(|s| s.kind == SourceKind::Languages)
             .map(|s| s.text.as_str())
             .collect();
+        let titles: Vec<String> = frame
+            .positions
+            .iter()
+            .filter_map(|p| p.title.clone())
+            .collect();
+        let title_words = titles
+            .iter()
+            .flat_map(|t| t.split(|c: char| !c.is_alphanumeric()))
+            .filter(|w| !w.is_empty())
+            .map(str::to_lowercase)
+            .collect();
         Self {
             posting: Evidence::of_texts([posting]),
             places: Evidence::of_texts(places),
             languages: Evidence::of_texts(languages),
-            titles: frame
-                .positions
-                .iter()
-                .filter_map(|p| p.title.clone())
-                .collect(),
+            titles,
+            title_words,
             employers,
             skills: frame.skills.clone(),
         }
@@ -214,17 +237,18 @@ impl Known {
         if self.employer(word) || self.skill(word) {
             return false;
         }
-        let place_or_language = self.places.says(word) || self.languages.says(word);
+        let lower = word.to_lowercase();
+        if RANK.contains(&lower.as_str()) {
+            // A rank is the person's only when a position's title says it.
+            return self.title_words.contains(&lower);
+        }
+        // Whole words: "Cisco" is not in "San Francisco".
+        let place_or_language = self.places.says_words(word) || self.languages.says_words(word);
+        let posting = place == Place::Summary && self.posting.says_words(word);
         match claim.kind {
             ClaimKind::Number | ClaimKind::Tool => false,
-            ClaimKind::Acronym => {
-                place_or_language || (place == Place::Summary && self.posting.says(word))
-            }
-            ClaimKind::Name => {
-                PLAIN.contains(&word.to_lowercase().as_str())
-                    || place_or_language
-                    || (place == Place::Summary && self.posting.says(word))
-            }
+            ClaimKind::Acronym => place_or_language || posting,
+            ClaimKind::Name => PLAIN.contains(&lower.as_str()) || place_or_language || posting,
         }
     }
 }
@@ -261,22 +285,23 @@ pub enum Reason {
 /// The reasons of every line that fails, by line id (a skill's too).
 pub type Checks = BTreeMap<String, Vec<Reason>>;
 
+/// Whether `source` may back a line at `place`: under a position, only that
+/// position's sources and the skills; a company fact only in the summary.
+fn backs_at(source: &Source, place: Place) -> bool {
+    match place {
+        Place::Bullet(own) => source.position == Some(own) || source.kind == SourceKind::Skills,
+        Place::Summary => true,
+        Place::Headline => source.kind != SourceKind::Company,
+    }
+}
+
 /// The sources of `line` at `place` that may back it: the ones the frame
-/// has, without a company fact outside the summary and without another
-/// position's source under a position.
+/// has, without a company fact outside the summary, and under a position
+/// only that position's and the skills.
 pub fn usable_sources(line: &Line, place: Place, frame: &Frame) -> Vec<String> {
     line.sources
         .iter()
-        .filter(|id| {
-            frame.get(id).is_some_and(|s| {
-                let company = s.kind == SourceKind::Company && place != Place::Summary;
-                let elsewhere = matches!(
-                    (place, s.position),
-                    (Place::Bullet(own), Some(at)) if at != own
-                );
-                !company && !elsewhere
-            })
-        })
+        .filter(|id| frame.get(id).is_some_and(|s| backs_at(s, place)))
         .cloned()
         .collect()
 }
@@ -318,13 +343,20 @@ pub fn check_line(line: &Line, place: Place, frame: &Frame, known: &Known) -> Ve
     if !elsewhere.is_empty() {
         reasons.push(Reason::OtherPosition { cites: elsewhere });
     }
-    // What backs it: its own sources (never another position's), and for
-    // the headline every position's title.
+    // What backs it: the sources it may use there (never another
+    // position's, nor under a position the profile-wide ones), and for the
+    // headline every position's title.
     let backing: Vec<String> = valid
         .iter()
-        .filter(|id| !reasons_cite(&reasons, id))
+        .filter(|id| {
+            !reasons_cite(&reasons, id) && frame.get(id).is_some_and(|s| backs_at(s, place))
+        })
         .cloned()
         .collect();
+    if backing.is_empty() && reasons.is_empty() {
+        // Under a position, the summary or the education says nothing of it.
+        return vec![Reason::NoSource];
+    }
     let mut texts = frame.evidence(&backing);
     if place == Place::Headline {
         texts.extend(known.titles.iter().cloned());
@@ -390,12 +422,56 @@ pub fn check(content: &Content, frame: &Frame, known: &Known) -> Checks {
     checks
 }
 
-/// Whether "Yes, keep it" may be offered for a line flagged for `reasons`:
-/// never for a company fact used as an achievement.
-pub fn keepable(reasons: &[Reason]) -> bool {
-    !reasons
+/// Why "Yes, keep it" is not offered for a flagged line.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CannotKeep {
+    /// It says what the company does, not what the person did.
+    Company,
+    /// It is what the person did in another job.
+    OtherPosition,
+    /// It is longer than a fact the profile keeps.
+    TooLong,
+}
+
+/// Why "Yes, keep it" may not be offered for a line at `place` flagged for
+/// `reasons`, if it may not: never for a company fact used as an
+/// achievement, nor for a summary whose flagged words only the company's
+/// facts say, nor for another job's line.
+pub fn cannot_keep(reasons: &[Reason], place: Place, frame: &Frame) -> Option<CannotKeep> {
+    if reasons
         .iter()
         .any(|r| matches!(r, Reason::CompanyFactOutsideSummary { .. }))
+    {
+        return Some(CannotKeep::Company);
+    }
+    if reasons
+        .iter()
+        .any(|r| matches!(r, Reason::OtherPosition { .. }))
+    {
+        return Some(CannotKeep::OtherPosition);
+    }
+    if place == Place::Summary {
+        let claims: Vec<&str> = reasons
+            .iter()
+            .filter_map(|r| match r {
+                Reason::ClaimNotInSources { claim, .. } => Some(claim.as_str()),
+                _ => None,
+            })
+            .collect();
+        let company = Evidence::of_texts(
+            frame
+                .sources
+                .iter()
+                .filter(|s| s.kind == SourceKind::Company)
+                .map(|s| s.text.as_str())
+                .chain(std::iter::once(frame.company.as_str())),
+        );
+        if !claims.is_empty() && claims.iter().all(|c| company.says(c)) {
+            return Some(CannotKeep::Company);
+        }
+    }
+    None
 }
 
 /// The ids of the lines that fail, in the order they are on the page.
@@ -530,7 +606,7 @@ mod tests {
             []
         );
         assert_eq!(
-            checked("Rust Developer and Team Lead", &["sk"], Place::Headline),
+            checked("Rust Developer and Platform Engineer", &["sk"], Place::Headline),
             []
         );
         // A month is not a claim; its year is.
@@ -538,6 +614,74 @@ mod tests {
             checked("Rebuilt billing in Rust in March", &["w0.h1"], W0),
             []
         );
+    }
+
+    #[test]
+    fn a_rank_is_a_claim_unless_a_positions_title_says_it() {
+        // "Senior" is in a title of the profile (the first position's): it
+        // may be said anywhere, even where that position's head is not cited.
+        assert_eq!(
+            checked(
+                "Built ingestion for 3 partner feeds as a Senior",
+                &["w1.h1"],
+                Place::Bullet(1)
+            ),
+            []
+        );
+        assert_eq!(checked("Wrote Rust as a Senior", &["sk"], W0), []);
+        // "Lead", "Staff", "Head", "Founder": no title says them, not even
+        // when the posting does.
+        for (text, rank) in [
+            ("Rust Developer and Team Lead", "Lead"),
+            ("Rust Staff Engineer", "Staff"),
+            ("Rust, Head of Platform", "Head"),
+            ("Rust engineer and Founder", "Founder"),
+        ] {
+            let reasons = checked(text, &["sk"], Place::Headline);
+            assert!(
+                reasons
+                    .iter()
+                    .any(|r| matches!(r, Reason::ClaimNotInSources { claim, .. } if claim == rank)),
+                "{text}: {reasons:?}"
+            );
+        }
+        let f = frame();
+        let staffed = Known::new(&f, &Contact::default(), "Staff Engineer");
+        assert!(
+            !check_line(
+                &line("Rust engineer at Staff level", &["w0.h1"]),
+                Place::Summary,
+                &f,
+                &staffed,
+            )
+            .is_empty(),
+            "the posting's rank is not the person's"
+        );
+    }
+
+    #[test]
+    fn places_languages_and_the_postings_words_match_whole_words() {
+        let f = frame();
+        let known = Known::new(
+            &f,
+            &Contact {
+                location: Some("San Francisco, California".into()),
+                ..Contact::default()
+            },
+            "We build for Francisco's teams across Americas",
+        );
+        let check = |text: &str, place| check_line(&line(text, &["w0.h1"]), place, &f, &known);
+        assert_eq!(check("Rebuilt billing in Rust in Francisco", W0), []);
+        assert!(matches!(
+            check("Rebuilt billing in Rust for Cisco", W0).as_slice(),
+            [Reason::ClaimNotInSources { claim, .. }] if claim == "Cisco"
+        ));
+        // Not a word of the posting either, in the summary.
+        assert!(matches!(
+            check("Rust engineer for Cisco", Place::Summary).as_slice(),
+            [Reason::ClaimNotInSources { claim, .. }] if claim == "Cisco"
+        ));
+        assert!(!check("Rust engineer for the Americ teams", Place::Summary).is_empty());
     }
 
     #[test]
@@ -662,8 +806,105 @@ mod tests {
             ),
             []
         );
-        assert!(!keepable(&checked(text, &cited, W0)));
-        assert!(keepable(&checked("Led a team of 12", &["w0.h1"], W0)));
+        let f = frame();
+        assert_eq!(
+            cannot_keep(&checked(text, &cited, W0), W0, &f),
+            Some(CannotKeep::Company)
+        );
+        assert_eq!(
+            cannot_keep(&checked("Led a team of 12", &["w0.h1"], W0), W0, &f),
+            None
+        );
+    }
+
+    #[test]
+    fn what_cannot_be_kept_says_why() {
+        let f = frame();
+        // Another job's line.
+        let other = checked("Built ingestion for 3 partner feeds", &["w1.h1"], W0);
+        assert_eq!(
+            cannot_keep(&other, W0, &f),
+            Some(CannotKeep::OtherPosition)
+        );
+        // A summary whose flagged words only the company's facts say.
+        let with_company = Frame::build(
+            &CvProfile {
+                positions: vec![CvPosition {
+                    index: 0,
+                    title: Some("Engineer".into()),
+                    highlights: vec!["Rebuilt billing in Rust".into()],
+                    ..CvPosition::default()
+                }],
+                skills: vec!["Rust".into()],
+                latest: Some(0),
+                ..CvProfile::default()
+            },
+            "Example Co",
+            &[model::CompanyFact {
+                id: "99999999-bbbb".into(),
+                text: "Runs payroll for 300 Bakeries".into(),
+                url: "https://example.test/".into(),
+            }],
+        );
+        let summary = check_line(
+            &line("Rust engineer who ran payroll for 300 Bakeries", &["w0.h1"]),
+            Place::Summary,
+            &with_company,
+            &known(&with_company),
+        );
+        assert_eq!(summary.len(), 2, "{summary:?}");
+        assert_eq!(
+            cannot_keep(&summary, Place::Summary, &with_company),
+            Some(CannotKeep::Company)
+        );
+        // A number the person may have: theirs to keep.
+        let number = checked("Rust engineer who cut runs to 20 minutes", &["w0.h1"], Place::Summary);
+        assert_eq!(cannot_keep(&number, Place::Summary, &f), None);
+    }
+
+    #[test]
+    fn a_bullet_is_backed_by_its_own_position_and_the_skills_only() {
+        let f = Frame::build(
+            &CvProfile {
+                summary: Some("Rust engineer in billing at Example Org".into()),
+                positions: vec![CvPosition {
+                    index: 0,
+                    title: Some("Engineer".into()),
+                    company: Some("Example Org".into()),
+                    highlights: vec!["Rebuilt billing".into()],
+                    ..CvPosition::default()
+                }],
+                skills: vec!["Rust".into()],
+                latest: Some(0),
+                ..CvProfile::default()
+            },
+            "Example Co",
+            &[],
+        );
+        let known = Known::new(&f, &Contact::default(), "");
+        // The summary does not back a bullet, so a bullet citing only it
+        // cites nothing it may use.
+        let from_summary = line("Rebuilt billing in Rust", &["sum"]);
+        assert_eq!(usable_sources(&from_summary, W0, &f), Vec::<String>::new());
+        assert_eq!(
+            check_line(&from_summary, W0, &f, &known),
+            [Reason::NoSource]
+        );
+        // Its words are not evidence for a bullet beside its own source.
+        assert!(matches!(
+            check_line(&line("Rebuilt billing in Rust", &["w0.h1", "sum"]), W0, &f, &known)
+                .as_slice(),
+            [Reason::ClaimNotInSources { claim, .. }] if claim == "Rust"
+        ));
+        assert_eq!(
+            check_line(&line("Rebuilt billing in Rust", &["w0.h1", "sk"]), W0, &f, &known),
+            []
+        );
+        // In the summary, it backs a line.
+        assert_eq!(
+            check_line(&from_summary, Place::Summary, &f, &known),
+            []
+        );
     }
 
     #[test]

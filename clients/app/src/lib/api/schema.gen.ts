@@ -2405,8 +2405,8 @@ export interface components {
         /** @description Why a board cannot be approved yet. */
         BoardBlocker: {
             /**
-             * @description `terms_forbid`, `robots_disallowed`, `needs_key`, `needs_permission`,
-             *     `no_endpoint`, `config_invalid`, `check_needed`; clients translate the ones they
+             * @description `terms_forbid`, `robots_disallowed`, `needs_key`, `needs_permission`, `no_endpoint`,
+             *     `config_invalid`, `check_needed`; clients translate the ones they
              *     know and show `detail` for any other.
              */
             code: string;
@@ -2429,8 +2429,8 @@ export interface components {
             approvable: boolean;
             /**
              * @description The first blocker's code (`terms_forbid`, `robots_disallowed`,
-             *     `needs_key`, `needs_permission`, `no_endpoint`, `config_invalid`,
-             *     `check_needed`), or none.
+             *     `needs_key`, `needs_permission`, `no_endpoint`, `config_invalid`, `check_needed`), or
+             *     none.
              */
             blocked?: string | null;
             /**

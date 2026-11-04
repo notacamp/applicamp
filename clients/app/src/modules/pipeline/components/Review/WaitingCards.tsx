@@ -10,15 +10,20 @@ import { MAX_LINE, type LineActions } from "./LineRow";
 function WaitingCard({ item, actions }: { item: CvWaiting; actions: LineActions }) {
   const { t } = useTranslation("pipeline");
   const [changing, setChanging] = useState(false);
-  const [text, setText] = useState(item.text);
+  // "Change it" starts from the person's own words, never the model's.
+  const quote = item.quote ?? undefined;
+  const [text, setText] = useState(quote ?? "");
   const skill = item.kind === "skill";
   const proposal = item.proposal ?? undefined;
   const role = item.role ?? undefined;
+  const company = item.company ?? undefined;
   let where: string;
   if (proposal === undefined) {
     where = t("cv.waiting.cannotKeep");
   } else if (skill) {
     where = t("cv.waiting.skillWhere");
+  } else if (company !== undefined && quote !== undefined) {
+    where = t("cv.waiting.toldUs", { company, quote });
   } else if (role === undefined) {
     where = t("cv.waiting.whereNoRole");
   } else {
@@ -27,13 +32,18 @@ function WaitingCard({ item, actions }: { item: CvWaiting; actions: LineActions 
   const id = item.line_id;
   return (
     <Tagged testId={`cv-question-${id}`}>
-      <Banner title={skill ? t("cv.waiting.skillQuestion") : t("cv.waiting.question")}>
-        <Stack gap="sm">
+      <Banner
+        title={
           <Tagged testId={`cv-question-text-${id}`}>
-            <Text weight="medium">
-              {skill ? item.text : t("cv.waiting.quoted", { text: item.text })}
-            </Text>
+            <span>
+              {skill
+                ? t("cv.waiting.skillQuestion", { skill: item.text })
+                : t("cv.waiting.question", { text: item.text })}
+            </span>
           </Tagged>
+        }
+      >
+        <Stack gap="sm">
           <Tagged testId={`cv-question-where-${id}`}>
             <Text tone="secondary" size="sm">
               {where}
@@ -59,7 +69,7 @@ function WaitingCard({ item, actions }: { item: CvWaiting; actions: LineActions 
                   disabled={actions.busy}
                   data-testid={`cv-question-change-${id}`}
                   onClick={() => {
-                    setText(item.text);
+                    setText(quote ?? "");
                     setChanging(true);
                   }}
                 >

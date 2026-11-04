@@ -96,7 +96,9 @@ cited, the other position's sources, the company fact or the skill.
 
 ### Requirement: A blocked line is fixed, said to be true, or removed
 What the app could not fix SHALL wait on the person as a question: "Is this true?" with the line,
-where a kept fact would go, and Yes, keep it / Change it / Remove it. "Yes, keep it" SHALL keep the
+the person's own words it was made from ("You told us about <company>: …") and where a kept fact
+would go, and Yes, keep it / Change it / Remove it. Change it SHALL start from the person's own
+words, never the model's, and an empty line SHALL not be saved. "Yes, keep it" SHALL keep the
 app's proposed fact (else the line's own words) on the line's position of the profile as a confirmed
 assumption based on "The CV draft for <company>", after which the line SHALL be checked again with
 that fact as a source and without another position's or a company's sources. It SHALL be refused
@@ -132,7 +134,9 @@ PDF SHALL be kept as it is. The person's text SHALL be passed as data and never 
 PDF's text SHALL then be read back with no AI and SHALL contain every section heading, every line,
 every job keyword the review showed as on the CV, the name, the email and the links, within the page
 count chosen. If anything fails, nothing SHALL be approved and the reasons SHALL be shown. A draft
-approved without a PDF SHALL offer to make it.
+approved without a PDF SHALL offer to make it. For 15 seconds after approving, Undo SHALL put the
+draft back as a draft, its PDF version gone, and the page SHALL say what starts next by itself and
+what it costs; after that, or once the cover letter has started, it SHALL be refused (`too_late`).
 
 #### Scenario: Approved with a PDF
 - **WHEN** someone approves a CV with nothing blocked
@@ -153,6 +157,10 @@ approved without a PDF SHALL offer to make it.
 #### Scenario: The PDF loses something
 - **WHEN** the read-back cannot find a heading or a line
 - **THEN** nothing is approved and the missing items are listed
+
+#### Scenario: Undo
+- **WHEN** someone approves a CV and presses Undo within 15 seconds
+- **THEN** it is a draft again with no version, and the cover letter that was to start next waits for the CV again
 
 #### Scenario: Approved before PDFs
 - **WHEN** a draft was approved and has no PDF
@@ -197,3 +205,34 @@ deleted 7 days after its last change; approved versions SHALL be kept.
 #### Scenario: Left alone
 - **WHEN** a draft is not approved and not changed for 7 days
 - **THEN** it is gone, while an approved version stays
+
+### Requirement: A shortlisted job is prepared by itself, waiting only on the person
+When an opportunity moves from Found to Shortlisted or later, and the person's Autonomy goal is
+"Prepare" or not answered, the app SHALL by itself read the company and compare the job, then
+stop while a question of the brief is open, then draft the CV. Approving the CV SHALL draft the
+cover letter and the job's answers by itself, once the 15 seconds in which the approval can be
+undone have passed. Opening Prepare on a Shortlisted or later
+opportunity that was never prepared SHALL start the same chain. Answering questions, keeping
+facts, approving the CV and the letter, and every stage move SHALL still wait on the person.
+With the goal "Find only", or without a model, nothing SHALL run by itself and every step SHALL
+start with a click, as before. A step SHALL never run twice for the same opportunity at once.
+
+#### Scenario: Shortlisting a job
+- **WHEN** someone with the goal "Prepare" moves a job to Shortlisted, its company's site is known and the comparison asks no question
+- **THEN** the company is read, the job compared and a CV drafted without another click, and the CV waits for their approval
+
+#### Scenario: A question is open
+- **WHEN** the comparison asks a question
+- **THEN** no CV is drafted until the person answers or skips every question, and the job shows that it waits on them
+
+#### Scenario: Approving the CV
+- **WHEN** the person approves the CV of a job being prepared by itself
+- **THEN** the cover letter and the job's answers are drafted once Undo has passed and wait for their approval
+
+#### Scenario: Find only
+- **WHEN** someone whose goal is "Find only" shortlists a job
+- **THEN** nothing is fetched and no model is called until they click
+
+#### Scenario: Jobs shortlisted earlier
+- **WHEN** someone with the goal "Prepare" opens Prepare on a Shortlisted job that was never prepared
+- **THEN** the chain starts

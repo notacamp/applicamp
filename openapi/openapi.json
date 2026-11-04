@@ -3678,6 +3678,86 @@
         ]
       }
     },
+    "/api/v1/opportunities/{id}/cv/drafts/{n}/unapprove": {
+      "post": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Undo an approval, for a moment.",
+        "description": "Within 15 seconds of approving, before the cover letter that comes next\nstarts, the draft becomes a draft again: its PDF version goes, the\nletter waits for the CV again, and the preview is made again. Refused\nafter that (`too_late`), or when it is not approved (`not_approved`). No\nmodel call.",
+        "operationId": "pipeline.cv_unapprove",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "n",
+            "in": "path",
+            "description": "The draft.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The CV, with the draft back.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cv"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`not_approved`; `too_late`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/v1/opportunities/{id}/cv/versions": {
       "post": {
         "tags": [
@@ -9892,6 +9972,17 @@
             "format": "double",
             "description": "About what one draft costs, in euros."
           },
+          "next": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CvNext",
+                "description": "What the app starts next by itself, when it does."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "opportunity_id": {
             "type": "string",
             "format": "uuid"
@@ -10134,6 +10225,14 @@
               }
             ]
           },
+          "undo_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Just approved: until then `…/unapprove` puts it back as a draft."
+          },
           "version": {
             "type": [
               "integer",
@@ -10272,6 +10371,31 @@
             "format": "int32",
             "description": "The version, for a PDF.",
             "minimum": 0
+          }
+        }
+      },
+      "CvNext": {
+        "type": "object",
+        "description": "What the app starts by itself now that the CV is approved.",
+        "required": [
+          "step",
+          "eur",
+          "at"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it starts: Undo stops it until then."
+          },
+          "eur": {
+            "type": "number",
+            "format": "double",
+            "description": "About what it costs, in euros."
+          },
+          "step": {
+            "type": "string",
+            "description": "`letter`: the cover letter and the job's answers."
           }
         }
       },
@@ -15214,6 +15338,13 @@
           "flags"
         ],
         "properties": {
+          "company": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The company of that position (\"You told us about …\")."
+          },
           "flags": {
             "type": "array",
             "items": {
@@ -15241,6 +15372,13 @@
               "null"
             ],
             "description": "The app's own question about it, when it asked one."
+          },
+          "quote": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The person's own words the line was made from, as the profile has\nthem: what \"Change it\" starts from. None when it cites none."
           },
           "role": {
             "type": [

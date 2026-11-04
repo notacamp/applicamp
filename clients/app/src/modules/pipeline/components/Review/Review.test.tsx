@@ -81,17 +81,18 @@ describe("Review the CV", () => {
       "Checked every line against your profile · fixed 1 line",
     );
     expect(screen.getByTestId("cv-needs-you")).toHaveTextContent("Needs you · 2");
-    expect(screen.getByTestId("cv-question-l5")).toHaveTextContent("Is this true?");
     expect(screen.getByTestId("cv-question-text-l5")).toHaveTextContent(
-      "“Cut invoice runs to 20 minutes”",
+      "Is this true? “Cut invoice runs to 20 minutes”",
     );
     expect(screen.getByTestId("cv-question-where-l5")).toHaveTextContent(
-      "If you keep it, it goes on your profile under Senior Engineer · Example Org.",
+      "You told us about Example Org: “Cut invoice runs from 6 hours to 40 minutes”. If you keep it, it goes on your profile.",
     );
     expect(screen.getByTestId("cv-question-yes-l5")).toHaveTextContent("Yes, keep it");
     expect(screen.getByTestId("cv-question-change-l5")).toHaveTextContent("Change it");
     expect(screen.getByTestId("cv-question-remove-l5")).toHaveTextContent("Remove it");
-    expect(screen.getByTestId("cv-question-l7")).toHaveTextContent("Do you have this skill?");
+    expect(screen.getByTestId("cv-question-text-l7")).toHaveTextContent(
+      "Do you have this skill? Kubernetes",
+    );
     expect(screen.getByTestId("cv-question-where-l7")).toHaveTextContent(
       "If you keep it, it is added to your skills.",
     );
@@ -179,7 +180,11 @@ describe("Review the CV", () => {
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("cv-question-change-l5"));
     const input = screen.getByTestId("cv-question-input-l5");
+    // It starts from the person's own words, never the model's.
+    expect(input).toHaveValue("Cut invoice runs from 6 hours to 40 minutes");
     await user.clear(input);
+    // An empty line is never saved.
+    expect(screen.getByTestId("cv-question-save-l5")).toBeDisabled();
     await user.type(input, "Cut invoice runs from 6 hours to 40 minutes");
     await user.click(screen.getByTestId("cv-question-save-l5"));
     await waitFor(() => {
@@ -242,6 +247,32 @@ describe("Review the CV", () => {
     await waitFor(() => {
       expect(said).toEqual({ text: "I cut invoice runs to 20 minutes in 2023" });
     });
+  });
+
+  it("lets the person undo an approval for a moment, saying what starts next and its cost", async () => {
+    let undone = false;
+    const later = new Date(Date.now() + 60_000).toISOString();
+    renderReview({
+      [CV]: {
+        body: cv({
+          draft: { ...fixedDraft(), status: "approved", version: 1, undo_until: later },
+          next: { step: "letter", eur: 0.002, at: later },
+        }),
+      },
+      [`POST /api/v1/opportunities/${ID}/cv/drafts/1/unapprove`]: () => {
+        undone = true;
+        return { body: fixed() };
+      },
+    });
+    expect(await screen.findByTestId("cv-approved-now")).toHaveTextContent("Approved");
+    expect(screen.getByTestId("cv-next")).toHaveTextContent(
+      "Writing your cover letter next, about €0.002. Undo stops it.",
+    );
+    await userEvent.setup().click(screen.getByTestId("cv-undo"));
+    await waitFor(() => {
+      expect(undone).toBe(true);
+    });
+    expect(await screen.findByTestId("cv-approve")).toBeEnabled();
   });
 
   it("offers to make the PDF of a CV approved without one", async () => {

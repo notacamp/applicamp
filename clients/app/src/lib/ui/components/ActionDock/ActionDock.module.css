@@ -1,0 +1,44 @@
+/*
+ * The page's main action and the line that says when it turns on, always in
+ * reach: stuck to the bottom of the screen, above the phone's tab bar.
+ */
+.dock {
+  position: sticky;
+  bottom: 0;
+  z-index: var(--z-sticky);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border-top: var(--border-width) solid var(--border-subtle);
+  background: var(--surface-base);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+@media (width < 48rem) {
+  /* Above the tab bar: its padding, a tap target and its border. */
+  .dock {
+    bottom: calc(
+      var(--size-hit) + var(--space-1) + max(var(--space-2), env(safe-area-inset-bottom)) +
+        var(--border-width)
+    );
+    margin-inline: calc(-1 * var(--space-4));
+  }
+}
+
+/* Buttons big enough to tap: 44 px on a phone, 36 px on a desktop. */
+.touch {
+  --btn-height: 36px;
+}
+
+@media (width < 48rem) {
+  .touch {
+    --btn-height: var(--size-hit);
+  }
+}

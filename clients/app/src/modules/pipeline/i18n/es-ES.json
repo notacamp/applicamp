@@ -464,7 +464,8 @@
       "invalid_length": "Elige 1 o 2 páginas.",
       "invalid_layout": "Elige una plantilla y 1 o 2 páginas.",
       "cannot_keep": "Esta línea trata de la empresa, no de ti. Cámbiala o quítala.",
-      "not_flagged": "Esta línea ya coincide con tu perfil."
+      "not_flagged": "Esta línea ya coincide con tu perfil.",
+      "too_late": "Ya es tarde para deshacerlo. Vuelve a hacer el CV para cambiarlo."
     },
     "layout": {
       "template": "Plantilla",
@@ -529,9 +530,8 @@
     },
     "waiting": {
       "title": "Te necesita · {{count}}",
-      "question": "¿Es cierto?",
-      "skillQuestion": "¿Tienes esta habilidad?",
-      "quoted": "«{{text}}»",
+      "question": "¿Es cierto? «{{text}}»",
+      "skillQuestion": "¿Tienes esta habilidad? {{skill}}",
       "where": "Si lo mantienes, se guarda en tu perfil en {{role}}.",
       "whereNoRole": "Si lo mantienes, se guarda en tu perfil.",
       "skillWhere": "Si la mantienes, se añade a tus habilidades.",
@@ -547,12 +547,19 @@
       "checkedFixed_other": "Cada línea comprobada con tu perfil · {{count}} líneas corregidas",
       "ready": "Apruébalo cuando estés conforme.",
       "answer_one": "Responde a la pregunta para aprobar.",
-      "answer_other": "Responde a las {{count}} preguntas para aprobar."
+      "answer_other": "Responde a las {{count}} preguntas para aprobar.",
+      "toldUs": "Nos contaste sobre {{company}}: «{{quote}}». Si lo mantienes, se guarda en tu perfil."
     },
     "needsVersion": {
       "title": "Este CV está aprobado pero aún no tiene PDF",
       "body": "Haz el PDF a partir del texto aprobado. No se usa IA.",
       "make": "Hacer el PDF"
+    },
+    "dock": {
+      "approved": "Aprobado",
+      "undo": "Deshacer",
+      "undoing": "Deshaciendo…",
+      "next": "Ahora escribimos tu carta de presentación, unos {{cost}}. Deshacer lo detiene."
     }
   },
   "cvs": {

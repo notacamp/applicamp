@@ -1023,6 +1023,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/opportunities/{id}/cv/drafts/{n}/unapprove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo an approval, for a moment.
+         * @description Within 15 seconds of approving, before the cover letter that comes next
+         *     starts, the draft becomes a draft again: its PDF version goes, the
+         *     letter waits for the CV again, and the preview is made again. Refused
+         *     after that (`too_late`), or when it is not approved (`not_approved`). No
+         *     model call.
+         */
+        post: operations["pipeline.cv_unapprove"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/opportunities/{id}/cv/versions": {
         parameters: {
             query?: never;
@@ -3136,6 +3160,7 @@ export interface components {
              * @description About what one draft costs, in euros.
              */
             draft_eur: number;
+            next?: components["schemas"]["CvNext"] | null;
             /** Format: uuid */
             opportunity_id: string;
             /** @description The PDF versions, newest first. */
@@ -3229,6 +3254,11 @@ export interface components {
             status: components["schemas"]["DraftStatus"];
             summary?: components["schemas"]["LineView"] | null;
             /**
+             * Format: date-time
+             * @description Just approved: until then `…/unapprove` puts it back as a draft.
+             */
+            undo_until?: string | null;
+            /**
              * Format: int32
              * @description Once approved: the version, from 1.
              */
@@ -3283,6 +3313,21 @@ export interface components {
              * @description The version, for a PDF.
              */
             version?: number | null;
+        };
+        /** @description What the app starts by itself now that the CV is approved. */
+        CvNext: {
+            /**
+             * Format: date-time
+             * @description When it starts: Undo stops it until then.
+             */
+            at: string;
+            /**
+             * Format: double
+             * @description About what it costs, in euros.
+             */
+            eur: number;
+            /** @description `letter`: the cover letter and the job's answers. */
+            step: string;
         };
         /** @description What the preview of a draft is, as the review page shows it. */
         CvPreview: {
@@ -5260,6 +5305,8 @@ export interface components {
          *     question only the person can answer.
          */
         Waiting: {
+            /** @description The company of that position ("You told us about …"). */
+            company?: string | null;
             /** @description Why it is flagged. */
             flags: components["schemas"]["Reason"][];
             kind: components["schemas"]["WaitingKind"];
@@ -5276,6 +5323,11 @@ export interface components {
             proposal?: string | null;
             /** @description The app's own question about it, when it asked one. */
             question?: string | null;
+            /**
+             * @description The person's own words the line was made from, as the profile has
+             *     them: what "Change it" starts from. None when it cites none.
+             */
+            quote?: string | null;
             /** @description "Title · Company" of the position a kept fact lands on. */
             role?: string | null;
             /** @description The line's text, or the skill. */
@@ -7931,6 +7983,58 @@ export interface operations {
                 };
             };
             /** @description `draft_frozen`; `already_on_cv` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.cv_unapprove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+                /** @description The draft. */
+                n: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The CV, with the draft back. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cv"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_approved`; `too_late` */
             409: {
                 headers: {
                     [name: string]: unknown;

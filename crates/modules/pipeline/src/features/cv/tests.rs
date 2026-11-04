@@ -1290,6 +1290,10 @@ async fn the_app_fixes_what_it_can_asks_the_rest_and_yes_keeps_the_fact_it_propo
     assert_eq!(team["question"], "Did you lead a team of 6 engineers?");
     assert_eq!(team["proposal"], "I led a team of 6 engineers.");
     assert_eq!(team["role"], "Senior Engineer · Example Org");
+    // "You told us about Example Org": the person's own words, never the
+    // model's, are what Change it starts from.
+    assert_eq!(team["company"], "Example Org");
+    assert_eq!(team["quote"], "Led a team of 4 engineers");
     let company = waiting_for(&cv, COMPANY_FACT);
     assert!(company["proposal"].is_null());
     let skill = waiting_for(&cv, "Kubernetes");
@@ -1437,4 +1441,70 @@ async fn an_approved_cv_with_no_pdf_offers_to_make_it(db: PgPool) {
     assert_eq!(status, StatusCode::OK, "{cv}");
     assert_eq!(cv["draft"]["needs_version"], false);
     assert_eq!(cv["versions"].as_array().unwrap().len(), 1);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_approval_can_be_undone_for_a_moment_and_not_after(db: PgPool) {
+    let s = stack(db).await;
+    // A job being prepared by itself, waiting for the CV's approval.
+    sqlx::query(
+        "INSERT INTO pipeline.preparations
+            (opportunity_id, account_id, state, step, waiting_on, updated_at)
+         VALUES ($1, $2, 'waiting', 'draft', 'cv_approval', now())",
+    )
+    .bind(Uuid::parse_str(&s.opp).unwrap())
+    .bind(s.h.account)
+    .execute(&s.h.db)
+    .await
+    .unwrap();
+    let cv = approved(&s, json!({})).await;
+    assert!(cv["draft"]["undo_until"].is_string(), "{cv}");
+    // What starts next by itself, and what it costs: the letter waits.
+    assert_eq!(cv["next"]["step"], "letter", "{cv}");
+    assert!(cv["next"]["eur"].as_f64().unwrap() > 0.0);
+    assert!(cv["next"]["at"].is_string());
+    // Undo: a draft again, its PDF version gone, the preview back.
+    let (status, cv) =
+        s.h.json("POST", &url(&s.opp, "/drafts/1/unapprove"), &json!({}))
+            .await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    assert_eq!(cv["draft"]["status"], "draft");
+    assert!(cv["draft"]["version"].is_null());
+    assert_eq!(cv["versions"], json!([]));
+    assert_eq!(cv["draft"]["can_approve"], true);
+    assert_eq!(cv["draft"]["preview"]["ready"], true);
+    // The letter waits for the CV again.
+    assert!(cv["next"].is_null(), "{cv}");
+    let waiting: String = sqlx::query_scalar(
+        "SELECT waiting_on FROM pipeline.preparations WHERE opportunity_id = $1",
+    )
+    .bind(Uuid::parse_str(&s.opp).unwrap())
+    .fetch_one(&s.h.db)
+    .await
+    .unwrap();
+    assert_eq!(waiting, "cv_approval");
+    let (status, body) =
+        s.h.json("POST", &url(&s.opp, "/drafts/1/unapprove"), &json!({}))
+            .await;
+    assert_eq!(status, StatusCode::CONFLICT, "{body}");
+    assert_eq!(body["code"], "not_approved");
+
+    // Approved again, it is version 1 again; past the moment, no undo.
+    let (status, cv) =
+        s.h.json("POST", &url(&s.opp, "/drafts/1/approve"), &json!({}))
+            .await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    assert_eq!(cv["versions"][0]["version"], 1);
+    sqlx::query("UPDATE pipeline.cv_drafts SET approved_at = now() - interval '1 minute'")
+        .execute(&s.h.db)
+        .await
+        .unwrap();
+    let (_, cv) = s.h.get(&url(&s.opp, "")).await;
+    assert!(cv["draft"]["undo_until"].is_null());
+    let (status, body) =
+        s.h.json("POST", &url(&s.opp, "/drafts/1/unapprove"), &json!({}))
+            .await;
+    assert_eq!(status, StatusCode::CONFLICT, "{body}");
+    assert_eq!(body["code"], "too_late");
+    assert_eq!(s.model.calls(CV).await, 1);
 }

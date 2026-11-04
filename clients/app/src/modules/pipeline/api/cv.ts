@@ -226,6 +226,21 @@ export function useApprove(id: string, n: number) {
   });
 }
 
+/** Undoes an approval made a moment ago: the draft is back, and what was to start next waits. */
+export function useUnapprove(id: string, n: number) {
+  const store = useStore(id);
+  return useMutation({
+    mutationFn: async (): Promise<Cv> =>
+      unwrap(
+        await api.POST("/api/v1/opportunities/{id}/cv/drafts/{n}/unapprove", {
+          params: { path: { id, n } },
+          headers: CSRF_HEADERS,
+        }),
+      ),
+    onSuccess: store,
+  });
+}
+
 /** Another version of the approved CV in a new layout: no AI, the old versions stay. */
 export function useMakeVersion(id: string) {
   const store = useStore(id);
@@ -276,6 +291,7 @@ const ERROR_CODES = [
   "invalid_fact",
   "cannot_keep",
   "not_flagged",
+  "too_late",
   "profile_changed",
   "draft_frozen",
   "lines_flagged",

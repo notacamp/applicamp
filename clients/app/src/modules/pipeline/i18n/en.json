@@ -464,7 +464,8 @@
       "invalid_length": "Choose 1 or 2 pages.",
       "invalid_layout": "Choose a template and 1 or 2 pages.",
       "cannot_keep": "This line is about the company, not about you. Change it or remove it.",
-      "not_flagged": "This line already matches your profile."
+      "not_flagged": "This line already matches your profile.",
+      "too_late": "It’s too late to undo. Make the CV again to change it."
     },
     "layout": {
       "template": "Template",
@@ -529,9 +530,8 @@
     },
     "waiting": {
       "title": "Needs you · {{count}}",
-      "question": "Is this true?",
-      "skillQuestion": "Do you have this skill?",
-      "quoted": "“{{text}}”",
+      "question": "Is this true? “{{text}}”",
+      "skillQuestion": "Do you have this skill? {{skill}}",
       "where": "If you keep it, it goes on your profile under {{role}}.",
       "whereNoRole": "If you keep it, it goes on your profile.",
       "skillWhere": "If you keep it, it is added to your skills.",
@@ -547,12 +547,19 @@
       "checkedFixed_other": "Checked every line against your profile · fixed {{count}} lines",
       "ready": "Approve when you’re happy with it.",
       "answer_one": "Answer the question to approve.",
-      "answer_other": "Answer the {{count}} questions to approve."
+      "answer_other": "Answer the {{count}} questions to approve.",
+      "toldUs": "You told us about {{company}}: “{{quote}}”. If you keep it, it goes on your profile."
     },
     "needsVersion": {
       "title": "This CV was approved but has no PDF yet",
       "body": "Make the PDF from the approved text. No AI is used.",
       "make": "Make the PDF"
+    },
+    "dock": {
+      "approved": "Approved",
+      "undo": "Undo",
+      "undoing": "Undoing…",
+      "next": "Writing your cover letter next, about {{cost}}. Undo stops it."
     }
   },
   "cvs": {

@@ -766,7 +766,7 @@
       "drop": "Drop",
       "dropLabel": "Drop: {{text}}",
       "edit": "Edit",
-      "takeBack": "Take back",
+      "takeBack": "Undo",
       "kept": "Kept",
       "dropped": "Dropped",
       "done": "Done on LinkedIn",

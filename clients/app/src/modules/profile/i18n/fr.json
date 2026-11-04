@@ -766,7 +766,7 @@
       "drop": "Écarter",
       "dropLabel": "Écarter : {{text}}",
       "edit": "Modifier",
-      "takeBack": "Revenir en arrière",
+      "takeBack": "Annuler",
       "kept": "Gardée",
       "dropped": "Écartée",
       "done": "Faite sur LinkedIn",
@@ -785,7 +785,7 @@
       "editLabel": "Ce que ça devrait dire",
       "editHint": "Ne dites que ce que dit votre profil. C’est vérifié à nouveau à l’enregistrement.",
       "save": "Enregistrer",
-      "cancel": "Annuler"
+      "cancel": "Annuler la modification"
     },
     "todo": {
       "title": "À changer sur LinkedIn",

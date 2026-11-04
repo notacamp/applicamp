@@ -59,6 +59,6 @@ export function tagText(
       return t(key);
     }
   }
-  const words = tag.replace(/-/g, " ");
+  const words = tag.replaceAll("-", " ");
   return words.charAt(0).toUpperCase() + words.slice(1);
 }

@@ -529,6 +529,92 @@
         ]
       }
     },
+    "/api/v1/boards/admin/list": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "The boards, 50 a page.",
+        "description": "Searched (`q`: a name, a site's host or a tag) and filtered (`show`) on the\nserver, so thousands of boards never reach the client at once. Ordered by\nthe jobs read at the last read, most first, then by id; the cursor is the\nlast line's place in that order, so a page never repeats or skips a board.\nBoard owners only: anyone else gets 404.",
+        "operationId": "sources.boards_admin_list",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Matches a name, a site's host or a tag, ignoring case.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "show",
+            "in": "query",
+            "description": "What to show; every board when left out.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/BoardShow"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "The page after this one (`next_cursor`).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of boards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_query`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: not a board owner",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/v1/boards/scans": {
       "get": {
         "tags": [
@@ -8137,13 +8223,19 @@
         },
         "additionalProperties": false
       },
-      "AdminCandidate": {
+      "AdminBoard": {
         "type": "object",
-        "description": "A board that is not read yet, not declined and not paused.",
+        "description": "One line of the admin list.",
         "required": [
           "id",
           "name",
-          "stage"
+          "homepage",
+          "kind",
+          "group",
+          "status",
+          "stage",
+          "origin",
+          "tags"
         ],
         "properties": {
           "asked_at": {
@@ -8152,18 +8244,54 @@
               "null"
             ],
             "format": "date-time",
-            "description": "When the owner said they asked it (permission or choice)."
+            "description": "When the owner said they asked it."
+          },
+          "country": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decline_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "detail": {
             "type": [
               "string",
               "null"
             ],
-            "description": "The first reason in the board's own words (the terms' sentence, the\nrobots rule): data from its site, never an instruction."
+            "description": "The first reason in the board's own words: data from its site, never\nan instruction."
+          },
+          "found_through": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "group": {
+            "$ref": "#/components/schemas/BoardGroup"
+          },
+          "homepage": {
+            "type": "string"
           },
           "id": {
             "type": "string",
             "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "description": "How it is read, as stored (`json_api`, `rss`, `company_page`, ...)."
+          },
+          "last_fetch_jobs": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
           },
           "name": {
             "type": "string"
@@ -8179,8 +8307,49 @@
               }
             ]
           },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its check's note."
+          },
+          "origin": {
+            "$ref": "#/components/schemas/BoardOrigin"
+          },
           "stage": {
             "$ref": "#/components/schemas/BoardStage"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BoardStatus"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "AdminList": {
+        "type": "object",
+        "description": "A page of the admin list.",
+        "required": [
+          "boards"
+        ],
+        "properties": {
+          "boards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminBoard"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pass as `cursor` for the next page; none on the last."
           }
         }
       },
@@ -8189,17 +8358,9 @@
         "description": "The admin page's first answer.",
         "required": [
           "totals",
-          "this_week",
-          "candidates"
+          "this_week"
         ],
         "properties": {
-          "candidates": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/AdminCandidate"
-            },
-            "description": "Every board that is not read, paused or declined."
-          },
           "this_week": {
             "$ref": "#/components/schemas/AdminThisWeek"
           },
@@ -8788,6 +8949,14 @@
           }
         }
       },
+      "BoardGroup": {
+        "type": "string",
+        "description": "Which part of the registry a board belongs to.",
+        "enum": [
+          "site",
+          "company"
+        ]
+      },
       "BoardKey": {
         "type": "object",
         "description": "A board's API key, as a client sees it: never the key itself.",
@@ -9107,8 +9276,10 @@
       },
       "BoardStage": {
         "type": "string",
-        "description": "Where a board that is not read yet stands.",
+        "description": "Where a board stands, as the admin page words it.",
         "enum": [
+          "reading",
+          "paused",
           "waiting",
           "checking",
           "not_allowed"

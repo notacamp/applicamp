@@ -337,7 +337,6 @@ export function cvErrorCode(error: unknown): CvErrorCode {
   return ERROR_CODES.find((known) => known === code) ?? "generic";
 }
 
-
 /** Where a flag can be fixed with "It's true": not for a company fact used as an achievement. */
 export function canConfirm(flags: readonly CvReason[]): boolean {
   return (

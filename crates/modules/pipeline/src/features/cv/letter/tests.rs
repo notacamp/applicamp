@@ -196,8 +196,12 @@ async fn with_no_language_asked_the_letter_is_in_the_approved_cvs(db: PgPool) {
     assert!(s.model.user_messages(LETTER).await[0].contains("<language>pt-PT</language>"));
     // Asked for, another.
     let (status, letter) =
-        s.h.json("POST", &url(&s.opp, "/drafts"), &json!({ "language": "en" }))
-            .await;
+        s.h.json(
+            "POST",
+            &url(&s.opp, "/drafts"),
+            &json!({ "language": "en" }),
+        )
+        .await;
     assert_eq!(status, StatusCode::OK, "{letter}");
     assert_eq!(letter["draft"]["language"], "en");
 }

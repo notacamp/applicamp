@@ -606,7 +606,11 @@ mod tests {
             []
         );
         assert_eq!(
-            checked("Rust Developer and Platform Engineer", &["sk"], Place::Headline),
+            checked(
+                "Rust Developer and Platform Engineer",
+                &["sk"],
+                Place::Headline
+            ),
             []
         );
         // A month is not a claim; its year is.
@@ -822,10 +826,7 @@ mod tests {
         let f = frame();
         // Another job's line.
         let other = checked("Built ingestion for 3 partner feeds", &["w1.h1"], W0);
-        assert_eq!(
-            cannot_keep(&other, W0, &f),
-            Some(CannotKeep::OtherPosition)
-        );
+        assert_eq!(cannot_keep(&other, W0, &f), Some(CannotKeep::OtherPosition));
         // A summary whose flagged words only the company's facts say.
         let with_company = Frame::build(
             &CvProfile {
@@ -858,7 +859,11 @@ mod tests {
             Some(CannotKeep::Company)
         );
         // A number the person may have: theirs to keep.
-        let number = checked("Rust engineer who cut runs to 20 minutes", &["w0.h1"], Place::Summary);
+        let number = checked(
+            "Rust engineer who cut runs to 20 minutes",
+            &["w0.h1"],
+            Place::Summary,
+        );
         assert_eq!(cannot_keep(&number, Place::Summary, &f), None);
     }
 
@@ -897,14 +902,16 @@ mod tests {
             [Reason::ClaimNotInSources { claim, .. }] if claim == "Rust"
         ));
         assert_eq!(
-            check_line(&line("Rebuilt billing in Rust", &["w0.h1", "sk"]), W0, &f, &known),
+            check_line(
+                &line("Rebuilt billing in Rust", &["w0.h1", "sk"]),
+                W0,
+                &f,
+                &known
+            ),
             []
         );
         // In the summary, it backs a line.
-        assert_eq!(
-            check_line(&from_summary, Place::Summary, &f, &known),
-            []
-        );
+        assert_eq!(check_line(&from_summary, Place::Summary, &f, &known), []);
     }
 
     #[test]

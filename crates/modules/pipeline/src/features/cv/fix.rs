@@ -454,7 +454,11 @@ mod tests {
             );
         }
         // The company's facts are not the person's sources.
-        let summary = line("s1", "Rust engineer, cut runs to 20 minutes", &["w0.h1", "c99999999"]);
+        let summary = line(
+            "s1",
+            "Rust engineer, cut runs to 20 minutes",
+            &["w0.h1", "c99999999"],
+        );
         assert!(!backs(
             "I cut runs to 20 minutes for Ledgers of small shops.",
             &summary,
@@ -575,7 +579,14 @@ mod tests {
             },
         );
         assert_eq!(
-            c.summary.as_ref().unwrap().ask.as_ref().unwrap().proposal.as_deref(),
+            c.summary
+                .as_ref()
+                .unwrap()
+                .ask
+                .as_ref()
+                .unwrap()
+                .proposal
+                .as_deref(),
             Some("I worked for 30 small shops.")
         );
     }

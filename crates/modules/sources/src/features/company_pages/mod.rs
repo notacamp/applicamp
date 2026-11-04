@@ -593,8 +593,8 @@ pub async fn check_system(
         found.push(blocker(
             "needs_choice",
             format!(
-                "Reading {}'s pages is allowed. It asks AI tools not to learn from them \
-                 (ai-train=no). Applicamp never trains on jobs: approve it to read its \
+                "Reading {}'s pages is allowed. It asks artificial intelligence tools not to \
+                 learn from them. Applicamp never trains on jobs: approve it to read its \
                  company pages, or decline it.",
                 system.name
             ),

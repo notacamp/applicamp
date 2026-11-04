@@ -227,7 +227,9 @@
         "json_api": "une API JSON",
         "rss": "un flux RSS",
         "jsonld_sitemap": "des offres dans son sitemap",
-        "hn": "le fil HN"
+        "hn": "le fil HN",
+        "hiring_system": "un système de recrutement",
+        "company_page": "une page d’entreprise"
       },
       "fields": {
         "title": "Titre",
@@ -353,7 +355,11 @@
       "lever": "Lever",
       "ashby": "Ashby",
       "jsonld": "Sa page carrières (JobPosting)",
-      "none": "Aucun site d’emploi"
+      "none": "Aucun site d’emploi",
+      "workable": "Workable",
+      "recruitee": "Recruitee",
+      "teamtailor": "Teamtailor",
+      "personio": "Personio"
     },
     "watching": {
       "emptyTitle": "Vous ne suivez encore aucune entreprise",

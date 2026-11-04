@@ -233,9 +233,8 @@ export function hiringLine(
   if (board.kind !== "company_page") {
     return null;
   }
-  const system = (SYSTEM_NAMES as readonly string[]).includes(board.system ?? "")
-    ? t(`boards.hiring.systems.${board.system ?? ""}`)
-    : (board.system ?? "");
+  const known = SYSTEM_NAMES.find((name) => name === board.system);
+  const system = known === undefined ? (board.system ?? "") : t(`boards.hiring.systems.${known}`);
   return t("boards.hiring.through", { system });
 }
 

@@ -23,6 +23,9 @@ export {
   type BoardsPageProps,
   type BoardsTab,
 } from "./components/BoardsPage/BoardsPage";
+// The Job boards page for board owners (#86): totals, what waits for them, every board.
+export { BoardsAdmin, type BoardsAdminProps } from "./components/BoardsAdmin/BoardsAdmin";
+export { useBoards } from "./api/boards";
 // Company watchers (#20): companies whose jobs keep fitting you, suggested
 // from your matches, whose own job board is read every day; Today's
 // compact suggestion.

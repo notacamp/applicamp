@@ -100,6 +100,7 @@
     "errors": {
       "not_board_owner": "Solo los responsables de los portales de esta instancia pueden hacer eso.",
       "not_waiting": "Solo se puede aprobar un portal en espera o en pausa.",
+      "not_asked": "Di primero que lo enviaste.",
       "not_approved": "Solo se puede pausar un portal aprobado.",
       "check_needed": "Revisa el portal primero: aún no se conocen sus reglas de robots.",
       "robots_disallowed": "Las reglas de robots del portal prohíben leer ese feed. Cambia su configuración a una ruta permitida.",
@@ -385,6 +386,206 @@
         }
       },
       "limits": "Hasta {{max}} empresas vigiladas. Cuenta para tus límites (0,30 € al día, 5 € al mes), y nada se reintenta pasado un límite."
+    }
+  },
+  "admin": {
+    "loadFailed": "No se pudieron cargar los portales de empleo.",
+    "retry": "Reintentar",
+    "none": "Aún no",
+    "worldwide": "En todo el mundo",
+    "cancel": "Cancelar",
+    "askedOn": "Pedido el {{date}}. Aún sin respuesta.",
+    "showMore_one": "Mostrar {{count}} más",
+    "showMore_other": "Mostrar {{count}} más",
+    "totals": {
+      "reading": "Leídos",
+      "readingDetail": "{{sites}} portales de empleo y {{companies}} empresas",
+      "waiting": "Esperándote",
+      "waitingDetail": "Permisos, claves y decisiones",
+      "checking": "En revisión",
+      "checkingDetail": "Encontrados hace poco, la app está leyendo sus normas",
+      "notAllowed": "No permitidos",
+      "notAllowedDetail": "Sus normas prohíben las apps",
+      "paused": "En pausa",
+      "pausedDetail": "Detenidos por ti, por ahora"
+    },
+    "week": {
+      "title": "Esta semana",
+      "found_one": "Encontrado {{count}} portal nuevo y revisados {{checked}}.",
+      "found_other": "Encontrados {{count}} portales nuevos y revisados {{checked}}.",
+      "started_one": "{{count}} portal empezó a leerse.",
+      "started_other": "{{count}} portales empezaron a leerse.",
+      "rechecked_one": "Se volvieron a leer las normas de {{count}} portal.",
+      "rechecked_other": "Se volvieron a leer las normas de {{count}} portales.",
+      "nothing": "Nada nuevo esta semana. La app busca portales nuevos cada semana."
+    },
+    "waiting": {
+      "title": "Esperándote",
+      "description": "Cada uno necesita algo que solo tú puedes hacer.",
+      "emptyTitle": "Nada te espera",
+      "emptyBody": "Un portal aparece aquí cuando sus normas piden permiso, necesita una clave o solo falta tu aprobación. La app encuentra y revisa portales nuevos cada semana."
+    },
+    "need": {
+      "permission": "Sus normas piden permiso por escrito antes de que una app lea sus ofertas.",
+      "key": "Necesita una clave gratuita que solo tú puedes pedir.",
+      "choice": "Una decisión sirve para todas las empresas de este sistema de contratación.",
+      "approve": "Todas las revisiones se superaron. Solo falta tu aprobación."
+    },
+    "cta": {
+      "permission": "Pedir permiso",
+      "key": "Añadir la clave",
+      "choice": "Decidir",
+      "approve": "Revisar"
+    },
+    "status": {
+      "reading": "Leyéndose",
+      "waiting": "Esperándote",
+      "checking": "En revisión",
+      "notAllowed": "No permitido",
+      "paused": "En pausa"
+    },
+    "kind": {
+      "site": "Portal de empleo",
+      "company": "Página de empresa"
+    },
+    "how": {
+      "json_api": "una lista pública de ofertas para apps",
+      "rss": "un canal de noticias con sus ofertas",
+      "jsonld_sitemap": "ofertas marcadas en sus páginas",
+      "hn": "un hilo mensual de publicaciones"
+    },
+    "origin": {
+      "seed": "la primera investigación",
+      "discovery": "la búsqueda semanal de portales",
+      "suggested": "una sugerencia"
+    },
+    "table": {
+      "board": "Portal",
+      "jobs": "Ofertas que tiene",
+      "where": "Dónde",
+      "status": "Estado",
+      "found": "Encontrado a través de"
+    },
+    "all": {
+      "title": "Todos los portales · {{total}}",
+      "search": "Buscar un portal",
+      "searchHint": "Hoteles, enfermeros, Lisboa",
+      "emptyTitle": "Ningún portal coincide",
+      "emptyBody": "Ningún portal coincide con estos filtros. Quita un filtro para ver más.",
+      "emptyNone": "Aún no se conoce ningún portal. La app busca nuevos cada semana.",
+      "clear": "Quitar filtros",
+      "table": "Todos los portales",
+      "showing": "Mostrando {{shown}} de {{total}}"
+    },
+    "filters": {
+      "kind": "Tipo de portal",
+      "status": "Estado",
+      "jobs": "Tipo de ofertas",
+      "anyStatus": "Cualquier estado",
+      "allJobs": "Todos los tipos de ofertas",
+      "kinds": {
+        "all": "Todo",
+        "site": "Portales de empleo",
+        "company": "Páginas de empresas"
+      }
+    },
+    "peek": {
+      "eyebrow": "Portal de empleo",
+      "close": "Cerrar",
+      "more": "Más opciones"
+    },
+    "decline": {
+      "button": "Rechazar",
+      "confirm": "Rechazarlo",
+      "sure": "¿Rechazar {{name}}? No se leerá nunca."
+    },
+    "permission": {
+      "title": "Pedir permiso",
+      "description": "Envíalo desde tu propio correo. Cuando respondan, márcalo aquí.",
+      "noContact": "Envíalo al contacto que aparece en su sitio.",
+      "to": "Para {{to}}",
+      "email": "Correo para enviar",
+      "copy": "Copiar el correo",
+      "copied": "Copiado",
+      "copyFailed": "Selecciona el texto y cópialo",
+      "sent": "Ya lo envié",
+      "yes": "Dijeron que sí",
+      "no": "Dijeron que no"
+    },
+    "key": {
+      "title": "Añadir su clave",
+      "description": "Solo tú puedes pedirla. Applicamp la guarda sellada y no la envía a ningún otro sitio.",
+      "open": "Abre la página donde {{name}} da las claves.",
+      "page": "Conseguir una clave",
+      "paste": "Pega la clave aquí.",
+      "field": "Clave",
+      "save": "Guardar y revisar"
+    },
+    "choice": {
+      "title": "Tu decisión",
+      "description": "Se permite leer estas páginas para mostrar sus ofertas. Su sitio pide a las herramientas de IA que no aprendan de sus páginas. La app nunca entrena un modelo con ofertas, pero sí pregunta a un modelo si una oferta le sirve a la persona.",
+      "yes": "Leerlas",
+      "no": "No leerlas"
+    },
+    "approve": {
+      "title": "Listo para leer",
+      "description": "Todas las revisiones se superaron. Apruébalo y las búsquedas empiezan a leerlo.",
+      "button": "Aprobar"
+    },
+    "checking": {
+      "title": "En revisión",
+      "description": "La app está leyendo sus normas y buscando sus ofertas. Aún no necesita nada de ti."
+    },
+    "notAllowed": {
+      "title": "No permitido",
+      "description": "Sus normas prohíben las apps, así que la app no lo lee."
+    },
+    "reading": {
+      "title": "Leyéndose",
+      "pause": "Pausar",
+      "check": "Revisar de nuevo",
+      "stop": "Dejar de leerlo",
+      "stopConfirm": "Dejar de leer",
+      "stopSure": "¿Dejar de leer {{name}}? Las búsquedas dejarán de usarlo."
+    },
+    "paused": {
+      "title": "En pausa",
+      "resume": "Volver a leerlo"
+    },
+    "facts": {
+      "jobs": "Ofertas que tiene",
+      "where": "Dónde",
+      "how": "Cómo se lee",
+      "found": "Encontrado a través de",
+      "checked": "Revisado",
+      "now": "Ahora",
+      "never": "Aún no"
+    },
+    "errors": {
+      "not_asked": "Di primero que lo enviaste.",
+      "not_waiting": "Solo se puede responder a un portal que te espera.",
+      "robots_disallowed": "Su sitio dice a los programas que no se acerquen a esa lista, así que un sí no puede ponerlo en marcha.",
+      "needs_key": "Antes necesita una clave. Añádela y responde después.",
+      "check_needed": "La app aún no revisó sus normas. Revísalo de nuevo primero.",
+      "generic": "Eso no funcionó. Inténtalo de nuevo."
+    },
+    "checks": {
+      "title": "Lo que revisó la app",
+      "feedOk": "Publica sus ofertas para que las apps las lean",
+      "feedWait": "Buscando una lista de sus ofertas",
+      "siteOk": "Su sitio permite que las apps lo lean",
+      "siteNo": "Su sitio dice a los programas que no se acerquen a esa lista",
+      "siteWait": "Leyendo las normas de su sitio",
+      "rulesOk": "Sus normas no dicen nada contra las apps",
+      "rulesNo": "Sus normas piden permiso primero",
+      "rulesWait": "Leyendo sus normas",
+      "keyOk": "Hay una clave",
+      "keyNo": "Necesita una clave: aún no hay ninguna",
+      "state": {
+        "ok": "Superado",
+        "part": "Aún en revisión",
+        "none": "Necesita atención"
+      }
     }
   }
 }

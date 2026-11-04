@@ -38,7 +38,7 @@ test("the boards searches read are ranked by salary, a candidate waits with its 
   await expect.poll(() => latestSearchStatus(page), { timeout: 60_000 }).toBe("finished");
 
   // The Boards page, from the sidebar or the tab bar.
-  await page.goto("/boards");
+  await page.goto("/boards?tab=list");
   await expectPageFillsTheScreen(page, "boards");
   const approved = page.getByTestId("boards-section-approved");
   await expect(approved).toContainText("Fake Remote Board");
@@ -114,7 +114,7 @@ test("every waiting board can be approved or says why: checked at start, a key s
   expect(keyed).not.toBeNull();
   expect(await callApi(page, "DELETE", `/api/v1/boards/${keyed?.board.id ?? ""}/key`)).toBe(200);
 
-  await page.goto("/boards");
+  await page.goto("/boards?tab=list");
   const waiting = page.getByTestId("boards-section-waiting");
   const peek = page.getByTestId("board-peek");
   const open = async (name: string) => {
@@ -188,4 +188,43 @@ test("every waiting board can be approved or says why: checked at start, a key s
   await page.getByTestId("board-proposal-use").click();
   await expect(page.getByTestId("board-proposal")).toHaveCount(0);
   await expect(page.getByTestId("board-approve")).toBeEnabled();
+});
+
+test("the owner's Job boards page: totals, what waits for them, and a board's decision before its facts and checks", async ({
+  page,
+}) => {
+  await signIn(page);
+  await page.goto("/boards");
+  await expectPageFillsTheScreen(page, "boards");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Job boards");
+  await expect(page.getByTestId("boards-back")).toBeVisible();
+  await expect(page.getByTestId("boards-admin-totals")).toBeVisible();
+  await expect(page.getByTestId("boards-admin-week")).toBeVisible();
+
+  // A board whose terms forbid automated reading waits for the owner, with its reason.
+  const waiting = page.getByTestId("boards-admin-waiting");
+  const row = waiting.getByTestId("boards-admin-waiting-row").filter({
+    hasText: "Fake Forbidding Board",
+  });
+  await expect(row).toContainText("written permission");
+  await expectNoSidewaysScroll(page);
+  await expectAccessible(page);
+
+  // Its panel: the email to send first, then the facts, then each check with the quoted sentence.
+  await row.getByTestId("boards-admin-waiting-open").click();
+  const permission = page.getByTestId("boards-admin-permission");
+  await expect(permission).toContainText("May Applicamp show jobs from Fake Forbidding Board?");
+  await expect(page.getByTestId("boards-admin-asked")).toBeVisible();
+  await expect(page.getByTestId("boards-admin-facts")).toBeVisible();
+  await expect(page.getByTestId("boards-admin-checks")).toContainText(
+    "read this invented site with robots",
+  );
+  await expectNoSidewaysScroll(page);
+  await expectAccessible(page);
+  await page.getByTestId("boards-admin-peek-close").click();
+  await expect(page.getByTestId("boards-admin-peek")).toBeHidden();
+
+  // Every board, searchable.
+  await page.getByTestId("boards-admin-search").fill("forbidding");
+  await expect(page.getByTestId("boards-admin-row")).toHaveCount(1);
 });

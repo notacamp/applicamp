@@ -264,3 +264,45 @@ export function discoveryRun(): ScanRun {
     ],
   };
 }
+
+type AdminOverview = Schema<"AdminOverview">;
+type PermissionEmail = Schema<"PermissionEmail">;
+
+/** The owners' overview: the boards `candidates` say what they wait for. */
+export function adminOverview(overrides: Partial<AdminOverview> = {}): AdminOverview {
+  return {
+    totals: {
+      reading_sites: 412,
+      reading_companies: 2736,
+      waiting: 1,
+      checking: 0,
+      not_allowed: 1,
+      paused: 0,
+    },
+    this_week: { found: 184, checked: 190, rechecked: 40, started_reading: 162 },
+    candidates: [
+      {
+        id: WAITING,
+        name: "Example Remote",
+        stage: "waiting",
+        need: "permission",
+        detail: "You may not scrape this site with automated tools.",
+        asked_at: null,
+      },
+    ],
+    ...overrides,
+  };
+}
+
+/** The email asking Example Remote for permission. */
+export function permissionEmail(overrides: Partial<PermissionEmail> = {}): PermissionEmail {
+  return {
+    to: null,
+    subject: "May Applicamp show jobs from Example Remote?",
+    body: "Hi Example Remote team,\n\nWe would read the list of jobs your site publishes at remote.example.\n\nThanks,\nApplicamp",
+    asked_at: null,
+    answered_at: null,
+    answer: null,
+    ...overrides,
+  };
+}

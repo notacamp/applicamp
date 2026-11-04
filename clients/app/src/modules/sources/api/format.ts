@@ -39,3 +39,8 @@ export function hostOf(url: string | null | undefined): string | null {
     return null;
   }
 }
+
+/** "28 Oct": a day and a short month, in the person's language. */
+export function shortDate(iso: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }).format(new Date(iso));
+}

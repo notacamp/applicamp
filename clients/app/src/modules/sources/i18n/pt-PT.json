@@ -100,6 +100,7 @@
     "errors": {
       "not_board_owner": "Só os responsáveis pelos portais desta instância podem fazer isso.",
       "not_waiting": "Só um portal à sua espera, ou em pausa, pode ser aprovado.",
+      "not_asked": "Diga primeiro que enviou.",
       "not_approved": "Só um portal aprovado pode ser posto em pausa.",
       "check_needed": "Verifique o portal primeiro: as regras do robots ainda não são conhecidas.",
       "robots_disallowed": "As regras do robots do portal proíbem ler esse feed. Altere a configuração para um caminho permitido.",
@@ -385,6 +386,206 @@
         }
       },
       "limits": "Até {{max}} empresas vigiadas. Conta para os seus limites (0,30 € por dia, 5 € por mês), e nada é repetido depois de um limite."
+    }
+  },
+  "admin": {
+    "loadFailed": "Não foi possível carregar os portais de emprego.",
+    "retry": "Tentar de novo",
+    "none": "Ainda não",
+    "worldwide": "Em todo o mundo",
+    "cancel": "Cancelar",
+    "askedOn": "Pedido a {{date}}. Ainda sem resposta.",
+    "showMore_one": "Mostrar mais {{count}}",
+    "showMore_other": "Mostrar mais {{count}}",
+    "totals": {
+      "reading": "A ser lidos",
+      "readingDetail": "{{sites}} portais de emprego e {{companies}} empresas",
+      "waiting": "À sua espera",
+      "waitingDetail": "Permissões, chaves e escolhas",
+      "checking": "Em verificação",
+      "checkingDetail": "Encontrados há pouco, a app está a ler as suas regras",
+      "notAllowed": "Não permitidos",
+      "notAllowedDetail": "As regras deles proíbem apps",
+      "paused": "Em pausa",
+      "pausedDetail": "Parados por si, por agora"
+    },
+    "week": {
+      "title": "Esta semana",
+      "found_one": "Encontrado {{count}} portal novo e verificados {{checked}}.",
+      "found_other": "Encontrados {{count}} portais novos e verificados {{checked}}.",
+      "started_one": "{{count}} portal começou a ser lido.",
+      "started_other": "{{count}} portais começaram a ser lidos.",
+      "rechecked_one": "As regras de {{count}} portal foram lidas outra vez.",
+      "rechecked_other": "As regras de {{count}} portais foram lidas outra vez.",
+      "nothing": "Nada de novo esta semana. A app procura portais novos todas as semanas."
+    },
+    "waiting": {
+      "title": "À sua espera",
+      "description": "Cada um precisa de algo que só você pode fazer.",
+      "emptyTitle": "Nada está à sua espera",
+      "emptyBody": "Um portal aparece aqui quando as regras pedem permissão, precisa de uma chave ou só falta a sua aprovação. A app encontra e verifica portais novos todas as semanas."
+    },
+    "need": {
+      "permission": "As regras pedem permissão escrita antes de uma app ler as suas ofertas.",
+      "key": "Precisa de uma chave gratuita que só você pode pedir.",
+      "choice": "Uma escolha vale para todas as empresas deste sistema de recrutamento.",
+      "approve": "Todas as verificações passaram. Só falta a sua aprovação."
+    },
+    "cta": {
+      "permission": "Pedir permissão",
+      "key": "Juntar a chave",
+      "choice": "Escolher",
+      "approve": "Ver"
+    },
+    "status": {
+      "reading": "A ser lido",
+      "waiting": "À sua espera",
+      "checking": "Em verificação",
+      "notAllowed": "Não permitido",
+      "paused": "Em pausa"
+    },
+    "kind": {
+      "site": "Portal de emprego",
+      "company": "Página de empresa"
+    },
+    "how": {
+      "json_api": "uma lista pública de ofertas para apps",
+      "rss": "um feed de notícias com as suas ofertas",
+      "jsonld_sitemap": "ofertas marcadas nas suas páginas",
+      "hn": "uma conversa mensal de publicações"
+    },
+    "origin": {
+      "seed": "a primeira pesquisa",
+      "discovery": "a procura semanal de portais",
+      "suggested": "uma sugestão"
+    },
+    "table": {
+      "board": "Portal",
+      "jobs": "Ofertas que tem",
+      "where": "Onde",
+      "status": "Estado",
+      "found": "Encontrado através de"
+    },
+    "all": {
+      "title": "Todos os portais · {{total}}",
+      "search": "Procurar um portal",
+      "searchHint": "Hotéis, enfermeiros, Lisboa",
+      "emptyTitle": "Nenhum portal corresponde",
+      "emptyBody": "Nenhum portal corresponde a estes filtros. Limpe um filtro para ver mais.",
+      "emptyNone": "Ainda não se conhece nenhum portal. A app procura novos todas as semanas.",
+      "clear": "Limpar filtros",
+      "table": "Todos os portais",
+      "showing": "A mostrar {{shown}} de {{total}}"
+    },
+    "filters": {
+      "kind": "Tipo de portal",
+      "status": "Estado",
+      "jobs": "Tipo de ofertas",
+      "anyStatus": "Qualquer estado",
+      "allJobs": "Todos os tipos de ofertas",
+      "kinds": {
+        "all": "Tudo",
+        "site": "Portais de emprego",
+        "company": "Páginas de empresas"
+      }
+    },
+    "peek": {
+      "eyebrow": "Portal de emprego",
+      "close": "Fechar",
+      "more": "Mais opções"
+    },
+    "decline": {
+      "button": "Recusar",
+      "confirm": "Recusar",
+      "sure": "Recusar {{name}}? Nunca será lido."
+    },
+    "permission": {
+      "title": "Pedir permissão",
+      "description": "Envie isto a partir do seu email. Quando responderem, marque aqui.",
+      "noContact": "Envie para o contacto que está no site.",
+      "to": "Para {{to}}",
+      "email": "Email a enviar",
+      "copy": "Copiar o email",
+      "copied": "Copiado",
+      "copyFailed": "Selecione o texto e copie-o",
+      "sent": "Já enviei",
+      "yes": "Disseram que sim",
+      "no": "Disseram que não"
+    },
+    "key": {
+      "title": "Juntar a chave",
+      "description": "Só você a pode pedir. O Applicamp guarda-a selada e não a envia para mais lado nenhum.",
+      "open": "Abra a página onde {{name}} dá as chaves.",
+      "page": "Obter uma chave",
+      "paste": "Cole aqui a chave.",
+      "field": "Chave",
+      "save": "Guardar e verificar"
+    },
+    "choice": {
+      "title": "A sua escolha",
+      "description": "É permitido ler estas páginas para mostrar as suas ofertas. O site pede às ferramentas de IA que não aprendam com as suas páginas. A app nunca treina um modelo com ofertas, mas pergunta a um modelo se uma oferta serve à pessoa.",
+      "yes": "Lê-las",
+      "no": "Não as ler"
+    },
+    "approve": {
+      "title": "Pronto a ler",
+      "description": "Todas as verificações passaram. Aprove e as pesquisas começam a lê-lo.",
+      "button": "Aprovar"
+    },
+    "checking": {
+      "title": "Em verificação",
+      "description": "A app está a ler as regras e a procurar as ofertas. Ainda não precisa de fazer nada."
+    },
+    "notAllowed": {
+      "title": "Não permitido",
+      "description": "As regras proíbem apps, por isso a app não o lê."
+    },
+    "reading": {
+      "title": "A ser lido",
+      "pause": "Pausar",
+      "check": "Verificar de novo",
+      "stop": "Deixar de o ler",
+      "stopConfirm": "Deixar de ler",
+      "stopSure": "Deixar de ler {{name}}? As pesquisas deixam de o usar."
+    },
+    "paused": {
+      "title": "Em pausa",
+      "resume": "Voltar a lê-lo"
+    },
+    "facts": {
+      "jobs": "Ofertas que tem",
+      "where": "Onde",
+      "how": "Como é lido",
+      "found": "Encontrado através de",
+      "checked": "Verificado",
+      "now": "Agora",
+      "never": "Ainda não"
+    },
+    "errors": {
+      "not_asked": "Diga primeiro que enviou.",
+      "not_waiting": "Só se pode responder a um portal que está à sua espera.",
+      "robots_disallowed": "O site diz aos programas para ficarem longe dessa lista, por isso um sim não o pode ativar.",
+      "needs_key": "Precisa primeiro de uma chave. Junte-a e responda depois.",
+      "check_needed": "A app ainda não verificou as regras. Verifique de novo primeiro.",
+      "generic": "Isso não funcionou. Tente de novo."
+    },
+    "checks": {
+      "title": "O que a app verificou",
+      "feedOk": "Publica as suas ofertas para as apps lerem",
+      "feedWait": "A procurar uma lista das suas ofertas",
+      "siteOk": "O site deixa as apps lê-lo",
+      "siteNo": "O site diz aos programas para ficarem longe dessa lista",
+      "siteWait": "A ler as regras do site",
+      "rulesOk": "As regras não dizem nada contra apps",
+      "rulesNo": "As regras pedem primeiro permissão",
+      "rulesWait": "A ler as regras",
+      "keyOk": "Há uma chave",
+      "keyNo": "Precisa de uma chave: ainda não há nenhuma",
+      "state": {
+        "ok": "Passou",
+        "part": "Ainda em verificação",
+        "none": "Precisa de atenção"
+      }
     }
   }
 }

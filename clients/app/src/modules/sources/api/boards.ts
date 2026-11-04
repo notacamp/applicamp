@@ -165,6 +165,7 @@ export function useSuggestBoard() {
 export const BOARD_ERRORS = [
   "not_board_owner",
   "not_waiting",
+  "not_asked",
   "not_approved",
   "check_needed",
   "robots_disallowed",

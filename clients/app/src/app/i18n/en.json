@@ -54,7 +54,9 @@
   },
   "boards": {
     "title": "Boards",
-    "lead": "The job boards searches read, ranked by the salaries they list, the new ones waiting for you, and what each search scanned."
+    "lead": "The job boards searches read, ranked by the salaries they list, the new ones waiting for you, and what each search scanned.",
+    "adminTitle": "Job boards",
+    "back": "You"
   },
   "companies": {
     "title": "Companies",

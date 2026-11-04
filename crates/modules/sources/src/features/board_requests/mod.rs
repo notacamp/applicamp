@@ -533,7 +533,7 @@ pub async fn asked(
 
 /// Record a board's answer.
 ///
-/// Only after it was asked. "yes" approves the board through the approve
+/// A permission only after it was asked (a choice needs no email). "yes" approves the board through the approve
 /// path (the note "They said yes on <date>" is kept): the terms and
 /// permission blockers are cleared, but robots rules that forbid the feed and
 /// a missing key still refuse it (409, nothing recorded). "no" declines it
@@ -586,7 +586,8 @@ pub async fn answer(
     let row = boards::fetch(&state.db, id).await?;
     let request: Option<Uuid> = sqlx::query_scalar(
         "SELECT id FROM sources.board_requests
-          WHERE board_id = $1 AND kind = $2 AND answered_at IS NULL AND asked_at IS NOT NULL",
+          WHERE board_id = $1 AND kind = $2 AND answered_at IS NULL
+            AND (kind = 'choice' OR asked_at IS NOT NULL)",
     )
     .bind(id)
     .bind(body.kind.as_str())

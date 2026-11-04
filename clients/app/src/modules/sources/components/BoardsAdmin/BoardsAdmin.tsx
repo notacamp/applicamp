@@ -231,30 +231,6 @@ function ThisWeek({ overview }: { overview: AdminOverview }) {
   );
 }
 
-/** What happened in the last 7 days, only from what the app recorded. */
-function ThisWeek({ overview }: { overview: AdminOverview }) {
-  const { t } = useTranslation("sources");
-  const week = overview.this_week;
-  const lines = [
-    week.found > 0 || week.checked > 0
-      ? t("admin.week.found", { count: week.found, checked: week.checked })
-      : null,
-    week.started_reading > 0 ? t("admin.week.started", { count: week.started_reading }) : null,
-    week.rechecked > 0 ? t("admin.week.rechecked", { count: week.rechecked }) : null,
-  ].filter((line): line is string => line !== null);
-  return (
-    <Section title={t("admin.week.title")} testId="boards-admin-week">
-      <Stack gap="sm">
-        {lines.length === 0 ? (
-          <Text tone="secondary">{t("admin.week.nothing")}</Text>
-        ) : (
-          lines.map((line) => <Text key={line}>{line}</Text>)
-        )}
-      </Stack>
-    </Section>
-  );
-}
-
 /** One board waiting for you; after you decline it, it stays here with "Declined" and Undo. */
 function WaitingRow({
   row,

@@ -1,4 +1,7 @@
-import type { AdminBoard, BoardNeed } from "./admin";
+import type { Schema } from "~/lib/api";
+
+type AdminBoard = Schema<"AdminBoard">;
+type BoardNeed = Schema<"BoardNeed">;
 
 /** Where a board stands, as the page words it. */
 export type RowStatus = "reading" | "waiting" | "checking" | "notAllowed" | "paused";

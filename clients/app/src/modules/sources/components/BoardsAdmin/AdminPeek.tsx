@@ -23,7 +23,13 @@ import {
   TextField,
 } from "~/lib/ui";
 
-import { useAnswerRequest, useMarkAsked, usePermissionEmail, useReopen } from "../../api/admin";
+import {
+  howRead,
+  useAnswerRequest,
+  useMarkAsked,
+  usePermissionEmail,
+  useReopen,
+} from "../../api/admin";
 import type { AdminRow, RowStatus } from "../../api/admin-rows";
 import {
   boardErrorOf,
@@ -56,20 +62,31 @@ function reconcile(row: AdminRow, detail: BoardDetail | undefined): AdminRow {
     return row;
   }
   let next: RowStatus = row.status;
-  if (status === "approved") {
-    next = "reading";
-  } else if (status === "paused") {
-    next = "paused";
-  } else if (status === "declined") {
-    next = "notAllowed";
-  } else if (row.status === "reading" || row.status === "paused" || row.status === "notAllowed") {
-    next = "waiting";
+  switch (status) {
+    case "approved": {
+      next = "reading";
+      break;
+    }
+    case "paused": {
+      next = "paused";
+      break;
+    }
+    case "declined": {
+      next = "notAllowed";
+      break;
+    }
+    case "candidate": {
+      if (row.status === "reading" || row.status === "paused" || row.status === "notAllowed") {
+        next = "waiting";
+      }
+      break;
+    }
   }
   return {
     ...row,
     status: next,
     need: next === "waiting" ? (row.need ?? "approve") : undefined,
-    board: { ...row.board, status, decline_reason: detail.board.decline_reason },
+    board: { ...row.board, status, decline_reason: detail.board.decline_reason ?? null },
   };
 }
 

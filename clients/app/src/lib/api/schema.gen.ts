@@ -2568,6 +2568,11 @@ export interface components {
             /** @description A fingerprint of the terms page, to notice a change. */
             terms_fingerprint?: string;
             /**
+             * @description The fingerprint of the terms sentences the model read (its verdict
+             *     and tags are kept until the terms change).
+             */
+            terms_read_for?: string;
+            /**
              * @description Its sentences about scraping, robots, automation, aggregation, the
              *     API, linking back, attribution or commercial use, verbatim (at most
              *     10).
@@ -4505,6 +4510,13 @@ export interface components {
         };
         /** @description What a board's robots.txt says to us. */
         RobotsReport: {
+            /**
+             * @description Its `Content-Signal` line (`search`, `ai-input`, `ai-train`: `yes` or
+             *     `no`). Recorded and shown, never a reason not to read.
+             */
+            content_signal?: {
+                [key: string]: string;
+            } | null;
             /**
              * Format: double
              * @description Seconds between requests it asks for.

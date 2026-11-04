@@ -8311,6 +8311,10 @@
             "type": "string",
             "description": "A fingerprint of the terms page, to notice a change."
           },
+          "terms_read_for": {
+            "type": "string",
+            "description": "The fingerprint of the terms sentences the model read (its verdict\nand tags are kept until the terms change)."
+          },
           "terms_sentences": {
             "type": "array",
             "items": {
@@ -8375,7 +8379,8 @@
           "attribution",
           "flags",
           "totals_7d",
-          "totals_30d"
+          "totals_30d",
+          "tags"
         ],
         "properties": {
           "approved_at": {
@@ -8411,6 +8416,9 @@
             ],
             "description": "What its site rules say about use of its content (search, ai-train).",
             "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
               "type": "string"
             }
           },
@@ -13372,6 +13380,19 @@
           "found"
         ],
         "properties": {
+          "content_signal": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Its `Content-Signal` line (`search`, `ai-input`, `ai-train`: `yes` or\n`no`). Recorded and shown, never a reason not to read.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
           "crawl_delay": {
             "type": [
               "number",

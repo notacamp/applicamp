@@ -327,7 +327,7 @@
       "draftPill": "Brouillon",
       "approvedPill": "Approuvé · v{{version}}",
       "language": "Rédigé en {{language}}",
-      "makeAgain": "Refaire · environ {{cost}}",
+      "makeAgain": "Réécrire · environ {{cost}}",
       "making": "Rédaction…",
       "approve": "Approuver v{{version}}",
       "approving": "Approbation…",
@@ -352,7 +352,8 @@
       "skills": "Compétences",
       "education": "Formation",
       "languages": "Langues",
-      "now": "en cours"
+      "now": "en cours",
+      "earlier": "Expérience antérieure"
     },
     "marks": {
       "as_in_profile": "Comme dans le profil",
@@ -468,7 +469,7 @@
       "too_late": "Il est trop tard pour annuler. Refaites le CV pour le modifier."
     },
     "layout": {
-      "template": "Modèle",
+      "template": "Style",
       "templates": {
         "clean": "Épuré",
         "compact": "Compact"
@@ -477,12 +478,14 @@
       "pages_one": "{{count}} page",
       "pages_other": "{{count}} pages",
       "language": "Langue",
-      "note": "Le modèle et la longueur font un PDF à partir du même texte approuvé, sans IA. Une autre langue est un nouveau brouillon : un appel à l’IA et une relecture. Utilisez « Refaire ».",
+      "note": "Le style et la longueur refont le PDF, sans IA. Pour une autre langue, choisissez-la et appuyez sur Réécrire.",
       "confirmTitle": "Faire une nouvelle version ?",
       "confirmBody": "Cela garde la v{{version}} telle quelle et fait la v{{next}} à partir du même texte approuvé, avec le modèle {{template}} sur {{pages}}. Aucune IA n’est utilisée.",
       "confirm": "Faire la v{{next}}",
       "cancel": "Annuler",
-      "making": "Création du PDF…"
+      "making": "Création du PDF…",
+      "languageNext": "Appuyez sur Réécrire pour l’avoir en {{language}}.",
+      "title": "Mise en page · langue"
     },
     "pdf": {
       "open": "Ouvrir le PDF",
@@ -560,6 +563,34 @@
       "undo": "Annuler",
       "undoing": "Annulation…",
       "next": "Nous écrivons ensuite votre lettre de motivation, environ {{cost}}. Annuler l’arrête."
+    },
+    "wants": {
+      "title": "Ce que l’offre demande",
+      "nice": "un plus",
+      "notInProfile": "absent de votre profil",
+      "notOnCv": "absent de ce CV",
+      "covered": "Sur votre CV",
+      "notCovered": "Pas sur votre CV"
+    },
+    "done": {
+      "title": "Fait par l’app · {{cost}}",
+      "row": "{{step}} · {{cost}}",
+      "doneLabel": "Fait",
+      "steps": {
+        "shortlist": "A retenu cette offre",
+        "site": "A trouvé le site de l’entreprise",
+        "read": "A lu le site de l’entreprise",
+        "compare": "A comparé l’offre avec votre profil",
+        "draft": "A écrit le CV",
+        "checked": "A vérifié chaque ligne avec votre profil",
+        "pdf": "A fait le PDF"
+      }
+    },
+    "fixed": {
+      "title_one": "Corrigé par l’app · {{count}} ligne",
+      "title_other": "Corrigé par l’app · {{count}} lignes",
+      "now": "« {{text}} »",
+      "was": "Elle disait : « {{text}} »"
     }
   },
   "cvs": {

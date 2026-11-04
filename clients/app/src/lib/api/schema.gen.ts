@@ -572,7 +572,8 @@ export interface paths {
          * @description Every opportunity of the signed-in person, newest first, except the
          *     dismissed ones ("Not for me") and the hidden ones (they fail a hard
          *     requirement; `hidden=true` lists only those, with the reason). Filter by
-         *     stage, by text in the role, company or place, or to the new ones.
+         *     stage, by text in the role, company or place, to the new ones, or to the
+         *     ones proposed to the person (`proposed=true`, best match first).
          */
         get: operations["pipeline.list"];
         put?: never;
@@ -3154,6 +3155,11 @@ export interface components {
         Cv: {
             can_draft: components["schemas"]["CanDraft"];
             caps: components["schemas"]["CvCaps"];
+            /**
+             * @description What the app did by itself for this CV, in order: the job's
+             *     preparation (when it prepared it) and the draft.
+             */
+            done: components["schemas"]["CvDoneStep"][];
             draft?: components["schemas"]["CvDraftView"] | null;
             /**
              * Format: double
@@ -3163,6 +3169,11 @@ export interface components {
             next?: components["schemas"]["CvNext"] | null;
             /** Format: uuid */
             opportunity_id: string;
+            /**
+             * @description The posting's language, when the CV is in another: offered, never
+             *     chosen for the person.
+             */
+            suggested_language?: string | null;
             /** @description The PDF versions, newest first. */
             versions: components["schemas"]["CvVersion"][];
         };
@@ -3196,6 +3207,18 @@ export interface components {
          * @enum {string}
          */
         CvDocument: "cv" | "letter";
+        /** @description A step the app did by itself for this job, with what it cost. */
+        CvDoneStep: {
+            /** Format: date-time */
+            at: string;
+            /**
+             * Format: double
+             * @description About what it cost, in euros.
+             */
+            eur: number;
+            /** @description `shortlist`, `site`, `read`, `compare` or `draft`. */
+            step: string;
+        };
         /** @description What to make a draft of. */
         CvDraftRequest: {
             /**
@@ -3212,6 +3235,12 @@ export interface components {
             can_approve: boolean;
             changes: components["schemas"]["Changes"];
             contact: components["schemas"]["ContactView"];
+            /**
+             * Format: double
+             * @description What the app's calls for this draft cost, in euros (the draft, the
+             *     second look at what the job wants, the fix of what was flagged).
+             */
+            cost_eur?: number | null;
             /** Format: date-time */
             created_at: string;
             education: components["schemas"]["EducationView"][];
@@ -3265,6 +3294,8 @@ export interface components {
             version?: number | null;
             /** @description What waits on the person, in the order the page shows it. */
             waiting: components["schemas"]["Waiting"][];
+            /** @description What the job wants, each covered by the CV or why not. */
+            wants: components["schemas"]["WantView"][];
         };
         /**
          * @description What a row of the CVs page is.
@@ -4239,10 +4270,13 @@ export interface components {
              * @description When the posting was published.
              */
             posted_at?: string | null;
+            /** @description Proposed to the person: Found, a match of 75 or more, open to them. */
+            proposed: boolean;
             /** @description Some of its reasons were stripped: they claimed things the profile never says. */
             reasons_updated: boolean;
             /** @description Pay, as the posting says. */
             salary_text?: string | null;
+            shortlisted_by?: components["schemas"]["ShortlistedBy"] | null;
             /** @description Where it was found (see the summary's `source`). */
             source: string;
             /**
@@ -4331,10 +4365,13 @@ export interface components {
             /** @description Found and never opened. */
             new: boolean;
             next_step?: string | null;
+            /** @description Proposed to the person: Found, a match of 75 or more, open to them. */
+            proposed: boolean;
             /** @description Where it is open, as the posting says, to go with the reason. */
             region_note?: string | null;
             /** @description Pay, as the posting says. */
             salary_text?: string | null;
+            shortlisted_by?: components["schemas"]["ShortlistedBy"] | null;
             /**
              * @description Where it was found: a job board's slug (`himalayas`), a company
              *     board (`greenhouse`, `lever`, `ashby`), `hn`, or `link` (added by
@@ -5032,6 +5069,11 @@ export interface components {
             why?: string | null;
         };
         /**
+         * @description Who shortlisted an opportunity.
+         * @enum {string}
+         */
+        ShortlistedBy: "person" | "app";
+        /**
          * @description Where the company's site came from.
          * @enum {string}
          */
@@ -5088,7 +5130,7 @@ export interface components {
          * @description What a source is.
          * @enum {string}
          */
-        SourceKind: "headline" | "summary" | "position_summary" | "highlight" | "fact" | "company" | "skills" | "education" | "languages";
+        SourceKind: "headline" | "summary" | "position_summary" | "highlight" | "fact" | "company" | "skills" | "education" | "languages" | "background" | "project" | "certificate";
         /** @description A source a line cites. */
         SourceView: {
             id: string;
@@ -5343,6 +5385,21 @@ export interface components {
          * @enum {string}
          */
         WaitingOn: "site" | "answers" | "cv_approval" | "letter_approval";
+        /**
+         * @description Why a want is or is not on the CV.
+         * @enum {string}
+         */
+        WantReason: "on_cv" | "in_profile" | "not_in_profile";
+        /** @description What the job wants, against the CV. */
+        WantView: {
+            /** @description The CV says it. */
+            covered: boolean;
+            /** @description `must` or `nice`. */
+            level: string;
+            reason: components["schemas"]["WantReason"];
+            /** @description What it wants, in short. */
+            text: string;
+        };
         /**
          * @description What a company's jobs are read from.
          * @enum {string}
@@ -6770,6 +6827,11 @@ export interface operations {
                  *     one. Left out otherwise.
                  */
                 hidden?: boolean;
+                /**
+                 * @description Only the ones proposed to the person (Found, a match of 75 or more,
+                 *     open to them), best match first.
+                 */
+                proposed?: boolean;
             };
             header?: never;
             path?: never;

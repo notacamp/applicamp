@@ -327,7 +327,7 @@
       "draftPill": "Draft",
       "approvedPill": "Approved · v{{version}}",
       "language": "Written in {{language}}",
-      "makeAgain": "Make again · about {{cost}}",
+      "makeAgain": "Write it again · about {{cost}}",
       "making": "Drafting…",
       "approve": "Approve v{{version}}",
       "approving": "Approving…",
@@ -352,7 +352,8 @@
       "skills": "Skills",
       "education": "Education",
       "languages": "Languages",
-      "now": "now"
+      "now": "now",
+      "earlier": "Earlier"
     },
     "marks": {
       "as_in_profile": "As in profile",
@@ -468,7 +469,7 @@
       "too_late": "It’s too late to undo. Make the CV again to change it."
     },
     "layout": {
-      "template": "Template",
+      "template": "Style",
       "templates": {
         "clean": "Clean",
         "compact": "Compact"
@@ -477,12 +478,14 @@
       "pages_one": "{{count}} page",
       "pages_other": "{{count}} pages",
       "language": "Language",
-      "note": "Template and length make a PDF from the same approved text, with no AI. A different language is a new draft: one AI call and a review. Use Make again.",
+      "note": "Style and length make the PDF again, with no AI. For another language, choose it and press Write it again.",
       "confirmTitle": "Make a new version?",
       "confirmBody": "This keeps v{{version}} as it is and makes v{{next}} from the same approved text, as {{template}} on {{pages}}. No AI is used.",
       "confirm": "Make v{{next}}",
       "cancel": "Cancel",
-      "making": "Making the PDF…"
+      "making": "Making the PDF…",
+      "languageNext": "Press Write it again to have it in {{language}}.",
+      "title": "Layout · language"
     },
     "pdf": {
       "open": "Open the PDF",
@@ -560,6 +563,34 @@
       "undo": "Undo",
       "undoing": "Undoing…",
       "next": "Writing your cover letter next, about {{cost}}. Undo stops it."
+    },
+    "wants": {
+      "title": "What the job wants",
+      "nice": "nice to have",
+      "notInProfile": "not on your profile",
+      "notOnCv": "not on this CV",
+      "covered": "On your CV",
+      "notCovered": "Not on your CV"
+    },
+    "done": {
+      "title": "Done by the app · {{cost}}",
+      "row": "{{step}} · {{cost}}",
+      "doneLabel": "Done",
+      "steps": {
+        "shortlist": "Shortlisted this job",
+        "site": "Found the company website",
+        "read": "Read the company website",
+        "compare": "Compared the job with your profile",
+        "draft": "Wrote the CV",
+        "checked": "Checked every line against your profile",
+        "pdf": "Made the PDF"
+      }
+    },
+    "fixed": {
+      "title_one": "Fixed by the app · {{count}} line",
+      "title_other": "Fixed by the app · {{count}} lines",
+      "now": "“{{text}}”",
+      "was": "It said: “{{text}}”"
     }
   },
   "cvs": {

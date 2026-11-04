@@ -256,6 +256,27 @@ function Review({
   };
   const version = draft.version ?? (newest?.version ?? 0) + 1;
   const waiting = draft.waiting.length;
+  // The CV's language and one other: the posting's when it differs, else
+  // English (or Portuguese for a CV in English).
+  const current = cvLanguage(draft.language);
+  const other = cvLanguage(cv.suggested_language ?? (current === "en" ? "pt-PT" : "en"));
+  const languages = other === current ? [current] : [current, other];
+  const writeAgain = (
+    <Button
+      variant="secondary"
+      ai
+      disabled={busy || !cv.can_draft.allowed}
+      data-testid="cv-make-again"
+      onClick={() => {
+        resetErrors();
+        again.mutate();
+      }}
+    >
+      {again.isPending
+        ? t("cv.toolbar.making")
+        : t("cv.toolbar.makeAgain", { cost: formatCost(cv.draft_eur, i18n.language) })}
+    </Button>
+  );
   const sheet = (
     <CvSheet
       draft={draft}
@@ -289,20 +310,7 @@ function Review({
                 })}
               </Text>
             </Tagged>
-            <Button
-              variant="secondary"
-              ai
-              disabled={busy || !cv.can_draft.allowed}
-              data-testid="cv-make-again"
-              onClick={() => {
-                resetErrors();
-                again.mutate();
-              }}
-            >
-              {again.isPending
-                ? t("cv.toolbar.making")
-                : t("cv.toolbar.makeAgain", { cost: formatCost(cv.draft_eur, i18n.language) })}
-            </Button>
+            {editable ? null : writeAgain}
           </Cluster>
         </Tagged>
         {draft.needs_version ? (
@@ -366,22 +374,6 @@ function Review({
             </Section>
           </Tagged>
         )}
-        <LayoutControls
-          layout={layout}
-          onLayout={(next) => {
-            resetErrors();
-            if (editable) {
-              preview.mutate(next);
-            } else {
-              setAsked(next);
-            }
-          }}
-          language={language}
-          onLanguage={(next) => {
-            setLanguage(cvLanguage(next));
-          }}
-          disabled={busy}
-        />
         <ReviewLayout
           testId="cv-layout"
           aside={
@@ -392,6 +384,36 @@ function Review({
               actions={actions}
               onBack={onPipeline}
               onOpenPdf={setViewing}
+              controls={
+                <Stack gap="sm">
+                  <LayoutControls
+                    layout={layout}
+                    onLayout={(next) => {
+                      resetErrors();
+                      if (editable) {
+                        preview.mutate(next);
+                      } else {
+                        setAsked(next);
+                      }
+                    }}
+                    language={language}
+                    languages={languages}
+                    onLanguage={(next) => {
+                      setLanguage(cvLanguage(next));
+                    }}
+                    disabled={busy}
+                  />
+                  {language === cvLanguage(draft.language) ? null : (
+                    <Tagged testId="cv-language-next">
+                      <Text size="sm">
+                        {t("cv.layout.languageNext", {
+                          language: languageName(language, i18n.language),
+                        })}
+                      </Text>
+                    </Tagged>
+                  )}
+                </Stack>
+              }
             />
           }
         >
@@ -426,20 +448,23 @@ function Review({
           <ActionDock
             testId="cv-dock"
             actions={
-              <Button
-                variant="primary"
-                icon="check"
-                disabled={busy || !draft.can_approve}
-                data-testid="cv-approve"
-                onClick={() => {
-                  resetErrors();
-                  approve.mutate(layout);
-                }}
-              >
-                {approve.isPending
-                  ? t("cv.toolbar.approving")
-                  : t("cv.toolbar.approve", { version })}
-              </Button>
+              <>
+                <Button
+                  variant="primary"
+                  icon="check"
+                  disabled={busy || !draft.can_approve}
+                  data-testid="cv-approve"
+                  onClick={() => {
+                    resetErrors();
+                    approve.mutate(layout);
+                  }}
+                >
+                  {approve.isPending
+                    ? t("cv.toolbar.approving")
+                    : t("cv.toolbar.approve", { version })}
+                </Button>
+                {writeAgain}
+              </>
             }
             note={
               <Tagged testId={draft.can_approve ? "cv-approve-ready" : "cv-approve-reason"}>

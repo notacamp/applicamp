@@ -275,6 +275,43 @@ describe("Review the CV", () => {
     expect(await screen.findByTestId("cv-approve")).toBeEnabled();
   });
 
+  it("says what the job wants, what the app did and what it cost, and what it rewrote", async () => {
+    const draft = cvDraft();
+    const role = draft.experience[0];
+    const fixedLine = cvLine("l8", "Led a team of 4 engineers", {
+      fixed_by_app: true,
+      original: "Led a team of 4 engineers building ledgers for small shops",
+    });
+    renderReview({
+      [CV]: {
+        body: cv({
+          draft: {
+            ...draft,
+            experience:
+              role === undefined ? [] : [{ ...role, bullets: [...role.bullets, fixedLine] }],
+          },
+          suggested_language: "fr",
+        }),
+      },
+    });
+    expect(await screen.findByTestId("cv-wants")).toHaveTextContent("What the job wants");
+    expect(screen.getByTestId("cv-want-1")).toHaveTextContent(
+      "Kafka · nice to have · not on your profile",
+    );
+    expect(screen.getByTestId("cv-done")).toHaveTextContent("Done by the app · €0.006");
+    expect(screen.getByTestId("cv-done-draft-1")).toHaveTextContent("Wrote the CV · €0.004");
+    expect(screen.getByTestId("cv-done-pdf")).toHaveTextContent("Made the PDF");
+    expect(screen.getByTestId("cv-fixed-l8")).toHaveTextContent(
+      "It said: “Led a team of 4 engineers building ledgers for small shops”",
+    );
+    // Style, Length, Language: the CV's and the posting's.
+    expect(screen.getByTestId("cv-layout-language")).toHaveTextContent("Style");
+    expect(screen.getByTestId("cv-language-en")).toBeVisible();
+    await userEvent.setup().click(screen.getByTestId("cv-language-fr"));
+    expect(screen.getByTestId("cv-language-next")).toHaveTextContent("Press Write it again");
+    expect(screen.getByTestId("cv-make-again")).toHaveTextContent("Write it again");
+  });
+
   it("offers to make the PDF of a CV approved without one", async () => {
     let asked: unknown;
     renderReview({

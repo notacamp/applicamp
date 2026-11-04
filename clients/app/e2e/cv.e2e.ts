@@ -164,6 +164,16 @@ test("someone drafts a CV, sees it as a PDF at once, says yes to the one questio
       expect(asks.x).toBeGreaterThanOrEqual(pdf.x + pdf.width - 1);
     }
   }
+  // What the job wants, what the app did and what it rewrote, in plain words.
+  await expect(page.getByTestId("cv-wants")).toContainText(
+    "Kafka · nice to have · not on your profile",
+  );
+  await expect(page.getByTestId("cv-done")).toContainText("Wrote the CV");
+  await expect(page.getByTestId("cv-done")).toContainText("Made the PDF");
+  await expect(page.getByTestId("cv-fixed")).toContainText("Led a team of 4 engineers");
+  await expect(page.getByTestId("cv-fixed")).toContainText("It said:");
+  await expect(page.getByTestId("cv-layout-language")).toContainText("Style");
+  await expect(page.getByTestId("cv-language-pt-PT")).toBeVisible();
   await expect(page.getByTestId("cv-keywords-count")).toContainText("/");
   await expect(page.getByTestId("cv-drafts-today")).toContainText("of 20");
   await expect(page.getByTestId("cv-month-spend")).toBeVisible();
@@ -204,6 +214,10 @@ test("someone drafts a CV, sees it as a PDF at once, says yes to the one questio
   await expect(page.getByTestId("cv-name")).toContainText("Alex Demo");
   await expect(page.getByTestId("cv-contact")).toContainText("alex.demo@example.com");
   await expect(page.getByTestId("cv-education")).toContainText("Example University");
+  // The position the CV leaves out is named under Earlier, as in the PDF.
+  await expect(page.getByTestId("cv-earlier")).toContainText(
+    "Junior Developer, Tiny Co (2015–2017)",
+  );
   await expect(page.getByTestId("cv-left-out")).toContainText("Left out for this job · 1 item");
   await expectNoSidewaysScroll(page);
 

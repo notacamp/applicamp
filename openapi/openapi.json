@@ -1818,7 +1818,7 @@
           "pipeline"
         ],
         "summary": "The pipeline.",
-        "description": "Every opportunity of the signed-in person, newest first, except the\ndismissed ones (\"Not for me\") and the hidden ones (they fail a hard\nrequirement; `hidden=true` lists only those, with the reason). Filter by\nstage, by text in the role, company or place, or to the new ones.",
+        "description": "Every opportunity of the signed-in person, newest first, except the\ndismissed ones (\"Not for me\") and the hidden ones (they fail a hard\nrequirement; `hidden=true` lists only those, with the reason). Filter by\nstage, by text in the role, company or place, to the new ones, or to the\nones proposed to the person (`proposed=true`, best match first).",
         "operationId": "pipeline.list",
         "parameters": [
           {
@@ -1852,6 +1852,15 @@
             "name": "hidden",
             "in": "query",
             "description": "Only the hidden ones: found before the requirement rules, they fail\none. Left out otherwise.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "proposed",
+            "in": "query",
+            "description": "Only the ones proposed to the person (Found, a match of 75 or more,\nopen to them), best match first.",
             "required": false,
             "schema": {
               "type": "boolean"
@@ -9947,7 +9956,8 @@
           "versions",
           "can_draft",
           "caps",
-          "draft_eur"
+          "draft_eur",
+          "done"
         ],
         "properties": {
           "can_draft": {
@@ -9955,6 +9965,13 @@
           },
           "caps": {
             "$ref": "#/components/schemas/CvCaps"
+          },
+          "done": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CvDoneStep"
+            },
+            "description": "What the app did by itself for this CV, in order: the job's\npreparation (when it prepared it) and the draft."
           },
           "draft": {
             "oneOf": [
@@ -9986,6 +10003,13 @@
           "opportunity_id": {
             "type": "string",
             "format": "uuid"
+          },
+          "suggested_language": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The posting's language, when the CV is in another: offered, never\nchosen for the person."
           },
           "versions": {
             "type": "array",
@@ -10062,6 +10086,30 @@
           "letter"
         ]
       },
+      "CvDoneStep": {
+        "type": "object",
+        "description": "A step the app did by itself for this job, with what it cost.",
+        "required": [
+          "step",
+          "eur",
+          "at"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "eur": {
+            "type": "number",
+            "format": "double",
+            "description": "About what it cost, in euros."
+          },
+          "step": {
+            "type": "string",
+            "description": "`shortlist`, `site`, `read`, `compare` or `draft`."
+          }
+        }
+      },
       "CvDraftRequest": {
         "type": "object",
         "description": "What to make a draft of.",
@@ -10096,7 +10144,8 @@
           "changes",
           "fixed_by_app",
           "waiting",
-          "needs_version"
+          "needs_version",
+          "wants"
         ],
         "properties": {
           "approved_at": {
@@ -10115,6 +10164,14 @@
           },
           "contact": {
             "$ref": "#/components/schemas/ContactView"
+          },
+          "cost_eur": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "What the app's calls for this draft cost, in euros (the draft, the\nsecond look at what the job wants, the fix of what was flagged)."
           },
           "created_at": {
             "type": "string",
@@ -10248,6 +10305,13 @@
               "$ref": "#/components/schemas/Waiting"
             },
             "description": "What waits on the person, in the order the page shows it."
+          },
+          "wants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WantView"
+            },
+            "description": "What the job wants, each covered by the CV or why not."
           }
         }
       },
@@ -12635,7 +12699,8 @@
           "gaps",
           "reasons_updated",
           "dismissed",
-          "editable"
+          "editable",
+          "proposed"
         ],
         "properties": {
           "apply_url": {
@@ -12749,6 +12814,10 @@
             "format": "date-time",
             "description": "When the posting was published."
           },
+          "proposed": {
+            "type": "boolean",
+            "description": "Proposed to the person: Found, a match of 75 or more, open to them."
+          },
           "reasons_updated": {
             "type": "boolean",
             "description": "Some of its reasons were stripped: they claimed things the profile never says."
@@ -12759,6 +12828,17 @@
               "null"
             ],
             "description": "Pay, as the posting says."
+          },
+          "shortlisted_by": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ShortlistedBy",
+                "description": "Who shortlisted it, once someone did."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "source": {
             "type": "string",
@@ -12949,7 +13029,8 @@
           "stage",
           "new",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "proposed"
         ],
         "properties": {
           "company": {
@@ -13000,6 +13081,10 @@
               "null"
             ]
           },
+          "proposed": {
+            "type": "boolean",
+            "description": "Proposed to the person: Found, a match of 75 or more, open to them."
+          },
           "region_note": {
             "type": [
               "string",
@@ -13013,6 +13098,17 @@
               "null"
             ],
             "description": "Pay, as the posting says."
+          },
+          "shortlisted_by": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ShortlistedBy",
+                "description": "Who shortlisted it, once someone did."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "source": {
             "type": "string",
@@ -14710,6 +14806,14 @@
           }
         }
       },
+      "ShortlistedBy": {
+        "type": "string",
+        "description": "Who shortlisted an opportunity.",
+        "enum": [
+          "person",
+          "app"
+        ]
+      },
       "SiteOrigin": {
         "type": "string",
         "description": "Where the company's site came from.",
@@ -14856,7 +14960,10 @@
           "company",
           "skills",
           "education",
-          "languages"
+          "languages",
+          "background",
+          "project",
+          "certificate"
         ]
       },
       "SourceView": {
@@ -15410,6 +15517,42 @@
           "cv_approval",
           "letter_approval"
         ]
+      },
+      "WantReason": {
+        "type": "string",
+        "description": "Why a want is or is not on the CV.",
+        "enum": [
+          "on_cv",
+          "in_profile",
+          "not_in_profile"
+        ]
+      },
+      "WantView": {
+        "type": "object",
+        "description": "What the job wants, against the CV.",
+        "required": [
+          "text",
+          "level",
+          "covered",
+          "reason"
+        ],
+        "properties": {
+          "covered": {
+            "type": "boolean",
+            "description": "The CV says it."
+          },
+          "level": {
+            "type": "string",
+            "description": "`must` or `nice`."
+          },
+          "reason": {
+            "$ref": "#/components/schemas/WantReason"
+          },
+          "text": {
+            "type": "string",
+            "description": "What it wants, in short."
+          }
+        }
       },
       "WatchBoardKind": {
         "type": "string",

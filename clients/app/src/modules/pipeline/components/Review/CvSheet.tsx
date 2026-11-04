@@ -39,6 +39,29 @@ function span(
   return `${start ?? ""} – ${end ?? now}`;
 }
 
+/** A position the CV names only, as the PDF does: "Title, Company (2015–2017)". */
+function earlierLine(role: {
+  title?: string | null;
+  company?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+}): string {
+  const head = [role.title, role.company]
+    .filter((part): part is string => part !== undefined && part !== null && part !== "")
+    .join(", ");
+  const year = (date: string | null | undefined) =>
+    date !== undefined && date !== null && /^\d{4}/.test(date) ? date.slice(0, 4) : undefined;
+  const start = year(role.start_date);
+  const end = year(role.end_date);
+  let years = "";
+  if (start !== undefined && end !== undefined) {
+    years = start === end ? ` (${start})` : ` (${start}–${end})`;
+  } else if (start !== undefined || end !== undefined) {
+    years = ` (${start ?? end ?? ""})`;
+  }
+  return `${head}${years}`;
+}
+
 export interface CvSheetProps {
   draft: CvDraft;
   actions: LineActions;
@@ -119,6 +142,11 @@ export function CvSheet({ draft, actions, onPutBack }: CvSheetProps) {
           </PaperRole>
         ))}
       </PaperSection>
+      {draft.left_out.roles.length === 0 ? null : (
+        <PaperSection title={t("cv.sheet.earlier")} testId="cv-earlier">
+          <Text size="sm">{draft.left_out.roles.map((role) => earlierLine(role)).join(" · ")}</Text>
+        </PaperSection>
+      )}
       {draft.skills.length === 0 ? null : (
         <PaperSection title={t("cv.sheet.skills")} testId="cv-skills">
           <ChipList>

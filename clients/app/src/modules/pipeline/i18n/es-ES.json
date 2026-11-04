@@ -327,7 +327,7 @@
       "draftPill": "Borrador",
       "approvedPill": "Aprobado · v{{version}}",
       "language": "Escrito en {{language}}",
-      "makeAgain": "Rehacer · unos {{cost}}",
+      "makeAgain": "Escribir de nuevo · unos {{cost}}",
       "making": "Redactando…",
       "approve": "Aprobar v{{version}}",
       "approving": "Aprobando…",
@@ -352,7 +352,8 @@
       "skills": "Habilidades",
       "education": "Formación",
       "languages": "Idiomas",
-      "now": "actual"
+      "now": "actual",
+      "earlier": "Experiencia anterior"
     },
     "marks": {
       "as_in_profile": "Como en el perfil",
@@ -468,7 +469,7 @@
       "too_late": "Ya es tarde para deshacerlo. Vuelve a hacer el CV para cambiarlo."
     },
     "layout": {
-      "template": "Plantilla",
+      "template": "Estilo",
       "templates": {
         "clean": "Limpia",
         "compact": "Compacta"
@@ -477,12 +478,14 @@
       "pages_one": "{{count}} página",
       "pages_other": "{{count}} páginas",
       "language": "Idioma",
-      "note": "La plantilla y la extensión hacen un PDF con el mismo texto aprobado, sin IA. Otro idioma es un borrador nuevo: una llamada a la IA y una revisión. Usa «Rehacer».",
+      "note": "El estilo y la longitud rehacen el PDF, sin IA. Para otro idioma, elígelo y pulsa Escribir de nuevo.",
       "confirmTitle": "¿Hacer una versión nueva?",
       "confirmBody": "Esto deja la v{{version}} como está y hace la v{{next}} con el mismo texto aprobado, con la plantilla {{template}} en {{pages}}. No se usa IA.",
       "confirm": "Hacer la v{{next}}",
       "cancel": "Cancelar",
-      "making": "Haciendo el PDF…"
+      "making": "Haciendo el PDF…",
+      "languageNext": "Pulsa Escribir de nuevo para tenerlo en {{language}}.",
+      "title": "Formato · idioma"
     },
     "pdf": {
       "open": "Abrir el PDF",
@@ -560,6 +563,34 @@
       "undo": "Deshacer",
       "undoing": "Deshaciendo…",
       "next": "Ahora escribimos tu carta de presentación, unos {{cost}}. Deshacer lo detiene."
+    },
+    "wants": {
+      "title": "Lo que pide la oferta",
+      "nice": "deseable",
+      "notInProfile": "no está en tu perfil",
+      "notOnCv": "no está en este CV",
+      "covered": "Está en tu CV",
+      "notCovered": "No está en tu CV"
+    },
+    "done": {
+      "title": "Hecho por la app · {{cost}}",
+      "row": "{{step}} · {{cost}}",
+      "doneLabel": "Hecho",
+      "steps": {
+        "shortlist": "Añadió esta oferta a tu lista",
+        "site": "Encontró la web de la empresa",
+        "read": "Leyó la web de la empresa",
+        "compare": "Comparó la oferta con tu perfil",
+        "draft": "Escribió el CV",
+        "checked": "Comprobó cada línea con tu perfil",
+        "pdf": "Hizo el PDF"
+      }
+    },
+    "fixed": {
+      "title_one": "Corregido por la app · {{count}} línea",
+      "title_other": "Corregido por la app · {{count}} líneas",
+      "now": "«{{text}}»",
+      "was": "Decía: «{{text}}»"
     }
   },
   "cvs": {

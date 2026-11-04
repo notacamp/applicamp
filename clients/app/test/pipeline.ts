@@ -34,6 +34,7 @@ export function opportunity(overrides: Partial<Opportunity> = {}): Opportunity {
     dismissed: false,
     editable: false,
     sources: [],
+    proposed: true,
     ...overrides,
   };
 }
@@ -48,6 +49,8 @@ export function summary(whole: Opportunity): OpportunitySummary {
     source: whole.source,
     stage: whole.stage,
     new: whole.new,
+    proposed: whole.proposed,
+    ...(whole.shortlisted_by === undefined ? {} : { shortlisted_by: whole.shortlisted_by }),
     created_at: whole.created_at,
     updated_at: whole.updated_at,
     ...(whole.location === undefined ? {} : { location: whole.location }),
@@ -258,6 +261,11 @@ export function cvDraft(overrides: Partial<CvDraft> = {}): CvDraft {
       at: "2026-10-31T10:00:01Z",
     },
     needs_version: false,
+    wants: [
+      { text: "Rust", level: "must", covered: true, reason: "on_cv" },
+      { text: "Kafka", level: "nice", covered: false, reason: "not_in_profile" },
+    ],
+    cost_eur: 0.004,
     ...overrides,
   };
 }
@@ -280,6 +288,11 @@ export function cv(overrides: Partial<Cv> = {}): Cv {
       month_limit_eur: 5,
     },
     draft_eur: 0.002,
+    done: [
+      { step: "read", eur: 0.002, at: "2026-10-31T09:59:00Z" },
+      { step: "draft", eur: 0.004, at: "2026-10-31T10:00:00Z" },
+    ],
+    suggested_language: null,
     ...overrides,
   };
 }

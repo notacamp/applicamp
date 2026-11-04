@@ -565,6 +565,20 @@ pub(crate) async fn find_board(
             let seen: Vec<(String, String)> =
                 detected.jobs.iter().map(crate::job::Job::key).collect();
             store::board_found(db, &row, &detected, &seen, now).await?;
+            // The board is a company page of the registry (#87): linked to
+            // it, and added to it when it was not there yet.
+            if let (Some(source), Some(token)) = (detected.kind.source(), detected.token.clone()) {
+                let link = crate::hiring_systems::CompanyLink {
+                    source,
+                    token,
+                    eu: detected.eu,
+                };
+                if let Err(e) =
+                    crate::company_pages::link_company(db, row.company, &link, now).await
+                {
+                    tracing::warn!(error = %e, "a watched board could not be linked to its company page");
+                }
+            }
             tracing::info!(
                 kind = detected.kind.as_str(),
                 jobs = seen.len(),

@@ -114,7 +114,26 @@
       "invalid_key": "Cette clé ne peut pas être utilisée.",
       "no_key_needed": "Ce site n’a pas besoin de clé.",
       "kind_locked": "Un site approuvé garde sa façon d’être lu. Mettez-le d’abord en pause.",
-      "generic": "Cela n’a pas fonctionné. Réessayez."
+      "generic": "Cela n’a pas fonctionné. Réessayez.",
+      "system_waiting": "Le système de recrutement de cette page attend votre décision. Approuvez d’abord celui-ci."
+    },
+    "hiring": {
+      "company_page": "Page d’entreprise",
+      "hiring_system": "Système de recrutement",
+      "through": "Recrute avec {{system}}",
+      "systemLine": "Là où les entreprises publient leurs offres",
+      "companyPages": "{{total}} pages d’entreprise : {{approved}} approuvées, {{waiting}} en attente, {{declined}} refusées. La liste montre celles en attente et les plus récentes.",
+      "webSearchOff": "La recherche web de pages d’entreprise est désactivée.",
+      "webSearchOn": "La recherche web de pages d’entreprise est activée : {{used}} recherches sur {{limit}} ce mois-ci.",
+      "systems": {
+        "greenhouse": "Greenhouse",
+        "lever": "Lever",
+        "ashby": "Ashby",
+        "workable": "Workable",
+        "recruitee": "Recruitee",
+        "teamtailor": "Teamtailor",
+        "personio": "Personio"
+      }
     }
   },
   "board": {
@@ -173,7 +192,9 @@
       "needs_permission": "Il demande d’abord la permission : {{detail}}",
       "no_endpoint": "Il n’a pas encore d’adresse de flux. La vérification en cherche une et propose une configuration.",
       "unknown": "Il ne peut pas encore être approuvé : {{detail}}",
-      "source": "Où c’est écrit"
+      "source": "Où c’est écrit",
+      "needs_choice": "La lecture de ses pages est autorisée. Il demande aux outils d’intelligence artificielle de ne pas apprendre d’elles. Applicamp n’entraîne jamais de modèle sur des offres : approuvez-le pour lire les pages des entreprises, ou refusez-le.",
+      "system_waiting": "Le système de recrutement de cette page n’est pas encore approuvé. Approuvez d’abord celui-ci."
     },
     "manage": {
       "title": "Votre décision",

@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<workzag-jobs>
+
+<position>
+    <id>1822270</id>
+    <subcompany>Mutter AG</subcompany>
+    <office>München</office>
+    <department>EDV</department>
+    <name>Junior IT-Sicherheitsberater</name>
+    <jobDescriptions>
+        <jobDescription>
+            <name>Ihre Aufgaben</name>
+            <value>
+                <![CDATA[<p>An invented description.</p>]]>
+            </value>
+        </jobDescription>
+        <jobDescription>
+            <name>Ihr Profil</name>
+            <value>
+                <![CDATA[<p>An invented description.</p>]]>
+            </value>
+        </jobDescription>
+        <jobDescription>
+            <name>Warum wir?</name>
+            <value>
+                <![CDATA[<p>An invented description.</p>]]>
+            </value>
+        </jobDescription>
+    </jobDescriptions>
+    <employmentType>permanent</employmentType>
+    <seniority>entry-level</seniority>
+    <schedule>full-time</schedule>
+    <occupation>computer_and_network_security</occupation>
+    <occupationCategory>it_software</occupationCategory>
+    <createdAt>2024-09-03T10:21:21+00:00</createdAt>
+    <salaryInformation>
+        <min>45000.00</min>
+        <max>55000.00</max>
+        <currencySymbol>€</currencySymbol>
+        <currencyCode>EUR</currencyCode>
+        <type>yearly</type>
+    </salaryInformation>
+</position>
+
+<position>
+    <id>1822269</id>
+    <subcompany>Mutter AG</subcompany>
+    <office>Remote</office>
+    <recruitingCategory>Festangestellte</recruitingCategory>
+    <name>Initiativbewerbung (Festanstellung)</name>
+    <jobDescriptions>
+        <jobDescription>
+            <name>Ihre Aufgaben</name>
+            <value>
+                <![CDATA[<p>An invented description.</p>]]>
+            </value>
+        </jobDescription>
+        <jobDescription>
+            <name>Ihr Profil</name>
+            <value>
+                <![CDATA[<p>An invented description.</p>]]>
+            </value>
+        </jobDescription>
+        <jobDescription>
+            <name>Warum wir?</name>
+            <value>
+                <![CDATA[<p>An invented description.</p>]]>
+            </value>
+        </jobDescription>
+    </jobDescriptions>
+    <employmentType>permanent</employmentType>
+    <seniority>entry-level</seniority>
+    <schedule>full-time</schedule>
+    <yearsOfExperience>lt-1</yearsOfExperience>
+    <occupation>other</occupation>
+    <occupationCategory>other</occupationCategory>
+    <createdAt>2018-07-31T09:25:04+00:00</createdAt>
+</position>
+
+</workzag-jobs>

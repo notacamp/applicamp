@@ -114,7 +114,26 @@
       "invalid_key": "Essa chave não pode ser usada.",
       "no_key_needed": "Este portal não precisa de chave.",
       "kind_locked": "Um portal aprovado mantém a forma como é lido. Pause-o primeiro.",
-      "generic": "Não resultou. Tente de novo."
+      "generic": "Não resultou. Tente de novo.",
+      "system_waiting": "O sistema de contratação desta página está à sua espera. Aprove primeiro esse."
+    },
+    "hiring": {
+      "company_page": "Página de empresa",
+      "hiring_system": "Sistema de contratação",
+      "through": "Contrata através de {{system}}",
+      "systemLine": "Onde as empresas publicam as suas vagas",
+      "companyPages": "{{total}} páginas de empresa: {{approved}} aprovadas, {{waiting}} à espera, {{declined}} recusadas. A lista mostra as que esperam e as mais recentes.",
+      "webSearchOff": "A pesquisa na web de páginas de empresa está desligada.",
+      "webSearchOn": "A pesquisa na web de páginas de empresa está ligada: {{used}} de {{limit}} pesquisas este mês.",
+      "systems": {
+        "greenhouse": "Greenhouse",
+        "lever": "Lever",
+        "ashby": "Ashby",
+        "workable": "Workable",
+        "recruitee": "Recruitee",
+        "teamtailor": "Teamtailor",
+        "personio": "Personio"
+      }
     }
   },
   "board": {
@@ -173,7 +192,9 @@
       "needs_permission": "Pede primeiro autorização: {{detail}}",
       "no_endpoint": "Ainda não tem endereço de feed. A verificação procura um e propõe uma configuração.",
       "unknown": "Ainda não pode ser aprovado: {{detail}}",
-      "source": "Onde o diz"
+      "source": "Onde o diz",
+      "needs_choice": "Ler as suas páginas é permitido. Pede às ferramentas de inteligência artificial que não aprendam com elas. A Applicamp nunca treina com vagas: aprove-o para ler as páginas das empresas, ou recuse-o.",
+      "system_waiting": "O sistema de contratação desta página ainda não está aprovado. Aprove primeiro esse."
     },
     "manage": {
       "title": "A sua decisão",

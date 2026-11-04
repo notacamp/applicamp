@@ -23,6 +23,7 @@ import {
 import {
   blockerCode,
   boardErrorOf,
+  isHiring,
   proposalLines,
   salaryLine,
   totalsLine,
@@ -57,7 +58,13 @@ export function BoardPeek({ id, onClose }: BoardPeekProps) {
     <SidePeek
       open={id !== null}
       label={data?.board.name ?? t("board.eyebrow")}
-      eyebrow={t("board.eyebrow")}
+      eyebrow={
+        data !== undefined && isHiring(data.board)
+          ? t(
+              `boards.hiring.${data.board.kind === "company_page" ? "company_page" : "hiring_system"}`,
+            )
+          : t("board.eyebrow")
+      }
       closeLabel={t("board.close")}
       onClose={onClose}
       testId="board-peek"

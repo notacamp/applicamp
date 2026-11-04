@@ -1,4 +1,4 @@
-import type { AdminCandidate, type AdminOverview, type BoardNeed } from "./admin";
+import type { AdminCandidate, AdminOverview, BoardNeed } from "./admin";
 import type { BoardSummary } from "./boards";
 
 /** Where a board stands, as the page words it. */

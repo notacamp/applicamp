@@ -125,7 +125,7 @@ function PeekBody({ detail }: { detail: BoardDetail }) {
               <Label key={tag} hue="gray">
                 {tagText(
                   tag,
-                  (key) => t(key),
+                  (key) => String(t(key as never)),
                   (key) => i18n.exists(key, { ns: "sources" }),
                 )}
               </Label>

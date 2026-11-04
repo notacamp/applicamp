@@ -1450,7 +1450,9 @@ async fn an_approval_can_be_undone_for_a_moment_and_not_after(db: PgPool) {
     sqlx::query(
         "INSERT INTO pipeline.preparations
             (opportunity_id, account_id, state, step, waiting_on, updated_at)
-         VALUES ($1, $2, 'waiting', 'draft', 'cv_approval', now())",
+         VALUES ($1, $2, 'waiting', 'draft', 'cv_approval', now())
+         ON CONFLICT (opportunity_id) DO UPDATE
+            SET state = 'waiting', step = 'draft', waiting_on = 'cv_approval'",
     )
     .bind(Uuid::parse_str(&s.opp).unwrap())
     .bind(s.h.account)

@@ -191,6 +191,7 @@ export function PdfPages({ url, labels, testId, enabled = true, minWidth = 200 }
             }
           }}
           className={styles["page"]}
+          role="img"
           aria-label={labels.page(number, pages)}
           data-testid={`${testId}-page-${String(number)}`}
         />

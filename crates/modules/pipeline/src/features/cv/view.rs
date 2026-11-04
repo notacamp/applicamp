@@ -938,7 +938,10 @@ mod tests {
             "Example Co",
             &[],
         );
-        let long = format!("Rebuilt billing in Rust for 12 teams {}", "and more ".repeat(40));
+        let long = format!(
+            "Rebuilt billing in Rust for 12 teams {}",
+            "and more ".repeat(40)
+        );
         let content = Content {
             summary: Some(line(
                 "s1",

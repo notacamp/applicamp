@@ -666,3 +666,470 @@ source = "https://www.dice.com/about/terms-and-conditions"
 
 [board.report]
 notes = "US tech jobs. Read 2026-10-28: no public API or feed."
+
+# --- Research of 2026-11-04 (#75) ---------------------------------------------
+#
+# Every board below was read once on 2026-11-04 (its feed or API, robots.txt
+# and terms; the answers are the fixtures in readers/fixtures/boards/). All are
+# candidates: the owner approves each on the Boards page.
+#
+# Not seeded, on purpose: Hacker News "jobs" (the official Firebase API,
+# https://hacker-news.firebaseio.com/v0/jobstories.json). It answers a list of
+# ids and then one request per id (/v0/item/<id>.json); the readers here take
+# one answer holding the items, so it cannot be expressed as a board config.
+# It has no company, place or pay fields either (they are in the title), only
+# about 5 posts a week, mostly US on site. Its README says "There is currently
+# no rate limit", but Y Combinator's terms forbid data mining and commercial
+# use unless authorized; it stays a question for the owner, not a board.
+
+[[board]]
+slug = "4dayweek"
+name = "4 Day Week"
+homepage = "https://4dayweek.io"
+kind = "json_api"
+priority = "high"
+status = "candidate"
+found_through = "the app's own research of 2026-11-04"
+
+# Public API, no key (read 2026-11-04). robots.txt: `Allow: /api/v2`. 60
+# requests a minute per IP, "a few polls per hour is plenty"; answers are cached
+# 60 seconds. `work_arrangement=remote&category=engineering` finds about 2 000
+# jobs, 100 a page. It writes salaries in cents (salary_divisor).
+[board.config]
+endpoint = "https://4dayweek.io/api/v2/jobs"
+query = { work_arrangement = "remote", category = "engineering", limit = "100" }
+items = "/data"
+page_param = "page"
+max_pages = 3
+poll_minutes = 60
+min_interval_ms = 1100
+remote_only = true
+salary_divisor = 100.0
+
+[board.config.fields]
+ref = "/id"
+title = "/title"
+company = "/company/name"
+company_url = "/company/website"
+# The job's page on 4dayweek.io: the visible link back. There is no separate
+# apply link.
+url = "/url"
+location = "/locations/0/country"
+description = "/description"
+posted_at = "/posted_at"
+salary_min = "/salary_min"
+salary_max = "/salary_max"
+salary_currency = "/salary_currency"
+salary_period = "/salary_period"
+
+[board.terms]
+attribution = "4dayweek.io"
+link_back = true
+follow = true
+no_redistribution = true
+notes = "Credit 4dayweek.io as the source and link to the page it returns for each job or employer. Stay within the rate limits (60 requests a minute). Do not present the results as your own research, and do not use them \"to build, train or populate a competing job board or a substantially similar database of employers or listings\". Stop using the results and delete stored copies within 30 days of a revocation."
+sources = ["https://4dayweek.io/terms", "https://4dayweek.io/developers"]
+
+[board.report]
+notes = "Remote engineering jobs, mostly at companies in the US; about 6 in 10 state a salary, which it writes in cents. Only a few companies hire worldwide. Its licence asks for credit and a link to each job, and forbids using the results for a competing job board."
+
+[[board]]
+slug = "remote-first-jobs"
+name = "Remote First Jobs"
+homepage = "https://remotefirstjobs.com"
+kind = "rss"
+priority = "high"
+status = "candidate"
+found_through = "the app's own research of 2026-11-04"
+
+# Only the per-skill feed is read: its robots.txt disallows /api/search-jobs
+# and /api/, so its JSON API is NOT used. The feed holds 100 items (read
+# 2026-11-04) with no structured place or pay. The title is "Role at Company".
+[board.config]
+endpoint = "https://remotefirstjobs.com/rss/jobs/software-development.rss"
+poll_minutes = 360
+remote_only = true
+title_split = { separator = " at ", company_first = false, last = true }
+
+[board.config.fields]
+ref = "guid"
+title = "title"
+url = "link"
+description = "description"
+posted_at = "pubDate"
+
+[board.terms]
+attribution = "Remote First Jobs"
+link_back = true
+follow = true
+notes = "\"If you use them to display jobs on your website or application, please: Credit us — Include a link back to Remote First Jobs as the source. Do not submit jobs from our feeds to LinkedIn Jobs, Google Jobs, Jooble, or similar platforms.\""
+sources = ["https://remotefirstjobs.com/rss", "https://remotefirstjobs.com/robots.txt"]
+
+[board.report]
+notes = "Remote software jobs (the feed formerly of JobsCollider). Its RSS feeds are free and public; its JSON API is disallowed by robots.txt and is not read. Credit and a link back are asked; its jobs must not be sent to LinkedIn Jobs, Google Jobs or Jooble."
+
+[[board]]
+slug = "remoteyeah"
+name = "RemoteYeah"
+homepage = "https://remoteyeah.com"
+kind = "rss"
+priority = "high"
+status = "candidate"
+found_through = "the app's own research of 2026-11-04"
+
+# robots.txt: `User-agent: *` / `Disallow:` (nothing). Its terms say nothing
+# about feeds or automated reading. The feed holds 300 items, newest first.
+# Its XML is not well formed (an unescaped `&` in the channel's link), so it
+# is read leniently, item by item. `pubDate` is ISO 8601, not RFC 822.
+[board.config]
+endpoint = "https://remoteyeah.com/rss.xml"
+poll_minutes = 360
+remote_only = true
+
+[board.config.fields]
+ref = "guid"
+title = "title"
+company = "company"
+url = "link"
+regions = "location"
+description = "description"
+posted_at = "pubDate"
+
+[board.terms]
+attribution = "RemoteYeah"
+link_back = true
+follow = true
+notes = "Its terms say nothing about feeds or automated reading. The links carry utm_source=rss&ref=rss, which stay as given."
+sources = ["https://remoteyeah.com/terms-and-conditions", "https://remoteyeah.com/robots.txt"]
+
+[board.report]
+notes = "Remote jobs of every kind (the feed is not only engineering), about 700 a week, mostly in the US; about one in twenty is open worldwide. No pay field. Its feed is malformed XML and is read leniently."
+
+[[board]]
+slug = "real-work-from-anywhere"
+name = "Real Work From Anywhere"
+homepage = "https://www.realworkfromanywhere.com"
+kind = "rss"
+priority = "high"
+status = "candidate"
+found_through = "the app's own research of 2026-11-04"
+
+# robots.txt: `Allow: /` and `Disallow: /go/` (the outbound apply redirect: it
+# is never followed). No terms page (/terms is 404); its feeds page says RSS
+# feeds are free, with no limit on how often to check. The feed holds 124 items
+# over a month, all work from anywhere. The XML is not well formed (an
+# unescaped `&` in the enclosure address), so it is read leniently. The title
+# is "Role at Company" and `author` holds the company.
+[board.config]
+endpoint = "https://www.realworkfromanywhere.com/rss.xml"
+poll_minutes = 360
+remote_only = true
+title_split = { separator = " at ", company_first = false, last = true }
+
+[board.config.fields]
+ref = "guid"
+title = "title"
+company = "author"
+url = "link"
+description = "description"
+posted_at = "pubDate"
+
+[board.terms]
+attribution = "Real Work From Anywhere"
+link_back = true
+follow = true
+notes = "No terms page. Its feeds page says: \"RSS feeds are completely free and don't require any account creation.\" Never follow its /go/ links (robots.txt)."
+sources = ["https://www.realworkfromanywhere.com/rss-feeds", "https://www.realworkfromanywhere.com/robots.txt"]
+
+[board.report]
+notes = "Jobs open from anywhere in the world, all kinds (about 8 to 10 a week for developers). Its feed is malformed XML and is read leniently; the job pages carry JSON-LD with pay, which the feed does not."
+
+[[board]]
+slug = "rails-job-board"
+name = "Rails Job Board"
+homepage = "https://jobs.rubyonrails.org"
+kind = "rss"
+priority = "low"
+status = "candidate"
+found_through = "the app's own research of 2026-11-04"
+
+# The official Ruby on Rails board (on JobKit). robots.txt has comments only.
+# No terms page was found. The feed holds 14 items (about 7 a month); the
+# title is "Role at Company". Stack: Ruby on Rails. No place or pay in the feed.
+[board.config]
+endpoint = "https://jobs.rubyonrails.org/jobs.rss"
+poll_minutes = 720
+title_split = { separator = " at ", company_first = false, last = true }
+
+[board.config.fields]
+ref = "guid"
+title = "title"
+url = "link"
+description = "description"
+posted_at = "pubDate"
+
+[board.terms]
+attribution = "Rails Job Board"
+link_back = true
+follow = true
+notes = "No terms page was found; the home page links its RSS feed. Link back to each job."
+sources = ["https://jobs.rubyonrails.org/jobs.rss", "https://jobs.rubyonrails.org/robots.txt"]
+
+[board.report]
+notes = "Ruby on Rails jobs only (about 7 a month), most remote, many of them for the US; salary is in most descriptions. No terms were found: a person reads the site before approving."
+flags = ["terms not found"]
+
+[[board]]
+slug = "elixir-jobs"
+name = "Elixir Jobs"
+homepage = "https://elixirjobs.net"
+kind = "rss"
+priority = "low"
+status = "candidate"
+found_through = "the app's own research of 2026-11-04"
+
+# robots.txt disallows only /login and /admin. No terms page; its About page
+# says an offer is posted to its Telegram channel and RSS feed. The feed holds
+# 10 items (about 2 a month). The title is only the role: the company, the
+# place and the pay are in the free text of the description, and there is no
+# apply link (the item's link is the offer's page on elixirjobs.net, which is
+# not an apply link, so it is not mapped as one). `pubDate` has no weekday
+# ("15 Oct 2026 14:21:22 +0000"). Its items therefore read with no company: the
+# app's "is this a job board" check (a title and a company or an apply link)
+# will not count them, and the board is left for the owner.
+[board.config]
+endpoint = "https://elixirjobs.net/rss"
+poll_minutes = 720
+
+[board.config.fields]
+ref = "guid"
+title = "title"
+url = "link"
+description = "description"
+posted_at = "pubDate"
+
+[board.terms]
+attribution = "Elixir Jobs"
+link_back = true
+follow = true
+notes = "No terms page. Its About page says an offer is also posted to its RSS feed. Link back to each job."
+sources = ["https://elixirjobs.net/rss", "https://elixirjobs.net/robots.txt"]
+
+[board.report]
+notes = "Elixir jobs only (about 2 a month). Its feed gives only the role: no company and no apply link, so the app cannot name who is hiring from it. Read 2026-11-04."
+flags = ["no company in the feed", "terms not found"]
+
+[[board]]
+slug = "get-on-board"
+name = "Get on Board"
+homepage = "https://www.getonbrd.com"
+kind = "json_api"
+priority = "low"
+status = "candidate"
+found_through = "the app's own research of 2026-11-04"
+
+# Public API, no key (read 2026-11-04). robots.txt: `Allow: /`. No rate limit
+# is stated. The programming category holds about 400 jobs, 100 a page. With
+# `expand` the company's name is in the answer; without it only its id.
+# Salaries are in US dollars a month. Most jobs are for Latin America.
+[board.config]
+endpoint = "https://www.getonbrd.com/api/v0/categories/programming/jobs"
+query = { per_page = "100", expand = '["company"]' }
+items = "/data"
+page_param = "page"
+max_pages = 4
+poll_minutes = 360
+min_interval_ms = 1000
+salary_currency = "USD"
+salary_period = "month"
+
+[board.config.fields]
+ref = "/id"
+title = "/attributes/title"
+company = "/attributes/company/data/attributes/name"
+url = "/links/public_url"
+regions = "/attributes/countries"
+description = "/attributes/description"
+posted_at = "/attributes/published_at"
+salary_min = "/attributes/min_salary"
+salary_max = "/attributes/max_salary"
+
+[board.terms]
+attribution = "Get on Board"
+link_back = true
+follow = true
+notes = "Its API description says: \"Public API — Open to anyone. Access the same data visible on the platform without logging in\" and \"No authentication required.\" Its terms cover only employer customers and its private API."
+sources = ["https://www.getonbrd.com/api-doc.html", "https://www.getonbrd.com/doc/openapi.yaml"]
+
+[board.report]
+notes = "Programming jobs, mostly for Latin America (half in Chile); about 14 in 100 are fully remote, and about 3 in 10 remote only inside a country. Pay is in about 45 of 100, in US dollars a month."
+
+# --- Waiting for the owner (research of 2026-11-04) ---------------------------
+
+[[board]]
+slug = "jobgether"
+name = "Jobgether"
+homepage = "https://jobgether.com"
+kind = "json_api"
+priority = "high"
+status = "candidate"
+found_through = "the app's own research of 2026-11-04"
+
+# What invites reading: its API docs (/astroapi/ai/jobs/docs) say it is
+# "intended for AI agents/assistants", and robots.txt has `Allow:
+# /astroapi/ai/jobs.json?*`. What forbids it: its terms of use. The data is
+# good (remote jobs with places like "Europe, ... Portugal", pay and date, no
+# description). Its parameters are `keyword` and `locations`. A person asks
+# for written permission before the app reads it.
+[board.config]
+endpoint = "https://jobgether.com/astroapi/ai/jobs.json"
+items = "/jobs"
+poll_minutes = 360
+min_interval_ms = 2000
+
+[board.config.fields]
+ref = "/id"
+title = "/title"
+company = "/company"
+# The job's page on Jobgether, not the apply link.
+url = "/url"
+location = "/location"
+posted_at = "/postedAt"
+# Written as "92900-167100 CAD".
+salary_text = "/salaryRange"
+
+[board.terms]
+attribution = "Jobgether"
+link_back = true
+follow = true
+notes = "Its terms of use forbid extracting its content by automated means; its API docs and robots.txt invite AI agents to read /astroapi/ai/jobs.json."
+sources = ["https://jobgether.com/terms-of-use", "https://jobgether.com/robots.txt"]
+
+[[board.blockers]]
+code = "needs_permission"
+detail = "Its terms of use ask users to \"refrain from accessing the Platform or extracting its content by automated means (bots, scrapers, crawlers)\" and say \"All acts of extraction, data mining, scraping and similar acts with respect to the elements (or certain elements) of the Platform are strictly prohibited.\" Its robots.txt allows /astroapi/ai/jobs.json?* and its API docs are meant for AI agents."
+source = "https://jobgether.com/terms-of-use"
+
+[board.report]
+notes = "Remote jobs with their places and pay, worldwide. Its API is open to AI agents by its robots.txt but its terms forbid automated extraction: ask Jobgether for written permission."
+
+[[board]]
+slug = "vuejobs"
+name = "VueJobs"
+homepage = "https://vuejobs.com"
+kind = "rss"
+priority = "low"
+status = "candidate"
+found_through = "the app's own research of 2026-11-04"
+
+# The feed is good (1 056 items, about 570 in the last 30 days; the employer
+# and the place are lines of the description) but robots.txt disallows it. The
+# address redirects to app.vuejobs.com, whose robots.txt disallows everything.
+# Only its owner can allow it.
+[board.config]
+endpoint = "https://vuejobs.com/feed"
+poll_minutes = 720
+
+[board.config.fields]
+ref = "guid"
+title = "title"
+url = "link"
+description = "description"
+posted_at = "pubDate"
+
+[board.terms]
+attribution = "VueJobs"
+link_back = true
+follow = true
+notes = "robots.txt disallows its feed; ask its owner for permission."
+sources = ["https://vuejobs.com/robots.txt"]
+
+[[board.blockers]]
+code = "needs_permission"
+detail = "robots.txt of vuejobs.com says `User-agent: *` / `Disallow: /feed`, and the robots.txt of app.vuejobs.com, where its pages are, says `User-agent: *` / `Disallow: /`."
+source = "https://vuejobs.com/robots.txt"
+
+[board.report]
+notes = "Vue.js jobs (about 570 a month), remote and on site. Its feed names the employer and the place only in the description text. Disallowed by robots.txt: ask its owner for permission."
+
+[[board]]
+slug = "elixir-forum"
+name = "Elixir Forum"
+homepage = "https://forum.elixirforum.com"
+kind = "rss"
+priority = "low"
+status = "candidate"
+found_through = "the app's own research of 2026-11-04"
+
+# A Discourse forum: its job posts are in its job categories, tagged
+# remote-worldwide, remote-region-specific, remote-country-specific and
+# onsite (27 of 29 recent posts were remote). The app has no reader for
+# Discourse yet, so there is no config. Its terms allow only personal use.
+# Ask its owner (AstonJ) for permission.
+
+[board.terms]
+attribution = "Elixir Forum"
+link_back = true
+follow = true
+notes = "Its terms allow only personal, non-commercial use of its content."
+sources = ["https://forum.elixirforum.com/tos"]
+
+[[board.blockers]]
+code = "needs_permission"
+detail = "Its terms say \"You may not copy, reproduce, republish, post, broadcast, download, transmit, make available to the public, or otherwise use … content in any way except for your own personal, non-commercial use.\" Any other use \"requires the prior written permission of ElixirForum\"."
+source = "https://forum.elixirforum.com/tos"
+
+[board.report]
+notes = "The best Elixir source (almost every post is remote, with machine-readable tags), but it is a Discourse forum the app cannot read yet, and its terms allow personal use only: ask its owner for permission."
+
+[[board]]
+slug = "startup-jobs"
+name = "Startup Jobs"
+homepage = "https://startup.jobs"
+kind = "json_api"
+priority = "high"
+status = "candidate"
+found_through = "the app's own research of 2026-11-04"
+
+# Its API needs a free key (an account on startup.jobs; 401 without it). The
+# mapping follows its OpenAPI description (https://api.startup.jobs/v1/openapi.json,
+# read 2026-11-04). Its documentation says to send the key as a bearer token
+# (`Authorization: Bearer sj_...`) and adds that "for quick experiments you can
+# also pass it as an `api_key` query parameter", which is what the key's
+# parameter below does. If its answer still says 401 once a key is set, the
+# app cannot send a bearer header yet. Its RSS feed (/feeds/jobs) is NOT used:
+# its terms forbid reusing its feeds "including RSS feeds" outside the API.
+# 20 requests a minute per key; the list holds the last 14 days.
+[board.config]
+endpoint = "https://api.startup.jobs/v1/jobs"
+query = { workplace_type = "remote", limit = "50" }
+items = "/data"
+cursor = { param = "starting_after", from = "/next_cursor" }
+max_pages = 3
+poll_minutes = 360
+min_interval_ms = 3100
+remote_only = true
+key = { params = ["api_key"], how = "Create a free Startup Jobs account, then ask for an API key on its API page.", url = "https://startup.jobs/api" }
+
+[board.config.fields]
+ref = "/id"
+title = "/title"
+company = "/company/name"
+company_url = "/company/website_url"
+# The job's page on startup.jobs: applications go through it.
+url = "/url"
+location = "/location/country"
+description = "/description_html"
+posted_at = "/published_at"
+salary_text = "/salary"
+
+[board.terms]
+attribution = "Startup Jobs"
+link_back = true
+follow = true
+no_redistribution = true
+notes = "Mention Startup Jobs as the source wherever its data is shown, link the job title to its page (dofollow), keep the attribution paragraph that ends each description, and refresh or delete fetched content within seven days. Its terms accept \"Personal automations, bots, newsletters, and job-search tools that link back to Startup Jobs\"."
+sources = ["https://startup.jobs/terms/api", "https://startup.jobs/api"]
+
+[board.report]
+notes = "Startup jobs, very many remote (50 new remote engineering jobs in about 11 hours). Needs a free API key. Its main terms forbid reusing its RSS feeds, so only the API is read."

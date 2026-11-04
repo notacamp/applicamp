@@ -238,6 +238,10 @@ pub struct TitleSplit {
     /// The company comes first.
     #[serde(default)]
     pub company_first: bool,
+    /// The separator is looked for from the end of the title (the company
+    /// after the last " at ").
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub last: bool,
 }
 
 /// Where each normalised field is in an item: a JSON pointer (`/title`)
@@ -405,6 +409,10 @@ pub struct BoardConfig {
     /// The pay's period when the board states none per job.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub salary_period: Option<String>,
+    /// The board writes pay in smaller units (cents: `100`): each amount is
+    /// divided by this.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub salary_divisor: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title_split: Option<TitleSplit>,
     /// Postings read per fetch through a sitemap (at most 50).
@@ -632,6 +640,11 @@ impl BoardConfig {
                 ));
             }
         }
+        if let Some(divisor) = self.salary_divisor
+            && !(divisor.is_finite() && (1.0..=1_000_000.0).contains(&divisor))
+        {
+            return Err("`salary_divisor` is a number from 1 to 1000000 (`100` for cents)".to_owned());
+        }
         if let Some(currency) = &self.salary_currency
             && !(currency.len() == 3 && currency.chars().all(|c| c.is_ascii_uppercase()))
         {
@@ -785,6 +798,10 @@ pub struct RobotsReport {
     /// A fingerprint of the file, to notice a change.
     #[serde(default)]
     pub fingerprint: String,
+    /// Its `Content-Signal` line (`search`, `ai-input`, `ai-train`: `yes` or
+    /// `no`). Recorded and shown, never a reason not to read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_signal: Option<BTreeMap<String, String>>,
 }
 
 /// A job a check read as a sample.
@@ -818,6 +835,10 @@ pub struct Report {
     /// A fingerprint of the terms page, to notice a change.
     #[serde(default)]
     pub terms_fingerprint: String,
+    /// The fingerprint of the terms sentences the model read (its verdict
+    /// and tags are kept until the terms change).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub terms_read_for: String,
     /// A feed found (`rss`), or an API (`json_api`), or `jsonld_sitemap`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub found_kind: Option<Kind>,
@@ -875,7 +896,7 @@ pub struct Proposal {
 #[serde(deny_unknown_fields)]
 #[schema(as = BoardBlocker)]
 pub struct Blocker {
-    /// `terms_forbid`, `robots_disallowed`, `needs_key`, `no_endpoint`,
+    /// `terms_forbid`, `robots_disallowed`, `needs_key`, `needs_permission`, `no_endpoint`,
     /// `config_invalid`, `check_needed`; clients translate the ones they
     /// know and show `detail` for any other.
     pub code: String,
@@ -887,7 +908,7 @@ pub struct Blocker {
 }
 
 /// The blockers a seed list may state: facts the research found.
-pub const SEED_BLOCKERS: [&str; 2] = ["terms_forbid", "robots_disallowed"];
+pub const SEED_BLOCKERS: [&str; 3] = ["terms_forbid", "robots_disallowed", "needs_permission"];
 
 /// A board as stored.
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -914,6 +935,21 @@ pub struct BoardRow {
     pub last_error: Option<String>,
     pub backoff_until: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
+    /// Who approved it: `owner` or `app`.
+    pub approved_by: Option<String>,
+    /// What it offers, as plain lowercase words.
+    pub tags: Vec<String>,
+    /// What its terms say about automated reading (`allow`, `silent`,
+    /// `forbid`, `ask_first`, `personal_only`); none before it is read.
+    pub terms_verdict: Option<String>,
+    /// The sentence of its terms that decided it.
+    pub terms_quote: Option<String>,
+    pub terms_url: Option<String>,
+    /// Its robots.txt Content-Signal values.
+    pub content_signal: Option<sqlx::types::Json<serde_json::Value>>,
+    pub contact_email: Option<String>,
+    /// How it was found, in plain words.
+    pub found_through: Option<String>,
     /// What the research found that forbids reading it ([`Blocker`]s).
     pub blockers: sqlx::types::Json<serde_json::Value>,
     /// Its API key, sealed with the instance secret; never sent to a client.
@@ -928,8 +964,9 @@ macro_rules! board_columns {
     () => {
         "id, slug, name, homepage, host, kind, priority, status, origin, country, config, \
          config_edited, terms, report, decline_reason, approved_at, recheck_after, last_fetch_at, \
-         last_fetch_jobs, last_error, backoff_until, created_at, blockers, api_key, api_key_host, \
-         api_key_set_at"
+         last_fetch_jobs, last_error, backoff_until, created_at, approved_by, tags, terms_verdict, \
+         terms_quote, terms_url, content_signal, contact_email, found_through, blockers, api_key, \
+         api_key_host, api_key_set_at"
     };
 }
 pub(crate) use board_columns;
@@ -1023,6 +1060,9 @@ pub struct SeedBoard {
     pub terms: Terms,
     #[serde(default)]
     pub report: Option<Report>,
+    /// How the app found it, in plain words.
+    #[serde(default)]
+    pub found_through: Option<String>,
     /// Facts that forbid reading it (`terms_forbid`, `robots_disallowed`):
     /// shown, and they block approval.
     #[serde(default)]
@@ -1155,7 +1195,7 @@ pub async fn sync(db: &PgPool, seed: &[SeedBoard], now: DateTime<Utc>) -> Result
                         WHEN $12::text IS NULL THEN report
                         ELSE jsonb_set(report, '{notes}', to_jsonb($12::text))
                     END,
-                    blockers = $13, updated_at = $10
+                    blockers = $13, found_through = coalesce(found_through, $14), updated_at = $10
               WHERE slug = $1 AND host = $11",
         )
         .bind(&board.slug)
@@ -1171,6 +1211,7 @@ pub async fn sync(db: &PgPool, seed: &[SeedBoard], now: DateTime<Utc>) -> Result
         .bind(&host)
         .bind(notes.as_deref())
         .bind(sqlx::types::Json(&blockers))
+        .bind(board.found_through.as_deref())
         .execute(db)
         .await?;
         if updated.rows_affected() == 1 {
@@ -1181,8 +1222,10 @@ pub async fn sync(db: &PgPool, seed: &[SeedBoard], now: DateTime<Utc>) -> Result
         let inserted = sqlx::query(
             "INSERT INTO sources.job_boards
                 (id, slug, name, homepage, host, kind, priority, status, origin, country, config,
-                 terms, report, blockers, approved_at, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'seed', $9, $10, $11, $12, $13, $14, $15, $15)
+                 terms, report, blockers, approved_at, approved_by, found_through, created_at,
+                 updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'seed', $9, $10, $11, $12, $13, $14, $16, $17,
+                     $15, $15)
              ON CONFLICT DO NOTHING",
         )
         .bind(Uuid::now_v7())
@@ -1200,6 +1243,8 @@ pub async fn sync(db: &PgPool, seed: &[SeedBoard], now: DateTime<Utc>) -> Result
         .bind(sqlx::types::Json(&blockers))
         .bind(approved.then_some(now))
         .bind(now)
+        .bind(approved.then_some("owner"))
+        .bind(board.found_through.as_deref())
         .execute(db)
         .await?;
         if inserted.rows_affected() == 1 {

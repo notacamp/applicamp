@@ -209,7 +209,11 @@ pub fn job_of(item: &impl Item, config: &BoardConfig, board: &BoardRef) -> Optio
     if let Some(split) = &config.title_split
         && company.is_empty()
         && !split.separator.is_empty()
-        && let Some((left, right)) = title.split_once(split.separator.as_str())
+        && let Some((left, right)) = if split.last {
+            title.rsplit_once(split.separator.as_str())
+        } else {
+            title.split_once(split.separator.as_str())
+        }
     {
         let (left, right) = (left.trim().to_owned(), right.trim().to_owned());
         if !left.is_empty() && !right.is_empty() {
@@ -234,8 +238,18 @@ pub fn job_of(item: &impl Item, config: &BoardConfig, board: &BoardRef) -> Optio
         (!regions.is_empty()).then(|| regions.join(", ").chars().take(SHORT).collect())
     });
     let pay = {
-        let min = get(&f.salary_min).as_deref().and_then(amount);
-        let max = get(&f.salary_max).as_deref().and_then(amount);
+        let divisor = config
+            .salary_divisor
+            .filter(|d| d.is_finite() && *d >= 1.0)
+            .unwrap_or(1.0);
+        let min = get(&f.salary_min)
+            .as_deref()
+            .and_then(amount)
+            .map(|n| n / divisor);
+        let max = get(&f.salary_max)
+            .as_deref()
+            .and_then(amount)
+            .map(|n| n / divisor);
         let currency = get(&f.salary_currency)
             .or_else(|| config.salary_currency.clone())
             .map(|c| c.trim().to_ascii_uppercase())

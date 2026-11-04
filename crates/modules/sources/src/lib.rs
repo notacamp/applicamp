@@ -77,6 +77,7 @@ pub mod requirements;
 pub mod robots;
 pub mod scans;
 pub mod scoring;
+pub mod terms;
 
 use std::sync::Arc;
 

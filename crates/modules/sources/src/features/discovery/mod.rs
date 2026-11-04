@@ -1,12 +1,13 @@
 //! Discovery: every week, look for job boards Applicamp does not know yet,
-//! check each one automatically, and put it in the owner's queue. No model
-//! is called, and no board's jobs are ever read into a search before the
-//! owner approves it.
+//! check each one automatically, and approve the ones whose check is clean;
+//! the others wait in the owner's queue. No board's jobs are read into a
+//! search before it is approved, by the app or the owner.
 //!
-//! - **Candidates**: the CC0 list `emredurukn/awesome-job-boards` (names
-//!   and links only; never LinkedIn, Indeed or Glassdoor, ADR 0006), and
-//!   boards someone suggested or the seed list holds that were never
-//!   checked. At most [`MAX_CHECKS`] a run.
+//! - **Candidates**: the public lists in [`lists`] (names and links only,
+//!   CC0 and MIT; never LinkedIn, Indeed or Glassdoor, ADR 0006), and boards
+//!   someone suggested or the seed list holds that were never checked. At
+//!   most `APPLICAMP_SOURCES__DISCOVERY_MAX_CHECKS` a run (200); each board
+//!   records the list it was found through.
 //! - **The check** (one request per path, robots respected): robots.txt of
 //!   the feed's host (else the site's); the site (its language, its feeds,
 //!   JSON-LD postings, a link to its terms); the terms page, whose
@@ -20,6 +21,16 @@
 //!   and a **proposed config** the owner may use (applied by itself only to
 //!   a discovered or suggested board nobody edited). The sample's remote
 //!   and worldwide shares set the priority; its salaries rank the candidate.
+//! - **The terms, read by a model** ([`crate::terms`]): one small call per
+//!   board (and again when its terms change), within the spending limits,
+//!   gives a verdict, the sentence that decided it and tags for what the
+//!   board offers; a board with no terms page is silent.
+//! - **Approval by the app**: a candidate nobody edited whose config reads
+//!   sample jobs, whose robots rules allow every path read, that is a job
+//!   board (at least 5 sample items with a title and a company or apply
+//!   link), that posted in the last 30 days, whose terms allow apps or say
+//!   nothing, and that has no blocker and needs no key, is approved by the
+//!   app (`approved_by = 'app'`). Anything else waits for the owner.
 //! - **Seeded boards at start** (`sources.check_seeded_boards`): every seeded
 //!   board waiting for the owner that was never checked with its current
 //!   config is checked once, unless the research found its terms or robots
@@ -47,7 +58,7 @@ use uuid::Uuid;
 
 use crate::{
     SourcesDeps, board_keys,
-    features::boards::unique_slug,
+    features::boards::{blockers, unique_slug},
     job::html_to_text,
     job_boards::{
         self, BoardConfig, BoardRow, Fields, Kind, Proposal, Report, SampleJob, Status,
@@ -61,10 +72,11 @@ use crate::{
     },
     regions, robots,
     scans::{self, Scan},
+    terms,
 };
 
-/// Boards checked per run, at most.
-pub const MAX_CHECKS: usize = 20;
+pub mod lists;
+
 /// Sample jobs a check keeps.
 pub const SAMPLE: usize = 20;
 /// Terms sentences a check keeps, and the longest.
@@ -73,7 +85,7 @@ pub const SENTENCES: (usize, usize) = (10, 300);
 pub const RECHECK: TimeDelta = TimeDelta::days(182);
 
 static LIST_ENTRY: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^\s*[-*]\s*\[([^\]]{1,100})\]\((https?://[^)\s]{1,300})\)")
+    Regex::new(r"^\s*(?:[-*]|\d+\.)\s*\[([^\]]{1,100})\]\((https?://[^)\s]{1,300})\)")
         .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
 });
 static HTML_LANG: LazyLock<Regex> = LazyLock::new(|| {
@@ -102,6 +114,10 @@ pub struct ListEntry {
     pub url: Url,
     /// The list's heading over it ("Remote", "Germany").
     pub section: String,
+    /// Its feed, when the list gives one (read first by the check).
+    pub feed: Option<Url>,
+    /// Its country (ISO 3166-1), when the list gives one.
+    pub country: Option<String>,
 }
 
 /// The boards a Markdown list names (`- [Name](https://…)`), under their
@@ -132,6 +148,8 @@ pub fn parse_list(markdown: &str) -> Vec<ListEntry> {
                 name: name.as_str().trim().to_owned(),
                 url,
                 section: section.clone(),
+                feed: None,
+                country: None,
             });
         }
     }
@@ -261,8 +279,9 @@ pub fn seeded_check_due(row: &BoardRow) -> bool {
     }
 }
 
-/// Check every seeded board [`seeded_check_due`] (at most [`MAX_CHECKS`]),
-/// as one discovery run. How many were checked.
+/// Check every seeded board [`seeded_check_due`] (at most
+/// `APPLICAMP_SOURCES__DISCOVERY_MAX_CHECKS`), as one discovery run, until
+/// an AI spending limit is reached. How many were checked.
 pub async fn check_seeded(deps: &SourcesDeps, db: &PgPool) -> Result<usize> {
     let reader = reader(deps)?;
     let rows: Vec<BoardRow> = sqlx::query_as(concat!(
@@ -277,18 +296,25 @@ pub async fn check_seeded(deps: &SourcesDeps, db: &PgPool) -> Result<usize> {
     let due: Vec<&BoardRow> = rows
         .iter()
         .filter(|row| seeded_check_due(row))
-        .take(MAX_CHECKS)
+        .take(deps.config.discovery_max_checks())
         .collect();
     if due.is_empty() {
         return Ok(0);
     }
     let run = start_run(db, deps.clock.now()).await?;
+    let mut checked = 0;
+    let mut stopped = None;
     for row in &due {
-        check(deps, reader, db, row, run).await?;
+        let outcome = check(deps, reader, db, row, run).await?;
+        checked += 1;
+        if outcome == Checked::BudgetReached {
+            stopped = Some("ai_budget_reached");
+            break;
+        }
     }
-    finish_run(db, run, (0, due.len(), 0), None, deps.clock.now()).await?;
-    tracing::info!(checked = due.len(), "seeded job boards checked");
-    Ok(due.len())
+    finish_run(db, run, (0, checked, 0), stopped, deps.clock.now()).await?;
+    tracing::info!(checked, "seeded job boards checked");
+    Ok(checked)
 }
 
 /// Make sure the next weekly discovery is scheduled, when it is on.
@@ -355,24 +381,52 @@ fn reader(deps: &SourcesDeps) -> Result<&Reader> {
         .ok_or_else(|| Error::internal("the sources module is not composed"))
 }
 
-/// One discovery run: new candidates from the list, never-checked
-/// candidates, re-checks due; then old scans forgotten.
+/// One discovery run: new candidates from the public lists, never-checked
+/// candidates, re-checks due; then old scans forgotten. It stops, cleanly,
+/// when an AI spending limit is reached: the rest waits for the next run.
 pub async fn discover(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
     let reader = reader(deps)?;
     let now = deps.clock.now();
     let run = start_run(db, now).await?;
+    let max = deps.config.discovery_max_checks();
     let mut found = 0;
     let mut checked = 0;
     let mut error = None;
+    let mut stopped = false;
 
-    // New candidates from the list.
-    let list = match reader.visit(db, &deps.config.discovery_list_url).await {
-        Ok(Some(body)) => parse_list(&String::from_utf8_lossy(&body)),
-        Ok(None) | Err(_) => {
-            error = Some("list_unreachable");
-            Vec::new()
+    // New candidates from the lists.
+    let mut listed: Vec<(ListEntry, String)> = Vec::new();
+    let mut read_any = false;
+    let mut asked_any = false;
+    for source in &lists::SOURCES {
+        if !deps.config.reads_list(source.id) {
+            continue;
         }
-    };
+        asked_any = true;
+        let url = if source.id == lists::FIRST {
+            deps.config.discovery_list_url.clone()
+        } else {
+            match Url::parse(source.url) {
+                Ok(url) => url,
+                Err(_) => continue,
+            }
+        };
+        match reader.visit(db, &url).await {
+            Ok(Some(body)) => {
+                read_any = true;
+                let through = source.found_through();
+                listed.extend(
+                    lists::entries(source, &String::from_utf8_lossy(&body))
+                        .into_iter()
+                        .map(|entry| (entry, through.clone())),
+                );
+            }
+            Ok(None) | Err(_) => {}
+        }
+    }
+    if asked_any && !read_any {
+        error = Some("list_unreachable");
+    }
     let known: HashSet<String> =
         sqlx::query_scalar::<_, String>("SELECT host FROM sources.job_boards")
             .fetch_all(db)
@@ -380,8 +434,8 @@ pub async fn discover(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
             .into_iter()
             .collect();
     let mut seen = known;
-    for entry in list {
-        if checked >= MAX_CHECKS {
+    for (entry, through) in listed {
+        if checked >= max || stopped {
             break;
         }
         let Some(host) = host_of(&entry.url) else {
@@ -390,31 +444,38 @@ pub async fn discover(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
         if never(&host) || !seen.insert(host.clone()) {
             continue;
         }
-        let Some(id) = add_candidate(db, &entry, &host, now).await? else {
+        let Some(id) = add_candidate(db, &entry, &host, &through, now).await? else {
             continue;
         };
         found += 1;
         if let Some(row) = job_boards::get(db, id).await? {
-            check(deps, reader, db, &row, run).await?;
             checked += 1;
+            if check(deps, reader, db, &row, run).await? == Checked::BudgetReached {
+                stopped = true;
+            }
         }
     }
 
     // Candidates never checked (suggested, or from the seed list).
-    let waiting: Vec<BoardRow> = sqlx::query_as(concat!(
-        "SELECT ",
-        board_columns!(),
-        " FROM sources.job_boards
-          WHERE status = 'candidate' AND (report IS NULL OR report->>'checked_at' IS NULL)
-            AND config ? 'endpoint' AND blockers = '[]'::jsonb
-          ORDER BY created_at LIMIT $1"
-    ))
-    .bind(i64::try_from(MAX_CHECKS.saturating_sub(checked)).unwrap_or(0))
-    .fetch_all(db)
-    .await?;
-    for row in &waiting {
-        check(deps, reader, db, row, run).await?;
-        checked += 1;
+    if !stopped {
+        let waiting: Vec<BoardRow> = sqlx::query_as(concat!(
+            "SELECT ",
+            board_columns!(),
+            " FROM sources.job_boards
+              WHERE status = 'candidate' AND (report IS NULL OR report->>'checked_at' IS NULL)
+                AND config ? 'endpoint' AND blockers = '[]'::jsonb
+              ORDER BY created_at LIMIT $1"
+        ))
+        .bind(i64::try_from(max.saturating_sub(checked)).unwrap_or(0))
+        .fetch_all(db)
+        .await?;
+        for row in &waiting {
+            checked += 1;
+            if check(deps, reader, db, row, run).await? == Checked::BudgetReached {
+                stopped = true;
+                break;
+            }
+        }
     }
 
     // Approved boards due a re-check.
@@ -426,14 +487,19 @@ pub async fn discover(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
           ORDER BY recheck_after NULLS FIRST LIMIT $2"
     ))
     .bind(now)
-    .bind(i64::try_from(MAX_CHECKS).unwrap_or(20))
+    .bind(i64::try_from(max).unwrap_or(200))
     .fetch_all(db)
     .await?;
     for row in &due {
-        recheck(deps, reader, db, row, run).await?;
+        if recheck(deps, reader, db, row, run).await? == Checked::BudgetReached {
+            stopped = true;
+        }
     }
 
     scans::prune(db, deps.clock.now()).await?;
+    if stopped {
+        error = Some("ai_budget_reached");
+    }
     finish_run(
         db,
         run,
@@ -446,6 +512,7 @@ pub async fn discover(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
         found,
         checked,
         rechecked = due.len(),
+        stopped,
         "job board discovery finished"
     );
     Ok(())
@@ -459,13 +526,13 @@ pub async fn check_one(deps: &SourcesDeps, db: &PgPool, id: Uuid) -> Result<()> 
     };
     let now = deps.clock.now();
     let run = start_run(db, now).await?;
-    if row.status() == Status::Approved {
-        recheck(deps, reader, db, &row, run).await?;
-        finish_run(db, run, (0, 0, 1), None, deps.clock.now()).await
+    let (counts, outcome) = if row.status() == Status::Approved {
+        ((0, 0, 1), recheck(deps, reader, db, &row, run).await?)
     } else {
-        check(deps, reader, db, &row, run).await?;
-        finish_run(db, run, (0, 1, 0), None, deps.clock.now()).await
-    }
+        ((0, 1, 0), check(deps, reader, db, &row, run).await?)
+    };
+    let stopped = (outcome == Checked::BudgetReached).then_some("ai_budget_reached");
+    finish_run(db, run, counts, stopped, deps.clock.now()).await
 }
 
 /// Add the list's `entry` as a candidate; its id, or `None` when its site
@@ -474,13 +541,22 @@ async fn add_candidate(
     db: &PgPool,
     entry: &ListEntry,
     host: &str,
+    found_through: &str,
     now: DateTime<Utc>,
 ) -> Result<Option<Uuid>> {
     let mut homepage = entry.url.clone();
     homepage.set_query(None);
     homepage.set_fragment(None);
     let country = places::countries_in(&entry.section);
-    let country = (country.len() == 1).then(|| country[0].to_owned());
+    let country = entry
+        .country
+        .clone()
+        .or_else(|| (country.len() == 1).then(|| country[0].to_owned()));
+    // A feed the list names is where the check looks first.
+    let (kind, config) = match &entry.feed {
+        Some(feed) => ("rss", serde_json::json!({ "endpoint": feed.as_str(), "fields": {} })),
+        None => ("json_api", serde_json::json!({})),
+    };
     let priority = if entry.section.eq_ignore_ascii_case("remote") {
         "high"
     } else {
@@ -491,8 +567,8 @@ async fn add_candidate(
     let inserted = sqlx::query(
         "INSERT INTO sources.job_boards
             (id, slug, name, homepage, host, kind, priority, status, origin, country,
-             created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, 'json_api', $6, 'candidate', 'discovery', $7, $8, $8)
+             config, found_through, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $9, $6, 'candidate', 'discovery', $7, $10, $11, $8, $8)
          ON CONFLICT DO NOTHING",
     )
     .bind(id)
@@ -503,9 +579,159 @@ async fn add_candidate(
     .bind(priority)
     .bind(country)
     .bind(now)
+    .bind(kind)
+    .bind(sqlx::types::Json(&config))
+    .bind(found_through.chars().take(300).collect::<String>())
     .execute(db)
     .await?;
     Ok((inserted.rows_affected() == 1).then_some(id))
+}
+
+/// How a check ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Checked {
+    /// Done (the board is as checked as it can be now).
+    Done,
+    /// An AI spending limit was reached: the terms were not read, and the
+    /// run stops asking the model.
+    BudgetReached,
+}
+
+/// What the model read of a board's terms, kept until they change.
+#[derive(Debug, Clone, Default)]
+struct TermsState {
+    verdict: Option<String>,
+    quote: Option<String>,
+    tags: Vec<String>,
+    /// The fingerprint of the terms sentences the verdict is from.
+    read_for: String,
+    /// The board has no terms page: silent without a call.
+    no_terms_page: bool,
+    budget_reached: bool,
+    cost_eur: f64,
+}
+
+impl TermsState {
+    /// The verdict is of the terms as they are now.
+    fn fresh(&self, key: &str) -> bool {
+        self.verdict.is_some() && (self.no_terms_page || self.read_for == key)
+    }
+
+    /// The terms allow apps or say nothing, as they are now.
+    fn allows(&self, key: &str) -> bool {
+        self.fresh(key) && matches!(self.verdict.as_deref(), Some("allow" | "silent"))
+    }
+}
+
+/// Read the terms of `row` with the model, unless its answer for these
+/// sentences is kept, there is nothing to read, or the terms page could not
+/// be reached (then the last answer stays, and is not fresh).
+#[allow(clippy::too_many_arguments)]
+async fn read_terms(
+    deps: &SourcesDeps,
+    db: &PgPool,
+    row: &BoardRow,
+    old: &Report,
+    sentences: &[String],
+    terms_read: bool,
+    no_terms_page: bool,
+    sample: &[(String, String, String)],
+    now: DateTime<Utc>,
+) -> TermsState {
+    let key = robots::fingerprint(&sentences.join("\n"));
+    let mut state = TermsState {
+        verdict: row.terms_verdict.clone(),
+        quote: row.terms_quote.clone(),
+        tags: row.tags.clone(),
+        read_for: old.terms_read_for.clone(),
+        no_terms_page,
+        ..TermsState::default()
+    };
+    if no_terms_page {
+        // No terms page found: silent, with no call for the verdict.
+        state.verdict = Some("silent".to_owned());
+        state.quote = None;
+    }
+    let kept = state.read_for == key && row.terms_verdict.is_some();
+    if kept || sample.is_empty() || !(terms_read || no_terms_page) {
+        return state;
+    }
+    let Some(ai) = crate::features::search::configured(deps) else {
+        return state;
+    };
+    let input = terms::Input {
+        name: &row.name,
+        has_terms: terms_read,
+        sentences,
+        sample,
+    };
+    match terms::read(ai, db, now, &input).await {
+        Ok((reading, cost_usd)) => {
+            state.verdict = Some(reading.verdict);
+            state.quote = reading.quote;
+            state.tags = reading.tags;
+            state.read_for = key;
+            state.cost_eur = cost_usd * ai.usd_to_eur();
+        }
+        Err(
+            applicamp_ai::Error::OverBudget { .. } | applicamp_ai::Error::OverDailyCap { .. },
+        ) => state.budget_reached = true,
+        Err(e) => {
+            tracing::warn!(board = %row.slug, error = %e, "a board's terms could not be read");
+        }
+    }
+    state
+}
+
+static MAILTO: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)mailto:([a-z0-9._%+-]{1,64}@[a-z0-9.-]{1,120}\.[a-z]{2,24})")
+        .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
+});
+static EMAIL: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)\b([a-z0-9._%+-]{1,64}@[a-z0-9.-]{1,120}\.[a-z]{2,24})\b")
+        .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
+});
+
+/// An address to ask the board for permission: a `mailto:` link on its
+/// terms page or homepage, else one written on its terms page.
+pub fn contact_email(home: &str, terms: Option<&str>) -> Option<String> {
+    let pick = |regex: &Regex, text: &str| {
+        regex
+            .captures(text)
+            .and_then(|c| c.get(1))
+            .map(|m| m.as_str().to_ascii_lowercase())
+    };
+    terms
+        .and_then(|t| pick(&MAILTO, t))
+        .or_else(|| pick(&MAILTO, home))
+        .or_else(|| terms.and_then(|t| pick(&EMAIL, &html_to_text(t))))
+        .filter(|email| !email.ends_with(".png") && !email.ends_with(".jpg"))
+}
+
+/// How many sample items look like job postings: a title, and a company or
+/// an apply link.
+pub fn postings(sample: &[crate::job::Job]) -> usize {
+    sample
+        .iter()
+        .filter(|job| {
+            !job.title.trim().is_empty()
+                && (!job.company.trim().is_empty()
+                    || job.board.as_ref().is_some_and(|b| b.apply_url.is_some()))
+        })
+        .count()
+}
+
+/// The least sample items that must look like postings for a site to be a
+/// job board (a CV tool or a blog has none).
+pub const MIN_POSTINGS: usize = 5;
+
+/// Whether the sample says the site is a job board that is alive: enough
+/// postings, and one posted in the last 30 days.
+pub fn is_a_live_job_board(sample: &[crate::job::Job], now: DateTime<Utc>) -> bool {
+    postings(sample) >= MIN_POSTINGS
+        && sample
+            .iter()
+            .any(|job| job.posted_at.is_some_and(|at| at >= now - TimeDelta::days(30)))
 }
 
 /// Pages one check reads, each path once.
@@ -895,7 +1121,7 @@ pub async fn check(
     db: &PgPool,
     row: &BoardRow,
     run: Uuid,
-) -> Result<()> {
+) -> Result<Checked> {
     let started = Instant::now();
     let now = deps.clock.now();
     let mut visits = Visits {
@@ -904,7 +1130,7 @@ pub async fn check(
         seen: HashSet::new(),
     };
     let Ok(home) = Url::parse(&row.homepage) else {
-        return Ok(());
+        return Ok(Checked::Done);
     };
     let config = row.config().unwrap_or_default();
     let kind = row.kind().unwrap_or(Kind::JsonApi);
@@ -949,6 +1175,7 @@ pub async fn check(
         .map(terms_sentences)
         .unwrap_or_default();
 
+    let contact = contact_email(&html, terms_html.as_deref());
     let board = BoardRef {
         id: row.id,
         slug: row.slug.clone(),
@@ -1056,7 +1283,36 @@ pub async fn check(
         .count();
     let remote_share = share(remote, sample.len());
     let worldwide_share = share(worldwide, sample.len());
+
+    // The terms, read by the model (kept until they change).
+    let old = row.report().unwrap_or_default();
+    let key = robots::fingerprint(&terms_sentences.join("\n"));
+    let sample_lines: Vec<(String, String, String)> = sample
+        .iter()
+        .map(|job| {
+            (
+                job.title.clone(),
+                job.company.clone(),
+                job.location.clone().unwrap_or_default(),
+            )
+        })
+        .collect();
+    let reading = read_terms(
+        deps,
+        db,
+        row,
+        &old,
+        &terms_sentences,
+        terms_html.is_some(),
+        !html.is_empty() && terms_url.is_none(),
+        &sample_lines,
+        now,
+    )
+    .await;
     let mut flags = Vec::new();
+    if reading.budget_reached {
+        flags.push("the AI spending limit is reached: its terms are not read yet".to_owned());
+    }
     if robots.endpoint_allowed == Some(false) {
         flags.push("robots.txt disallows the feed".to_owned());
     }
@@ -1095,10 +1351,14 @@ pub async fn check(
         Some(p) => (row.kind.clone(), row.config.0.clone(), Some(p)),
         None => (row.kind.clone(), row.config.0.clone(), None),
     };
-    let old = row.report().unwrap_or_default();
+    let content_signal = robots
+        .content_signal
+        .as_ref()
+        .and_then(|signal| serde_json::to_value(signal).ok());
     let report = Report {
         checked_at: Some(now),
         robots,
+        terms_read_for: reading.read_for.clone(),
         terms_url: terms_url.as_ref().map(Url::to_string),
         terms_fingerprint: terms_html
             .as_deref()
@@ -1141,7 +1401,9 @@ pub async fn check(
     };
     sqlx::query(
         "UPDATE sources.job_boards
-            SET report = $2, kind = $3, config = $4, priority = $5, updated_at = $6
+            SET report = $2, kind = $3, config = $4, priority = $5, updated_at = $6,
+                terms_verdict = $7, terms_quote = $8, tags = $9, terms_url = $10,
+                content_signal = $11, contact_email = coalesce($12, contact_email)
           WHERE id = $1",
     )
     .bind(row.id)
@@ -1152,9 +1414,24 @@ pub async fn check(
     .bind(sqlx::types::Json(&new_config))
     .bind(&priority)
     .bind(now)
+    .bind(&reading.verdict)
+    .bind(&reading.quote)
+    .bind(&reading.tags)
+    .bind(&report.terms_url)
+    .bind(content_signal.as_ref().map(sqlx::types::Json))
+    .bind(&contact)
     .execute(db)
     .await?;
     job_boards::keep_listed(db, row.id, &crate::readers::listed(sample), true, now).await?;
+    let approved = reading_allows_and_approve(
+        db,
+        row,
+        sample,
+        reading.allows(&key),
+        reading.budget_reached,
+        now,
+    )
+    .await?;
     let note = match &found {
         Some(f) if !f.sample.is_empty() => format!(
             "{} at {} · {} sample jobs · robots {}{}",
@@ -1175,7 +1452,11 @@ pub async fn check(
             } else {
                 ""
             }
-        ),
+        ) + if approved {
+            " · approved by the app"
+        } else {
+            ""
+        },
         _ if secret.is_err() => "Needs an API key".to_owned(),
         _ => "No feed or API found".to_owned(),
     };
@@ -1186,6 +1467,7 @@ pub async fn check(
             board: row.id,
             outcome: "checked",
             jobs_read: u32::try_from(sample.len()).unwrap_or(0),
+            ai_cost_eur: reading.cost_eur,
             duration_ms: u32::try_from(started.elapsed().as_millis()).unwrap_or(u32::MAX),
             note: Some(note),
             ..Scan::default()
@@ -1193,8 +1475,62 @@ pub async fn check(
         deps.clock.now(),
     )
     .await?;
-    tracing::info!(board = %row.slug, found = found.is_some(), "job board checked");
-    Ok(())
+    tracing::info!(board = %row.slug, found = found.is_some(), approved, "job board checked");
+    Ok(if reading.budget_reached {
+        Checked::BudgetReached
+    } else {
+        Checked::Done
+    })
+}
+
+/// Approve `row` by the app when its check is clean, as stored just now:
+/// still a candidate nobody edited, no blocker (the research's facts, what
+/// its terms and robots rules say, a key it needs, a config that reads), a
+/// config that reads its sample, terms that allow apps or say nothing as
+/// they are now, a live job board. Whether it was.
+async fn reading_allows_and_approve(
+    db: &PgPool,
+    row: &BoardRow,
+    sample: &[crate::job::Job],
+    terms_allow: bool,
+    budget_reached: bool,
+    now: DateTime<Utc>,
+) -> Result<bool> {
+    if budget_reached
+        || !terms_allow
+        || row.status() != Status::Candidate
+        || row.config_edited
+        || !is_a_live_job_board(sample, now)
+    {
+        return Ok(false);
+    }
+    let Some(fresh) = job_boards::get(db, row.id).await? else {
+        return Ok(false);
+    };
+    if fresh.status() != Status::Candidate
+        || fresh.config_edited
+        || fresh.usable_config().is_none()
+        || !blockers(&fresh).is_empty()
+    {
+        return Ok(false);
+    }
+    // Only if nobody (the owner) changed it in the meantime.
+    let approved = sqlx::query(
+        "UPDATE sources.job_boards
+            SET status = 'approved', approved_by = 'app', approved_at = $2,
+                recheck_after = $2 + interval '182 days', updated_at = $2
+          WHERE id = $1 AND status = 'candidate' AND config_edited = false",
+    )
+    .bind(row.id)
+    .bind(now)
+    .execute(db)
+    .await?
+    .rows_affected()
+        == 1;
+    if approved {
+        tracing::info!(board = %row.slug, "job board approved by the app: its check is clean");
+    }
+    Ok(approved)
 }
 
 /// Paths a check probes for a feed or an API when the board has no usable
@@ -1209,7 +1545,7 @@ pub async fn recheck(
     db: &PgPool,
     row: &BoardRow,
     run: Uuid,
-) -> Result<()> {
+) -> Result<Checked> {
     let started = Instant::now();
     let now = deps.clock.now();
     let mut visits = Visits {
@@ -1218,7 +1554,7 @@ pub async fn recheck(
         seen: HashSet::new(),
     };
     let Ok(home) = Url::parse(&row.homepage) else {
-        return Ok(());
+        return Ok(Checked::Done);
     };
     let config = row.config().unwrap_or_default();
     let start = row.kind().and_then(|k| config.start(k)).cloned();
@@ -1240,31 +1576,90 @@ pub async fn recheck(
         flag("robots.txt now disallows the feed");
     }
     let mut terms_fingerprint = old.terms_fingerprint.clone();
+    // What the model reads of its terms once they changed (once).
+    let mut reread: Option<TermsState> = None;
     if let Some(url) = old.terms_url.as_deref().and_then(|u| Url::parse(u).ok())
         && let Some(html) = visits.get(&url).await
     {
         let fingerprint = robots::fingerprint(&html);
         if !old.terms_fingerprint.is_empty() && old.terms_fingerprint != fingerprint {
             flag("its terms page changed since the last check");
+            let sample_lines: Vec<(String, String, String)> = old
+                .sample
+                .iter()
+                .map(|job| {
+                    (
+                        job.title.clone(),
+                        job.company.clone(),
+                        job.location.clone().unwrap_or_default(),
+                    )
+                })
+                .collect();
+            let state = read_terms(
+                deps,
+                db,
+                row,
+                &old,
+                &terms_sentences(&html),
+                true,
+                false,
+                &sample_lines,
+                now,
+            )
+            .await;
+            if matches!(
+                state.verdict.as_deref(),
+                Some("forbid" | "ask_first" | "personal_only")
+            ) {
+                flag("its terms now forbid reading it or ask for permission first: read them");
+            }
+            reread = Some(state);
         }
         terms_fingerprint = fingerprint;
     }
+    let content_signal = robots
+        .content_signal
+        .as_ref()
+        .and_then(|signal| serde_json::to_value(signal).ok());
+    let read_for = reread
+        .as_ref()
+        .filter(|state| state.verdict.is_some())
+        .map_or_else(|| old.terms_read_for.clone(), |state| state.read_for.clone());
     let report = Report {
         checked_at: Some(now),
         robots,
         terms_fingerprint,
+        terms_read_for: read_for,
         flags,
         ..old
     };
     sqlx::query(
-        "UPDATE sources.job_boards SET report = $2, recheck_after = $3, updated_at = $4 WHERE id = $1",
+        "UPDATE sources.job_boards
+            SET report = $2, recheck_after = $3, updated_at = $4,
+                content_signal = coalesce($5, content_signal)
+          WHERE id = $1",
     )
     .bind(row.id)
     .bind(sqlx::types::Json(serde_json::to_value(&report).map_err(Error::internal)?))
     .bind(now + RECHECK)
     .bind(now)
+    .bind(content_signal.as_ref().map(sqlx::types::Json))
     .execute(db)
     .await?;
+    // A board approved before: its status stays the owner's (or the app's
+    // own approval, until the owner decides); only what it says is kept.
+    if let Some(state) = reread.as_ref().filter(|state| state.verdict.is_some()) {
+        sqlx::query(
+            "UPDATE sources.job_boards SET terms_verdict = $2, terms_quote = $3, tags = $4
+              WHERE id = $1",
+        )
+        .bind(row.id)
+        .bind(&state.verdict)
+        .bind(&state.quote)
+        .bind(&state.tags)
+        .execute(db)
+        .await?;
+    }
     let note = if report.robots.endpoint_allowed == Some(false) {
         "Re-checked: robots.txt now disallows the feed".to_owned()
     } else {
@@ -1276,6 +1671,7 @@ pub async fn recheck(
         &[Scan {
             board: row.id,
             outcome: "checked",
+            ai_cost_eur: reread.as_ref().map_or(0.0, |state| state.cost_eur),
             duration_ms: u32::try_from(started.elapsed().as_millis()).unwrap_or(u32::MAX),
             note: Some(note),
             ..Scan::default()
@@ -1283,5 +1679,9 @@ pub async fn recheck(
         deps.clock.now(),
     )
     .await?;
-    Ok(())
+    Ok(if reread.is_some_and(|state| state.budget_reached) {
+        Checked::BudgetReached
+    } else {
+        Checked::Done
+    })
 }

@@ -2,24 +2,31 @@
 
 ## Purpose
 The job boards a search reads: a registry of boards, each read within its terms and credited
-in the app, new ones found every week and checked automatically, none read before a person
-approves it, all ranked by the salaries they list; and a view of what every search and check
+in the app, new ones found every week and checked automatically, none read before it is approved (by the
+app when its check is clean, else by a person), all ranked by the salaries they list; and a view of what every search and check
 scanned on each board.
 
 ## Requirements
 
-### Requirement: New job boards are found and approved by a person
-The app SHALL look for new job boards every week, check each one's robots
-rules, terms and machine-readable feed automatically, and SHALL NOT read a
-board's jobs until the owner approves it after seeing that check. Only the
-owner SHALL decline a board: the app SHALL NOT decline one on the owner's
-behalf, and what its research found SHALL be shown as a note (an opinion) or
-as a blocker (a fact: terms that forbid automated reading, robots rules that
-disallow the job pages), never as a decline.
+### Requirement: New job boards are found, checked and approved by the app when the check is clean
+The app SHALL look for new job boards every week on public lists, check each one's robots rules,
+terms and machine-readable feed automatically, and SHALL approve a board by itself, recording
+"approved by the app" with the date, only when its check is clean: its config reads sample jobs,
+its robots rules allow every path read, at least 5 of the sample items look like job postings (a
+title and a company or an apply link), it posted jobs in the last 30 days, its terms allow apps
+or say nothing about automated reading, it has no blocker and it needs no key. A board the owner
+paused, declined or edited SHALL never be approved by the app. Only the owner SHALL decline a
+board: the app SHALL NOT decline one on the owner's behalf, and what its research found SHALL be
+shown as a note (an opinion) or as a blocker (a fact: terms that forbid automated reading, robots
+rules that disallow the job pages, a need for permission), never as a decline.
 
-#### Scenario: A board found by discovery
-- **WHEN** discovery finds a board with a public JSON feed and terms that mention automated access
-- **THEN** it waits on the Boards page with the endpoint, the matched terms sentences and sample jobs, and no search reads it until it is approved
+#### Scenario: A board found by discovery with a clean check
+- **WHEN** discovery finds a board with a feed of at least 5 postings from the last 30 days, allowed by its robots rules, with terms that say nothing about automated reading
+- **THEN** the app approves it, its peek says "Approved by the app on" the date, and searches read it
+
+#### Scenario: Not a job board
+- **WHEN** a found site's sample has fewer than 5 items with a title and a company or an apply link
+- **THEN** it waits for the owner with its check, and the app does not approve it
 
 #### Scenario: A board whose robots rules forbid the feed
 - **WHEN** a candidate's robots.txt disallows its API path
@@ -32,6 +39,10 @@ disallow the job pages), never as a decline.
 #### Scenario: Terms that forbid automated reading
 - **WHEN** a waiting board's terms forbid automated reading (Landing.jobs)
 - **THEN** its peek quotes the clause with a link to the terms, Approve stays disabled, and its site is not read by the checks at start
+
+#### Scenario: A board the owner edited
+- **WHEN** the owner edited a candidate's config and a check finds it clean
+- **THEN** the app does not approve it
 
 ### Requirement: Boards are ranked by average salary
 The Boards page and the approval queue SHALL list boards by the average stated
@@ -152,3 +163,64 @@ pages can be read for a tailored CV without asking.
 #### Scenario: The board gives the website
 - **WHEN** a board lists a job with the company's website and a search adds it
 - **THEN** the company's site is that website, and Prepare does not ask for it
+
+### Requirement: A board's terms are read by a model
+The app SHALL read each board's terms with one model call (the `complete` role) from the terms
+sentences the check picked, once per board and again only when those sentences change, charged to
+the instance's AI budget and refused, never retried, past a spending limit. The call SHALL return
+a verdict (allow, silent, forbid, ask first or personal only) and the sentence that decided it,
+which SHALL be one of the sentences it was given. The terms text SHALL be handled as data, never
+as instructions. A board with no terms page SHALL be silent. A forbid SHALL be a `terms_forbid`
+blocker; ask first, personal only, and a forbid that the site's own robots rules contradict with
+an explicit `Allow` for the feed SHALL be a `needs_permission` blocker showing the quote.
+
+#### Scenario: Terms that ask for permission
+- **WHEN** a board's terms say automated access needs written permission
+- **THEN** the board waits for the owner with a "needs permission" reason quoting that sentence, and Approve stays disabled
+
+#### Scenario: A spending limit
+- **WHEN** the instance's AI spending limit is reached during discovery
+- **THEN** no call is sent, the run stops cleanly, the board waits with a note that its terms are not read yet, and nothing is approved by the app
+
+#### Scenario: A quote nobody wrote
+- **WHEN** the model forbids reading with a sentence that is not in the terms it was given
+- **THEN** the answer is discarded and the board is not approved by the app
+
+### Requirement: Boards are tagged by what they offer
+The app SHALL tag each board, in the same call that reads its terms, with the kinds of jobs its
+sample shows (from a fixed list), where its jobs are, whether they are mostly remote, and the
+specialities it is built around.
+
+#### Scenario: A remote design board
+- **WHEN** a board's sample jobs are remote design roles open worldwide
+- **THEN** its tags include `design`, `worldwide` and `remote`
+
+### Requirement: The robots Content-Signal is recorded
+The app SHALL parse a robots.txt `Content-Signal` line and keep and show its values. A signal
+such as `ai-train=no` SHALL NOT stop a board from being read, and the app SHALL NOT train on jobs.
+
+#### Scenario: ai-train is no
+- **WHEN** a board's robots.txt says `Content-Signal: search=yes, ai-train=no`
+- **THEN** the board is read as usual, and its peek says the site asks that its content is not used to train models
+
+### Requirement: Discovery reads public lists of boards
+Discovery SHALL read the CC0 and MIT lists of job boards named in its source table (awesome-job-boards,
+awesome-remote-job, remote-working-list, awesome-remote-jobs, idimetrix's awesome-job-boards and
+Wikidata's employment websites), record on each board it adds which list it was found through, check
+at most 200 boards a run (configurable), and never add sites on its never list (LinkedIn, Indeed,
+Glassdoor and the like).
+
+#### Scenario: A list names a feed
+- **WHEN** a list gives a board's feed address
+- **THEN** the board is added with that feed as its endpoint and its check reads it first
+
+### Requirement: Boards that need permission, and the research's seeds
+The seed list SHALL include the boards researched on 2026-11-04 as candidates with real configs, so
+their check approves them when clean, and SHALL state `needs_permission` with its quote and source
+for boards whose terms or robots rules require asking first (Jobgether, VueJobs, Elixir Forum). A
+feed whose XML is malformed (a bare `&`, an unclosed item, tags in capitals, a byte-order mark)
+SHALL still be read.
+
+#### Scenario: A malformed feed
+- **WHEN** a feed has an unescaped `&` in a link and an item that is never closed
+- **THEN** its items are read

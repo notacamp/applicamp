@@ -77,6 +77,42 @@ pub fn rules_for_us(text: &str) -> (Vec<RobotsRule>, Option<f64>) {
         .unwrap_or_default()
 }
 
+/// The `Content-Signal` line of `text` (`search=yes, ai-input=yes,
+/// ai-train=no`): each signal's value, lower case, for the ones that are
+/// `yes` or `no`; the keys we do not know are kept too (at most 8, short).
+/// `None` when there is no such line. Never a reason not to read: it is
+/// recorded and shown, and the app never trains on jobs.
+pub fn content_signal(text: &str) -> Option<std::collections::BTreeMap<String, String>> {
+    let mut signals = std::collections::BTreeMap::new();
+    for line in text.lines() {
+        let line = line.split('#').next().unwrap_or("").trim();
+        let Some((key, value)) = line.split_once(':') else {
+            continue;
+        };
+        if !key.trim().eq_ignore_ascii_case("content-signal") {
+            continue;
+        }
+        for part in value.split(',') {
+            let Some((name, answer)) = part.split_once('=') else {
+                continue;
+            };
+            let (name, answer) = (
+                name.trim().to_ascii_lowercase(),
+                answer.trim().to_ascii_lowercase(),
+            );
+            let word = |t: &str| {
+                !t.is_empty()
+                    && t.len() <= 20
+                    && t.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+            };
+            if word(&name) && word(&answer) && signals.len() < 8 {
+                signals.insert(name, answer);
+            }
+        }
+    }
+    (!signals.is_empty()).then_some(signals)
+}
+
 /// Whether `pattern` matches `path` (from its start).
 fn matches(pattern: &str, path: &str) -> bool {
     let (pattern, anchored) = match pattern.strip_suffix('$') {
@@ -179,6 +215,7 @@ pub fn report(text: Option<&str>, endpoint: Option<&url::Url>) -> RobotsReport {
         endpoint_allowed,
         deciding_rule,
         fingerprint: fingerprint(text),
+        content_signal: content_signal(text),
     }
 }
 
@@ -220,6 +257,19 @@ mod tests {
         let (star, delay) = rules_for_us("User-agent: *\nCrawl-delay: 1\nAllow: /");
         assert_eq!(delay, Some(1.0));
         assert!(allowed(&star, "/api").0);
+    }
+
+    #[test]
+    fn the_content_signal_line_is_read_and_never_blocks() {
+        let text = "User-agent: *\nContent-Signal: search=yes, ai-train=no\nAllow: /\n";
+        let signal = content_signal(text).unwrap();
+        assert_eq!(signal.get("ai-train").map(String::as_str), Some("no"));
+        assert_eq!(signal.get("search").map(String::as_str), Some("yes"));
+        assert!(content_signal("User-agent: *\nAllow: /").is_none());
+        let url: url::Url = "https://board.example/feed".parse().unwrap();
+        let report = report(Some(text), Some(&url));
+        assert_eq!(report.endpoint_allowed, Some(true), "ai-train=no never blocks");
+        assert!(report.content_signal.is_some());
     }
 
     #[test]

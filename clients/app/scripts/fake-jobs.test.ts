@@ -219,7 +219,7 @@ describe("the fake CV writer", () => {
       {
         id: "l5",
         rewrite: null,
-        question: "Is this true?",
+        question: "Is “23” right?",
         fact: "I rebuilt the billing pipeline in Rust, cutting invoice runs from 23 hours to 40 minutes.",
       },
       { id: "l6", rewrite: "Led a team of 4 engineers", question: null, fact: null },

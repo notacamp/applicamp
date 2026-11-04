@@ -297,6 +297,7 @@ const ERROR_CODES = [
   "lines_flagged",
   "already_on_cv",
   "cv_doesnt_fit",
+  "cv_previews_daily_cap",
   "cv_pdf_check_failed",
   "cv_pdf_unavailable",
   "cv_versions_cap",
@@ -315,8 +316,11 @@ export function cvErrorCode(error: unknown): CvErrorCode {
   return ERROR_CODES.find((known) => known === code) ?? "generic";
 }
 
-/** What "Draft the CV" costs, about, in euros (the server's own figure is `Cv.draft_eur`). */
-export const DRAFT_ESTIMATE_EUR = 0.002;
+/**
+ * What "Draft the CV" costs, about, in euros: the draft and, at worst, the app's fix round (the
+ * server's own figure is `Cv.draft_eur`).
+ */
+export const DRAFT_ESTIMATE_EUR = 0.004;
 
 /** Where a flag can be fixed with "It's true": not for a company fact used as an achievement. */
 export function canConfirm(flags: readonly CvReason[]): boolean {

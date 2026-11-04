@@ -84,8 +84,15 @@ describe("Review the CV", () => {
     expect(screen.getByTestId("cv-question-text-l5")).toHaveTextContent(
       "Is this true? “Cut invoice runs to 20 minutes”",
     );
+    // The app's question, where the line comes from, and what a yes keeps, word for word.
+    expect(screen.getByTestId("cv-question-ask-l5")).toHaveTextContent(
+      "Did invoice runs drop to 20 minutes?",
+    );
     expect(screen.getByTestId("cv-question-where-l5")).toHaveTextContent(
-      "You told us about Example Org: “Cut invoice runs from 6 hours to 40 minutes”. If you keep it, it goes on your profile.",
+      "You told us about Example Org: “Cut invoice runs from 6 hours to 40 minutes”.",
+    );
+    expect(screen.getByTestId("cv-question-keeps-l5")).toHaveTextContent(
+      "If you keep it, this goes on your profile: “I cut invoice runs to 20 minutes.”",
     );
     expect(screen.getByTestId("cv-question-yes-l5")).toHaveTextContent("Yes, keep it");
     expect(screen.getByTestId("cv-question-change-l5")).toHaveTextContent("Change it");
@@ -93,9 +100,10 @@ describe("Review the CV", () => {
     expect(screen.getByTestId("cv-question-text-l7")).toHaveTextContent(
       "Do you have this skill? Kubernetes",
     );
-    expect(screen.getByTestId("cv-question-where-l7")).toHaveTextContent(
+    expect(screen.getByTestId("cv-question-keeps-l7")).toHaveTextContent(
       "If you keep it, it is added to your skills.",
     );
+    expect(screen.queryByTestId("cv-question-where-l7")).toBeNull();
     expect(screen.queryByTestId("cv-question-change-l7")).toBeNull();
     // Approve is off, and says what turns it on.
     expect(screen.getByTestId("cv-approve")).toBeDisabled();
@@ -275,6 +283,104 @@ describe("Review the CV", () => {
     expect(await screen.findByTestId("cv-approve")).toBeEnabled();
   });
 
+  it("says why a line can't be kept: another job's, or too long", async () => {
+    renderReview({
+      [CV]: {
+        body: cv({
+          draft: cvDraft({
+            waiting: [
+              {
+                line_id: "l3",
+                kind: "line",
+                text: "Built ingestion for 3 partner feeds",
+                proposal: null,
+                cannot_keep: "other_position",
+                flags: [{ kind: "other_position", cites: ["w1.h1"] }],
+              },
+              {
+                line_id: "l4",
+                kind: "line",
+                text: "Rebuilt billing",
+                proposal: null,
+                cannot_keep: "too_long",
+                flags: [{ kind: "claim_not_in_sources", claim: "12", cites: ["w0.h1"] }],
+              },
+            ],
+          }),
+        }),
+      },
+    });
+    expect(await screen.findByTestId("cv-question-keeps-l3")).toHaveTextContent(
+      "This line is about another job on your profile. Change it or remove it.",
+    );
+    expect(screen.getByTestId("cv-question-keeps-l4")).toHaveTextContent(
+      "This line is too long to keep on your profile as it is. Make it shorter or remove it.",
+    );
+    expect(screen.queryByTestId("cv-question-yes-l3")).toBeNull();
+    expect(screen.queryByTestId("cv-question-yes-l4")).toBeNull();
+    expect(screen.getByTestId("cv-question-change-l4")).toBeVisible();
+  });
+
+  it("offers Make the PDF when the PDF is older than the last change, or there is none", async () => {
+    const asked: unknown[] = [];
+    const draft = cvDraft();
+    const stale = { ...draft, preview: draft.preview ? { ...draft.preview, stale: true } : null };
+    renderReview({
+      [CV]: { body: cv({ draft: stale }) },
+      [`POST /api/v1/opportunities/${ID}/cv/drafts/1/preview`]: async (request) => {
+        asked.push(await request.json());
+        return { body: cv({ draft: cvDraft() }) };
+      },
+    });
+    const user = userEvent.setup();
+    expect(await screen.findByTestId("cv-preview-stale")).toHaveTextContent(
+      "The PDF is older than your last change.",
+    );
+    await user.click(screen.getByTestId("cv-preview-make"));
+    await waitFor(() => {
+      expect(asked).toEqual([{ template: "clean", length: 1 }]);
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId("cv-preview-stale")).toBeNull();
+    });
+    expect(screen.getByTestId("cv-preview-download")).toBeVisible();
+  });
+
+  it("offers Make the PDF, never an endless wait, when a draft has none", async () => {
+    renderReview({ [CV]: { body: cv({ draft: cvDraft({ preview: null }) }) } });
+    expect(await screen.findByTestId("cv-preview-none")).toHaveTextContent(
+      "This draft has no PDF yet.",
+    );
+    expect(screen.getByTestId("cv-preview-make")).toHaveTextContent("Make the PDF");
+  });
+
+  it("marks a line the app rewrote", async () => {
+    const draft = fixedDraft();
+    const role = draft.experience[0];
+    const first = role?.bullets[0];
+    if (role === undefined || first === undefined) {
+      throw new Error("the fixture has a bullet");
+    }
+    const rewritten = {
+      ...draft,
+      experience: [
+        {
+          ...role,
+          bullets: [
+            { ...first, fixed_by_app: true, original: "Led a team of 12" },
+            ...role.bullets.slice(1),
+          ],
+        },
+      ],
+    };
+    renderReview({ [CV]: { body: cv({ draft: rewritten }) } });
+    const user = userEvent.setup();
+    await openLines(user);
+    expect(await screen.findByTestId(`cv-line-mark-${first.id}`)).toHaveTextContent(
+      "Fixed by the app",
+    );
+  });
+
   it("offers to make the PDF of a CV approved without one", async () => {
     let asked: unknown;
     renderReview({
@@ -436,7 +542,7 @@ describe("Review the CV", () => {
   it("offers the draft when there is none, and a company fact used as an achievement can't be confirmed", async () => {
     renderReview({ [CV]: { body: cv() } });
     expect(await screen.findByTestId("cv-empty")).toBeVisible();
-    expect(screen.getByTestId("cv-draft")).toHaveTextContent("Draft the CV · about €0.002");
+    expect(screen.getByTestId("cv-draft")).toHaveTextContent("Draft the CV · about €0.004");
   });
 
   it("offers only Change it and Remove it for a company fact outside the summary", async () => {
@@ -466,7 +572,7 @@ describe("Review the CV", () => {
         }),
       },
     });
-    expect(await screen.findByTestId("cv-question-where-l9")).toHaveTextContent(
+    expect(await screen.findByTestId("cv-question-keeps-l9")).toHaveTextContent(
       "This is about the company, not about you. Change it or remove it.",
     );
     expect(screen.queryByTestId("cv-question-yes-l9")).toBeNull();

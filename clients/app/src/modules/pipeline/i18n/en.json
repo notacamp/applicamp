@@ -358,7 +358,8 @@
       "as_in_profile": "As in profile",
       "moved_up": "Moved up",
       "reworded": "Reworded",
-      "edited": "Edited"
+      "edited": "Edited",
+      "fixed_by_app": "Fixed by the app"
     },
     "from": {
       "show": "From your profile",
@@ -465,7 +466,8 @@
       "invalid_layout": "Choose a template and 1 or 2 pages.",
       "cannot_keep": "This line is about the company, not about you. Change it or remove it.",
       "not_flagged": "This line already matches your profile.",
-      "too_late": "It’s too late to undo. Make the CV again to change it."
+      "too_late": "It’s too late to undo. Make the CV again to change it.",
+      "cv_previews_daily_cap": "You’ve made 30 PDFs of drafts today. It continues tomorrow; changing a line still makes the PDF again."
     },
     "layout": {
       "template": "Template",
@@ -526,14 +528,15 @@
       "note": "Some words may not come out right when a job site reads this PDF.",
       "doesntFit": "The CV doesn’t fit on 2 pages. Remove a few lines.",
       "unavailable": "The PDF couldn’t be made just now. Change a line or pick a layout to try again.",
-      "lines": "Every line and where it comes from"
+      "lines": "Every line and where it comes from",
+      "stale": "The PDF is older than your last change.",
+      "make": "Make the PDF",
+      "none": "This draft has no PDF yet."
     },
     "waiting": {
       "title": "Needs you · {{count}}",
       "question": "Is this true? “{{text}}”",
       "skillQuestion": "Do you have this skill? {{skill}}",
-      "where": "If you keep it, it goes on your profile under {{role}}.",
-      "whereNoRole": "If you keep it, it goes on your profile.",
       "skillWhere": "If you keep it, it is added to your skills.",
       "cannotKeep": "This is about the company, not about you. Change it or remove it.",
       "yes": "Yes, keep it",
@@ -548,7 +551,10 @@
       "ready": "Approve when you’re happy with it.",
       "answer_one": "Answer the question to approve.",
       "answer_other": "Answer the {{count}} questions to approve.",
-      "toldUs": "You told us about {{company}}: “{{quote}}”. If you keep it, it goes on your profile."
+      "toldUs": "You told us about {{company}}: “{{quote}}”.",
+      "keeps": "If you keep it, this goes on your profile: “{{proposal}}”",
+      "cannotKeepOther": "This line is about another job on your profile. Change it or remove it.",
+      "cannotKeepLong": "This line is too long to keep on your profile as it is. Make it shorter or remove it."
     },
     "needsVersion": {
       "title": "This CV was approved but has no PDF yet",

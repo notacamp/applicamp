@@ -24,3 +24,14 @@ ALTER TABLE pipeline.cv_drafts
     ADD COLUMN IF NOT EXISTS preview_error text
         CHECK (preview_error IS NULL OR char_length(preview_error) <= 64),
     ADD COLUMN IF NOT EXISTS preview_at timestamptz;
+
+-- Each "see it in another layout" or "Make the PDF" the person asks for: at
+-- most 30 a day per account (`cv_previews_daily_cap`). The ones made after a
+-- change are not counted. Ids and times only.
+CREATE TABLE IF NOT EXISTS pipeline.cv_preview_makes (
+    id uuid PRIMARY KEY,
+    account_id uuid NOT NULL,
+    made_at timestamptz NOT NULL
+);
+CREATE INDEX IF NOT EXISTS cv_preview_makes_account_made
+    ON pipeline.cv_preview_makes (account_id, made_at);

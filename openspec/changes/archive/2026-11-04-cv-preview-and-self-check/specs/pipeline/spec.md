@@ -10,7 +10,11 @@ never refuse the preview. A render that fails SHALL be kept as a short code (`cv
 cause (its kind and the compiler's counts, never the CV's text). The person SHALL be able to render
 another template or length (no model call; refused with `cv_doesnt_fit` when it does not fit, the
 preview kept as it was), see the preview inline and download it as "<Name> CV - <Company>
-(draft).pdf", never cached or sniffed. Another account's draft SHALL be not found.
+(draft).pdf", never cached or sniffed. When the PDF was made before the draft's last change, the
+preview SHALL say it is stale and the page SHALL offer "Make the PDF"; a draft with no PDF SHALL offer
+the same, never an endless "Making the PDF…". The person SHALL ask for at most 30 previews a day
+(`cv_previews_daily_cap`); the ones made after a change are not counted. Another account's draft SHALL
+be not found.
 
 #### Scenario: A draft
 - **WHEN** someone drafts a CV
@@ -28,15 +32,21 @@ preview kept as it was), see the preview inline and download it as "<Name> CV - 
 - **WHEN** another account asks for the preview's PDF
 - **THEN** the answer is 404
 
+#### Scenario: Older than the last change
+- **WHEN** the draft's text changed and its PDF was not made again
+- **THEN** the preview says it is stale, the page says "The PDF is older than your last change" with Make the PDF, and Approve renders the text anew
+
 ### Requirement: The app fixes what the check flags before asking
 After the check, when a line is flagged, the app SHALL make one more model call for all the flagged
-lines (never a skill), showing each line, why it was flagged and the sources it may use (not a
-company fact outside the summary, not another position's) as data, never the person's name or how to
-reach them. For each line it SHALL get either a rewrite that says only what those sources say, which
+lines (never a skill), showing each line, why it was flagged and the sources it may use (under a
+position only that position's and the skills; a company fact only in the summary, marked as a fact
+about the company, not the person) as data, never the person's name or how to reach them. For each line it SHALL get either a rewrite that says only what those sources say, which
 SHALL replace the line only when it passes the check (marked as fixed by the app, with what it said
 before kept), or one yes-or-no question with the claim as a first-person fact, kept as the line's
-proposal only when that fact backs the line (else "Yes, keep it" keeps the line's own words). A
-company fact used as an achievement SHALL never be proposed for keeping. There SHALL be one round
+proposal only when that fact backs the line and claims nothing that neither the line nor its own
+sources (never the company's) say (else "Yes, keep it" keeps the line's own words). A company fact
+used as an achievement, a summary whose flagged words only the company's facts say, and another job's
+line SHALL never be proposed for keeping. There SHALL be one round
 only, through the same caps and spending limits; a call that cannot be made, or answers nothing
 usable, SHALL leave every flagged line to the person. Nothing SHALL reach the profile in this step.
 
@@ -60,12 +70,15 @@ matter SHALL appear in the text of those sources (with the head of their positio
 name for a company fact): a number (with or without a unit, a currency or a percentage, a year), a
 technology or a skill of the profile, the name of an employer (a company of the profile, or the
 job's), an acronym, and a name the profile does not give. A word written with a capital that names no
-fact (Senior, Developer, Stack, a month) SHALL not be a claim; a place or a language the profile names
-SHALL be allowed in any line; the summary MAY use the posting's words and acronyms, never its numbers,
-technologies or employers; the headline MAY say what any position's title says. A source id that does
-not exist SHALL count as no source. A bullet under a position SHALL cite only that position's sources
-and the profile-wide ones; another position's source SHALL be flagged ("This line belongs to another
-job") and SHALL not back it. A company fact cited anywhere but the summary SHALL be flagged ("company
+fact (Developer, Stack, a month) SHALL not be a claim; a rank or a seniority (Senior, Lead, Staff,
+Head, Principal, Founder, Manager and the like) SHALL be a claim unless a position's title says it; a
+place or a language the profile names SHALL be allowed in any line; the summary MAY use the posting's
+words and acronyms, never its numbers, technologies, employers or ranks; the headline MAY say what any
+position's title says. Places, languages and the posting's words SHALL match whole words only. A
+source id that does not exist SHALL count as no source. A bullet under a position SHALL be backed only
+by that position's sources and the skills: another position's source SHALL be flagged ("This line
+belongs to another job") and SHALL not back it, and the profile's headline, summary, education and
+languages SHALL not back it. A company fact cited anywhere but the summary SHALL be flagged ("company
 facts can't be your achievements"). Every skill SHALL be one the profile lists, with aliases matched as
 one skill. A line that fails SHALL be blocked and carry the reason, naming the claim, the sources
 cited, the other position's sources, the company fact or the skill.
@@ -75,8 +88,16 @@ cited, the other position's sources, the company fact or the skill.
 - **THEN** it is blocked, and the reason names the claim 20 and the source it cites
 
 #### Scenario: Words that name no fact
-- **WHEN** the headline says "Senior Full Stack Developer" citing the skills, and the summary says the person is based in Lisbon, which the profile's location says
+- **WHEN** the headline says "Senior Full Stack Developer" citing the skills, a position's title says Senior, and the summary says the person is based in Lisbon, which the profile's location says
 - **THEN** neither is blocked
+
+#### Scenario: A rank nobody holds
+- **WHEN** the headline says "Team Lead" and no position's title says Lead, even though the posting does
+- **THEN** it is blocked, and the reason names Lead
+
+#### Scenario: Part of a word
+- **WHEN** the profile's location is San Francisco and a bullet names Cisco
+- **THEN** it is blocked, and the reason names Cisco
 
 #### Scenario: A tool nobody wrote
 - **WHEN** a bullet says Kubernetes and no source it cites does, even though the posting asks for it
@@ -96,13 +117,17 @@ cited, the other position's sources, the company fact or the skill.
 
 ### Requirement: A blocked line is fixed, said to be true, or removed
 What the app could not fix SHALL wait on the person as a question: "Is this true?" with the line,
-the person's own words it was made from ("You told us about <company>: …") and where a kept fact
-would go, and Yes, keep it / Change it / Remove it. Change it SHALL start from the person's own
+the app's own question when it asked one, the person's own words it was made from, from the position
+the card names ("You told us about <company>: …"), and what a yes keeps word for word ("If you keep
+it, this goes on your profile: …"), and Yes, keep it / Change it / Remove it. When there is no yes,
+the card SHALL say why: it is about the company, it is another job's line, or it is too long to keep
+as a fact. Change it SHALL start from the person's own
 words, never the model's, and an empty line SHALL not be saved. "Yes, keep it" SHALL keep the
 app's proposed fact (else the line's own words) on the line's position of the profile as a confirmed
 assumption based on "The CV draft for <company>", after which the line SHALL be checked again with
 that fact as a source and without another position's or a company's sources. It SHALL be refused
-(`cannot_keep`) for a company fact used as an achievement. Change it SHALL edit the line, the new text
+(`cannot_keep`) for a company fact used as an achievement, a summary whose flagged words only the
+company says, another job's line, and a line longer than a fact. Change it SHALL edit the line, the new text
 being checked against the same sources (a rewritten line no longer cites company facts unless it is
 the summary, nor another position's sources under a position). The person MAY still say it is true in
 their own words, which SHALL be saved as a fact on the line's position with those words as its quote
@@ -111,7 +136,11 @@ profile. None of these SHALL call a model; each SHALL make the preview again.
 
 #### Scenario: Yes, keep it
 - **WHEN** a line is blocked for "a team of 6" and the app proposed "I led a team of 6 engineers."
-- **THEN** Yes keeps that sentence on the position as a confirmed assumption, the line cites it and passes
+- **THEN** the card shows "If you keep it, this goes on your profile: “I led a team of 6 engineers.”", and Yes keeps that sentence on the position as a confirmed assumption, the line cites it and passes
+
+#### Scenario: A fact that says more
+- **WHEN** the app proposes a fact that names a tool, a number or a name neither the line nor its own sources say
+- **THEN** it is not proposed, and Yes keeps the line's own words
 
 #### Scenario: It's true
 - **WHEN** a line is blocked for a number and the person writes the number in their own words
@@ -130,7 +159,7 @@ Approving a draft SHALL render its text as a PDF inside the server with the temp
 Compact) and length (1 or 2 pages) asked for, the preview's when left out, else Clean on 1 page, with
 the standard section headings in the CV's language, real text, real links and embedded fonts. When
 the preview was made from the draft's text as it is now, in that layout, and its read-back passed, its
-PDF SHALL be kept as it is. The person's text SHALL be passed as data and never interpreted as markup. The
+PDF SHALL be kept as it is; another text or another layout SHALL be rendered anew. The person's text SHALL be passed as data and never interpreted as markup. The
 PDF's text SHALL then be read back with no AI and SHALL contain every section heading, every line,
 every job keyword the review showed as on the CV, the name, the email and the links, within the page
 count chosen. If anything fails, nothing SHALL be approved and the reasons SHALL be shown. A draft
@@ -162,6 +191,10 @@ what it costs; after that, or once the cover letter has started, it SHALL be ref
 - **WHEN** someone approves a CV and presses Undo within 15 seconds
 - **THEN** it is a draft again with no version, and the cover letter that was to start next waits for the CV again
 
+#### Scenario: Undo, then approve again
+- **WHEN** someone approves, undoes and approves again within 15 seconds
+- **THEN** the cover letter does not start while the second approval can still be undone, and starts after
+
 #### Scenario: Approved before PDFs
 - **WHEN** a draft was approved and has no PDF
 - **THEN** the CV says so and making the PDF makes its first version
@@ -170,7 +203,7 @@ what it costs; after that, or once the cover letter has started, it SHALL be ref
 The review page SHALL show the draft's PDF as its main content, made again after every change, with
 its pages and language in one line and, when the read-back noted something, one plain sentence; beside
 it the questions that wait on the person, "Checked every line against your profile" with how many
-lines the app fixed, the layout (Clean or Compact, 1 or 2 pages), Approve and Download draft. The app
+lines the app fixed (each such line marked "Fixed by the app"), the layout (Clean or Compact, 1 or 2 pages), Approve and Download draft. The app
 SHALL open a PDF in a viewer (full screen on a phone, a large dialog on a desktop) that draws every
 page, offers Download and closes with Escape, with PDF.js loaded only when a PDF is first shown and
 from the app's own files. Once approved, the page SHALL offer Open the PDF, the read-back results,
@@ -193,7 +226,7 @@ UTC day, refused with `cv_drafts_per_opportunity_cap` and `cv_drafts_daily_cap`
 before any call; drafts made by a job's preparation count the same. A draft
 SHALL start only from a click or from the preparation of a job the person
 shortlisted, and SHALL make at most two model calls: the draft, and the fix of
-what the check flagged. The calls SHALL go through the account and instance
+what the check flagged; its cost estimate SHALL count both at their worst. The calls SHALL go through the account and instance
 spending limits, and nothing SHALL be retried past a limit or run on a timer.
 Rendering a preview SHALL call no model. A draft nobody approved SHALL be
 deleted 7 days after its last change; approved versions SHALL be kept.

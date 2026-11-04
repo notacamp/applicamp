@@ -2940,6 +2940,11 @@ export interface components {
             /** @description Its address. */
             url: string;
         };
+        /**
+         * @description Why "Yes, keep it" is not offered for a flagged line.
+         * @enum {string}
+         */
+        CannotKeep: "company" | "other_position" | "too_long";
         /** @description The least they would take, before tax. */
         CashFloor: {
             /**
@@ -3427,6 +3432,11 @@ export interface components {
             pages?: number | null;
             /** @description There is a PDF to show (`…/preview.pdf`). */
             ready: boolean;
+            /**
+             * @description The PDF was made before the draft's last change: "Make the PDF"
+             *     (`POST …/preview`) makes it again.
+             */
+            stale: boolean;
             template?: components["schemas"]["Template"] | null;
         };
         /** @description An approved version: the approved text as a PDF. */
@@ -5538,6 +5548,7 @@ export interface components {
          *     question only the person can answer.
          */
         Waiting: {
+            cannot_keep?: components["schemas"]["CannotKeep"] | null;
             /** @description The company of that position ("You told us about …"). */
             company?: string | null;
             /** @description Why it is flagged. */

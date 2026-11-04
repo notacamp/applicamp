@@ -112,7 +112,7 @@ test("someone drafts a CV, sees it as a PDF at once, says yes to the one questio
 
   // Prepare: read the company's pages (the facts the CV may cite), then draft.
   await page.goto(`/pipeline/${id}/prepare`);
-  await expect(page.getByTestId("prepare-draft")).toContainText("Draft the CV · about €0.002");
+  await expect(page.getByTestId("prepare-draft")).toContainText("Draft the CV · about €0.004");
   await page.getByTestId("prepare-read").click();
   await expect(page.getByTestId("prepare-facts")).toContainText("Builds ledgers for small shops");
   await page.getByTestId("prepare-draft").click();
@@ -142,8 +142,13 @@ test("someone drafts a CV, sees it as a PDF at once, says yes to the one questio
   const questions = page.getByTestId(/^cv-question-l\d+$/);
   const number = questions.filter({ hasText: "from 23 hours to 40 minutes" });
   await expect(number).toContainText("Is this true?");
-  await expect(number).toContainText(
-    "You told us about Example Org: “Rebuilt the billing pipeline in Rust, cutting invoice runs from 6 hours to 40 minutes”. If you keep it, it goes on your profile.",
+  await expect(number.getByTestId(/^cv-question-ask-/)).toContainText("Is “23” right?");
+  await expect(number.getByTestId(/^cv-question-where-/)).toContainText(
+    "You told us about Example Org: “Rebuilt the billing pipeline in Rust, cutting invoice runs from 6 hours to 40 minutes”.",
+  );
+  // What a yes keeps on the profile, word for word.
+  await expect(number.getByTestId(/^cv-question-keeps-/)).toContainText(
+    "If you keep it, this goes on your profile: “I rebuilt the billing pipeline in Rust, cutting invoice runs from 23 hours to 40 minutes.”",
   );
   const skill = questions.filter({ hasText: "Kubernetes" });
   await expect(skill).toContainText("Do you have this skill?");

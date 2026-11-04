@@ -79,8 +79,9 @@ use crate::{
 pub const CAP_PER_OPPORTUNITY: i64 = 10;
 /// Drafts one account can start in a UTC day.
 pub const CAP_PER_DAY: i64 = 20;
-/// About what a draft costs, in euros: one call.
-pub const DRAFT_EUR: f64 = 0.002;
+/// About what a draft costs, in euros: the draft's call, and at worst the
+/// app's fix round after it (one more call of up to 3,000 tokens).
+pub const DRAFT_EUR: f64 = 0.004;
 /// How long a draft nobody approves is kept after its last change.
 pub const LIFETIME: TimeDelta = TimeDelta::days(7);
 /// How long a CV just approved can be put back as a draft (Undo); the cover
@@ -261,6 +262,8 @@ struct Row {
     preview_checks: Option<sqlx::types::Json<PdfChecks>>,
     preview_error: Option<String>,
     preview_at: Option<DateTime<Utc>>,
+    /// The fingerprint of the content the preview was made from.
+    preview_of: Option<Vec<u8>>,
 }
 
 /// A select of a draft's columns, with `$tail` after the table.
@@ -270,7 +273,7 @@ macro_rules! select_draft {
             "SELECT id, n, language, status, version, content, frame, checks, created_at, \
              approved_at, expires_at, preview_pdf IS NOT NULL AS preview_ready, \
              preview_template, preview_length, preview_pages, preview_checks, preview_error, \
-             preview_at FROM pipeline.cv_drafts ",
+             preview_at, preview_of FROM pipeline.cv_drafts ",
             $tail
         )
     };
@@ -1100,7 +1103,8 @@ pub async fn change_line(
 /// `{proposal: true}` keeps the fact the app proposed for a flagged line
 /// (its question's, else the line's own words) on the line's position as a
 /// **confirmed assumption**, based on this CV draft; refused
-/// (`cannot_keep`) for a company fact used as an achievement. `{text}`
+/// (`cannot_keep`) for a company fact used as an achievement, another job's
+/// line, or one longer than a fact (its `waiting` item says which). `{text}`
 /// keeps the person's own words as a fact (its `quote` is the text; `area`
 /// defaults to `results`), as Grill me's Keep does. Either way the line is
 /// checked again with that fact as a source (and none another position's or
@@ -1164,14 +1168,25 @@ pub async fn confirm_line(
                     "This line traces to your profile already.".to_owned(),
                 )
             })?;
-        if !check::keepable(&reasons) {
+        let place = content.place_of(&line).ok_or(Error::NotFound)?;
+        if let Some(why) = check::cannot_keep(&reasons, place, &frame) {
             return Err(Error::Conflict(
                 "cannot_keep",
-                "A fact about the company can't be your achievement. Change the line or remove it."
-                    .to_owned(),
+                match why {
+                    check::CannotKeep::OtherPosition => {
+                        "This line is about another job on your profile. Change it or remove it."
+                    }
+                    check::CannotKeep::Company => {
+                        "A fact about the company can't be your achievement. Change the line or \
+                         remove it."
+                    }
+                    check::CannotKeep::TooLong => {
+                        "This line is too long to keep as a fact. Change it or remove it."
+                    }
+                }
+                .to_owned(),
             ));
         }
-        let place = content.place_of(&line).ok_or(Error::NotFound)?;
         let target = content
             .lines()
             .map(|(l, _)| l)
@@ -1185,8 +1200,8 @@ pub async fn confirm_line(
             .filter(|p| fix::backs(p, &target, place, &frame, &known, frame.latest))
             .unwrap_or_else(|| target.text.clone());
         if proposal.chars().count() > MAX_FACT {
-            return Err(Error::BadRequest(
-                "invalid_fact",
+            return Err(Error::Conflict(
+                "cannot_keep",
                 format!("Change the line to {MAX_FACT} characters or fewer to keep it."),
             ));
         }

@@ -358,7 +358,8 @@
       "as_in_profile": "Como en el perfil",
       "moved_up": "Subida",
       "reworded": "Reformulada",
-      "edited": "Editada"
+      "edited": "Editada",
+      "fixed_by_app": "Corregida por la app"
     },
     "from": {
       "show": "De tu perfil",
@@ -465,7 +466,8 @@
       "invalid_layout": "Elige una plantilla y 1 o 2 páginas.",
       "cannot_keep": "Esta línea trata de la empresa, no de ti. Cámbiala o quítala.",
       "not_flagged": "Esta línea ya coincide con tu perfil.",
-      "too_late": "Ya es tarde para deshacerlo. Vuelve a hacer el CV para cambiarlo."
+      "too_late": "Ya es tarde para deshacerlo. Vuelve a hacer el CV para cambiarlo.",
+      "cv_previews_daily_cap": "Has hecho 30 PDF de borradores hoy. Sigue mañana; cambiar una línea vuelve a hacer el PDF igualmente."
     },
     "layout": {
       "template": "Plantilla",
@@ -526,14 +528,15 @@
       "note": "Algunas palabras pueden no salir bien cuando un portal de empleo lea este PDF.",
       "doesntFit": "El CV no cabe en 2 páginas. Quita algunas líneas.",
       "unavailable": "No se ha podido hacer el PDF ahora. Cambia una línea o elige un formato para intentarlo de nuevo.",
-      "lines": "Cada línea y de dónde viene"
+      "lines": "Cada línea y de dónde viene",
+      "stale": "El PDF es anterior a tu último cambio.",
+      "make": "Hacer el PDF",
+      "none": "Este borrador aún no tiene PDF."
     },
     "waiting": {
       "title": "Te necesita · {{count}}",
       "question": "¿Es cierto? «{{text}}»",
       "skillQuestion": "¿Tienes esta habilidad? {{skill}}",
-      "where": "Si lo mantienes, se guarda en tu perfil en {{role}}.",
-      "whereNoRole": "Si lo mantienes, se guarda en tu perfil.",
       "skillWhere": "Si la mantienes, se añade a tus habilidades.",
       "cannotKeep": "Esto trata de la empresa, no de ti. Cámbialo o quítalo.",
       "yes": "Sí, mantener",
@@ -548,7 +551,10 @@
       "ready": "Apruébalo cuando estés conforme.",
       "answer_one": "Responde a la pregunta para aprobar.",
       "answer_other": "Responde a las {{count}} preguntas para aprobar.",
-      "toldUs": "Nos contaste sobre {{company}}: «{{quote}}». Si lo mantienes, se guarda en tu perfil."
+      "toldUs": "Nos contaste sobre {{company}}: «{{quote}}».",
+      "keeps": "Si lo mantienes, esto se guarda en tu perfil: «{{proposal}}»",
+      "cannotKeepOther": "Esta línea trata de otro trabajo de tu perfil. Cámbiala o quítala.",
+      "cannotKeepLong": "Esta línea es demasiado larga para guardarla así en tu perfil. Acórtala o quítala."
     },
     "needsVersion": {
       "title": "Este CV está aprobado pero aún no tiene PDF",

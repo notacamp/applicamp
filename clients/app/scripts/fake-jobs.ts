@@ -1391,10 +1391,13 @@ function cvFixes(userContent: string) {
         return { id: line.id, rewrite: own, question: null, fact: null };
       }
       const lower = `${line.text.charAt(0).toLowerCase()}${line.text.slice(1)}`;
+      const claim = line.flagged
+        .map((why) => /^"(.+)" is not in its sources$/.exec(why)?.[1])
+        .find((found) => found !== undefined);
       return {
         id: line.id,
         rewrite: null,
-        question: "Is this true?",
+        question: claim === undefined ? "Is this line right?" : `Is “${claim}” right?`,
         fact: `I ${lower.replace(/[.!?]+$/, "")}.`,
       };
     }),

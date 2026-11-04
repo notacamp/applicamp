@@ -38,7 +38,7 @@ use axum::{
     Extension, Json,
     extract::{Path, Query, State},
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, PgPool};
 use utoipa::{IntoParams, ToSchema};
@@ -599,9 +599,47 @@ const STOPS: &[&str] = &[
     "company_unknown",
 ];
 
+/// When the CV's approval of `opp` can still be undone while its letter is
+/// queued: the letter waits until then.
+async fn letter_waits_until(
+    db: &PgPool,
+    opp: Uuid,
+    now: DateTime<Utc>,
+) -> Result<Option<DateTime<Utc>>> {
+    let approved: Option<Option<DateTime<Utc>>> = sqlx::query_scalar(
+        "SELECT d.approved_at
+           FROM pipeline.preparations p
+           JOIN pipeline.cv_drafts d
+             ON d.opportunity_id = p.opportunity_id AND d.status = 'approved'
+          WHERE p.opportunity_id = $1 AND p.state = 'queued' AND p.step = 'letter'
+          ORDER BY d.approved_at DESC NULLS LAST LIMIT 1",
+    )
+    .bind(opp)
+    .fetch_optional(db)
+    .await?;
+    Ok(approved
+        .flatten()
+        .map(|at| at + cv::UNDO_WINDOW)
+        .filter(|until| *until > now))
+}
+
 /// Run `opp`'s queued steps.
 pub(crate) async fn run(deps: &PipelineDeps, db: &PgPool, opp: Uuid) -> Result<()> {
     loop {
+        // An approval undone and made again leaves the first approval's job
+        // behind: the letter never starts while Undo is offered, and runs
+        // once the newest approval's moment is over.
+        if let Some(until) = letter_waits_until(db, opp, Utc::now()).await? {
+            let mut conn = db.acquire().await?;
+            jobs::enqueue_at(
+                &mut conn,
+                &Prepare { opportunity: opp },
+                until + TimeDelta::seconds(1),
+            )
+            .await?;
+            tracing::info!(opportunity = %opp, "a letter waits while its CV's approval can be undone");
+            return Ok(());
+        }
         let claimed: Option<(Uuid, String, Option<String>)> = sqlx::query_as(
             "UPDATE pipeline.preparations SET state = 'running', updated_at = now()
               WHERE opportunity_id = $1 AND state = 'queued'

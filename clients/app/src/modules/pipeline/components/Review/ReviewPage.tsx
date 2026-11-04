@@ -403,6 +403,12 @@ function Review({
                   n={draft.n}
                   language={draft.language}
                   preview={draft.preview}
+                  making={preview.isPending}
+                  disabled={busy}
+                  onMake={() => {
+                    resetErrors();
+                    preview.mutate(layout);
+                  }}
                 />
                 <Tagged testId="cv-lines">
                   <Disclosure

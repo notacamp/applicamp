@@ -252,6 +252,7 @@ export function cvDraft(overrides: Partial<CvDraft> = {}): CvDraft {
     ],
     preview: {
       ready: true,
+      stale: false,
       template: "clean",
       length: 1,
       pages: 1,
@@ -279,7 +280,7 @@ export function cv(overrides: Partial<Cv> = {}): Cv {
       month_eur: 0.42,
       month_limit_eur: 5,
     },
-    draft_eur: 0.002,
+    draft_eur: 0.004,
     ...overrides,
   };
 }

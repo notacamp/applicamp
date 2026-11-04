@@ -53,6 +53,9 @@ pub struct CvPreview {
     pub error: Option<String>,
     /// When it was made.
     pub at: Option<DateTime<Utc>>,
+    /// The PDF was made before the draft's last change: "Make the PDF"
+    /// (`POST …/preview`) makes it again.
+    pub stale: bool,
 }
 
 /// The layouts tried, in order, starting from `start`: it, the same
@@ -78,7 +81,10 @@ pub(super) fn layout_of(row: &Row) -> Option<(Template, Length)> {
 /// The preview of `row`, as the page shows it.
 pub(super) fn view(row: &Row) -> Option<CvPreview> {
     let at = row.preview_at?;
+    let stale = row.preview_ready
+        && row.preview_of.as_deref() != Some(fingerprint(&row.content.0).as_slice());
     Some(CvPreview {
+        stale,
         ready: row.preview_ready,
         template: row.preview_template.as_deref().and_then(Template::parse),
         length: row.preview_length.and_then(|l| u8::try_from(l).ok()),
@@ -117,6 +123,10 @@ pub(super) async fn render_draft(
 fn fingerprint(content: &Content) -> Vec<u8> {
     applicamp_kernel::crypto::hash(&serde_json::to_string(content).unwrap_or_default())
 }
+
+/// Previews the person can ask for in a UTC day ("another layout", "Make the
+/// PDF"); the ones made after a change are not counted.
+pub const PREVIEWS_PER_DAY: i64 = 30;
 
 /// What a render that failed is called on the page.
 const fn error_code(refusal: &Refusal) -> &'static str {
@@ -243,6 +253,7 @@ pub(super) async fn reusable(
     let fresh = row.preview_ready
         && row.preview_error.is_none()
         && layout_of(row) == Some(layout)
+        && row.preview_of.as_deref() == Some(fingerprint(content).as_slice())
         && row.preview_checks.as_ref().is_some_and(|c| c.0.passed());
     let (Some(checks), Some(pages), true) = (
         row.preview_checks.as_ref(),
@@ -266,13 +277,14 @@ pub(super) async fn reusable(
     }))
 }
 
-/// See the draft in another layout.
+/// See the draft in another layout, or make its PDF again.
 ///
 /// Renders the draft's text with the `template` and `length` asked for (what
 /// the preview has when left out) and keeps it as its preview. **No model
 /// call.** What the read-back finds is a note, never a refusal. Refused when
 /// it does not fit the length (`cv_doesnt_fit`): the preview stays as it was.
-/// Only a draft has a preview to change.
+/// Only a draft has a preview to change. At most 30 a day per account
+/// (`cv_previews_daily_cap`).
 #[utoipa::path(
     post,
     path = "/api/v1/opportunities/{id}/cv/drafts/{n}/preview",
@@ -292,6 +304,8 @@ pub(super) async fn reusable(
             content_type = "application/problem+json"),
         (status = 409, description = "`draft_frozen`; `cv_doesnt_fit`", body = Problem,
             content_type = "application/problem+json"),
+        (status = 429, description = "`cv_previews_daily_cap`", body = Problem,
+            content_type = "application/problem+json"),
         (status = 503, description = "`cv_pdf_unavailable`", body = Problem,
             content_type = "application/problem+json"),
     ),
@@ -309,6 +323,30 @@ pub async fn make(
     let (opp, row) = open_draft(&state, account, id, n, now).await?;
     let fallback = layout_of(&row).unwrap_or((Template::Clean, Length::One));
     let chosen = layout(&request, fallback)?;
+    let today: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM pipeline.cv_preview_makes WHERE account_id = $1 AND made_at >= $2",
+    )
+    .bind(account)
+    .bind(applicamp_ai::usage::day_start(now))
+    .fetch_one(&state.db)
+    .await?;
+    if today >= PREVIEWS_PER_DAY {
+        return Err(Error::TooManyRequests(
+            "cv_previews_daily_cap",
+            format!(
+                "You've made {PREVIEWS_PER_DAY} PDFs of drafts today. It continues tomorrow; \
+                 changes to a line still make it again."
+            ),
+        ));
+    }
+    sqlx::query(
+        "INSERT INTO pipeline.cv_preview_makes (id, account_id, made_at) VALUES ($1, $2, $3)",
+    )
+    .bind(Uuid::now_v7())
+    .bind(account)
+    .bind(now)
+    .execute(&state.db)
+    .await?;
     let made = render_draft(
         &state.db,
         &opp,

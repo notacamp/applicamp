@@ -4,7 +4,7 @@
 - [x] 3 robots: Content-Signal parsed and kept
 - [x] 4 `terms`: model reading (fenced input, quote check, tags), cache by fingerprint, system account, spending limits
 - [x] 5 check: reads terms, tags, contact email, approves a clean board by the app; recheck reads changed terms again
-- [x] 6 discovery: six lists with licences, feed hints, `DISCOVERY_MAX_CHECKS` (200), stops at a spending limit
+- [x] 6 discovery: six lists with licences, feed hints, `DISCOVERY_MAX_CHECKS` (100 a run, daily), stops at a spending limit
 - [x] 7 lenient feeds
 - [x] 8 seed: seven candidates with real configs and fixtures, three needing permission, one needing a key
 - [x] 9 API: `BoardSummary` fields, `needs_permission`; OpenAPI and client types

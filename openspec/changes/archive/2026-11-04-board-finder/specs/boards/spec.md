@@ -5,7 +5,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: New job boards are found, checked and approved by the app when the check is clean
-The app SHALL look for new job boards every week on public lists, check each one's robots rules,
+The app SHALL look for new job boards every day on public lists, check each one's robots rules,
 terms and machine-readable feed automatically, and SHALL approve a board by itself, recording
 "approved by the app" with the date, only when its check is clean: its config reads sample jobs,
 its robots rules allow every path read, at least 5 of the sample items look like job postings (a
@@ -85,7 +85,7 @@ such as `ai-train=no` SHALL NOT stop a board from being read, and the app SHALL 
 Discovery SHALL read the CC0 and MIT lists of job boards named in its source table (awesome-job-boards,
 awesome-remote-job, remote-working-list, awesome-remote-jobs, idimetrix's awesome-job-boards and
 Wikidata's employment websites), record on each board it adds which list it was found through, check
-at most 200 boards a run (configurable), and never add sites on its never list (LinkedIn, Indeed,
+at most 100 boards a run (configurable), and never add sites on its never list (LinkedIn, Indeed,
 Glassdoor and the like).
 
 #### Scenario: A list names a feed

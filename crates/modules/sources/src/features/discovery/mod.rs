@@ -1,4 +1,4 @@
-//! Discovery: every week, look for job boards Applicamp does not know yet,
+//! Discovery: every day, look for job boards Applicamp does not know yet,
 //! check each one automatically, and approve the ones whose check is clean;
 //! the others wait in the owner's queue. No board's jobs are read into a
 //! search before it is approved, by the app or the owner.
@@ -6,7 +6,7 @@
 //! - **Candidates**: the public lists in [`lists`] (names and links only,
 //!   CC0 and MIT; never LinkedIn, Indeed or Glassdoor, ADR 0006), and boards
 //!   someone suggested or the seed list holds that were never checked. At
-//!   most `APPLICAMP_SOURCES__DISCOVERY_MAX_CHECKS` a run (200); each board
+//!   most `APPLICAMP_SOURCES__DISCOVERY_MAX_CHECKS` a run (100); each board
 //!   records the list it was found through.
 //! - **The check** (one request per path, robots respected): robots.txt of
 //!   the feed's host (else the site's); the site (its language, its feeds,
@@ -38,7 +38,7 @@
 //! - **Re-checks**: approved boards' robots rules and terms every 6 months;
 //!   a change is flagged for the owner.
 //!
-//! `sources.discover_boards` runs weekly (Mondays, 04:00 UTC) when
+//! `sources.discover_boards` runs daily (04:00 UTC) when
 //! `APPLICAMP_SOURCES__DISCOVERY` is on; `sources.check_board` checks one
 //! board now (a suggestion, or the owner's "Check again").
 
@@ -48,7 +48,7 @@ mod tests;
 use std::{collections::HashSet, sync::LazyLock, time::Instant};
 
 use applicamp_kernel::{Error, JobContext, JobError, Result, jobs};
-use chrono::{DateTime, Datelike as _, TimeDelta, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -167,20 +167,19 @@ pub fn never(host: &str) -> bool {
         || host == "github.com"
 }
 
-/// The next Monday 04:00 UTC after `now`.
+/// The next 04:00 UTC after `now`.
 pub fn next_run(now: DateTime<Utc>) -> DateTime<Utc> {
-    let days = (7 - i64::from(now.weekday().num_days_from_monday())) % 7;
-    let mut at = (now + TimeDelta::days(days))
+    let mut at = now
         .date_naive()
         .and_hms_opt(4, 0, 0)
         .map_or(now, |t| t.and_utc());
     if at <= now {
-        at += TimeDelta::days(7);
+        at += TimeDelta::days(1);
     }
     at
 }
 
-/// The weekly discovery.
+/// The daily discovery.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Discover {}
 
@@ -317,7 +316,7 @@ pub async fn check_seeded(deps: &SourcesDeps, db: &PgPool) -> Result<usize> {
     Ok(checked)
 }
 
-/// Make sure the next weekly discovery is scheduled, when it is on.
+/// Make sure the next daily discovery is scheduled, when it is on.
 /// Whether one was added.
 pub async fn schedule(db: &PgPool, deps: &SourcesDeps) -> Result<bool> {
     if !deps.config.discovery() {
@@ -484,7 +483,7 @@ pub async fn discover(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
           ORDER BY recheck_after NULLS FIRST LIMIT $2"
     ))
     .bind(now)
-    .bind(i64::try_from(max).unwrap_or(200))
+    .bind(i64::try_from(max).unwrap_or(100))
     .fetch_all(db)
     .await?;
     for row in &due {

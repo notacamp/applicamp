@@ -2,6 +2,10 @@
 -- clean, their terms are read by a model, and what each board offers is
 -- tagged. `approved_by` was the approving account's id; it is now who
 -- approved ('owner' or 'app'), and `approved_at` (already there) says when.
+-- Keep who approved: the account (by id, no foreign key across schemas).
+ALTER TABLE sources.job_boards ADD COLUMN approved_account uuid;
+UPDATE sources.job_boards SET approved_account = approved_by;
+
 ALTER TABLE sources.job_boards
     ALTER COLUMN approved_by TYPE text USING (CASE WHEN approved_by IS NULL THEN NULL ELSE 'owner' END);
 

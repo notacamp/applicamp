@@ -35,21 +35,21 @@ fn the_list_gives_names_links_and_sections() {
 }
 
 #[test]
-fn it_runs_on_mondays() {
+fn it_runs_every_day_at_four() {
     let tuesday = Utc.with_ymd_and_hms(2026, 10, 27, 12, 0, 0).unwrap();
     assert_eq!(
         next_run(tuesday),
+        Utc.with_ymd_and_hms(2026, 10, 28, 4, 0, 0).unwrap()
+    );
+    let early = Utc.with_ymd_and_hms(2026, 11, 2, 3, 0, 0).unwrap();
+    assert_eq!(
+        next_run(early),
         Utc.with_ymd_and_hms(2026, 11, 2, 4, 0, 0).unwrap()
     );
-    let monday_early = Utc.with_ymd_and_hms(2026, 11, 2, 3, 0, 0).unwrap();
+    let late = Utc.with_ymd_and_hms(2026, 11, 2, 5, 0, 0).unwrap();
     assert_eq!(
-        next_run(monday_early),
-        Utc.with_ymd_and_hms(2026, 11, 2, 4, 0, 0).unwrap()
-    );
-    let monday_late = Utc.with_ymd_and_hms(2026, 11, 2, 5, 0, 0).unwrap();
-    assert_eq!(
-        next_run(monday_late),
-        Utc.with_ymd_and_hms(2026, 11, 9, 4, 0, 0).unwrap()
+        next_run(late),
+        Utc.with_ymd_and_hms(2026, 11, 3, 4, 0, 0).unwrap()
     );
 }
 

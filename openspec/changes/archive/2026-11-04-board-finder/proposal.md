@@ -29,10 +29,10 @@ what kind of jobs a board has. ADR 0010: the app does the work first; approvals 
   and specialities.
 - **Content-Signal** line of robots.txt parsed and kept (`ai-train=no` never blocks reading; the
   app never trains on jobs); shown in the peek.
-- **Discovery reads six public lists** (CC0 and MIT, each credited as "found through"): the
+- **Discovery runs daily and reads six public lists** (CC0 and MIT, each credited as "found through"): the
   existing one, awesome-remote-job (numbered items), remote-working-list (CSV with feed
   addresses), awesome-remote-jobs, idimetrix/awesome-job-boards and Wikidata's employment
-  websites. Up to 200 boards a run (`APPLICAMP_SOURCES__DISCOVERY_MAX_CHECKS`); it stops cleanly
+  websites. Up to 100 boards a run, once a day at 04:00 UTC (`APPLICAMP_SOURCES__DISCOVERY_MAX_CHECKS`); it stops cleanly
   at an AI spending limit.
 - **Seeds** 4dayweek.io (cents divided by `salary_divisor`), Remote First Jobs (one feed; its
   API is disallowed), RemoteYeah, Real Work From Anywhere, the Rails job board, Elixir Jobs and
@@ -49,7 +49,7 @@ declining any board; anything the owner edited.
 
 ## Cost
 One terms call per new board, plus one when its terms change: about EUR 0.001 each on GLM-5.3
-Flash, about EUR 0.20 for 200 boards a week. Charged to the instance budget; at the limit
+Flash, about EUR 0.10 a day, EUR 0.70 for about 700 boards a week. Charged to the instance budget; at the limit
 discovery stops and the rest waits for the next run. The calls count on the system account's
 daily token cap like any account's.
 

@@ -712,6 +712,7 @@ async fn set_status(
     id: Uuid,
     status: Status,
     reason: Option<&str>,
+    by: Uuid,
     now: DateTime<Utc>,
 ) -> Result<()> {
     sqlx::query(
@@ -719,6 +720,7 @@ async fn set_status(
             SET status = $2, decline_reason = $3,
                 approved_at = CASE WHEN $2 = 'approved' THEN $4 ELSE approved_at END,
                 approved_by = CASE WHEN $2 = 'approved' THEN 'owner' ELSE approved_by END,
+                approved_account = CASE WHEN $2 = 'approved' THEN $5 ELSE approved_account END,
                 recheck_after = CASE WHEN $2 = 'approved' THEN $4 + interval '182 days'
                                      ELSE recheck_after END,
                 updated_at = $4
@@ -728,6 +730,7 @@ async fn set_status(
     .bind(status.as_str())
     .bind(reason)
     .bind(now)
+    .bind(by)
     .execute(db)
     .await?;
     Ok(())
@@ -780,7 +783,7 @@ pub async fn approve(
         return Err(Error::Conflict(conflict_code(&first.code), first.detail));
     }
     let now = state.clock.now();
-    set_status(&state.db, id, Status::Approved, None, now).await?;
+    set_status(&state.db, id, Status::Approved, None, account, now).await?;
     tracing::info!(board = %row.slug, "job board approved");
     let row = fetch(&state.db, id).await?;
     Ok(Json(detail(&deps, &state, account, row).await?))
@@ -833,6 +836,7 @@ pub async fn decline(
         id,
         Status::Declined,
         Some(reason),
+        account,
         state.clock.now(),
     )
     .await?;

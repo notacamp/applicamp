@@ -26,6 +26,13 @@
 //   seeded-board.test     a JSON API the seed list names: checked at start,
 //                         then approvable;
 //   keyed-board.test      a JSON API that answers only with the key `e2e-key`;
+//   clean-site.test       a JSON API with five jobs from the last week and a
+//                         terms page with nothing against apps (and a
+//                         Content-Signal line): the check at start approves
+//                         it by itself, and the model's reading of its terms
+//                         (the fake answers "silent") tags it (#75);
+//   ask-first-site.test   the same, but its terms ask for written consent
+//                         first: it waits, with that sentence quoted;
 //   feed-site-<p>.test    a site with no config whose homepage links its RSS
 //                         feed: the check proposes a config (one per
 //                         Playwright project, desktop and phone).
@@ -711,6 +718,10 @@ async function complete(request: IncomingMessage, response: ServerResponse) {
       json(response, 200, completion(aboutAnswer(user?.content ?? "")));
       return;
     }
+    if (system.startsWith("You read the terms of a job board")) {
+      json(response, 200, completion(termsReading(user?.content ?? "")));
+      return;
+    }
     if (system.startsWith("You read pages from a company")) {
       json(response, 200, completion(companyFacts(user?.content ?? "")));
       return;
@@ -800,6 +811,72 @@ function waitingJobs(site: string) {
   };
 }
 
+/** The sentence the sites that approve themselves have in their terms. */
+const CLEAN_TERMS = "Jobs here may be linked to from other sites, with attribution to Clean Site.";
+/** The sentence of the site that asks first. */
+const ASK_FIRST_TERMS =
+  "You may not access the site by automated means without our prior written consent.";
+
+/** Five invented jobs posted in the last week, as the sites of #75 list them. */
+function recentJobs(site: string) {
+  const titles = [
+    "Hotel Operations Lead",
+    "Backend Engineer",
+    "Travel Experience Designer",
+    "Platform Engineer",
+    "Guest Services Manager",
+  ];
+  return {
+    jobs: titles.map((title, index) => ({
+      id: `${site}-${String(index + 1)}`,
+      title,
+      company: [
+        "Harbour Stays",
+        "Northlight Labs",
+        "Wayfarer Co",
+        "Northlight Labs",
+        "Harbour Stays",
+      ][index],
+      url: `https://example.com/${site}/jobs/${String(index + 1)}`,
+      location: "Remote - Europe",
+      posted_at: new Date(Date.now() - (index + 1) * 24 * 3600 * 1000).toISOString(),
+    })),
+  };
+}
+
+/** The terms page of a site of #75. */
+function termsPage(site: string): string {
+  const sentence = site === "ask-first-site.test" ? ASK_FIRST_TERMS : CLEAN_TERMS;
+  return `<html lang="en"><body><h1>Terms</h1><p>${sentence}</p></body></html>`;
+}
+
+/**
+ * The terms reader (system prompt "You read the terms of a job board…"): the
+ * sentences it is shown are a JSON array between <terms> tags. Written consent
+ * first is `ask_first`, quoting that sentence; anything else is `silent`.
+ * Both are tagged for a hospitality-and-tech board in Europe.
+ */
+function termsReading(user: string) {
+  const block = /<terms>\s*([\s\S]*?)\s*<\/terms>/.exec(user)?.[1] ?? "[]";
+  let sentences: string[] = [];
+  try {
+    sentences = (JSON.parse(block) as unknown[]).filter(
+      (sentence): sentence is string => typeof sentence === "string",
+    );
+  } catch {
+    sentences = [];
+  }
+  const asks = sentences.find((sentence) => /written consent|written permission/i.test(sentence));
+  return {
+    verdict: asks === undefined ? "silent" : "ask_first",
+    quote: asks ?? "",
+    kinds: ["hospitality-travel", "tech"],
+    where: ["europe"],
+    remote: "mostly-remote",
+    specialities: [],
+  };
+}
+
 /** The same jobs as an RSS feed. */
 function waitingFeed(site: string): string {
   const items = waitingJobs(site)
@@ -820,8 +897,29 @@ function text(response: ServerResponse, type: string, body: string, status = 200
 /** A waiting board's site, by its host name; whether it answered. */
 function waitingBoard(site: string, url: URL, response: ServerResponse): boolean {
   if (url.pathname === "/robots.txt") {
-    text(response, "text/plain", "User-agent: *\nDisallow: /private\n");
+    const signal = site === "clean-site.test" ? "Content-Signal: search=yes, ai-train=no\n" : "";
+    text(response, "text/plain", `User-agent: *\n${signal}Disallow: /private\n`);
     return true;
+  }
+  if (site === "clean-site.test" || site === "ask-first-site.test") {
+    if (url.pathname === "/") {
+      text(
+        response,
+        "text/html",
+        `<html lang="en"><body>Invented jobs. <a href="/terms">Terms of service</a></body></html>`,
+      );
+      return true;
+    }
+    if (url.pathname === "/terms") {
+      text(response, "text/html", termsPage(site));
+      return true;
+    }
+    if (url.pathname === "/api/jobs") {
+      console.log(`fake-jobs: listed ${site}`);
+      json(response, 200, recentJobs(site));
+      return true;
+    }
+    return false;
   }
   if (site.startsWith("feed-site-")) {
     if (url.pathname === "/") {

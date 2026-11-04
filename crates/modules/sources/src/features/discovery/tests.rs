@@ -6,7 +6,9 @@ use wiremock::{
 };
 
 use super::*;
-use crate::testkit::{Fake, Harness, boards_config, requests_to, seed_fake_boards, today};
+use crate::testkit::{
+    Fake, Harness, boards_config, completion, gateway, requests_to, seed_fake_boards, today,
+};
 
 #[test]
 fn the_list_gives_names_links_and_sections() {
@@ -33,21 +35,21 @@ fn the_list_gives_names_links_and_sections() {
 }
 
 #[test]
-fn it_runs_on_mondays() {
+fn it_runs_every_day_at_four() {
     let tuesday = Utc.with_ymd_and_hms(2026, 10, 27, 12, 0, 0).unwrap();
     assert_eq!(
         next_run(tuesday),
+        Utc.with_ymd_and_hms(2026, 10, 28, 4, 0, 0).unwrap()
+    );
+    let early = Utc.with_ymd_and_hms(2026, 11, 2, 3, 0, 0).unwrap();
+    assert_eq!(
+        next_run(early),
         Utc.with_ymd_and_hms(2026, 11, 2, 4, 0, 0).unwrap()
     );
-    let monday_early = Utc.with_ymd_and_hms(2026, 11, 2, 3, 0, 0).unwrap();
+    let late = Utc.with_ymd_and_hms(2026, 11, 2, 5, 0, 0).unwrap();
     assert_eq!(
-        next_run(monday_early),
-        Utc.with_ymd_and_hms(2026, 11, 2, 4, 0, 0).unwrap()
-    );
-    let monday_late = Utc.with_ymd_and_hms(2026, 11, 2, 5, 0, 0).unwrap();
-    assert_eq!(
-        next_run(monday_late),
-        Utc.with_ymd_and_hms(2026, 11, 9, 4, 0, 0).unwrap()
+        next_run(late),
+        Utc.with_ymd_and_hms(2026, 11, 3, 4, 0, 0).unwrap()
     );
 }
 
@@ -387,4 +389,284 @@ async fn a_site_with_postings_in_its_sitemap_gets_a_sitemap_config_proposed(db: 
         assert!(requests_to(&site, probe).await <= 1, "{probe}");
     }
     assert_eq!(requests_to(&site, "/about").await, 0);
+}
+
+#[test]
+fn numbered_items_and_contact_addresses_are_read() {
+    let markdown = "## Remote\n\n  1. [Numbered](https://numbered.example/) - Jobs.\n";
+    assert_eq!(parse_list(markdown).len(), 1);
+    let home = r#"<a href="mailto:Hello@Board.example">Contact</a>"#;
+    assert_eq!(
+        contact_email(home, None).as_deref(),
+        Some("hello@board.example")
+    );
+    assert_eq!(
+        contact_email(
+            "<html></html>",
+            Some("<p>Write to legal@board.example.</p>")
+        )
+        .as_deref(),
+        Some("legal@board.example")
+    );
+    assert_eq!(contact_email("<html></html>", None), None);
+}
+
+/// A site with a live job feed of `jobs` postings (a title, a company, a
+/// worldwide region, posted two days before "today"), a list naming it, and
+/// terms when `terms` says something.
+async fn a_live_board_site(jobs: usize, terms: Option<&str>) -> MockServer {
+    let server = MockServer::start().await;
+    let page =
+        |body: String, kind: &str| ResponseTemplate::new(200).set_body_raw(body.into_bytes(), kind);
+    let list = format!(
+        "## Remote\n\n- [Live Board]({}/) - Remote jobs.\n",
+        server.uri()
+    );
+    let items: String = (1..=jobs)
+        .map(|n| {
+            format!(
+                "<item><title>Remote Engineer {n}</title><company>Example Co {n}</company>\
+                 <region>Worldwide</region><link>{}/jobs/{n}</link><guid>{n}</guid>\
+                 <pubDate>Sat, 24 Oct 2026 08:00:00 +0000</pubDate>\
+                 <description>Invented.</description></item>",
+                server.uri()
+            )
+        })
+        .collect();
+    let feed =
+        format!("<?xml version=\"1.0\"?><rss version=\"2.0\"><channel>{items}</channel></rss>");
+    let home = format!(
+        "<html lang=\"en\"><head><link rel=\"alternate\" type=\"application/rss+xml\" \
+         href=\"/feed.xml\"></head><body>{}</body></html>",
+        if terms.is_some() {
+            "<a href=\"/terms\">Terms of service</a>"
+        } else {
+            "Jobs."
+        }
+    );
+    for (route, body, kind) in [
+        ("/list.md", list, "text/markdown"),
+        (
+            "/robots.txt",
+            "User-agent: *\nDisallow: /private\n".to_owned(),
+            "text/plain",
+        ),
+        ("/", home, "text/html"),
+        ("/feed.xml", feed, "application/rss+xml"),
+    ] {
+        Mock::given(method("GET"))
+            .and(path(route))
+            .respond_with(page(body, kind))
+            .mount(&server)
+            .await;
+    }
+    if let Some(terms) = terms {
+        Mock::given(method("GET"))
+            .and(path("/terms"))
+            .respond_with(page(format!("<p>{terms}</p>"), "text/html"))
+            .mount(&server)
+            .await;
+    }
+    server
+}
+
+/// A fake model that reads every terms page as `verdict`, quoting `quote`.
+async fn model_reading_terms(verdict: &str, quote: &str) -> MockServer {
+    let server = MockServer::start().await;
+    let answer = serde_json::json!({
+        "verdict": verdict, "quote": quote, "kinds": ["tech", "design"],
+        "where": ["worldwide"], "remote": "mostly-remote", "specialities": ["ruby"]
+    });
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(completion(&answer, 0.001)))
+        .mount(&server)
+        .await;
+    server
+}
+
+async fn discovered(db: PgPool, site: &MockServer, model: Option<&MockServer>) -> Harness {
+    let mut settings = boards_config();
+    settings.discovery_list_url = format!("{}/list.md", site.uri()).parse().unwrap();
+    let ai = model.map(|m| gateway(m, applicamp_ai::BudgetConfig::default()));
+    let h = Harness::new(db, settings, ai, Fake::ready()).await;
+    discover(&h.deps, &h.db).await.unwrap();
+    h
+}
+
+async fn the_board(h: &Harness) -> serde_json::Value {
+    let board = job_boards::all(&h.db).await.unwrap().remove(0);
+    h.get(&format!("/api/v1/boards/{}", board.id)).await.1
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_clean_board_with_no_terms_page_is_approved_by_the_app(db: PgPool) {
+    let site = a_live_board_site(6, None).await;
+    let h = discovered(db, &site, None).await;
+    let detail = the_board(&h).await;
+    assert_eq!(detail["board"]["status"], "approved", "{detail}");
+    assert_eq!(detail["board"]["approved_by"], "app");
+    assert!(detail["board"]["approved_at"].is_string());
+    assert_eq!(detail["board"]["terms_verdict"], "silent");
+    assert_eq!(detail["board"]["origin"], "discovery");
+    assert!(
+        detail["board"]["found_through"]
+            .as_str()
+            .unwrap()
+            .contains("CC0"),
+        "{detail}"
+    );
+    assert_eq!(job_boards::approved(&h.db).await.unwrap().len(), 1);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_board_that_is_not_a_job_board_waits(db: PgPool) {
+    // Four postings are a blog's feed, not a board's.
+    let site = a_live_board_site(4, None).await;
+    let h = discovered(db, &site, None).await;
+    let detail = the_board(&h).await;
+    assert_eq!(detail["board"]["status"], "candidate", "{detail}");
+    assert!(detail["board"]["approved_by"].is_null());
+    assert_eq!(detail["approvable"], true, "the owner may still approve it");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn terms_that_invite_apps_are_read_by_the_model_and_the_board_approves(db: PgPool) {
+    let terms = "You may use our feed with an app or aggregator through our API. Cookies keep you signed in.";
+    let site = a_live_board_site(6, Some(terms)).await;
+    let model =
+        model_reading_terms("allow", "You may use our feed with an app or aggregator").await;
+    let h = discovered(db, &site, Some(&model)).await;
+    let detail = the_board(&h).await;
+    assert_eq!(detail["board"]["status"], "approved", "{detail}");
+    assert_eq!(detail["board"]["terms_verdict"], "allow");
+    assert_eq!(
+        detail["board"]["tags"],
+        serde_json::json!(["tech", "design", "worldwide", "remote", "ruby"])
+    );
+    assert!(
+        detail["board"]["terms_quote"]
+            .as_str()
+            .unwrap()
+            .starts_with("You may use our feed")
+    );
+    assert_eq!(
+        model.received_requests().await.unwrap().len(),
+        1,
+        "one call"
+    );
+    // The terms are fenced as data in the request.
+    let body =
+        String::from_utf8_lossy(&model.received_requests().await.unwrap()[0].body).into_owned();
+    assert!(body.contains("<terms>"), "{body}");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn terms_that_forbid_reading_block_the_board_with_their_quote(db: PgPool) {
+    let terms = "You may not scrape this site with automated tools.";
+    let site = a_live_board_site(6, Some(terms)).await;
+    let model = model_reading_terms(
+        "forbid",
+        "You may not scrape this site with automated tools",
+    )
+    .await;
+    let h = discovered(db, &site, Some(&model)).await;
+    let detail = the_board(&h).await;
+    assert_eq!(detail["board"]["status"], "candidate", "{detail}");
+    assert_eq!(detail["blocked"], "terms_forbid", "{detail}");
+    assert_eq!(detail["approvable"], false);
+    assert!(
+        detail["blockers"][0]["detail"]
+            .as_str()
+            .unwrap()
+            .starts_with("You may not scrape")
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn terms_that_ask_for_permission_wait_as_needs_permission(db: PgPool) {
+    let terms = "Automated access to our listings needs our written permission first.";
+    let site = a_live_board_site(6, Some(terms)).await;
+    let model = model_reading_terms(
+        "ask_first",
+        "Automated access to our listings needs our written permission",
+    )
+    .await;
+    let h = discovered(db, &site, Some(&model)).await;
+    let detail = the_board(&h).await;
+    assert_eq!(detail["board"]["status"], "candidate", "{detail}");
+    assert_eq!(detail["blocked"], "needs_permission", "{detail}");
+    assert_eq!(detail["board"]["terms_verdict"], "ask_first");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_model_that_invents_a_quote_approves_nothing(db: PgPool) {
+    let terms = "You may use our feed with an app or aggregator through our API.";
+    let site = a_live_board_site(6, Some(terms)).await;
+    let model = model_reading_terms("forbid", "Robots are never welcome here at all").await;
+    let h = discovered(db, &site, Some(&model)).await;
+    let detail = the_board(&h).await;
+    assert_eq!(detail["board"]["status"], "candidate", "{detail}");
+    assert!(detail["board"]["terms_verdict"].is_null(), "not read");
+    assert_eq!(
+        detail["approvable"], true,
+        "no verdict, no blocker: the owner decides"
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_spending_limit_stops_discovery_cleanly_and_nothing_is_approved(db: PgPool) {
+    let terms = "You may use our feed with an app or aggregator through our API.";
+    let site = a_live_board_site(6, Some(terms)).await;
+    let model =
+        model_reading_terms("allow", "You may use our feed with an app or aggregator").await;
+    let mut settings = boards_config();
+    settings.discovery_list_url = format!("{}/list.md", site.uri()).parse().unwrap();
+    let budget = applicamp_ai::BudgetConfig {
+        instance_monthly_eur: Some(0.000_001),
+        usd_to_eur: Some(1.0),
+        ..applicamp_ai::BudgetConfig::default()
+    };
+    let h = Harness::new(db, settings, Some(gateway(&model, budget)), Fake::ready()).await;
+    discover(&h.deps, &h.db).await.unwrap();
+    assert_eq!(
+        model.received_requests().await.unwrap().len(),
+        0,
+        "refused, never sent"
+    );
+    let run: (Option<String>, i32) =
+        sqlx::query_as("SELECT error_kind, checked FROM sources.discovery_runs")
+            .fetch_one(&h.db)
+            .await
+            .unwrap();
+    assert_eq!(run, (Some("ai_budget_reached".to_owned()), 1));
+    let detail = the_board(&h).await;
+    assert_eq!(detail["board"]["status"], "candidate", "{detail}");
+    assert!(
+        detail["board"]["flags"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|f| f.as_str().unwrap().contains("spending limit")),
+        "{detail}"
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_board_the_owner_edited_is_never_approved_by_the_app(db: PgPool) {
+    let site = a_live_board_site(6, None).await;
+    let mut settings = boards_config();
+    settings.discovery_list_url = format!("{}/list.md", site.uri()).parse().unwrap();
+    let h = Harness::new(db, settings, None, Fake::ready()).await;
+    // The owner edits the config of a candidate, then it is checked.
+    let id = seeded_without_config(&h.db, &site, "rss").await;
+    sqlx::query("UPDATE sources.job_boards SET config_edited = true WHERE id = $1")
+        .bind(id)
+        .execute(&h.db)
+        .await
+        .unwrap();
+    check_one(&h.deps, &h.db, id).await.unwrap();
+    let row = job_boards::get(&h.db, id).await.unwrap().unwrap();
+    assert_eq!(row.status(), Status::Candidate);
+    assert!(row.approved_by.is_none());
 }

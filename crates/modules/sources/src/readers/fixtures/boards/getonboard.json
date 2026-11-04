@@ -1,0 +1,189 @@
+{
+ "data": [
+  {
+   "id": "founding-gtm-engineer-hostop-remote",
+   "type": "job",
+   "attributes": {
+    "title": "Founding GTM Engineer",
+    "description": "<ul><li>5+ years in outbound, SDR/BDR, growth or GTM roles at early-stage B2B SaaS (seed to Series B), with booked-meeting results you can show in numbers.</li><li>You’ve built outbound from zero at least once: lists, sending infrastructure, copy, sequences and reporting.</li><li>",
+    "remote": true,
+    "remote_modality": "fully_remote",
+    "countries": [
+     "Remote"
+    ],
+    "lang": "en",
+    "category_name": "Programming",
+    "min_salary": 4500,
+    "max_salary": 6000,
+    "published_at": 1793720805,
+    "company": {
+     "data": {
+      "id": 20908,
+      "type": "company",
+      "attributes": {
+       "name": "Example Company One"
+      }
+     }
+    }
+   },
+   "links": {
+    "public_url": "https://www.getonbrd.com/jobs/founding-gtm-engineer-hostop-remote"
+   }
+  },
+  {
+   "id": "desarrollador-a-full-stack-financia-capital-santiago",
+   "type": "job",
+   "attributes": {
+    "title": "Desarrollador/a Full-Stack",
+    "description": "<ul><li>Al menos 3 años de experiencia profesional con PHP y Laravel.</li><li>Experiencia desarrollando frontends con Vue.js.</li><li>Buen manejo de SQL y modelamiento de bases de datos relacionales (MySQL o SQL Server).</li><li>Experiencia construyendo y consumiendo APIs REST.</li><li>",
+    "remote": false,
+    "remote_modality": "no_remote",
+    "countries": [
+     "Chile"
+    ],
+    "lang": "lang_not_specified",
+    "category_name": "Programming",
+    "min_salary": 1700,
+    "max_salary": 2000,
+    "published_at": 1793133968,
+    "company": {
+     "data": {
+      "id": 12324,
+      "type": "company",
+      "attributes": {
+       "name": "Example Company Two"
+      }
+     }
+    }
+   },
+   "links": {
+    "public_url": "https://www.getonbrd.com/jobs/desarrollador-a-full-stack-financia-capital-santiago"
+   }
+  },
+  {
+   "id": "senior-software-engineer-vetclaims-ai-remote",
+   "type": "job",
+   "attributes": {
+    "title": "Senior Software Engineer",
+    "description": "<ul><li>5+ years building production web applications, with real ownership of systems on both frontend and backend.</li><li>Strong TypeScript, Next.js, Prisma and Postgres. You understand the server/client boundary, caching, and how schema and query design affect the product.</li><li>",
+    "remote": true,
+    "remote_modality": "fully_remote",
+    "countries": [
+     "Remote"
+    ],
+    "lang": "en",
+    "category_name": "Programming",
+    "min_salary": 6000,
+    "max_salary": 6000,
+    "published_at": 1792872188,
+    "company": {
+     "data": {
+      "id": 20901,
+      "type": "company",
+      "attributes": {
+       "name": "Example Company Three"
+      }
+     }
+    }
+   },
+   "links": {
+    "public_url": "https://www.getonbrd.com/jobs/senior-software-engineer-vetclaims-ai-remote"
+   }
+  },
+  {
+   "id": "especialista-integracion-pleno-bci-santiago-f68d",
+   "type": "job",
+   "attributes": {
+    "title": "Especialista Integración Pleno",
+    "description": "<ul><li>Experiencia en Java, mínimo 4 años, con conocimiento de Java 8 o superior.</li><li>Experiencia mínima 2 años en desarrollo y diseño de Microservicios.</li><li>Experiencia integrando Web Services SOAP.</li><li>Conocimientos de diseño de Apis / Restful.</li><li>",
+    "remote": false,
+    "remote_modality": "hybrid",
+    "countries": [
+     "Chile"
+    ],
+    "lang": "lang_not_specified",
+    "category_name": "Programming",
+    "min_salary": 3500,
+    "max_salary": 4000,
+    "published_at": 1792605728,
+    "company": {
+     "data": {
+      "id": 3125,
+      "type": "company",
+      "attributes": {
+       "name": "Example Company Four"
+      }
+     }
+    }
+   },
+   "links": {
+    "public_url": "https://www.getonbrd.com/jobs/especialista-integracion-pleno-bci-santiago-f68d"
+   }
+  },
+  {
+   "id": "ai-engineering-lead-niuro-remote",
+   "type": "job",
+   "attributes": {
+    "title": "AI Engineering Lead",
+    "description": "<ul><li>8+ years of software engineering experience, including 3+ years leading concurrent development workstreams or teams</li><li>C1 English level or higher</li><li>Expertise with AI Coding Assistants, AI Agent Frameworks, and Software Engineering</li><li>",
+    "remote": true,
+    "remote_modality": "remote_local",
+    "countries": [
+     "Remote"
+    ],
+    "lang": "lang_not_specified",
+    "category_name": "Programming",
+    "min_salary": 5500,
+    "max_salary": 6000,
+    "published_at": 1793740357,
+    "company": {
+     "data": {
+      "id": 16033,
+      "type": "company",
+      "attributes": {
+       "name": "Example Company Five"
+      }
+     }
+    }
+   },
+   "links": {
+    "public_url": "https://www.getonbrd.com/jobs/ai-engineering-lead-niuro-remote"
+   }
+  },
+  {
+   "id": "senior-frontend-software-engineer-improving-remote",
+   "type": "job",
+   "attributes": {
+    "title": "Senior Front-end Software Engineer",
+    "description": "<ul><li>Strong professional Vue.js experience and proficiency with JavaScript, HTML, and CSS.</li><li>Experience maintaining and modernizing mature, data-intensive single-page applications.</li><li>",
+    "remote": true,
+    "remote_modality": "remote_local",
+    "countries": [
+     "Remote"
+    ],
+    "lang": "en",
+    "category_name": "Programming",
+    "min_salary": 3000,
+    "max_salary": 3700,
+    "published_at": 1793732847,
+    "company": {
+     "data": {
+      "id": 4161,
+      "type": "company",
+      "attributes": {
+       "name": "Example Company Six"
+      }
+     }
+    }
+   },
+   "links": {
+    "public_url": "https://www.getonbrd.com/jobs/senior-frontend-software-engineer-improving-remote"
+   }
+  }
+ ],
+ "meta": {
+  "page": 1,
+  "per_page": 100,
+  "total_pages": 4
+ }
+}

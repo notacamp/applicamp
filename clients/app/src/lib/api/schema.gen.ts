@@ -2453,7 +2453,7 @@ export interface components {
         /** @description Why a board cannot be approved yet. */
         BoardBlocker: {
             /**
-             * @description `terms_forbid`, `robots_disallowed`, `needs_key`, `no_endpoint`,
+             * @description `terms_forbid`, `robots_disallowed`, `needs_key`, `needs_permission`, `no_endpoint`,
              *     `config_invalid`, `check_needed`; clients translate the ones they
              *     know and show `detail` for any other.
              */
@@ -2477,7 +2477,7 @@ export interface components {
             approvable: boolean;
             /**
              * @description The first blocker's code (`terms_forbid`, `robots_disallowed`,
-             *     `needs_key`, `no_endpoint`, `config_invalid`, `check_needed`), or
+             *     `needs_key`, `needs_permission`, `no_endpoint`, `config_invalid`, `check_needed`), or
              *     none.
              */
             blocked?: string | null;
@@ -2616,6 +2616,11 @@ export interface components {
             /** @description A fingerprint of the terms page, to notice a change. */
             terms_fingerprint?: string;
             /**
+             * @description The fingerprint of the terms sentences the model read (its verdict
+             *     and tags are kept until the terms change).
+             */
+            terms_read_for?: string;
+            /**
              * @description Its sentences about scraping, robots, automation, aggregation, the
              *     API, linking back, attribution or commercial use, verbatim (at most
              *     10).
@@ -2641,13 +2646,28 @@ export interface components {
         };
         /** @description A job board, as the Boards page lists it. */
         BoardSummary: {
+            /**
+             * Format: date-time
+             * @description When it was approved.
+             */
+            approved_at?: string | null;
+            /** @description Who approved it: `owner` or `app`. */
+            approved_by?: string | null;
             /** @description How its jobs are credited ("From Himalayas"). */
             attribution: string;
+            /** @description Where to ask it for permission. */
+            contact_email?: string | null;
+            /** @description What its site rules say about use of its content (search, ai-train). */
+            content_signal?: {
+                [key: string]: string;
+            } | null;
             /** @description The one country its jobs are in, when it is country-scoped. */
             country?: string | null;
             decline_reason?: string | null;
             /** @description What the owner should know (from its check). */
             flags: string[];
+            /** @description How the app found it, in plain words. */
+            found_through?: string | null;
             homepage: string;
             /** Format: uuid */
             id: string;
@@ -2670,6 +2690,14 @@ export interface components {
             /** @description Its stable name: the source its jobs carry. */
             slug: string;
             status: components["schemas"]["BoardStatus"];
+            /** @description Plain lowercase words that describe it ("tech", "europe"). */
+            tags: string[];
+            /** @description The sentence of its terms that decided the verdict. */
+            terms_quote?: string | null;
+            /** @description The page its terms are on. */
+            terms_url?: string | null;
+            /** @description What its terms say: `allow`, `silent`, `forbid`, `ask_first` or `personal_only`. */
+            terms_verdict?: string | null;
             /** @description Over the last 30 days. */
             totals_30d: components["schemas"]["BoardTotals"];
             /** @description The person's searches on it over the last 7 days. */
@@ -4681,6 +4709,13 @@ export interface components {
         /** @description What a board's robots.txt says to us. */
         RobotsReport: {
             /**
+             * @description Its `Content-Signal` line (`search`, `ai-input`, `ai-train`: `yes` or
+             *     `no`). Recorded and shown, never a reason not to read.
+             */
+            content_signal?: {
+                [key: string]: string;
+            } | null;
+            /**
              * Format: double
              * @description Seconds between requests it asks for.
              */
@@ -5989,7 +6024,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `not_waiting`: it is approved or declined; else its first blocker: `terms_forbid`, `robots_disallowed`, `needs_key`, `no_endpoint`, `config_invalid`, `check_needed`; the detail says what exactly */
+            /** @description `not_waiting`: it is approved or declined; else its first blocker: `terms_forbid`, `robots_disallowed`, `needs_key`, `needs_permission`, `no_endpoint`, `config_invalid`, `check_needed`; the detail says what exactly */
             409: {
                 headers: {
                     [name: string]: unknown;

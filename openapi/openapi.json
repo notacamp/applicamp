@@ -759,7 +759,7 @@
             }
           },
           "409": {
-            "description": "`not_waiting`: it is approved or declined; else its first blocker: `terms_forbid`, `robots_disallowed`, `needs_key`, `no_endpoint`, `config_invalid`, `check_needed`; the detail says what exactly",
+            "description": "`not_waiting`: it is approved or declined; else its first blocker: `terms_forbid`, `robots_disallowed`, `needs_key`, `needs_permission`, `no_endpoint`, `config_invalid`, `check_needed`; the detail says what exactly",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8154,7 +8154,7 @@
         "properties": {
           "code": {
             "type": "string",
-            "description": "`terms_forbid`, `robots_disallowed`, `needs_key`, `no_endpoint`,\n`config_invalid`, `check_needed`; clients translate the ones they\nknow and show `detail` for any other."
+            "description": "`terms_forbid`, `robots_disallowed`, `needs_key`, `needs_permission`, `no_endpoint`,\n`config_invalid`, `check_needed`; clients translate the ones they\nknow and show `detail` for any other."
           },
           "detail": {
             "type": "string",
@@ -8220,7 +8220,7 @@
               "string",
               "null"
             ],
-            "description": "The first blocker's code (`terms_forbid`, `robots_disallowed`,\n`needs_key`, `no_endpoint`, `config_invalid`, `check_needed`), or\nnone."
+            "description": "The first blocker's code (`terms_forbid`, `robots_disallowed`,\n`needs_key`, `needs_permission`, `no_endpoint`, `config_invalid`, `check_needed`), or\nnone."
           },
           "blockers": {
             "type": "array",
@@ -8556,6 +8556,10 @@
             "type": "string",
             "description": "A fingerprint of the terms page, to notice a change."
           },
+          "terms_read_for": {
+            "type": "string",
+            "description": "The fingerprint of the terms sentences the model read (its verdict\nand tags are kept until the terms change)."
+          },
           "terms_sentences": {
             "type": "array",
             "items": {
@@ -8620,12 +8624,48 @@
           "attribution",
           "flags",
           "totals_7d",
-          "totals_30d"
+          "totals_30d",
+          "tags"
         ],
         "properties": {
+          "approved_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it was approved."
+          },
+          "approved_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Who approved it: `owner` or `app`."
+          },
           "attribution": {
             "type": "string",
             "description": "How its jobs are credited (\"From Himalayas\")."
+          },
+          "contact_email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where to ask it for permission."
+          },
+          "content_signal": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "What its site rules say about use of its content (search, ai-train).",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
           },
           "country": {
             "type": [
@@ -8646,6 +8686,13 @@
               "type": "string"
             },
             "description": "What the owner should know (from its check)."
+          },
+          "found_through": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "How the app found it, in plain words."
           },
           "homepage": {
             "type": "string"
@@ -8717,6 +8764,34 @@
           },
           "status": {
             "$ref": "#/components/schemas/BoardStatus"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Plain lowercase words that describe it (\"tech\", \"europe\")."
+          },
+          "terms_quote": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The sentence of its terms that decided the verdict."
+          },
+          "terms_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The page its terms are on."
+          },
+          "terms_verdict": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What its terms say: `allow`, `silent`, `forbid`, `ask_first` or `personal_only`."
           },
           "totals_30d": {
             "$ref": "#/components/schemas/BoardTotals",
@@ -13914,6 +13989,19 @@
           "found"
         ],
         "properties": {
+          "content_signal": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Its `Content-Signal` line (`search`, `ai-input`, `ai-train`: `yes` or\n`no`). Recorded and shown, never a reason not to read.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
           "crawl_delay": {
             "type": [
               "number",

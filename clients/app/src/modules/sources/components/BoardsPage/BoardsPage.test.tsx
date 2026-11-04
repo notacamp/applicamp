@@ -269,6 +269,62 @@ describe("the boards page", () => {
     expect(screen.getByTestId("board-approve")).toBeDisabled();
   });
 
+  it("says when the app approved a board itself", async () => {
+    fakeBoards(true, {
+      [`GET /api/v1/boards/${HIMALAYAS}`]: () => ({
+        body: detail(board({ approved_by: "app", approved_at: "2026-10-26T12:00:00Z" })),
+      }),
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const approved = await screen.findByTestId("boards-section-approved");
+    await user.click(within(approved).getByTestId("boards-row"));
+    expect(await screen.findByTestId("board-approved-by-app")).toHaveTextContent(
+      "Approved by the app on 26 October",
+    );
+  });
+
+  it("shows what a site offers as tags, kinds first, translated", async () => {
+    fakeBoards(true, {
+      [`GET /api/v1/boards/${HIMALAYAS}`]: () => ({
+        body: detail(board({ tags: ["hospitality-travel", "europe", "remote", "ruby on rails"] })),
+      }),
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const approved = await screen.findByTestId("boards-section-approved");
+    await user.click(within(approved).getByTestId("boards-row"));
+    expect(await screen.findByTestId("board-tags")).toHaveTextContent(
+      "Hotels and travelEuropeMostly remoteRuby on rails",
+    );
+  });
+
+  it("shows the quote of a board that asks for permission first", async () => {
+    fakeBoards(true, {
+      [`GET /api/v1/boards/${WAITING}`]: () => ({
+        body: detail(waiting(), {
+          approvable: false,
+          blocked: "needs_permission",
+          blockers: [
+            {
+              code: "needs_permission",
+              detail: "Please ask us before using our jobs.",
+              source: "https://remote.example/terms",
+            },
+          ],
+          can_manage: true,
+        }),
+      }),
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const waitingSection = await screen.findByTestId("boards-section-waiting");
+    await user.click(within(waitingSection).getByTestId("boards-row"));
+    expect(await screen.findByTestId("board-blocker-needs_permission")).toHaveTextContent(
+      "It asks for permission first: Please ask us before using our jobs.",
+    );
+  });
+
   it("shows an action's error beside its button, with what the server said", async () => {
     fakeBoards(true, {
       [`GET /api/v1/boards/${WAITING}`]: () => ({

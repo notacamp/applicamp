@@ -109,6 +109,7 @@
       "suggestion_limit_reached": "Já são 10 sugestões hoje. Tente de novo amanhã.",
       "terms_forbid": "Os termos do portal proíbem a leitura automática, por isso não pode ser aprovado.",
       "needs_key": "Precisa primeiro de uma chave de API: defina-a abaixo.",
+      "needs_permission": "Pede primeiro autorização. Peça-a ao site e depois aprove-o.",
       "no_endpoint": "Ainda não tem endereço de feed. Verifique o portal para procurar um.",
       "invalid_key": "Essa chave não pode ser usada.",
       "no_key_needed": "Este portal não precisa de chave.",
@@ -134,6 +135,9 @@
     "days30": "30 dias",
     "flagsTitle": "A verificar",
     "homepage": "Abrir o portal",
+    "approvedByApp": "Aprovado pela aplicação em {{when}}",
+    "contentSignalNoTrain": "O site pede que o seu conteúdo não seja usado para treinar modelos. O Applicamp nunca treina com ofertas de emprego.",
+    "foundThrough": "Encontrado através de {{source}}",
     "robots": {
       "unchecked": "Ainda não verificado.",
       "none": "Sem robots.txt: tudo é permitido.",
@@ -166,6 +170,7 @@
       "config_invalid": "A configuração não funciona: {{detail}}",
       "terms_forbid": "Os termos proíbem a leitura automática: {{detail}}",
       "needs_key": "Precisa de uma chave de API de {{board}}: {{how}}",
+      "needs_permission": "Pede primeiro autorização: {{detail}}",
       "no_endpoint": "Ainda não tem endereço de feed. A verificação procura um e propõe uma configuração.",
       "unknown": "Ainda não pode ser aprovado: {{detail}}",
       "source": "Onde o diz"
@@ -229,6 +234,36 @@
       "notJson": "Isso não é JSON válido.",
       "notObject": "A configuração é um objeto JSON.",
       "advanced": "Avançado: editar a configuração em JSON"
+    },
+    "tags": {
+      "kind": {
+        "tech": "Tecnologia",
+        "data": "Dados",
+        "design": "Design",
+        "product": "Produto",
+        "marketing": "Marketing",
+        "sales": "Vendas",
+        "finance": "Finanças",
+        "legal": "Jurídico",
+        "people": "Pessoas e recursos humanos",
+        "operations": "Operações",
+        "support": "Apoio ao cliente",
+        "health-care": "Saúde e cuidados",
+        "education": "Educação",
+        "hospitality-travel": "Hotelaria e viagens",
+        "retail": "Comércio",
+        "logistics": "Logística",
+        "trades": "Ofícios",
+        "climate": "Clima",
+        "nonprofit": "Sem fins lucrativos",
+        "public-sector": "Setor público",
+        "media": "Media",
+        "science": "Ciência"
+      },
+      "remote": {
+        "remote": "Maioritariamente remoto",
+        "some-remote": "Algum remoto"
+      }
     }
   },
   "scanned": {

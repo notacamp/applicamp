@@ -25,6 +25,8 @@ pub mod mapping;
 pub mod rss;
 
 #[cfg(test)]
+mod seed_tests;
+#[cfg(test)]
 mod tests;
 
 use std::{

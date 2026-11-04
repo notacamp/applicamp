@@ -401,6 +401,8 @@ pub(crate) fn boards_config() -> SourcesConfig {
     SourcesConfig {
         allow_private_hosts: Some(true),
         discovery: Some(false),
+        // The one list tests point at a fake; the others are on the web.
+        discovery_sources: Some(vec!["awesome-job-boards".to_owned()]),
         cache_secs: Some(0),
         requests_per_second: Some(1_000),
         manual_per_day: Some(0),

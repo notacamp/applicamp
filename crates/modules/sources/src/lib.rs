@@ -252,9 +252,6 @@ pub async fn start(db: &PgPool, deps: &SourcesDeps) -> Result<(), String> {
         company_pages::register_boards(db, &boards::all(db).await.map_err(|e| e.to_string())?, now)
             .await
             .map_err(|e| e.to_string())?;
-    let page_checks = features::company_pages::schedule(db, deps)
-        .await
-        .map_err(|e| e.to_string())?;
     let web_search = features::company_pages::web_search::schedule(db, deps)
         .await
         .map_err(|e| e.to_string())?;
@@ -262,6 +259,11 @@ pub async fn start(db: &PgPool, deps: &SourcesDeps) -> Result<(), String> {
         .await
         .map_err(|e| e.to_string())?;
     let seeded_checks = features::discovery::schedule_seeded(db, deps)
+        .await
+        .map_err(|e| e.to_string())?;
+    // After the seeded boards' check, which may name company pages: the
+    // first reads of the day then wait behind it.
+    let page_checks = features::company_pages::schedule(db, deps)
         .await
         .map_err(|e| e.to_string())?;
     let scheduled = features::search::schedule_nightly(db, deps)

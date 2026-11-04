@@ -6,7 +6,7 @@
   of the text it was made from), `preview_error` (a short
   code: `cv_doesnt_fit`, `cv_pdf_unavailable`), `preview_at`. All nullable; cleared when the draft is
   approved (its version holds the PDF) or put away. Migration
-  `20261104150000_pipeline__cv_preview.sql`. No cross-schema reference.
+  `20261104145120_pipeline__cv_preview.sql`. No cross-schema reference.
 - A line of a draft's `content` may carry `fixed_by_app`, `original` (what it said before) and `ask`
   (`question`, `proposal`). Older drafts read with the defaults.
 - The profile keeps a "yes" as a fact with `status: confirmed_assumption` and `basis: "The CV draft

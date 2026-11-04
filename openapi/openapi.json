@@ -14464,6 +14464,14 @@
           "dont_have"
         ]
       },
+      "QuoteFrom": {
+        "type": "string",
+        "description": "Where the quote of a waiting line comes from.",
+        "enum": [
+          "you",
+          "profile"
+        ]
+      },
       "RankingBasis": {
         "type": "string",
         "description": "What a board's place in the order rests on.",
@@ -16356,6 +16364,17 @@
               "null"
             ],
             "description": "The person's own words the line was made from, as the profile has\nthem on that position: what \"Change it\" starts from. None when it\ncites none."
+          },
+          "quote_from": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/QuoteFrom",
+                "description": "Whether the quote is something the person told the app or their\nprofile's words. None when there is no quote."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "role": {
             "type": [

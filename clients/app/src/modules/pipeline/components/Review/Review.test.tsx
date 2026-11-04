@@ -330,7 +330,12 @@ describe("Review the CV", () => {
       [CV]: {
         body: cv({
           draft: cvDraft({
-            preview: { ready: false, error: "cv_pdf_unavailable", at: "2026-10-31T10:00:01Z" },
+            preview: {
+              ready: false,
+              stale: false,
+              error: "cv_pdf_unavailable",
+              at: "2026-10-31T10:00:01Z",
+            },
           }),
         }),
       },

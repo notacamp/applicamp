@@ -4896,16 +4896,16 @@ export interface components {
          */
         QuestionState: "open" | "answered" | "skipped" | "dont_have";
         /**
+         * @description Where the quote of a waiting line comes from.
+         * @enum {string}
+         */
+        QuoteFrom: "you" | "profile";
+        /**
          * @description What a board's place in the order rests on.
          * @enum {string}
          */
         RankingBasis: "own" | "few" | "benchmark" | "none";
         /** @description Why a line cannot be traced to the profile. */
-        /**
-         * @description Where the quote of a waiting line comes from.
-         * @enum {string}
-         */
-        QuoteFrom: "you" | "profile";
         Reason: {
             /** @description The sources it cites. */
             cites: string[];

@@ -61,6 +61,21 @@ const ACCEPT: Record<"linkedin_zip" | "pdf", string> = {
   pdf: ".pdf,application/pdf",
 };
 
+/** What a chosen file is, by its type or its name: a PDF, a ZIP, or neither. */
+export function kindOfFile(file: File): "pdf" | "linkedin_zip" | null {
+  if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
+    return "pdf";
+  }
+  if (
+    file.type === "application/zip" ||
+    file.type === "application/x-zip-compressed" ||
+    /\.zip$/i.test(file.name)
+  ) {
+    return "linkedin_zip";
+  }
+  return null;
+}
+
 export interface ImportPanelProps {
   /** What this instance can import (the LinkedIn export always). */
   kinds: readonly ImportKind[];
@@ -72,7 +87,8 @@ export interface ImportPanelProps {
 
 /**
  * The three ways in: the LinkedIn export (read on the server, no AI), a PDF
- * or pasted text (read by the AI model, when one is set up). Uploading makes
+ * or pasted text (read by the AI model, when one is set up). A file is read
+ * as what it is, whichever of the two file kinds is chosen. Uploading makes
  * a draft; nothing is saved yet.
  */
 export function ImportPanel({ kinds, onDrafted, onCancel }: ImportPanelProps) {
@@ -164,11 +180,18 @@ export function ImportPanel({ kinds, onDrafted, onCancel }: ImportPanelProps) {
           <FileField
             label={t(kind === "pdf" ? "import.pdfLabel" : "import.zipLabel")}
             hint={t(kind === "pdf" ? "import.pdfHint" : "import.zipHint")}
-            accept={ACCEPT[kind]}
+            accept={kinds.includes("pdf") ? `${ACCEPT.linkedin_zip},${ACCEPT.pdf}` : ACCEPT[kind]}
             file={file}
             onChange={(next) => {
               setFile(next);
               setLocal(null);
+              // A PDF picked as the LinkedIn export (or the other way round)
+              // is read as what it is: the person never has to switch first.
+              const picked = next === null ? null : kindOfFile(next);
+              if (picked !== null && picked !== kind && kinds.includes(picked)) {
+                setKind(picked);
+                create.reset();
+              }
             }}
             chooseLabel={t("import.chooseFile")}
             disabled={create.isPending}

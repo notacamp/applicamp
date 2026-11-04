@@ -55,8 +55,25 @@
     }
   },
   "review": {
-    "title": "Reveja o que foi encontrado",
-    "lead": "Nada é guardado até escolher. Substituir faz disto o seu perfil; Juntar mantém o seu como está e acrescenta só o que é novo.",
+    "title": "Veja o que encontrámos",
+    "lead": "Nada é guardado até escolher. Substituir faz disto o seu perfil. Juntar mantém o que editou, preenche o que falta e tira um local do resumo de um emprego.",
+    "found": "Encontrámos {{list}}.",
+    "counts": {
+      "jobs_one": "{{count}} emprego",
+      "jobs_other": "{{count}} empregos",
+      "achievements_one": "{{count}} conquista",
+      "achievements_other": "{{count}} conquistas",
+      "skills_one": "{{count}} competência",
+      "skills_other": "{{count}} competências",
+      "degrees_one": "{{count}} curso",
+      "degrees_other": "{{count}} cursos",
+      "languages_one": "{{count}} língua",
+      "languages_other": "{{count}} línguas",
+      "certificates_one": "{{count}} certificação",
+      "certificates_other": "{{count}} certificações",
+      "projects_one": "{{count}} projeto",
+      "projects_other": "{{count}} projetos"
+    },
     "loading": "A carregar o rascunho…",
     "loadFailed": "Não foi possível carregar o rascunho.",
     "gone": "Este rascunho já não existe: os rascunhos duram 24 horas.",
@@ -76,6 +93,7 @@
       "label": "Nenhum título profissional encontrado neste ficheiro",
       "summary": "Nenhum resumo encontrado neste ficheiro",
       "work": "Nenhuma posição encontrada neste ficheiro",
+      "achievements": "Nenhuma conquista encontrada neste ficheiro",
       "education": "Nenhuma formação encontrada neste ficheiro",
       "skills": "Nenhuma competência encontrada neste ficheiro",
       "languages": "Nenhum idioma encontrado neste ficheiro",
@@ -83,6 +101,10 @@
       "projects": "Nenhum projeto encontrado neste ficheiro",
       "hint": "Adicione-os à mão depois de aplicar, ou importe a exportação de dados do LinkedIn, que inclui competências, formação e idiomas.",
       "hintZip": "Adicione-os à mão depois de aplicar."
+    },
+    "stopped": {
+      "title": "O seu limite de IA não nos deixou ler outra vez as partes em falta.",
+      "body": "Abaixo está o que encontrámos. Acrescente as partes em falta à mão, ou tente de novo amanhã."
     }
   },
   "source": {

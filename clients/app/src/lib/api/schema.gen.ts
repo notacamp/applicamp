@@ -3987,6 +3987,12 @@ export interface components {
             kind: components["schemas"]["ImportKind"];
             /** @description Where it is. */
             status: components["schemas"]["ImportStatus"];
+            /**
+             * @description What stopped reading the sections that came back empty a second time
+             *     (`ai_budget_reached`, `ai_daily_limit_reached`), if anything: the draft
+             *     has what the first reads found.
+             */
+            stopped?: string | null;
         };
         /**
          * @description What an import is made from.

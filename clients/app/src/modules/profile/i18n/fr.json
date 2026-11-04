@@ -55,8 +55,25 @@
     }
   },
   "review": {
-    "title": "Relisez ce qui a été trouvé",
-    "lead": "Rien n’est enregistré tant que vous n’avez pas choisi. Remplacer en fait votre profil ; Fusionner garde le vôtre tel quel et n’ajoute que les nouveautés.",
+    "title": "Vérifiez ce que nous avons trouvé",
+    "lead": "Rien n’est enregistré tant que vous n’avez pas choisi. Remplacer en fait votre profil. Fusionner garde vos modifications, complète ce qui manque et retire un lieu du résumé d’un poste.",
+    "found": "Nous avons trouvé {{list}}.",
+    "counts": {
+      "jobs_one": "{{count}} poste",
+      "jobs_other": "{{count}} postes",
+      "achievements_one": "{{count}} réalisation",
+      "achievements_other": "{{count}} réalisations",
+      "skills_one": "{{count}} compétence",
+      "skills_other": "{{count}} compétences",
+      "degrees_one": "{{count}} diplôme",
+      "degrees_other": "{{count}} diplômes",
+      "languages_one": "{{count}} langue",
+      "languages_other": "{{count}} langues",
+      "certificates_one": "{{count}} certification",
+      "certificates_other": "{{count}} certifications",
+      "projects_one": "{{count}} projet",
+      "projects_other": "{{count}} projets"
+    },
     "loading": "Chargement du brouillon…",
     "loadFailed": "Impossible de charger le brouillon.",
     "gone": "Ce brouillon n’existe plus : les brouillons durent 24 heures.",
@@ -76,6 +93,7 @@
       "label": "Aucun titre trouvé dans ce fichier",
       "summary": "Aucun résumé trouvé dans ce fichier",
       "work": "Aucun poste trouvé dans ce fichier",
+      "achievements": "Aucune réalisation trouvée dans ce fichier",
       "education": "Aucune formation trouvée dans ce fichier",
       "skills": "Aucune compétence trouvée dans ce fichier",
       "languages": "Aucune langue trouvée dans ce fichier",
@@ -83,6 +101,10 @@
       "projects": "Aucun projet trouvé dans ce fichier",
       "hint": "Ajoutez-les à la main après avoir appliqué, ou importez votre export de données LinkedIn, qui contient compétences, formation et langues.",
       "hintZip": "Ajoutez-les à la main après avoir appliqué."
+    },
+    "stopped": {
+      "title": "Votre limite d’IA nous a empêchés de relire les parties manquantes.",
+      "body": "Voici ce que nous avons trouvé. Ajoutez les parties manquantes à la main, ou réessayez demain."
     }
   },
   "source": {

@@ -602,6 +602,12 @@ impl Profile {
     /// empty fields of `basics` are filled from the draft, and positions,
     /// schools, skills, languages, certifications, projects and links the
     /// profile does not have yet are added after its own.
+    ///
+    /// A position both have is **repaired**, never overwritten (#72): its
+    /// empty fields are filled (location, end date, summary), the draft's
+    /// highlights it does not have are added, and a summary that is only a
+    /// place (an earlier import's mistake, not the person's edit) gives way to
+    /// the draft's paragraph, the place moving to the location.
     #[must_use]
     pub fn merged_with(mut self, draft: Self) -> Self {
         let basics = &mut self.basics;
@@ -620,14 +626,15 @@ impl Profile {
         add_new(&mut basics.profiles, draft.basics.profiles, |a, b| {
             same(&a.url) == same(&b.url)
         });
-        // A position is the same one when the company matches and so does
-        // its start or its title: editing either by hand never brings the
-        // imported one back beside it.
-        add_new(&mut self.work, draft.work, |a, b| {
-            same_opt(a.name.as_deref()) == same_opt(b.name.as_deref())
-                && (same_opt(a.start_date.as_deref()) == same_opt(b.start_date.as_deref())
-                    || same_opt(a.position.as_deref()) == same_opt(b.position.as_deref()))
-        });
+        // Positions are matched one to one (see `match_positions`): a
+        // position both have is repaired, never added twice.
+        let matches = match_positions(&self.work, &draft.work);
+        for (theirs, mine) in draft.work.into_iter().zip(matches) {
+            match mine {
+                Some(at) => self.work[at].repair_from(theirs),
+                None => self.work.push(theirs),
+            }
+        }
         add_new(&mut self.education, draft.education, |a, b| {
             same(&a.institution) == same(&b.institution)
                 && same_opt(a.study_type.as_deref()) == same_opt(b.study_type.as_deref())
@@ -646,6 +653,90 @@ impl Profile {
         });
         self.cap_lists();
         self
+    }
+}
+
+/// Which of `mine` each of `theirs` is, by place in `mine`: the same company
+/// and the same start first; the same company and title only when no
+/// position of `mine` has that start (its start was edited by hand); and
+/// never one of `mine` twice, so two stints with the same title at one
+/// company stay two.
+pub(crate) fn match_positions(mine: &[Work], theirs: &[Work]) -> Vec<Option<usize>> {
+    let company = |w: &Work| same_opt(w.name.as_deref());
+    let start = |w: &Work| same_opt(w.start_date.as_deref());
+    let title = |w: &Work| same_opt(w.position.as_deref());
+    let mut used = vec![false; mine.len()];
+    theirs
+        .iter()
+        .map(|t| {
+            let same_start = |m: &Work| company(m) == company(t) && start(m) == start(t);
+            let found = mine
+                .iter()
+                .enumerate()
+                .find(|(at, m)| !used[*at] && same_start(m))
+                .map(|(at, _)| at)
+                .or_else(|| {
+                    if mine.iter().any(same_start) {
+                        return None;
+                    }
+                    mine.iter()
+                        .enumerate()
+                        .find(|(at, m)| {
+                            !used[*at] && company(m) == company(t) && title(m) == title(t)
+                        })
+                        .map(|(at, _)| at)
+                });
+            if let Some(at) = found {
+                used[at] = true;
+            }
+            found
+        })
+        .collect()
+}
+
+impl Work {
+    /// This position, repaired from `theirs` (the same position, read again).
+    /// What it has stays and what it lacks is filled. Its summary is touched
+    /// only when the new read has a real paragraph: an empty one takes it; one
+    /// that is only this position's place (an earlier import's mistake, never
+    /// a description someone wrote) gives way to it, the place moving to an
+    /// empty location. A summary is never dropped when the location holds a
+    /// different place.
+    fn repair_from(&mut self, theirs: Self) {
+        use crate::features::imports::repair::{add_highlight, is_place, same_place};
+        let fill = |mine: &mut Option<String>, theirs: Option<String>| {
+            if mine.as_deref().is_none_or(|m| m.trim().is_empty()) {
+                *mine = theirs;
+            }
+        };
+        let paragraph = theirs
+            .summary
+            .filter(|s| !s.trim().is_empty() && !is_place(s, theirs.location.as_deref()));
+        if let Some(paragraph) = paragraph {
+            match self.summary.as_deref().map(str::trim) {
+                None | Some("") => self.summary = Some(paragraph),
+                Some(summary) if is_place(summary, self.location.as_deref()) => {
+                    match self.location.as_deref().map(str::trim) {
+                        None | Some("") => {
+                            self.location = Some(summary.trim_end_matches('.').to_owned());
+                            self.summary = Some(paragraph);
+                        }
+                        Some(location) if same_place(summary, location) => {
+                            self.summary = Some(paragraph);
+                        }
+                        // Another place than the location: it stays as it is.
+                        Some(_) => {}
+                    }
+                }
+                Some(_) => {}
+            }
+        }
+        fill(&mut self.location, theirs.location);
+        fill(&mut self.end_date, theirs.end_date);
+        fill(&mut self.start_date, theirs.start_date);
+        for highlight in theirs.highlights {
+            add_highlight(&mut self.highlights, highlight);
+        }
     }
 }
 
@@ -727,6 +818,230 @@ mod tests {
         assert_eq!(merged.work[1].name.as_deref(), Some("Sample Labs"));
         let skills: Vec<_> = merged.skills.iter().map(|s| s.name.as_str()).collect();
         assert_eq!(skills, ["Rust", "SQL"]);
+    }
+
+    /// `summary` and `location` on a position at Example Org, merged with a
+    /// read of the same position that has `paragraph` as its summary.
+    fn merged_summary(
+        summary: Option<&str>,
+        location: Option<&str>,
+        paragraph: Option<&str>,
+    ) -> (Option<String>, Option<String>) {
+        let mine = Profile {
+            work: vec![Work {
+                summary: summary.map(str::to_owned),
+                location: location.map(str::to_owned),
+                ..work("Example Org", "Staff Engineer", "2023-07")
+            }],
+            ..Profile::default()
+        };
+        let draft = Profile {
+            work: vec![Work {
+                summary: paragraph.map(str::to_owned),
+                ..work("Example Org", "Staff Engineer", "2023-07")
+            }],
+            ..Profile::default()
+        };
+        let merged = mine.merged_with(draft);
+        assert_eq!(merged.work.len(), 1);
+        let work = merged.work.into_iter().next().unwrap();
+        (work.summary, work.location)
+    }
+
+    #[test]
+    fn merging_replaces_a_place_summary_only_with_a_real_paragraph() {
+        let paragraph = Some("Built the billing platform for 40 shops.");
+        let some = |s: &str| Some(s.to_owned());
+        for (summary, location, read, want) in [
+            // A place, an empty location, a paragraph: the place moves.
+            (
+                some("Coimbra, Coimbra, Portugal"),
+                None,
+                paragraph,
+                (
+                    paragraph.map(str::to_owned),
+                    some("Coimbra, Coimbra, Portugal"),
+                ),
+            ),
+            // The place is the location already: the paragraph takes it.
+            (
+                some("Lisbon"),
+                some("Lisbon, Portugal"),
+                paragraph,
+                (paragraph.map(str::to_owned), some("Lisbon, Portugal")),
+            ),
+            // No paragraph in the new read: nothing is touched.
+            (
+                some("Coimbra, Coimbra, Portugal"),
+                None,
+                None,
+                (some("Coimbra, Coimbra, Portugal"), None),
+            ),
+            // The location holds a different place: the summary stays.
+            (
+                some("Coimbra, Coimbra, Portugal"),
+                some("Porto, Portugal"),
+                paragraph,
+                (some("Coimbra, Coimbra, Portugal"), some("Porto, Portugal")),
+            ),
+            // Words someone wrote are never a place.
+            (
+                some("Sold to retailers in Spain, Portugal, France"),
+                some("Portugal"),
+                paragraph,
+                (
+                    some("Sold to retailers in Spain, Portugal, France"),
+                    some("Portugal"),
+                ),
+            ),
+            (
+                some("Head of Engineering"),
+                None,
+                paragraph,
+                (some("Head of Engineering"), None),
+            ),
+            (
+                some("Customer Success"),
+                some("Porto, Portugal"),
+                paragraph,
+                (some("Customer Success"), some("Porto, Portugal")),
+            ),
+            (
+                some("Rust, Kafka, PostgreSQL"),
+                None,
+                paragraph,
+                (some("Rust, Kafka, PostgreSQL"), None),
+            ),
+            // An empty summary is filled.
+            (None, None, paragraph, (paragraph.map(str::to_owned), None)),
+        ] {
+            assert_eq!(
+                merged_summary(summary.as_deref(), location.as_deref(), read),
+                want,
+                "{summary:?} at {location:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn merging_repairs_a_position_read_again() {
+        let mine = Profile {
+            work: vec![
+                Work {
+                    summary: Some("Coimbra, Coimbra, Portugal".into()),
+                    highlights: vec!["Cut refunds by half".into()],
+                    ..work("Example Org", "Staff Engineer", "2023-07")
+                },
+                Work {
+                    summary: Some("Ran the platform team, by hand.".into()),
+                    location: Some("Porto".into()),
+                    ..work("Sample Labs", "Engineer", "2019-01")
+                },
+            ],
+            ..Profile::default()
+        };
+        let draft = Profile {
+            work: vec![
+                Work {
+                    location: Some("Coimbra, Coimbra, Portugal".into()),
+                    end_date: Some("2024-04".into()),
+                    summary: Some("Built the billing platform for 40 shops.".into()),
+                    highlights: vec![
+                        "cut refunds  by half".into(),
+                        "Moved billing to Rust".into(),
+                    ],
+                    ..work("Example Org", "Staff Engineer", "2023-07")
+                },
+                Work {
+                    summary: Some("Ran the platform team.".into()),
+                    location: Some("Lisbon".into()),
+                    end_date: Some("2021-02".into()),
+                    ..work("Sample Labs", "Engineer", "2019-01")
+                },
+            ],
+            ..Profile::default()
+        };
+        let merged = mine.merged_with(draft);
+        assert_eq!(merged.work.len(), 2, "no position twice");
+        let first = &merged.work[0];
+        assert_eq!(
+            first.summary.as_deref(),
+            Some("Built the billing platform for 40 shops."),
+            "a place gives way to the paragraph"
+        );
+        assert_eq!(
+            first.location.as_deref(),
+            Some("Coimbra, Coimbra, Portugal")
+        );
+        assert_eq!(
+            first.end_date.as_deref(),
+            Some("2024-04"),
+            "an empty end date fills"
+        );
+        assert_eq!(
+            first.highlights,
+            ["Cut refunds by half", "Moved billing to Rust"],
+            "highlights add, once each"
+        );
+        let second = &merged.work[1];
+        assert_eq!(
+            second.summary.as_deref(),
+            Some("Ran the platform team, by hand."),
+            "an edit stays"
+        );
+        assert_eq!(second.location.as_deref(), Some("Porto"));
+        assert_eq!(second.end_date.as_deref(), Some("2021-02"));
+    }
+
+    #[test]
+    fn two_stints_with_one_title_at_one_company_stay_two() {
+        let stint = |start: &str, end: Option<&str>, highlight: &str| Work {
+            end_date: end.map(str::to_owned),
+            highlights: vec![highlight.to_owned()],
+            ..work("Example Org", "Consultant", start)
+        };
+        // The profile has the current stint only; the new read has both,
+        // newest first, as LinkedIn lists them.
+        let mine = Profile {
+            work: vec![Work {
+                highlights: Vec::new(),
+                ..stint("2022-01", None, "")
+            }],
+            ..Profile::default()
+        };
+        let draft = Profile {
+            work: vec![
+                stint("2022-01", None, "Ran the pricing review"),
+                stint("2018-03", Some("2020-06"), "Wrote the onboarding guide"),
+            ],
+            ..Profile::default()
+        };
+        let merged = mine.merged_with(draft);
+        assert_eq!(merged.work.len(), 2);
+        assert_eq!(
+            merged.work[0].end_date, None,
+            "the current stint stays current"
+        );
+        assert_eq!(merged.work[0].highlights, ["Ran the pricing review"]);
+        assert_eq!(merged.work[1].start_date.as_deref(), Some("2018-03"));
+        assert_eq!(merged.work[1].highlights, ["Wrote the onboarding guide"]);
+
+        // Both stints on the profile already: each to its own.
+        let both = Profile {
+            work: vec![
+                stint("2022-01", None, "Ran the pricing review"),
+                stint("2018-03", Some("2020-06"), "Wrote the onboarding guide"),
+            ],
+            ..Profile::default()
+        };
+        assert_eq!(match_positions(&both.work, &both.work), [Some(0), Some(1)]);
+        // A start edited by hand still finds its position by title, once.
+        let edited = vec![work("Example Org", "Consultant", "2022-02")];
+        assert_eq!(
+            match_positions(&edited, &both.work),
+            [Some(0), None],
+            "the title is the fallback, and one position is matched once"
+        );
     }
 
     #[test]

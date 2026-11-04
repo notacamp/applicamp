@@ -12099,6 +12099,13 @@
           "status": {
             "$ref": "#/components/schemas/ImportStatus",
             "description": "Where it is."
+          },
+          "stopped": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What stopped reading the sections that came back empty a second time\n(`ai_budget_reached`, `ai_daily_limit_reached`), if anything: the draft\nhas what the first reads found."
           }
         }
       },

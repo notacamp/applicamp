@@ -140,3 +140,41 @@ export function callApiJson(page: Page, method: string, path: string, body?: unk
     { method, path, body },
   );
 }
+
+/**
+ * A one-page PDF saying `lines` (Latin-1 text, one line each, in Helvetica):
+ * a CV or a LinkedIn profile saved as PDF, made here so no file is kept.
+ */
+export function pdfSaying(lines: readonly string[]): Buffer {
+  const escape = (line: string) =>
+    line
+      .replaceAll("\\", String.raw`\\`)
+      .replaceAll("(", String.raw`\(`)
+      .replaceAll(")", String.raw`\)`);
+  const content = [
+    "BT",
+    "/F1 11 Tf",
+    "72 780 Td",
+    ...lines.flatMap((line) => [`(${escape(line)}) Tj`, "0 -16 Td"]),
+    "ET",
+  ].join("\n");
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R " +
+      "/Resources << /Font << /F1 5 0 R >> >> >>",
+    `<< /Length ${String(Buffer.byteLength(content, "latin1"))} >>\nstream\n${content}\nendstream`,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+  ];
+  let pdf = "%PDF-1.4\n";
+  const offsets: number[] = [];
+  for (const [index, object] of objects.entries()) {
+    offsets.push(Buffer.byteLength(pdf, "latin1"));
+    pdf += `${String(index + 1)} 0 obj\n${object}\nendobj\n`;
+  }
+  const xref = Buffer.byteLength(pdf, "latin1");
+  pdf += `xref\n0 ${String(objects.length + 1)}\n0000000000 65535 f \n`;
+  pdf += offsets.map((offset) => `${String(offset).padStart(10, "0")} 00000 n \n`).join("");
+  pdf += `trailer\n<< /Size ${String(objects.length + 1)} /Root 1 0 R >>\nstartxref\n${String(xref)}\n%%EOF\n`;
+  return Buffer.from(pdf, "latin1");
+}

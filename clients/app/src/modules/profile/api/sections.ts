@@ -209,6 +209,34 @@ export function isSameEntry(list: ListKey, a: Entry, b: Entry): boolean {
   }
 }
 
+/**
+ * Which of `mine` each of `theirs` is, by place in `mine` (the server's merge
+ * rule): the same company and start first; the same company and title only
+ * when no position of `mine` has that start; never one of `mine` twice.
+ */
+export function matchPositions(
+  mine: readonly Entry[],
+  theirs: readonly Entry[],
+): (number | undefined)[] {
+  const used = mine.map(() => false);
+  const eq = (a: Entry, b: Entry, key: FieldKey) => same(textOf(a, key)) === same(textOf(b, key));
+  return theirs.map((entry) => {
+    const sameStart = (known: Entry) => eq(known, entry, "name") && eq(known, entry, "startDate");
+    let at = mine.findIndex((known, index) => used[index] !== true && sameStart(known));
+    if (at === -1 && !mine.some(sameStart)) {
+      at = mine.findIndex(
+        (known, index) =>
+          used[index] !== true && eq(known, entry, "name") && eq(known, entry, "position"),
+      );
+    }
+    if (at === -1) {
+      return;
+    }
+    used[at] = true;
+    return at;
+  });
+}
+
 /** How a draft's value compares with the profile's. */
 export type Change = "new" | "changed" | "same";
 
@@ -220,8 +248,12 @@ export function compareList(
 ): { entry: Entry; change: Change }[] {
   const mine: readonly Entry[] = current[list];
   const theirs: readonly Entry[] = draft[list];
-  return theirs.map((entry): { entry: Entry; change: Change } => {
-    const match = mine.find((known) => isSameEntry(list, known, entry));
+  const positions = list === "work" ? matchPositions(mine, theirs) : [];
+  return theirs.map((entry, index): { entry: Entry; change: Change } => {
+    const match =
+      list === "work"
+        ? mine[positions[index] ?? -1]
+        : mine.find((known) => isSameEntry(list, known, entry));
     if (match === undefined) {
       return { entry, change: "new" };
     }
@@ -269,7 +301,7 @@ export function withList<K extends ListKey>(
 }
 
 /** A part of a draft that came back with nothing in it. */
-export type EmptySection = "label" | "summary" | ListKey;
+export type EmptySection = "label" | "summary" | "achievements" | ListKey;
 
 /**
  * What a draft has nothing of: the headline, the summary and each list. The
@@ -287,6 +319,39 @@ export function emptySections(draft: Profile): EmptySection[] {
     if (draft[list].length === 0) {
       empty.push(list);
     }
+    // Jobs, but not one achievement on any of them.
+    if (
+      list === "work" &&
+      draft.work.length > 0 &&
+      draft.work.every((work) => work.highlights.length === 0)
+    ) {
+      empty.push("achievements");
+    }
   }
   return empty;
+}
+
+/** A part of a draft counted for the review's "Found …" line. */
+export type FoundKey =
+  "jobs" | "achievements" | "skills" | "degrees" | "languages" | "certificates" | "projects";
+
+/**
+ * What a draft holds, part by part, in the order the review says it, the
+ * empty ones left out: "Found 6 jobs, 18 achievements, 9 skills, 2 degrees
+ * and 2 languages."
+ */
+export function foundIn(draft: Profile): { key: FoundKey; count: number }[] {
+  const counts: { key: FoundKey; count: number }[] = [
+    { key: "jobs", count: draft.work.length },
+    {
+      key: "achievements",
+      count: draft.work.reduce((sum, work) => sum + work.highlights.length, 0),
+    },
+    { key: "skills", count: draft.skills.length },
+    { key: "degrees", count: draft.education.length },
+    { key: "languages", count: draft.languages.length },
+    { key: "certificates", count: draft.certificates.length },
+    { key: "projects", count: draft.projects.length },
+  ];
+  return counts.filter(({ count }) => count > 0);
 }

@@ -8629,7 +8629,9 @@
           "json_api",
           "rss",
           "jsonld_sitemap",
-          "hn"
+          "hn",
+          "hiring_system",
+          "company_page"
         ]
       },
       "BoardList": {
@@ -8637,18 +8639,29 @@
         "description": "The job boards, highest average salary first (none last).",
         "required": [
           "can_manage",
-          "boards"
+          "boards",
+          "company_pages",
+          "web_search"
         ],
         "properties": {
           "boards": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/BoardSummary"
-            }
+            },
+            "description": "The boards and the hiring systems, with the company pages that wait\nfirst and the newest (at most [`SHOWN_COMPANY_PAGES`])."
           },
           "can_manage": {
             "type": "boolean",
             "description": "The signed-in person manages the boards."
+          },
+          "company_pages": {
+            "$ref": "#/components/schemas/CompanyPageCounts",
+            "description": "Every company page there is."
+          },
+          "web_search": {
+            "$ref": "#/components/schemas/WebSearchState",
+            "description": "The web search."
           }
         }
       },
@@ -8935,6 +8948,13 @@
             "type": "string",
             "description": "How its jobs are credited (\"From Himalayas\")."
           },
+          "company_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For a company page, the company on its system (`acme`)."
+          },
           "contact_email": {
             "type": [
               "string",
@@ -9052,6 +9072,13 @@
           },
           "status": {
             "$ref": "#/components/schemas/BoardStatus"
+          },
+          "system": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For a hiring system and a company page, the system (`lever`)."
           },
           "tags": {
             "type": "array",
@@ -9824,6 +9851,40 @@
             "items": {
               "$ref": "#/components/schemas/WatchedCompany"
             }
+          }
+        }
+      },
+      "CompanyPageCounts": {
+        "type": "object",
+        "description": "How many company pages there are, by where they stand.",
+        "required": [
+          "total",
+          "approved",
+          "waiting",
+          "declined"
+        ],
+        "properties": {
+          "approved": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Read by the app or the owner.",
+            "minimum": 0
+          },
+          "declined": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "waiting": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Not approved yet: their system waits, or no recent job was seen.",
+            "minimum": 0
           }
         }
       },
@@ -16150,6 +16211,10 @@
           "greenhouse",
           "lever",
           "ashby",
+          "workable",
+          "recruitee",
+          "teamtailor",
+          "personio",
           "jsonld",
           "none"
         ]
@@ -16228,6 +16293,33 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "WebSearchState": {
+        "type": "object",
+        "description": "The optional web search that finds company pages.",
+        "required": [
+          "on",
+          "queries_this_month",
+          "monthly_limit"
+        ],
+        "properties": {
+          "monthly_limit": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The most a month asks.",
+            "minimum": 0
+          },
+          "on": {
+            "type": "boolean",
+            "description": "A key is set on the server."
+          },
+          "queries_this_month": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Queries asked this calendar month.",
+            "minimum": 0
           }
         }
       },

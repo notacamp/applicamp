@@ -2603,12 +2603,20 @@ export interface components {
          * @description How a board is read.
          * @enum {string}
          */
-        BoardKind: "json_api" | "rss" | "jsonld_sitemap" | "hn";
+        BoardKind: "json_api" | "rss" | "jsonld_sitemap" | "hn" | "hiring_system" | "company_page";
         /** @description The job boards, highest average salary first (none last). */
         BoardList: {
+            /**
+             * @description The boards and the hiring systems, with the company pages that wait
+             *     first and the newest (at most [`SHOWN_COMPANY_PAGES`]).
+             */
             boards: components["schemas"]["BoardSummary"][];
             /** @description The signed-in person manages the boards. */
             can_manage: boolean;
+            /** @description Every company page there is. */
+            company_pages: components["schemas"]["CompanyPageCounts"];
+            /** @description The web search. */
+            web_search: components["schemas"]["WebSearchState"];
         };
         /**
          * @description Where a board came from.
@@ -2737,6 +2745,8 @@ export interface components {
             approved_by?: string | null;
             /** @description How its jobs are credited ("From Himalayas"). */
             attribution: string;
+            /** @description For a company page, the company on its system (`acme`). */
+            company_token?: string | null;
             /** @description Where to ask it for permission. */
             contact_email?: string | null;
             /** @description What its site rules say about use of its content (search, ai-train). */
@@ -2772,6 +2782,8 @@ export interface components {
             /** @description Its stable name: the source its jobs carry. */
             slug: string;
             status: components["schemas"]["BoardStatus"];
+            /** @description For a hiring system and a company page, the system (`lever`). */
+            system?: string | null;
             /** @description Plain lowercase words that describe it ("tech", "europe"). */
             tags: string[];
             /** @description The sentence of its terms that decided the verdict. */
@@ -3061,6 +3073,23 @@ export interface components {
             limit: number;
             suggested: components["schemas"]["CompanySuggestion"][];
             watching: components["schemas"]["WatchedCompany"][];
+        };
+        /** @description How many company pages there are, by where they stand. */
+        CompanyPageCounts: {
+            /**
+             * Format: int32
+             * @description Read by the app or the owner.
+             */
+            approved: number;
+            /** Format: int32 */
+            declined: number;
+            /** Format: int32 */
+            total: number;
+            /**
+             * Format: int32
+             * @description Not approved yet: their system waits, or no recent job was seen.
+             */
+            waiting: number;
         };
         /** @description The last read of the company's pages. */
         CompanyRead: {
@@ -5594,7 +5623,7 @@ export interface components {
          * @description What a company's jobs are read from.
          * @enum {string}
          */
-        WatchBoardKind: "greenhouse" | "lever" | "ashby" | "jsonld" | "none";
+        WatchBoardKind: "greenhouse" | "lever" | "ashby" | "workable" | "recruitee" | "teamtailor" | "personio" | "jsonld" | "none";
         /** @description A company the person watches. */
         WatchedCompany: {
             /** @description How its jobs are read; `none` when no board was found. */
@@ -5626,6 +5655,21 @@ export interface components {
             /** Format: date-time */
             watching_since?: string | null;
             website?: string | null;
+        };
+        /** @description The optional web search that finds company pages. */
+        WebSearchState: {
+            /**
+             * Format: int32
+             * @description The most a month asks.
+             */
+            monthly_limit: number;
+            /** @description A key is set on the server. */
+            on: boolean;
+            /**
+             * Format: int32
+             * @description Queries asked this calendar month.
+             */
+            queries_this_month: number;
         };
         /** @description A position. */
         Work: {

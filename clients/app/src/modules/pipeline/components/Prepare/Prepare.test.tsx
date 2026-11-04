@@ -205,7 +205,7 @@ describe("Prepare: company and job", () => {
     expect(screen.getByTestId("prepare-wants-pending")).toBeVisible();
     expect(screen.getByTestId("prepare-draft-slot")).toBeVisible();
     expect(await screen.findByTestId("prepare-draft")).toHaveTextContent(
-      "Draft the CV · about €0.002",
+      "Draft the CV · about €0.004",
     );
     expect(screen.getByTestId("prepare-spend")).toHaveTextContent("Company reads today: 1 of 20.");
     expect(requests.map((r) => r.route)).not.toContain(

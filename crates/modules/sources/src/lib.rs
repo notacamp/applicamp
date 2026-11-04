@@ -19,6 +19,14 @@
 //!   pasting a posting's link); off in searches by default
 //!   (`APPLICAMP_SOURCES__COMPANY_BOARDS`), kept for company watchers
 //!   (#20).
+//! - **Company pages** ([`company_pages`], [`hiring_systems`],
+//!   [`features::company_pages`], #87): the hiring systems companies publish
+//!   their jobs on (Greenhouse, Lever, Ashby, Workable, Recruitee,
+//!   Teamtailor, Personio) are rows of the registry, checked once each
+//!   (robots rules, terms, content signal); every apply link of a job read
+//!   names a company page, registered with no request, and a daily check
+//!   approves it after one sample read when its system is approved and it
+//!   posted lately. Searches do not read them yet (a job store comes first).
 //! - **The search** ([`features::search`]): the same job seen on several
 //!   boards merged into one ([`dedupe`]), crediting each; the goals' hard
 //!   limits on the boards' structured fields (a board's regions too:
@@ -57,11 +65,13 @@
 
 pub mod board_keys;
 pub mod boards;
+pub mod company_pages;
 pub mod config;
 pub mod dedupe;
 pub mod events;
 pub mod features;
 pub mod grounding;
+pub mod hiring_systems;
 pub mod job;
 pub mod job_boards;
 pub mod lisbon;
@@ -92,7 +102,7 @@ use axum::Extension;
 use sqlx::PgPool;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
-pub use config::SourcesConfig;
+pub use config::{SearchConfig, SourcesConfig};
 pub use features::search::{SearchRow, latest_row, read_posting};
 pub use ports::Neighbours;
 
@@ -181,7 +191,8 @@ impl SourcesDeps {
 /// The sources module, composed with `deps`.
 pub fn module(deps: SourcesDeps) -> Module {
     use features::{
-        board_requests as requests, boards as board, discovery, recheck, reground, search, watch,
+        board_requests as requests, boards as board, company_pages, discovery, recheck, reground,
+        search, watch,
     };
     let router = OpenApiRouter::new()
         .routes(routes!(search::start))
@@ -220,6 +231,9 @@ pub fn module(deps: SourcesDeps) -> Module {
             .job_with::<discovery::Discover, _>(deps.clone())
             .job_with::<discovery::CheckBoard, _>(deps.clone())
             .job_with::<discovery::CheckSeeded, _>(deps.clone())
+            .job_with::<company_pages::CheckPages, _>(deps.clone())
+            .job_with::<company_pages::CheckPagesSoon, _>(deps.clone())
+            .job_with::<company_pages::web_search::WebSearch, _>(deps.clone())
             .job_with::<watch::FindBoard, _>(deps)
             .publishes::<events::SearchFinished>(),
         kinds: Vec::new(),
@@ -239,10 +253,26 @@ pub async fn start(db: &PgPool, deps: &SourcesDeps) -> Result<(), String> {
     let job_boards = job_boards::sync(db, &job_seed, deps.clock.now())
         .await
         .map_err(|e| e.to_string())?;
+    let now = deps.clock.now();
+    company_pages::ensure_systems(db, now)
+        .await
+        .map_err(|e| e.to_string())?;
+    let company_pages_added =
+        company_pages::register_boards(db, &boards::all(db).await.map_err(|e| e.to_string())?, now)
+            .await
+            .map_err(|e| e.to_string())?;
+    let web_search = features::company_pages::web_search::schedule(db, deps)
+        .await
+        .map_err(|e| e.to_string())?;
     let discovery = features::discovery::schedule(db, deps)
         .await
         .map_err(|e| e.to_string())?;
     let seeded_checks = features::discovery::schedule_seeded(db, deps)
+        .await
+        .map_err(|e| e.to_string())?;
+    // After the seeded boards' check, which may name company pages: the
+    // first reads of the day then wait behind it.
+    let page_checks = features::company_pages::schedule(db, deps)
         .await
         .map_err(|e| e.to_string())?;
     let scheduled = features::search::schedule_nightly(db, deps)
@@ -257,6 +287,9 @@ pub async fn start(db: &PgPool, deps: &SourcesDeps) -> Result<(), String> {
     tracing::info!(
         boards = count,
         job_boards,
+        company_pages_added,
+        page_checks,
+        web_search,
         company_boards = deps.config.company_boards(),
         discovery,
         seeded_checks,
@@ -287,13 +320,16 @@ mod tests {
             registry.kinds(),
             [
                 "sources.check_board",
+                "sources.check_company_pages",
+                "sources.check_company_pages_soon",
                 "sources.check_seeded_boards",
                 "sources.discover_boards",
                 "sources.find_board",
                 "sources.nightly",
                 "sources.recheck_requirements",
                 "sources.reground_reasons",
-                "sources.search"
+                "sources.search",
+                "sources.web_search_pages"
             ]
         );
     }

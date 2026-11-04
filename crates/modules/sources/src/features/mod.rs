@@ -2,6 +2,7 @@
 
 pub mod board_requests;
 pub mod boards;
+pub mod company_pages;
 pub mod discovery;
 pub mod recheck;
 pub mod reground;

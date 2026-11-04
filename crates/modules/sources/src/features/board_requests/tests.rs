@@ -400,3 +400,50 @@ async fn the_list_is_filtered_searched_and_paged_on_the_server(db: PgPool) {
     let (status, _) = h.get("/api/v1/boards/admin/list?show=everything").await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_hiring_system_waits_for_a_choice_and_its_pages_for_the_system(db: PgPool) {
+    let h = harness(db, true).await;
+    let system = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO sources.job_boards (id, slug, name, homepage, host, kind, priority, status,
+            origin, report, blockers, created_at, updated_at)
+         VALUES ($1, 'lever', 'Lever', 'https://lever.example', 'lever.example', 'hiring_system',
+                 'low', 'candidate', 'discovery', $2, $3, $4, $4)",
+    )
+    .bind(system)
+    .bind(sqlx::types::Json(
+        json!({ "checked_at": today(), "flags": [] }),
+    ))
+    .bind(sqlx::types::Json(
+        json!([{ "code": "needs_choice", "detail": "AI training: no" }]),
+    ))
+    .bind(today())
+    .execute(&h.db)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO sources.job_boards (id, slug, name, homepage, host, kind, priority, status,
+            origin, system_id, created_at, updated_at)
+         VALUES ($1, 'lever-acme', 'Acme', 'https://acme.example', 'acme.example', 'company_page',
+                 'low', 'candidate', 'discovery', $2, $3, $3)",
+    )
+    .bind(Uuid::now_v7())
+    .bind(system)
+    .bind(today())
+    .execute(&h.db)
+    .await
+    .unwrap();
+    let (status, page) = h.get("/api/v1/boards/admin/list?show=waiting").await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert_eq!(page["boards"].as_array().unwrap().len(), 1);
+    assert_eq!(page["boards"][0]["name"], "Lever");
+    assert_eq!(page["boards"][0]["need"], "choice");
+    // The company page waits on its system, and is one of the company pages.
+    let (_, company) = h.get("/api/v1/boards/admin/list?show=company").await;
+    assert_eq!(company["boards"].as_array().unwrap().len(), 1);
+    assert_eq!(company["boards"][0]["stage"], "checking");
+    let (_, overview) = h.get("/api/v1/boards/admin").await;
+    assert_eq!(overview["totals"]["waiting"], 1);
+    assert_eq!(overview["totals"]["reading_companies"], 0);
+}

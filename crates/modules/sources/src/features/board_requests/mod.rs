@@ -78,9 +78,9 @@ pub enum Stage {
 /// How many boards are in each state.
 #[derive(Debug, Clone, Copy, Serialize, ToSchema)]
 pub struct AdminTotals {
-    /// Approved job sites.
+    /// Job sites that are read.
     pub reading_sites: u32,
-    /// Companies read through their hiring system (Greenhouse, Lever, Ashby).
+    /// Company pages that are read.
     pub reading_companies: u32,
     pub waiting: u32,
     pub checking: u32,
@@ -207,7 +207,8 @@ type LatestRequest = (Option<DateTime<Utc>>, Option<DateTime<Utc>>, Option<Strin
 type Classified = (Stage, Option<Need>, Option<String>, Option<DateTime<Utc>>);
 
 /// Where a candidate stands and what it waits for.
-fn classify(row: &BoardRow, open: &[&OpenRequest]) -> Classified {
+/// `system_ok` is false for a company page whose hiring system is not approved.
+fn classify(row: &BoardRow, open: &[&OpenRequest], system_ok: bool) -> Classified {
     let blockers = boards::blockers(row);
     let asked = |kind: &str| {
         open.iter()
@@ -245,6 +246,26 @@ fn classify(row: &BoardRow, open: &[&OpenRequest]) -> Classified {
             Stage::NotAllowed,
             None,
             detail_of("robots_disallowed"),
+            None,
+        );
+    }
+    if !system_ok {
+        return (
+            Stage::Checking,
+            None,
+            Some("Its hiring system is not approved yet.".to_owned()),
+            None,
+        );
+    }
+    if has(&blockers, "needs_choice")
+        && blockers
+            .iter()
+            .all(|b| boards::CHOICES.contains(&b.code.as_str()))
+    {
+        return (
+            Stage::Waiting,
+            Some(Need::Choice),
+            detail_of("needs_choice"),
             None,
         );
     }
@@ -305,12 +326,22 @@ pub async fn overview(
     for request in &requests {
         by_board.entry(request.board_id).or_default().push(request);
     }
-    let (mut sites, mut waiting, mut checking, mut not_allowed, mut paused) = (0, 0, 0, 0, 0);
+    let approved: std::collections::HashSet<Uuid> = rows
+        .iter()
+        .filter(|r| r.status() == Status::Approved)
+        .map(|r| r.id)
+        .collect();
+    let (mut sites, mut companies, mut waiting, mut checking, mut not_allowed, mut paused) =
+        (0, 0, 0, 0, 0, 0);
     let mut started = 0;
     for row in &rows {
         match row.status() {
             Status::Approved => {
-                sites += 1;
+                match row.kind.as_str() {
+                    "company_page" => companies += 1,
+                    "hiring_system" => {}
+                    _ => sites += 1,
+                }
                 if row.approved_at.is_some_and(|at| at > since) {
                     started += 1;
                 }
@@ -319,7 +350,8 @@ pub async fn overview(
             Status::Declined => not_allowed += 1,
             Status::Candidate => {
                 let open = by_board.get(&row.id).map(Vec::as_slice).unwrap_or(&[]);
-                let (stage, _, _, _) = classify(row, open);
+                let system_ok = row.system_id.is_none_or(|id| approved.contains(&id));
+                let (stage, _, _, _) = classify(row, open, system_ok);
                 match stage {
                     Stage::Waiting => waiting += 1,
                     Stage::Checking => checking += 1,
@@ -329,9 +361,6 @@ pub async fn overview(
             }
         }
     }
-    let companies: i64 = sqlx::query_scalar("SELECT count(*) FROM sources.boards")
-        .fetch_one(&state.db)
-        .await?;
     let (found, checked, rechecked): (i64, i64, i64) = sqlx::query_as(
         "SELECT COALESCE(sum(found), 0)::bigint, COALESCE(sum(checked), 0)::bigint,
                 COALESCE(sum(rechecked), 0)::bigint
@@ -343,7 +372,7 @@ pub async fn overview(
     Ok(Json(AdminOverview {
         totals: AdminTotals {
             reading_sites: sites,
-            reading_companies: n(companies),
+            reading_companies: companies,
             waiting,
             checking,
             not_allowed,
@@ -825,12 +854,12 @@ fn key_of(row: &BoardRow) -> i32 {
     row.last_fetch_jobs.unwrap_or(-1)
 }
 
-fn admin_board(row: &BoardRow, open: &[&OpenRequest]) -> AdminBoard {
+fn admin_board(row: &BoardRow, open: &[&OpenRequest], system_ok: bool) -> AdminBoard {
     let (stage, need, detail, asked_at) = match row.status() {
         Status::Approved => (Stage::Reading, None, None, None),
         Status::Paused => (Stage::Paused, None, None, None),
         Status::Declined => (Stage::NotAllowed, None, None, None),
-        Status::Candidate => classify(row, open),
+        Status::Candidate => classify(row, open, system_ok),
     };
     let kind_group = if matches!(row.kind.as_str(), "company_page" | "hiring_system") {
         Group::Company
@@ -970,9 +999,23 @@ pub async fn list(
         for request in &requests {
             by_board.entry(request.board_id).or_default().push(request);
         }
+        let systems: Vec<Uuid> = rows.iter().filter_map(|r| r.system_id).collect();
+        let approved: std::collections::HashSet<Uuid> = if systems.is_empty() {
+            std::collections::HashSet::new()
+        } else {
+            sqlx::query_scalar(
+                "SELECT id FROM sources.job_boards WHERE status = 'approved' AND id = ANY($1)",
+            )
+            .bind(&systems)
+            .fetch_all(&state.db)
+            .await?
+            .into_iter()
+            .collect()
+        };
         for row in &rows {
             let open = by_board.get(&row.id).map(Vec::as_slice).unwrap_or(&[]);
-            let item = admin_board(row, open);
+            let system_ok = row.system_id.is_none_or(|id| approved.contains(&id));
+            let item = admin_board(row, open, system_ok);
             if !show.passes(item.stage) {
                 continue;
             }

@@ -1,11 +1,13 @@
 //! Finding a company's job board without a model.
 //!
-//! 1. If a posting of the company already came from a Greenhouse, Lever or
-//!    Ashby board, that board is used (the link says it: [`hint_of`]).
+//! 1. If a posting of the company already came from a Greenhouse, Lever,
+//!    Ashby, Workable, Recruitee, Teamtailor or Personio board, that board is
+//!    used (the link says it: [`hint_of`], through
+//!    [`crate::hiring_systems::company_link`]).
 //! 2. Otherwise the company's own site is looked at: its home page, the
 //!    careers pages it links to and the usual paths (`/careers`, `/jobs`…),
-//!    where robots.txt allows, for a Greenhouse, Lever or Ashby board (a link,
-//!    an embed or a token) or schema.org `JobPosting` JSON-LD.
+//!    where robots.txt allows, for such a board (a link, an embed or a token)
+//!    or schema.org `JobPosting` JSON-LD.
 //! 3. A board found is read once to confirm it lists jobs.
 //!
 //! Every page goes through [`Reader::page`] (a public address, the same-site
@@ -50,6 +52,10 @@ pub enum BoardKind {
     Greenhouse,
     Lever,
     Ashby,
+    Workable,
+    Recruitee,
+    Teamtailor,
+    Personio,
     /// A careers page with schema.org `JobPosting` data.
     Jsonld,
     /// No board found.
@@ -63,6 +69,10 @@ impl BoardKind {
             Self::Greenhouse => "greenhouse",
             Self::Lever => "lever",
             Self::Ashby => "ashby",
+            Self::Workable => "workable",
+            Self::Recruitee => "recruitee",
+            Self::Teamtailor => "teamtailor",
+            Self::Personio => "personio",
             Self::Jsonld => "jsonld",
             Self::None => "none",
         }
@@ -70,10 +80,19 @@ impl BoardKind {
 
     /// The kind stored as `raw`; `None` (no board) for anything else.
     pub fn parse(raw: &str) -> Self {
-        [Self::Greenhouse, Self::Lever, Self::Ashby, Self::Jsonld]
-            .into_iter()
-            .find(|k| k.as_str() == raw)
-            .unwrap_or(Self::None)
+        [
+            Self::Greenhouse,
+            Self::Lever,
+            Self::Ashby,
+            Self::Workable,
+            Self::Recruitee,
+            Self::Teamtailor,
+            Self::Personio,
+            Self::Jsonld,
+        ]
+        .into_iter()
+        .find(|k| k.as_str() == raw)
+        .unwrap_or(Self::None)
     }
 
     /// The reader's source for an applicant tracking system.
@@ -82,6 +101,10 @@ impl BoardKind {
             Self::Greenhouse => Some(Source::Greenhouse),
             Self::Lever => Some(Source::Lever),
             Self::Ashby => Some(Source::Ashby),
+            Self::Workable => Some(Source::Workable),
+            Self::Recruitee => Some(Source::Recruitee),
+            Self::Teamtailor => Some(Source::Teamtailor),
+            Self::Personio => Some(Source::Personio),
             Self::Jsonld | Self::None => None,
         }
     }
@@ -92,6 +115,10 @@ impl BoardKind {
             Source::Greenhouse => Self::Greenhouse,
             Source::Lever => Self::Lever,
             Source::Ashby => Self::Ashby,
+            Source::Workable => Self::Workable,
+            Source::Recruitee => Self::Recruitee,
+            Source::Teamtailor => Self::Teamtailor,
+            Source::Personio => Self::Personio,
             Source::Arbeitnow | Source::Hn | Source::Board => Self::None,
         }
     }
@@ -147,6 +174,15 @@ static ASHBY: LazyLock<Regex> =
 static ASHBY_API: LazyLock<Regex> = LazyLock::new(|| {
     re(r"(?i)\bapi\.ashbyhq\.com/posting-api/job-board/([A-Za-z0-9][A-Za-z0-9_.-]{0,99})")
 });
+static WORKABLE: LazyLock<Regex> = LazyLock::new(|| {
+    re(r"(?i)\bapply\.workable\.com/(?:api/v1/widget/accounts/)?([A-Za-z0-9][A-Za-z0-9_-]{0,99})")
+});
+static RECRUITEE: LazyLock<Regex> =
+    LazyLock::new(|| re(r"(?i)\b([a-z0-9][a-z0-9-]{0,62})\.recruitee\.com"));
+static TEAMTAILOR: LazyLock<Regex> =
+    LazyLock::new(|| re(r"(?i)\b([a-z0-9][a-z0-9-]{0,62})\.teamtailor\.com"));
+static PERSONIO: LazyLock<Regex> =
+    LazyLock::new(|| re(r"(?i)\b([a-z0-9][a-z0-9-]{0,62})\.jobs\.personio\.(?:de|com)"));
 
 /// The Greenhouse, Lever and Ashby boards `text` (a page, or one link)
 /// names, in the order it names them, each once.
@@ -199,6 +235,28 @@ pub fn ats_in(text: &str) -> Vec<AtsBoard> {
             }
         }
     }
+    for (regex, kind) in [
+        (&*WORKABLE, BoardKind::Workable),
+        (&*RECRUITEE, BoardKind::Recruitee),
+        (&*TEAMTAILOR, BoardKind::Teamtailor),
+        (&*PERSONIO, BoardKind::Personio),
+    ] {
+        for caps in regex.captures_iter(text) {
+            if let (Some(all), Some(token)) = (caps.get(0), caps.get(1)) {
+                let lower = token.as_str().to_ascii_lowercase();
+                // `www.recruitee.com` and `j` are the system's own.
+                if kind != BoardKind::Workable
+                    && ["www", "app", "api", "careers", "support", "help"].contains(&lower.as_str())
+                {
+                    continue;
+                }
+                if kind == BoardKind::Workable && lower == "j" {
+                    continue;
+                }
+                add(all.start(), kind, token.as_str(), false);
+            }
+        }
+    }
     found.sort_by_key(|(position, _)| *position);
     let mut seen = HashSet::new();
     found
@@ -213,11 +271,20 @@ pub fn ats_in(text: &str) -> Vec<AtsBoard> {
 pub fn hint_of(links: &[&str]) -> Option<AtsBoard> {
     links.iter().find_map(|raw| {
         let url = Url::parse(raw).ok()?;
-        let (source, token, _, eu) = posting_link(&url)?;
+        if let Some((source, token, _, eu)) = posting_link(&url) {
+            return Some(AtsBoard {
+                kind: BoardKind::of_source(source),
+                token,
+                eu,
+            });
+        }
+        // A company page of a system whose posting links carry no id we read
+        // (Workable, Recruitee, Teamtailor, Personio), or any company page.
+        let link = crate::hiring_systems::company_link(&url)?;
         Some(AtsBoard {
-            kind: BoardKind::of_source(source),
-            token,
-            eu,
+            kind: BoardKind::of_source(link.source),
+            token: link.token,
+            eu: link.eu,
         })
     })
 }
@@ -800,6 +867,54 @@ mod tests {
             })
         );
         assert_eq!(hint_of(&["https://example.com/jobs/1"]), None);
+    }
+
+    #[test]
+    fn the_four_newer_systems_are_hints_and_found_on_pages() {
+        for (link, kind, token) in [
+            (
+                "https://apply.workable.com/acme/j/ABC123/",
+                BoardKind::Workable,
+                "acme",
+            ),
+            (
+                "https://acme.recruitee.com/o/engineer",
+                BoardKind::Recruitee,
+                "acme",
+            ),
+            (
+                "https://acme.teamtailor.com/jobs/1-engineer",
+                BoardKind::Teamtailor,
+                "acme",
+            ),
+            (
+                "https://acme.jobs.personio.de/job/42",
+                BoardKind::Personio,
+                "acme",
+            ),
+        ] {
+            assert_eq!(
+                hint_of(&[link]),
+                Some(AtsBoard {
+                    kind,
+                    token: token.into(),
+                    eu: false
+                }),
+                "{link}"
+            );
+            assert!(kind.source().is_some());
+            assert_eq!(BoardKind::parse(kind.as_str()), kind);
+        }
+        let html = r#"<a href="https://apply.workable.com/northwind">Jobs</a>
+            <a href="https://careers.recruitee.com/">x</a>
+            <a href="https://contoso.teamtailor.com/jobs">More</a>"#;
+        assert_eq!(
+            token(&ats_in(html)),
+            [
+                (BoardKind::Workable, "northwind".to_owned(), false),
+                (BoardKind::Teamtailor, "contoso".to_owned(), false),
+            ]
+        );
     }
 
     #[test]

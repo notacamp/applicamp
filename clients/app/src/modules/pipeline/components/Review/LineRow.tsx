@@ -37,6 +37,8 @@ export interface LineActions {
   edit: (line: string, text: string) => void;
   remove: (line: string) => void;
   confirm: (line: string, text?: string) => void;
+  /** "Yes, keep it": the fact the app proposed goes on the profile. */
+  keep: (line: string) => void;
 }
 
 /** Why a line is flagged, in words. */
@@ -51,6 +53,9 @@ export function ReasonText({ reason }: { reason: CvReason }) {
     }
     case "company_fact_outside_summary": {
       return <>{t("cv.flag.company")}</>;
+    }
+    case "other_position": {
+      return <>{t("cv.flag.otherPosition")}</>;
     }
     case "skill_not_on_profile": {
       return <>{t("cv.flag.skill", { skill: reason.skill })}</>;
@@ -271,7 +276,7 @@ export function LineRow({
         </Tagged>
       )}
     </Stack>
-  ) : line.mark === "reworded" || line.mark === "edited" ? (
+  ) : line.mark === "reworded" || line.mark === "edited" || line.fixed_by_app ? (
     <Tagged testId={`cv-from-toggle-${line.id}`}>
       <Disclosure summary={t("cv.from.show")}>
         <FromProfile line={line} />
@@ -285,9 +290,13 @@ export function LineRow({
       testId={`cv-line-${line.id}`}
       mark={
         <Tagged testId={`cv-line-mark-${line.id}`}>
-          <Label hue={flagged ? "red" : MARK_HUES[line.mark]}>
-            {flagged ? t("cv.flag.label") : t(`cv.marks.${line.mark}`)}
-          </Label>
+          {flagged ? (
+            <Label hue="red">{t("cv.flag.label")}</Label>
+          ) : line.fixed_by_app ? (
+            <Label hue="green">{t("cv.marks.fixed_by_app")}</Label>
+          ) : (
+            <Label hue={MARK_HUES[line.mark]}>{t(`cv.marks.${line.mark}`)}</Label>
+          )}
         </Tagged>
       }
       detail={detail}

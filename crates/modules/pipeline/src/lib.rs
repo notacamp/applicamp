@@ -22,8 +22,10 @@
 //! - **The tailored CV** (`/api/v1/opportunities/{id}/cv`): a draft per
 //!   opportunity (one model call), every line citing the profile sources it
 //!   comes from, a fact check without a model that blocks Approve while a
-//!   line says what its sources do not, review (edit, remove, "it's true",
-//!   put back) and approval as a version.
+//!   line says what its sources do not, the app's own fix of what the check
+//!   flags (one more call) and a question for the rest, a PDF preview of
+//!   every draft, review (Yes keep it, edit, remove, "it's true", put back)
+//!   and approval as a version.
 //!
 //! - **The tailored CV as a PDF** (#38): approving renders the approved text
 //!   with Typst inside the server (Clean or Compact, 1 or 2 pages), reads the
@@ -98,7 +100,10 @@ pub fn module(deps: PipelineDeps) -> Module {
         .routes(routes!(cv::change_line))
         .routes(routes!(cv::confirm_line))
         .routes(routes!(cv::put_back))
+        .routes(routes!(cv::preview::make))
+        .routes(routes!(cv::preview::pdf_file))
         .routes(routes!(cv::approve))
+        .routes(routes!(cv::unapprove))
         .routes(routes!(cv::versions::create))
         .routes(routes!(cv::versions::pdf_file))
         .routes(routes!(cv::versions::list_all))

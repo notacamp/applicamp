@@ -12,7 +12,7 @@ use super::model::{Frame, Source, SourceKind};
 use crate::features::brief::BriefWant;
 
 /// Raise with every change to the instructions' text.
-pub const VERSION: u32 = 1;
+pub const VERSION: u32 = 2;
 
 /// Characters of the posting the model is shown.
 pub const POSTING_BUDGET: usize = 8_000;
@@ -46,6 +46,8 @@ No number, tool, name, place or result that is not in a cited source.\n\
 turn a sentence into a bullet. Keep the numbers exactly.\n\
 - Company facts (ids starting with `c`) may be cited only in `summary`, and only to say how the \
 person's real experience fits the company. They are never the person's achievements.\n\
+- A bullet cites only its own position's sources (ids starting with that position's `w`, like \
+`w3.`) and [sk].\n\
 - Pick what fits the job and leave the rest out. Leave out positions that do not help. Keep it \
 to one page.\n\
 - Write in the language of <language>. Keep tool names, titles and numbers as they are.\n\

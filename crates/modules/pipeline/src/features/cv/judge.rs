@@ -70,6 +70,7 @@ fn line(content: &mut Content, text: &str, sources: Vec<String>, most: usize) ->
         text: text.chars().take(most).collect(),
         sources: cited,
         edited: false,
+        ..Line::default()
     }
 }
 

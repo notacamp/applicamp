@@ -115,7 +115,26 @@
       "invalid_key": "That key can’t be used.",
       "no_key_needed": "This board doesn’t need a key.",
       "kind_locked": "An approved board keeps how it is read. Pause it first.",
-      "generic": "That didn’t work. Try again."
+      "generic": "That didn’t work. Try again.",
+      "system_waiting": "The hiring system of this page waits for you. Approve that one first."
+    },
+    "hiring": {
+      "company_page": "Company page",
+      "hiring_system": "Hiring system",
+      "through": "Hires through {{system}}",
+      "systemLine": "Where companies post their jobs",
+      "companyPages": "{{total}} company pages: {{approved}} approved, {{waiting}} waiting, {{declined}} declined. The list shows the ones waiting and the newest.",
+      "webSearchOff": "Web search for company pages is off.",
+      "webSearchOn": "Web search for company pages is on: {{used}} of {{limit}} searches this month.",
+      "systems": {
+        "greenhouse": "Greenhouse",
+        "lever": "Lever",
+        "ashby": "Ashby",
+        "workable": "Workable",
+        "recruitee": "Recruitee",
+        "teamtailor": "Teamtailor",
+        "personio": "Personio"
+      }
     }
   },
   "board": {
@@ -174,7 +193,9 @@
       "needs_permission": "It asks for permission first: {{detail}}",
       "no_endpoint": "It has no feed address yet. Check looks for one and proposes a config.",
       "unknown": "It can’t be approved yet: {{detail}}",
-      "source": "Where it says so"
+      "source": "Where it says so",
+      "needs_choice": "Reading its pages is allowed. It asks artificial intelligence tools not to learn from them. Applicamp never trains on jobs: approve it to read its company pages, or decline it.",
+      "system_waiting": "The hiring system of this page isn’t approved yet. Approve that one first."
     },
     "manage": {
       "title": "Your decision",
@@ -207,7 +228,9 @@
         "json_api": "a JSON API",
         "rss": "an RSS feed",
         "jsonld_sitemap": "job postings through its sitemap",
-        "hn": "HN’s thread"
+        "hn": "HN’s thread",
+        "hiring_system": "a hiring system",
+        "company_page": "a company page"
       },
       "fields": {
         "title": "Title",
@@ -333,7 +356,11 @@
       "lever": "Lever",
       "ashby": "Ashby",
       "jsonld": "Their careers page (JobPosting)",
-      "none": "No job board"
+      "none": "No job board",
+      "workable": "Workable",
+      "recruitee": "Recruitee",
+      "teamtailor": "Teamtailor",
+      "personio": "Personio"
     },
     "watching": {
       "emptyTitle": "You’re not watching any company yet",

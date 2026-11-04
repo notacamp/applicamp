@@ -115,7 +115,26 @@
       "invalid_key": "Esa clave no se puede usar.",
       "no_key_needed": "Este portal no necesita clave.",
       "kind_locked": "Un portal aprobado mantiene cómo se lee. Ponlo en pausa primero.",
-      "generic": "No ha funcionado. Vuelve a intentarlo."
+      "generic": "No ha funcionado. Vuelve a intentarlo.",
+      "system_waiting": "El sistema de contratación de esta página espera tu decisión. Aprueba primero ese."
+    },
+    "hiring": {
+      "company_page": "Página de empresa",
+      "hiring_system": "Sistema de contratación",
+      "through": "Contrata a través de {{system}}",
+      "systemLine": "Donde las empresas publican sus ofertas",
+      "companyPages": "{{total}} páginas de empresa: {{approved}} aprobadas, {{waiting}} en espera, {{declined}} rechazadas. La lista muestra las que esperan y las más recientes.",
+      "webSearchOff": "La búsqueda web de páginas de empresa está desactivada.",
+      "webSearchOn": "La búsqueda web de páginas de empresa está activada: {{used}} de {{limit}} búsquedas este mes.",
+      "systems": {
+        "greenhouse": "Greenhouse",
+        "lever": "Lever",
+        "ashby": "Ashby",
+        "workable": "Workable",
+        "recruitee": "Recruitee",
+        "teamtailor": "Teamtailor",
+        "personio": "Personio"
+      }
     }
   },
   "board": {
@@ -174,7 +193,9 @@
       "needs_permission": "Pide permiso primero: {{detail}}",
       "no_endpoint": "Aún no tiene dirección de feed. La comprobación busca una y propone una configuración.",
       "unknown": "Aún no se puede aprobar: {{detail}}",
-      "source": "Dónde lo dice"
+      "source": "Dónde lo dice",
+      "needs_choice": "Leer sus páginas está permitido. Pide a las herramientas de inteligencia artificial que no aprendan de ellas. Applicamp nunca entrena con ofertas: apruébalo para leer las páginas de las empresas, o recházalo.",
+      "system_waiting": "El sistema de contratación de esta página aún no está aprobado. Aprueba primero ese."
     },
     "manage": {
       "title": "Tu decisión",
@@ -207,7 +228,9 @@
         "json_api": "una API JSON",
         "rss": "un feed RSS",
         "jsonld_sitemap": "ofertas en su sitemap",
-        "hn": "el hilo de HN"
+        "hn": "el hilo de HN",
+        "hiring_system": "un sistema de contratación",
+        "company_page": "una página de empresa"
       },
       "fields": {
         "title": "Título",
@@ -333,7 +356,11 @@
       "lever": "Lever",
       "ashby": "Ashby",
       "jsonld": "Su página de empleo (JobPosting)",
-      "none": "Sin portal de empleo"
+      "none": "Sin portal de empleo",
+      "workable": "Workable",
+      "recruitee": "Recruitee",
+      "teamtailor": "Teamtailor",
+      "personio": "Personio"
     },
     "watching": {
       "emptyTitle": "Todavía no vigilas ninguna empresa",

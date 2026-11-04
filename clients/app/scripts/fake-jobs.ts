@@ -52,6 +52,9 @@
 // no source says (it is flagged), a bullet that cites a company fact outside
 // the summary (flagged), a summary that cites a company fact, a skill that is
 // not on the profile (flagged), and every position after the second left out.
+// The fix prompt ("You fix the lines of a CV…", #73) rewrites the company-fact
+// line to its own source's words and asks about any other, proposing the line
+// as a first-person fact.
 //
 // The cover letter (#45): the model answers the letter prompt ("You write a
 // cover letter…") by fixed rules: a paragraph citing a company fact and a
@@ -60,6 +63,21 @@
 // claims nothing, an answer to each of the posting's application questions it
 // can support, and an empty one for a notice period, salary, visa or move
 // (the profile cannot say). The posting lists two application questions.
+//
+// Company pages (#87): the hiring systems, each at its own host name (aliases of
+// this fake on the e2e network, and the address the server reads that system
+// at, `<system>.hiring.test`), every one with robots rules that allow it. The
+// jobs of clean-site.test carry apply links on the systems' public addresses,
+// so the check at start registers a company page for each:
+//   greenhouse.hiring.test  clean: the app approves the system, then the
+//                           company page `harbour-stays` (a board with recent
+//                           jobs, read through the Greenhouse API);
+//   lever.hiring.test       robots.txt says `ai-train=no`: the system waits for
+//                           the owner (the blocker `needs_choice`), and the
+//                           company page `northlight-labs` waits with it;
+//   workable.hiring.test    clean: the system, then the company page
+//                           `wayfarer-co` (the Workable widget answer below).
+// The other four systems answer with clean rules and no jobs.
 //
 // Company watchers (#20): three companies' own sites per Playwright project
 // (desktop, phone) and one to show by hand (demo), each at its own host name:
@@ -734,6 +752,10 @@ async function complete(request: IncomingMessage, response: ServerResponse) {
       json(response, 200, completion(tailoredCv(user?.content ?? "")));
       return;
     }
+    if (system.startsWith("You fix the lines of a CV")) {
+      json(response, 200, completion(cvFixes(user?.content ?? "")));
+      return;
+    }
     if (system.startsWith("You write a cover letter")) {
       json(response, 200, completion(coverLetter(user?.content ?? "")));
       return;
@@ -817,6 +839,17 @@ const CLEAN_TERMS = "Jobs here may be linked to from other sites, with attributi
 const ASK_FIRST_TERMS =
   "You may not access the site by automated means without our prior written consent.";
 
+/**
+ * Where the first three jobs of clean-site.test say to apply: a company page
+ * on a hiring system's public address (never fetched: the stack reads the
+ * system at its `.hiring.test` host).
+ */
+const APPLY_LINKS = [
+  "https://boards.greenhouse.io/harbour-stays/jobs/4001",
+  "https://jobs.lever.co/northlight-labs/0b6d1c2e-4f1c-4a55-8a1d-2f1c0b6d1c2e",
+  "https://apply.workable.com/wayfarer-co/j/WF10A/",
+] as const;
+
 /** Five invented jobs posted in the last week, as the sites of #75 list them. */
 function recentJobs(site: string) {
   const titles = [
@@ -837,7 +870,10 @@ function recentJobs(site: string) {
         "Northlight Labs",
         "Harbour Stays",
       ][index],
-      url: `https://example.com/${site}/jobs/${String(index + 1)}`,
+      url:
+        site === "clean-site.test" && APPLY_LINKS[index] !== undefined
+          ? APPLY_LINKS[index]
+          : `https://example.com/${site}/jobs/${String(index + 1)}`,
       location: "Remote - Europe",
       posted_at: new Date(Date.now() - (index + 1) * 24 * 3600 * 1000).toISOString(),
     })),
@@ -947,6 +983,65 @@ function waitingBoard(site: string, url: URL, response: ServerResponse): boolean
     }
     console.log(`fake-jobs: listed the waiting board ${site}`);
     json(response, 200, waitingJobs(site));
+    return true;
+  }
+  return false;
+}
+
+/** The hiring systems' hosts (#87), one per system the server reads. */
+const HIRING_HOST =
+  /^(greenhouse|lever|ashby|workable|recruitee|teamtailor|personio)\.hiring\.test$/;
+
+/** The company a Greenhouse board of a hiring system's fake is of. */
+const HIRING_COMPANIES: Record<string, string> = {
+  "harbour-stays": "Harbour Stays",
+  "northlight-labs": "Northlight Labs",
+  "wayfarer-co": "Wayfarer Co",
+};
+
+/** Workable's widget answer for the company `token`: two jobs published today. */
+function workableList(token: string) {
+  const day = new Date().toISOString().slice(0, 10);
+  return {
+    name: HIRING_COMPANIES[token] ?? "Example Co",
+    description: "Invented.",
+    jobs: ["Travel Experience Designer", "Guest Services Manager"].map((title, index) => {
+      const code = `WF${String(index + 1)}0A`;
+      return {
+        title,
+        shortcode: code,
+        url: `https://apply.workable.com/${token}/j/${code}/`,
+        application_url: `https://apply.workable.com/${token}/j/${code}/apply/`,
+        published_on: day,
+        created_at: day,
+        telecommuting: true,
+        country: "Portugal",
+        city: "Lisbon",
+        locations: [{ country: "Portugal", city: "Lisbon", hidden: false }],
+      };
+    }),
+  };
+}
+
+/**
+ * A hiring system's host: robots rules (Lever's say `ai-train=no`), a home page
+ * with no terms, and Workable's widget answer; the other readers' paths are
+ * answered by the generic routes below. Whether it answered.
+ */
+function hiringSite(site: string, url: URL, response: ServerResponse): boolean {
+  if (url.pathname === "/robots.txt") {
+    const signal = site === "lever.hiring.test" ? "Content-Signal: search=yes, ai-train=no\n" : "";
+    text(response, "text/plain", `User-agent: *\n${signal}Disallow: /private\n`);
+    return true;
+  }
+  if (url.pathname === "/") {
+    text(response, "text/html", `<html lang="en"><body>An invented hiring system.</body></html>`);
+    return true;
+  }
+  const widget = /^\/api\/v1\/widget\/accounts\/([\w-]+)$/.exec(url.pathname);
+  if (widget?.[1] !== undefined) {
+    console.log(`fake-jobs: listed the Workable company ${widget[1]}`);
+    json(response, 200, workableList(widget[1]));
     return true;
   }
   return false;
@@ -1348,6 +1443,55 @@ function tailoredCv(userContent: string) {
   };
 }
 
+/** One flagged line of the CV fix prompt: its id, text, why, and its sources' words. */
+interface FixLine {
+  id: string;
+  text: string;
+  flagged: string[];
+  sources: string[];
+}
+
+/** The `<line>` blocks of the CV fix prompt. */
+function fixLinesOf(content: string): FixLine[] {
+  return [...content.matchAll(/<line id="([^"]+)"[^>]*>\n([\s\S]*?)<\/line>/g)].map((match) => {
+    const block = match[2] ?? "";
+    return {
+      id: match[1] ?? "",
+      text: /<text>([\s\S]*?)<\/text>/.exec(block)?.[1] ?? "",
+      flagged: [...block.matchAll(/<flagged>(.*?)<\/flagged>/g)].map((found) => found[1] ?? ""),
+      sources: [...block.matchAll(/<source id="[^"]+">(.*?)<\/source>/g)].map(
+        (found) => found[1] ?? "",
+      ),
+    };
+  });
+}
+
+/**
+ * The CV fixer (system prompt "You fix the lines of a CV…"): a line that uses
+ * a company fact as an achievement is rewritten to its own source's words;
+ * any other gets a question, with the line as a first-person fact.
+ */
+function cvFixes(userContent: string) {
+  return {
+    lines: fixLinesOf(userContent).map((line) => {
+      const own = line.sources[0];
+      if (line.flagged.some((why) => why.includes("about the company")) && own !== undefined) {
+        return { id: line.id, rewrite: own, question: null, fact: null };
+      }
+      const lower = `${line.text.charAt(0).toLowerCase()}${line.text.slice(1)}`;
+      const claim = line.flagged
+        .map((why) => /^"(.+)" is not in its sources$/.exec(why)?.[1])
+        .find((found) => found !== undefined);
+      return {
+        id: line.id,
+        rewrite: null,
+        question: claim === undefined ? "Is this line right?" : `Is “${claim}” right?`,
+        fact: `I ${lower.replace(/[.!?]+$/, "")}.`,
+      };
+    }),
+  };
+}
+
 /** The job's own questions of the letter prompt: `1. text` lines. */
 function letterQuestionsOf(content: string): string[] {
   const block = /<questions>\n([\s\S]*?)\n?<\/questions>/.exec(content)?.[1] ?? "";
@@ -1430,7 +1574,15 @@ const server = createServer((request, response) => {
   if (method === "GET" && WATCHED_HOST.test(site) && watchedSite(site, url, response)) {
     return;
   }
-  if (method === "GET" && site.endsWith(".test") && waitingBoard(site, url, response)) {
+  if (method === "GET" && HIRING_HOST.test(site) && hiringSite(site, url, response)) {
+    return;
+  }
+  if (
+    method === "GET" &&
+    site.endsWith(".test") &&
+    !HIRING_HOST.test(site) &&
+    waitingBoard(site, url, response)
+  ) {
     return;
   }
   const board = /^\/v1\/boards\/([\w-]+)\/jobs\/?$/.exec(url.pathname);
@@ -1470,9 +1622,14 @@ const server = createServer((request, response) => {
   if (method === "GET" && board !== null) {
     lists += 1;
     const base = Date.now() * 10 + lists;
-    console.log(`fake-jobs: listed board ${board[1] ?? ""}`);
+    const token = board[1] ?? "";
+    console.log(`fake-jobs: listed board ${token}`);
+    const company = HIRING_COMPANIES[token];
     json(response, 200, {
-      jobs: ROLES.map((title, index) => job(base * 10 + index, title)),
+      jobs: ROLES.map((title, index) => ({
+        ...job(base * 10 + index, title),
+        ...(company === undefined ? {} : { company_name: company }),
+      })),
       meta: { total: ROLES.length },
     });
     return;

@@ -18,6 +18,10 @@ export type CvSource = Schema<"SourceView">;
 export type CvVersion = Schema<"CvVersion">;
 export type CvPdfChecks = Schema<"PdfChecks">;
 export type CvTemplate = Schema<"Template">;
+/** A draft as a PDF, made at once and after every change. */
+export type CvPreview = Schema<"CvPreview">;
+/** A line (or skill) the app could not fix: a question for the person. */
+export type CvWaiting = Schema<"Waiting">;
 
 /** The templates, as the person picks them. */
 export const TEMPLATES = ["clean", "compact"] as const satisfies readonly CvTemplate[];
@@ -46,6 +50,36 @@ export function layoutOf(version: Pick<CvVersion, "template" | "length">): CvLay
 export function cvPdfUrl(opportunity: string, version: number, download = false): string {
   const base = `/api/v1/opportunities/${encodeURIComponent(opportunity)}/cv/versions/${String(version)}/pdf`;
   return download ? `${base}?download=1` : base;
+}
+
+/**
+ * Where a draft's preview is: shown in the page (`version` makes the browser
+ * ask for the newest one), or (with `download`) saved as "… (draft).pdf".
+ */
+export function cvPreviewUrl(
+  opportunity: string,
+  n: number,
+  { download = false, version }: { download?: boolean; version?: string | null } = {},
+): string {
+  const base = `/api/v1/opportunities/${encodeURIComponent(opportunity)}/cv/drafts/${String(n)}/preview.pdf`;
+  const query = new URLSearchParams();
+  if (download) {
+    query.set("download", "1");
+  }
+  if (version !== undefined && version !== null && version !== "") {
+    query.set("v", version);
+  }
+  const tail = query.toString();
+  return tail === "" ? base : `${base}?${tail}`;
+}
+
+/** The layout of a draft's preview, when it has one. */
+export function previewLayout(preview: CvPreview | null | undefined): CvLayout | undefined {
+  const template = preview?.template ?? undefined;
+  if (template === undefined) {
+    return undefined;
+  }
+  return { template, length: preview?.length === 2 ? 2 : 1 };
 }
 
 const cvKey = (id: string) => [...PIPELINE_QUERY_KEY, "cv", id] as const;
@@ -109,17 +143,28 @@ export function useChangeLine(id: string, n: number) {
   });
 }
 
-/** "It's true: add it to my profile": the person's words become a fact. */
+/**
+ * "Yes, keep it" (`proposal`: the fact the app proposed, kept as a confirmed
+ * assumption), or "It's true" in the person's own words (`text`).
+ */
 export function useConfirmLine(id: string, n: number) {
   const store = useStore(id);
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ line, text }: { line: string; text?: string }): Promise<Cv> =>
+    mutationFn: async ({
+      line,
+      text,
+      proposal,
+    }: {
+      line: string;
+      text?: string;
+      proposal?: true;
+    }): Promise<Cv> =>
       unwrap(
         await api.POST("/api/v1/opportunities/{id}/cv/drafts/{n}/lines/{line_id}/confirm", {
           params: { path: { id, n, line_id: line } },
           headers: CSRF_HEADERS,
-          body: text === undefined ? {} : { text },
+          body: proposal === true ? { proposal: true } : text === undefined ? {} : { text },
         }),
       ),
     onSuccess: (cv) => {
@@ -127,6 +172,22 @@ export function useConfirmLine(id: string, n: number) {
       // The profile gained a fact or a skill (the profile module's keys).
       void queryClient.invalidateQueries({ queryKey: ["profile"] });
     },
+  });
+}
+
+/** The draft's preview in another layout: no AI. */
+export function usePreview(id: string, n: number) {
+  const store = useStore(id);
+  return useMutation({
+    mutationFn: async (layout: CvLayout): Promise<Cv> =>
+      unwrap(
+        await api.POST("/api/v1/opportunities/{id}/cv/drafts/{n}/preview", {
+          params: { path: { id, n } },
+          headers: CSRF_HEADERS,
+          body: layout,
+        }),
+      ),
+    onSuccess: store,
   });
 }
 
@@ -159,6 +220,21 @@ export function useApprove(id: string, n: number) {
           params: { path: { id, n } },
           headers: CSRF_HEADERS,
           body: layout,
+        }),
+      ),
+    onSuccess: store,
+  });
+}
+
+/** Undoes an approval made a moment ago: the draft is back, and what was to start next waits. */
+export function useUnapprove(id: string, n: number) {
+  const store = useStore(id);
+  return useMutation({
+    mutationFn: async (): Promise<Cv> =>
+      unwrap(
+        await api.POST("/api/v1/opportunities/{id}/cv/drafts/{n}/unapprove", {
+          params: { path: { id, n } },
+          headers: CSRF_HEADERS,
         }),
       ),
     onSuccess: store,
@@ -213,11 +289,15 @@ const ERROR_CODES = [
   "ai_failed",
   "invalid_text",
   "invalid_fact",
+  "cannot_keep",
+  "not_flagged",
+  "too_late",
   "profile_changed",
   "draft_frozen",
   "lines_flagged",
   "already_on_cv",
   "cv_doesnt_fit",
+  "cv_previews_daily_cap",
   "cv_pdf_check_failed",
   "cv_pdf_unavailable",
   "cv_versions_cap",
@@ -236,8 +316,11 @@ export function cvErrorCode(error: unknown): CvErrorCode {
   return ERROR_CODES.find((known) => known === code) ?? "generic";
 }
 
-/** What "Draft the CV" costs, about, in euros (the server's own figure is `Cv.draft_eur`). */
-export const DRAFT_ESTIMATE_EUR = 0.002;
+/**
+ * What "Draft the CV" costs, about, in euros: the draft and, at worst, the app's fix round (the
+ * server's own figure is `Cv.draft_eur`).
+ */
+export const DRAFT_ESTIMATE_EUR = 0.004;
 
 /** Where a flag can be fixed with "It's true": not for a company fact used as an achievement. */
 export function canConfirm(flags: readonly CvReason[]): boolean {

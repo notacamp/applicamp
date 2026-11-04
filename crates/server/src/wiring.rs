@@ -758,6 +758,21 @@ impl applicamp_pipeline::Neighbours for PipelineWiring {
         })
     }
 
+    fn keep_assumption<'a>(
+        &'a self,
+        state: &'a AppState,
+        account: Uuid,
+        position: usize,
+        title: Option<&'a str>,
+        company: Option<&'a str>,
+        text: &'a str,
+        basis: &'a str,
+    ) -> BoxFuture<'a, Result<String>> {
+        Box::pin(matching::keep_assumption(
+            state, account, position, title, company, text, basis,
+        ))
+    }
+
     fn add_skill<'a>(
         &'a self,
         state: &'a AppState,

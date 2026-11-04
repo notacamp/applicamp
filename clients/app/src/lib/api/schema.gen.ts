@@ -1003,9 +1003,11 @@ export interface paths {
          * Approve the draft.
          * @description Refused (409 `lines_flagged`) while any line or skill cannot be traced to
          *     the profile. The draft is frozen, its text rendered as a PDF with the
-         *     `template` and `length` asked for (Clean, 1 page by default), the PDF read
-         *     back out and compared with the CV, and the PDF kept as the next version:
-         *     all or nothing. If it does not fit the length (`cv_doesnt_fit`) or the
+         *     `template` and `length` asked for (the preview's when left out, else
+         *     Clean on 1 page), the PDF read back out and compared with the CV, and the
+         *     PDF kept as the next version: all or nothing. The preview's PDF is kept
+         *     as it is when the draft has not changed since it was made, its layout is
+         *     the one asked for and its read-back passed. If it does not fit the length (`cv_doesnt_fit`) or the
          *     read-back finds it lacking (`cv_pdf_check_failed`, with the reasons, one
          *     per line), nothing is approved. Contact details are read from the profile
          *     again. No model call.
@@ -1053,7 +1055,9 @@ export interface paths {
         /**
          * Change one line of a draft.
          * @description `{text}` edits it: the new text is checked against the **same sources**
-         *     (an edited line that is not a summary drops its company-fact citations).
+         *     (an edited line that is not a summary drops its company-fact citations,
+         *     and a bullet drops another position's), and the app's question about it,
+         *     if any, goes. The preview is made again.
          *     `{remove: true}` removes the line (a position left with no line goes to
          *     "left out"), or the skill. No model call. Only a draft can change.
          */
@@ -1070,14 +1074,68 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * "It's true: add it to my profile."
-         * @description The person's own words become a fact kept on the line's position (its
-         *     `quote` is the text; `area` defaults to `results`), as Grill me's Keep
-         *     does, and the line is checked again with that fact as an extra source.
-         *     For a skill it adds the skill to the profile instead. A summary or
-         *     headline puts the fact on the most recent position. No model call.
+         * "Yes, keep it", or "It's true" in the person's words.
+         * @description `{proposal: true}` keeps the fact the app proposed for a flagged line
+         *     (its question's, else the line's own words) on the line's position as a
+         *     **confirmed assumption**, based on this CV draft; refused
+         *     (`cannot_keep`) for a company fact used as an achievement, another job's
+         *     line, or one longer than a fact (its `waiting` item says which). `{text}`
+         *     keeps the person's own words as a fact (its `quote` is the text; `area`
+         *     defaults to `results`), as Grill me's Keep does. Either way the line is
+         *     checked again with that fact as a source (and none another position's or
+         *     a company's), and the preview is made again. For a skill it adds the
+         *     skill to the profile instead. A summary or headline puts the fact on the
+         *     most recent position. No model call.
          */
         post: operations["pipeline.cv_confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/cv/drafts/{n}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * See the draft in another layout, or make its PDF again.
+         * @description Renders the draft's text with the `template` and `length` asked for (what
+         *     the preview has when left out) and keeps it as its preview. **No model
+         *     call.** What the read-back finds is a note, never a refusal. Refused when
+         *     it does not fit the length (`cv_doesnt_fit`): the preview stays as it was.
+         *     Only a draft has a preview to change. At most 30 a day per account
+         *     (`cv_previews_daily_cap`).
+         */
+        post: operations["pipeline.cv_preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/cv/drafts/{n}/preview.pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The PDF of a draft's preview.
+         * @description `Content-Type: application/pdf`, shown inline, named
+         *     `<Name> CV - <Company> (draft).pdf`; `?download=1` serves it as an
+         *     attachment. Never cached, never sniffed. A draft with no preview, and
+         *     another account's, are not found.
+         */
+        get: operations["pipeline.cv_preview_pdf"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1101,6 +1159,30 @@ export interface paths {
          *     it passes the check. No model call.
          */
         post: operations["pipeline.cv_put_back"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/cv/drafts/{n}/unapprove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo an approval, for a moment.
+         * @description Within 15 seconds of approving, before the cover letter that comes next
+         *     starts, the draft becomes a draft again: its PDF version goes, the
+         *     letter waits for the CV again, and the preview is made again. Refused
+         *     after that (`too_late`), or when it is not approved (`not_approved`). No
+         *     model call.
+         */
+        post: operations["pipeline.cv_unapprove"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2764,12 +2846,20 @@ export interface components {
          * @description How a board is read.
          * @enum {string}
          */
-        BoardKind: "json_api" | "rss" | "jsonld_sitemap" | "hn";
+        BoardKind: "json_api" | "rss" | "jsonld_sitemap" | "hn" | "hiring_system" | "company_page";
         /** @description The job boards, highest average salary first (none last). */
         BoardList: {
+            /**
+             * @description The boards and the hiring systems, with the company pages that wait
+             *     first and the newest (at most [`SHOWN_COMPANY_PAGES`]).
+             */
             boards: components["schemas"]["BoardSummary"][];
             /** @description The signed-in person manages the boards. */
             can_manage: boolean;
+            /** @description Every company page there is. */
+            company_pages: components["schemas"]["CompanyPageCounts"];
+            /** @description The web search. */
+            web_search: components["schemas"]["WebSearchState"];
         };
         /**
          * @description What a board waits on the owner for.
@@ -2908,6 +2998,8 @@ export interface components {
             approved_by?: string | null;
             /** @description How its jobs are credited ("From Himalayas"). */
             attribution: string;
+            /** @description For a company page, the company on its system (`acme`). */
+            company_token?: string | null;
             /** @description Where to ask it for permission. */
             contact_email?: string | null;
             /** @description What its site rules say about use of its content (search, ai-train). */
@@ -2943,6 +3035,8 @@ export interface components {
             /** @description Its stable name: the source its jobs carry. */
             slug: string;
             status: components["schemas"]["BoardStatus"];
+            /** @description For a hiring system and a company page, the system (`lever`). */
+            system?: string | null;
             /** @description Plain lowercase words that describe it ("tech", "europe"). */
             tags: string[];
             /** @description The sentence of its terms that decided the verdict. */
@@ -3108,6 +3202,11 @@ export interface components {
             allowed: boolean;
             reason?: components["schemas"]["LetterBlocked"] | null;
         };
+        /**
+         * @description Why "Yes, keep it" is not offered for a flagged line.
+         * @enum {string}
+         */
+        CannotKeep: "company" | "other_position" | "too_long";
         /** @description A careers page (or a link to a job board) someone pasted. */
         CareersPage: {
             /** @description Its address. */
@@ -3227,6 +3326,23 @@ export interface components {
             limit: number;
             suggested: components["schemas"]["CompanySuggestion"][];
             watching: components["schemas"]["WatchedCompany"][];
+        };
+        /** @description How many company pages there are, by where they stand. */
+        CompanyPageCounts: {
+            /**
+             * Format: int32
+             * @description Read by the app or the owner.
+             */
+            approved: number;
+            /** Format: int32 */
+            declined: number;
+            /** Format: int32 */
+            total: number;
+            /**
+             * Format: int32
+             * @description Not approved yet: their system waits, or no recent job was seen.
+             */
+            waiting: number;
         };
         /** @description The last read of the company's pages. */
         CompanyRead: {
@@ -3350,11 +3466,19 @@ export interface components {
          * @enum {string}
          */
         CompletionRole: "system" | "user" | "assistant";
-        /** @description "It's true": the person's words. */
+        /** @description "Yes, keep it", or "It's true" in the person's words. */
         ConfirmRequest: {
             /** @description What it is about (Grill me's areas); `results` when left out. */
             area?: string | null;
-            /** @description In their own words, up to 300 characters. Not needed for a skill. */
+            /**
+             * @description Keep the fact the app proposed for this line (its `waiting` item's
+             *     `proposal`) as a confirmed assumption on the position.
+             */
+            proposal?: boolean | null;
+            /**
+             * @description In their own words, up to 300 characters. Not needed for a skill or
+             *     with `proposal`.
+             */
             text?: string | null;
         };
         /** @description Name, email and links as text. */
@@ -3401,6 +3525,7 @@ export interface components {
              * @description About what one draft costs, in euros.
              */
             draft_eur: number;
+            next?: components["schemas"]["CvNext"] | null;
             /** Format: uuid */
             opportunity_id: string;
             /** @description The PDF versions, newest first. */
@@ -3465,6 +3590,11 @@ export interface components {
             first_flagged?: string | null;
             /**
              * Format: int32
+             * @description How many lines the app rewrote to say only what their sources say.
+             */
+            fixed_by_app: number;
+            /**
+             * Format: int32
              * @description How many lines (and skills) cannot be traced to the profile.
              */
             flagged: number;
@@ -3479,14 +3609,27 @@ export interface components {
              * @description Its number for this opportunity, from 1.
              */
             n: number;
+            /**
+             * @description Approved, but with no PDF yet (approved before PDFs were made): offer
+             *     to make it.
+             */
+            needs_version: boolean;
+            preview?: components["schemas"]["CvPreview"] | null;
             skills: components["schemas"]["SkillView"][];
             status: components["schemas"]["DraftStatus"];
             summary?: components["schemas"]["LineView"] | null;
+            /**
+             * Format: date-time
+             * @description Just approved: until then `…/unapprove` puts it back as a draft.
+             */
+            undo_until?: string | null;
             /**
              * Format: int32
              * @description Once approved: the version, from 1.
              */
             version?: number | null;
+            /** @description What waits on the person, in the order the page shows it. */
+            waiting: components["schemas"]["Waiting"][];
         };
         /**
          * @description What a row of the CVs page is.
@@ -3535,6 +3678,50 @@ export interface components {
              * @description The version, for a PDF.
              */
             version?: number | null;
+        };
+        /** @description What the app starts by itself now that the CV is approved. */
+        CvNext: {
+            /**
+             * Format: date-time
+             * @description When it starts: Undo stops it until then.
+             */
+            at: string;
+            /**
+             * Format: double
+             * @description About what it costs, in euros.
+             */
+            eur: number;
+            /** @description `letter`: the cover letter and the job's answers. */
+            step: string;
+        };
+        /** @description What the preview of a draft is, as the review page shows it. */
+        CvPreview: {
+            /**
+             * Format: date-time
+             * @description When it was made.
+             */
+            at?: string | null;
+            checks?: components["schemas"]["PdfChecks"] | null;
+            /** @description Why the last render failed: `cv_doesnt_fit` or `cv_pdf_unavailable`. */
+            error?: string | null;
+            /**
+             * Format: int32
+             * @description The most pages it may take: 1 or 2.
+             */
+            length?: number | null;
+            /**
+             * Format: int32
+             * @description The pages it takes.
+             */
+            pages?: number | null;
+            /** @description There is a PDF to show (`…/preview.pdf`). */
+            ready: boolean;
+            /**
+             * @description The PDF was made before the draft's last change: "Make the PDF"
+             *     (`POST …/preview`) makes it again.
+             */
+            stale: boolean;
+            template?: components["schemas"]["Template"] | null;
         };
         /** @description An approved version: the approved text as a PDF. */
         CvVersion: {
@@ -4298,10 +4485,14 @@ export interface components {
         LineView: {
             /** @description The words of the line that the check looks for in its sources. */
             claims: string[];
+            /** @description The app rewrote it to say only what its sources say. */
+            fixed_by_app: boolean;
             /** @description Why it cannot be traced to the profile; empty when it can. */
             flags: components["schemas"]["Reason"][];
             id: string;
             mark: components["schemas"]["Mark"];
+            /** @description What it said before the app rewrote it. */
+            original?: string | null;
             /** @description The sources it cites that the profile has. */
             sources: components["schemas"]["SourceView"][];
             text: string;
@@ -4935,6 +5126,11 @@ export interface components {
             cites: string[];
             /** @enum {string} */
             kind: "company_fact_outside_summary";
+        } | {
+            /** @description The other positions' sources it cites. */
+            cites: string[];
+            /** @enum {string} */
+            kind: "other_position";
         } | {
             /** @enum {string} */
             kind: "skill_not_on_profile";
@@ -5660,6 +5856,46 @@ export interface components {
             result: unknown;
         };
         /**
+         * @description A line (or skill) the check flagged and the app could not fix: a
+         *     question only the person can answer.
+         */
+        Waiting: {
+            cannot_keep?: components["schemas"]["CannotKeep"] | null;
+            /** @description The company of that position ("You told us about …"). */
+            company?: string | null;
+            /** @description Why it is flagged. */
+            flags: components["schemas"]["Reason"][];
+            kind: components["schemas"]["WaitingKind"];
+            /**
+             * @description The line (or skill) id: what `…/lines/{line_id}/confirm` and
+             *     `…/lines/{line_id}` are given.
+             */
+            line_id: string;
+            /**
+             * @description What "Yes, keep it" (`{proposal: true}`) keeps on the profile: the
+             *     app's sentence, else the line's own words, or the skill. None when it
+             *     cannot be kept (`cannot_keep` says why).
+             */
+            proposal?: string | null;
+            /** @description The app's own question about it, when it asked one. */
+            question?: string | null;
+            /**
+             * @description The person's own words the line was made from, as the profile has
+             *     them on that position: what "Change it" starts from. None when it
+             *     cites none.
+             */
+            quote?: string | null;
+            /** @description "Title · Company" of the position a kept fact lands on. */
+            role?: string | null;
+            /** @description The line's text, or the skill. */
+            text: string;
+        };
+        /**
+         * @description What a waiting item is.
+         * @enum {string}
+         */
+        WaitingKind: "line" | "skill";
+        /**
          * @description What a preparation waits on.
          * @enum {string}
          */
@@ -5668,7 +5904,7 @@ export interface components {
          * @description What a company's jobs are read from.
          * @enum {string}
          */
-        WatchBoardKind: "greenhouse" | "lever" | "ashby" | "jsonld" | "none";
+        WatchBoardKind: "greenhouse" | "lever" | "ashby" | "workable" | "recruitee" | "teamtailor" | "personio" | "jsonld" | "none";
         /** @description A company the person watches. */
         WatchedCompany: {
             /** @description How its jobs are read; `none` when no board was found. */
@@ -5700,6 +5936,21 @@ export interface components {
             /** Format: date-time */
             watching_since?: string | null;
             website?: string | null;
+        };
+        /** @description The optional web search that finds company pages. */
+        WebSearchState: {
+            /**
+             * Format: int32
+             * @description The most a month asks.
+             */
+            monthly_limit: number;
+            /** @description A key is set on the server. */
+            on: boolean;
+            /**
+             * Format: int32
+             * @description Queries asked this calendar month.
+             */
+            queries_this_month: number;
         };
         /** @description A position. */
         Work: {
@@ -8409,8 +8660,142 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `draft_frozen`; `profile_changed` */
+            /** @description `draft_frozen`; `profile_changed`; `cannot_keep`; `not_flagged` */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.cv_preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+                /** @description The draft. */
+                n: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LayoutRequest"];
+            };
+        };
+        responses: {
+            /** @description The CV, with the new preview. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cv"];
+                };
+            };
+            /** @description `invalid_layout`; `invalid_length` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `draft_frozen`; `cv_doesnt_fit` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `cv_previews_daily_cap` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `cv_pdf_unavailable` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.cv_preview_pdf": {
+        parameters: {
+            query?: {
+                /** @description `1` serves it as an attachment. */
+                download?: string;
+                /**
+                 * @description Anything: lets the page ask for the newest preview (it is never
+                 *     cached).
+                 */
+                v?: string;
+            };
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+                /** @description The draft. */
+                n: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The PDF. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": components["schemas"]["PdfFile"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -8475,6 +8860,58 @@ export interface operations {
                 };
             };
             /** @description `draft_frozen`; `already_on_cv` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.cv_unapprove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+                /** @description The draft. */
+                n: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The CV, with the draft back. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cv"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_approved`; `too_late` */
             409: {
                 headers: {
                     [name: string]: unknown;

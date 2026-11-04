@@ -20,6 +20,12 @@ import type { BoardDetail, BoardSummary } from "../../api/boards";
 
 import { BoardsPage, type BoardsTab } from "./BoardsPage";
 
+/** What the list says about company pages and the web search when there are none. */
+const NO_PAGES = {
+  company_pages: { total: 0, approved: 0, waiting: 0, declined: 0 },
+  web_search: { on: false, queries_this_month: 0, monthly_limit: 1000 },
+};
+
 /** A server with an approved board, one waiting and one declined, keeping the owner's decisions. */
 function fakeBoards(canManage: boolean, extra: Record<string, Stub> = {}) {
   const boards = new Map<string, BoardSummary>([
@@ -46,7 +52,7 @@ function fakeBoards(canManage: boolean, extra: Record<string, Stub> = {}) {
     };
   const requests = stubApi({
     "GET /api/v1/boards": () => ({
-      body: { can_manage: canManage, boards: [...boards.values()] },
+      body: { can_manage: canManage, boards: [...boards.values()], ...NO_PAGES },
     }),
     [`GET /api/v1/boards/${HIMALAYAS}`]: () => answer(HIMALAYAS),
     [`GET /api/v1/boards/${WAITING}`]: () => answer(WAITING),
@@ -513,9 +519,55 @@ describe("the boards page", () => {
     expect(await screen.findByTestId("boards-section-approved")).toBeVisible();
   });
 
+  it("shows a hiring system and a company page by their kind, in plain words", async () => {
+    stubApi({
+      "GET /api/v1/boards": {
+        body: {
+          can_manage: false,
+          boards: [
+            board({
+              id: "00000000-0000-4000-8000-0000000000a1",
+              slug: "lever-acme-1a2b3c",
+              name: "Acme",
+              kind: "company_page",
+              system: "lever",
+              company_token: "acme",
+              approved_by: "app",
+              approved_at: "2026-11-04T05:00:00Z",
+            }),
+            board({
+              id: "00000000-0000-4000-8000-0000000000a2",
+              slug: "hiring-lever",
+              name: "Lever",
+              kind: "hiring_system",
+              system: "lever",
+              status: "candidate",
+            }),
+          ],
+          company_pages: { total: 1, approved: 1, waiting: 0, declined: 0 },
+          web_search: { on: true, queries_this_month: 12, monthly_limit: 1000 },
+        },
+      },
+    });
+    renderPage();
+    const approved = await screen.findByTestId("boards-section-approved");
+    expect(approved).toHaveTextContent("Acme");
+    expect(approved).toHaveTextContent("Company page");
+    expect(approved).toHaveTextContent("Hires through Lever");
+    const waitingSection = screen.getByTestId("boards-section-waiting");
+    expect(waitingSection).toHaveTextContent("Hiring system");
+    expect(waitingSection).toHaveTextContent("Where companies post their jobs");
+    const pages = screen.getByTestId("boards-company-pages");
+    expect(pages).toHaveTextContent("1 company pages: 1 approved, 0 waiting, 0 declined");
+    expect(pages).toHaveTextContent("12 of 1000 searches this month");
+    for (const shown of [approved, waitingSection, pages]) {
+      expect(shown).not.toHaveTextContent(/\bATS\b|robots|\bAPI\b/);
+    }
+  });
+
   it("says when nothing was scanned yet", async () => {
     stubApi({
-      "GET /api/v1/boards": { body: { can_manage: false, boards: [] } },
+      "GET /api/v1/boards": { body: { can_manage: false, boards: [], ...NO_PAGES } },
       "GET /api/v1/boards/scans": { body: { runs: [], next_cursor: null } },
     });
     renderPage("scanned");

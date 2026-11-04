@@ -315,7 +315,7 @@
     "eyebrow": "CV à medida",
     "title": "Rever o CV",
     "heading": "Reveja o seu CV para {{company}}",
-    "lead": "Feito a partir do seu perfil para esta vaga. Cada linha indica de onde vem. As linhas que não se conseguem ligar ao seu perfil ficam bloqueadas até as corrigir.",
+    "lead": "Feito a partir do seu perfil para esta vaga. A app verificou cada linha com o seu perfil. Responda ao que ela pergunta e depois aprove. Nada é enviado a ninguém.",
     "back": "Voltar a Preparar",
     "loading": "A carregar o CV…",
     "loadFailed": "Não foi possível carregar o CV.",
@@ -358,7 +358,8 @@
       "as_in_profile": "Como no perfil",
       "moved_up": "Subiu",
       "reworded": "Reformulada",
-      "edited": "Editada"
+      "edited": "Editada",
+      "fixed_by_app": "Corrigida pela app"
     },
     "from": {
       "show": "Do seu perfil",
@@ -370,7 +371,8 @@
       "claim": "«{{claim}}» não está nas fontes que esta linha cita.",
       "noSource": "Esta linha não cita nada do seu perfil.",
       "company": "Os factos da empresa não podem ser conquistas suas. Só podem aparecer no resumo.",
-      "skill": "{{skill}} não é uma das suas competências."
+      "skill": "{{skill}} não é uma das suas competências.",
+      "otherPosition": "Esta linha é de outro emprego."
     },
     "actions": {
       "edit": "Editar",
@@ -461,7 +463,11 @@
       "not_approved": "Aprove primeiro o CV: o PDF é feito a partir do texto aprovado.",
       "same_layout": "Esse já é o aspeto da versão mais recente.",
       "invalid_length": "Escolha 1 ou 2 páginas.",
-      "invalid_layout": "Escolha um modelo e 1 ou 2 páginas."
+      "invalid_layout": "Escolha um modelo e 1 ou 2 páginas.",
+      "cannot_keep": "Esta linha é sobre a empresa, não sobre si. Altere ou retire.",
+      "not_flagged": "Esta linha já corresponde ao seu perfil.",
+      "too_late": "Já é tarde para desfazer. Faça o CV de novo para o alterar.",
+      "cv_previews_daily_cap": "Já fez 30 PDFs de rascunhos hoje. Continua amanhã; alterar uma linha faz o PDF na mesma."
     },
     "layout": {
       "template": "Modelo",
@@ -512,6 +518,54 @@
       "loading": "A carregar o PDF…",
       "failed": "Não foi possível abrir o PDF. Ainda o pode descarregar.",
       "page": "Página {{page}} de {{pages}}"
+    },
+    "preview": {
+      "facts": "{{pages}} · {{language}}",
+      "download": "Descarregar rascunho",
+      "loading": "A carregar o PDF…",
+      "failed": "Não foi possível mostrar o PDF. Pode descarregá-lo na mesma.",
+      "making": "A fazer o PDF…",
+      "note": "Algumas palavras podem não sair bem quando um site de emprego lê este PDF.",
+      "doesntFit": "O CV não cabe em 2 páginas. Retire algumas linhas.",
+      "unavailable": "Não foi possível fazer o PDF agora. Altere uma linha ou escolha um formato para tentar de novo.",
+      "lines": "Cada linha e de onde vem",
+      "stale": "O PDF é anterior à sua última alteração.",
+      "make": "Fazer o PDF",
+      "none": "Este rascunho ainda não tem PDF."
+    },
+    "waiting": {
+      "title": "Precisa de si · {{count}}",
+      "question": "Isto é verdade? «{{text}}»",
+      "skillQuestion": "Tem esta competência? {{skill}}",
+      "skillWhere": "Se a mantiver, é acrescentada às suas competências.",
+      "cannotKeep": "Isto é sobre a empresa, não sobre si. Altere ou retire.",
+      "yes": "Sim, manter",
+      "change": "Alterar",
+      "remove": "Retirar",
+      "changeLabel": "Alterar a linha",
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "checked": "Cada linha verificada com o seu perfil",
+      "checkedFixed_one": "Cada linha verificada com o seu perfil · {{count}} linha corrigida",
+      "checkedFixed_other": "Cada linha verificada com o seu perfil · {{count}} linhas corrigidas",
+      "ready": "Aprove quando estiver satisfeito.",
+      "answer_one": "Responda à pergunta para aprovar.",
+      "answer_other": "Responda às {{count}} perguntas para aprovar.",
+      "toldUs": "Disse-nos sobre a {{company}}: «{{quote}}».",
+      "keeps": "Se a mantiver, isto fica no seu perfil: «{{proposal}}»",
+      "cannotKeepOther": "Esta linha é sobre outro emprego do seu perfil. Altere ou retire.",
+      "cannotKeepLong": "Esta linha é demasiado longa para ficar assim no seu perfil. Encurte ou retire."
+    },
+    "needsVersion": {
+      "title": "Este CV foi aprovado mas ainda não tem PDF",
+      "body": "Faça o PDF a partir do texto aprovado. Não é usada IA.",
+      "make": "Fazer o PDF"
+    },
+    "dock": {
+      "approved": "Aprovado",
+      "undo": "Desfazer",
+      "undoing": "A desfazer…",
+      "next": "A seguir escrevemos a sua carta de apresentação, cerca de {{cost}}. Desfazer para isto."
     }
   },
   "cvs": {

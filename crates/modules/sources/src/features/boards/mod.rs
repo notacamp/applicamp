@@ -137,6 +137,32 @@ pub struct BoardSummary {
     pub contact_email: Option<String>,
     /// How the app found it, in plain words.
     pub found_through: Option<String>,
+    /// For a hiring system and a company page, the system (`lever`).
+    pub system: Option<String>,
+    /// For a company page, the company on its system (`acme`).
+    pub company_token: Option<String>,
+}
+
+/// How many company pages there are, by where they stand.
+#[derive(Debug, Clone, Copy, Default, Serialize, ToSchema)]
+pub struct CompanyPageCounts {
+    pub total: u32,
+    /// Read by the app or the owner.
+    pub approved: u32,
+    /// Not approved yet: their system waits, or no recent job was seen.
+    pub waiting: u32,
+    pub declined: u32,
+}
+
+/// The optional web search that finds company pages.
+#[derive(Debug, Clone, Copy, Serialize, ToSchema)]
+pub struct WebSearchState {
+    /// A key is set on the server.
+    pub on: bool,
+    /// Queries asked this calendar month.
+    pub queries_this_month: u32,
+    /// The most a month asks.
+    pub monthly_limit: u32,
 }
 
 /// The job boards, highest average salary first (none last).
@@ -144,8 +170,21 @@ pub struct BoardSummary {
 pub struct BoardList {
     /// The signed-in person manages the boards.
     pub can_manage: bool,
+    /// The boards and the hiring systems, with the company pages that wait
+    /// first and the newest (at most [`SHOWN_COMPANY_PAGES`]).
     pub boards: Vec<BoardSummary>,
+    /// Every company page there is.
+    pub company_pages: CompanyPageCounts,
+    /// The web search.
+    pub web_search: WebSearchState,
 }
+
+/// Company pages the list shows, at most.
+pub const SHOWN_COMPANY_PAGES: i64 = 100;
+
+/// Blockers the owner settles by approving: reading is allowed, the owner
+/// chooses ([`blockers`] still lists them).
+pub const CHOICES: [&str; 1] = ["needs_choice"];
 
 /// A job board, whole: its check, config and terms.
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -429,6 +468,8 @@ fn summary(
             .and_then(|json| serde_json::from_value(json.0.clone()).ok()),
         contact_email: row.contact_email.clone(),
         found_through: row.found_through.clone(),
+        system: row.system.clone(),
+        company_token: row.company_token.clone(),
     }
 }
 
@@ -479,6 +520,18 @@ pub fn blockers(row: &BoardRow) -> Vec<Blocker> {
         && !found.iter().any(|b| b.code == read.code)
     {
         found.push(read);
+    }
+    // A hiring system's rules are its own check's; a company page is read by
+    // its system's reader, with no feed address or key of its own.
+    if let Some(kind) = row.kind().filter(|k| k.is_hiring()) {
+        if kind == Kind::HiringSystem && row.report().and_then(|r| r.checked_at).is_none() {
+            found.push(blocker(
+                "check_needed",
+                "Its robots rules and terms are not known yet: check it.",
+                None,
+            ));
+        }
+        return found;
     }
     let Some(kind) = row.kind() else {
         found.push(blocker(
@@ -585,6 +638,10 @@ pub(crate) async fn detail(
     let totals = scans::totals(&state.db, account, now).await?;
     let config = row.config().ok();
     let blockers = blockers(&row);
+    let first_hard = blockers
+        .iter()
+        .find(|b| !CHOICES.contains(&b.code.as_str()));
+    let system_ok = system_blocker(&state.db, &row).await?.is_none();
     Ok(BoardDetail {
         board: summary(&row, ranking, fit, totals.get(&row.id)),
         endpoint: config
@@ -594,9 +651,10 @@ pub(crate) async fn detail(
         config: row.config.0.clone(),
         terms: row.terms(),
         report: row.report(),
-        approvable: blockers.is_empty()
+        approvable: first_hard.is_none()
+            && system_ok
             && matches!(row.status(), Status::Candidate | Status::Paused),
-        blocked: blockers.first().map(|b| b.code.clone()),
+        blocked: first_hard.map(|b| b.code.clone()),
         key: key_of(&row),
         blockers,
         can_manage: is_owner(deps, &state.db, account).await?,
@@ -614,10 +672,39 @@ pub(crate) fn conflict_code(code: &str) -> &'static str {
         "no_endpoint",
         "config_invalid",
         "check_needed",
+        "system_waiting",
     ]
     .into_iter()
     .find(|known| *known == code)
     .unwrap_or("not_approvable")
+}
+
+/// What keeps a company page from being approved: its hiring system is not
+/// approved. `None` for any other board, and for a page whose system is.
+async fn system_blocker(db: &PgPool, row: &BoardRow) -> Result<Option<Blocker>> {
+    if row.kind() != Some(Kind::CompanyPage) {
+        return Ok(None);
+    }
+    let system = match row.system_id {
+        Some(id) => job_boards::get(db, id).await?,
+        None => None,
+    };
+    Ok(match system {
+        Some(system) if system.status() == Status::Approved => None,
+        Some(system) => Some(blocker(
+            "system_waiting",
+            format!(
+                "Its hiring system, {}, is not approved yet: approve it first.",
+                system.name
+            ),
+            None,
+        )),
+        None => Some(blocker(
+            "system_waiting",
+            "Its hiring system is not in the registry.",
+            None,
+        )),
+    })
 }
 
 pub(crate) async fn fetch(db: &PgPool, id: Uuid) -> Result<BoardRow> {
@@ -651,7 +738,11 @@ pub async fn list(
 ) -> Result<Json<BoardList>> {
     let account = principal.account_id;
     let now = state.clock.now();
-    let rows = job_boards::all(&state.db).await?;
+    let rows = job_boards::shown(&state.db, SHOWN_COMPANY_PAGES).await?;
+    let company_pages = job_boards::company_page_counts(&state.db).await?;
+    let queries_this_month = crate::features::company_pages::queries_this_month(&state.db, now)
+        .await
+        .unwrap_or(0);
     let who = viewer(&deps, &state.db, account, now).await?;
     let mut rankings = rankings(&state.db, &rows, &who, now).await?;
     let totals = scans::totals(&state.db, account, now).await?;
@@ -672,6 +763,12 @@ pub async fn list(
     Ok(Json(BoardList {
         can_manage: is_owner(&deps, &state.db, account).await?,
         boards,
+        company_pages,
+        web_search: WebSearchState {
+            on: deps.config.search.brave(),
+            queries_this_month,
+            monthly_limit: u32::try_from(deps.config.search.monthly_queries()).unwrap_or(u32::MAX),
+        },
     }))
 }
 
@@ -733,6 +830,19 @@ async fn set_status(
     .bind(by)
     .execute(db)
     .await?;
+    if status == Status::Declined {
+        // The company pages of a declined hiring system are declined with it.
+        sqlx::query(
+            "UPDATE sources.job_boards
+                SET status = 'declined', decline_reason = 'Its hiring system was declined.',
+                    updated_at = $2
+              WHERE system_id = $1 AND kind = 'company_page' AND status <> 'declined'",
+        )
+        .bind(id)
+        .bind(now)
+        .execute(db)
+        .await?;
+    }
     Ok(())
 }
 
@@ -779,7 +889,13 @@ pub async fn approve(
             "Only a board waiting for you, or paused, can be approved.".to_owned(),
         ));
     }
-    if let Some(first) = blockers(&row).into_iter().next() {
+    if let Some(first) = blockers(&row)
+        .into_iter()
+        .find(|b| !CHOICES.contains(&b.code.as_str()))
+    {
+        return Err(Error::Conflict(conflict_code(&first.code), first.detail));
+    }
+    if let Some(first) = system_blocker(&state.db, &row).await? {
         return Err(Error::Conflict(conflict_code(&first.code), first.detail));
     }
     let now = state.clock.now();
@@ -938,6 +1054,13 @@ pub async fn set_config(
         .kind()
         .ok_or_else(|| Error::internal("a board of an unknown kind"))?;
     let kind = body.kind.unwrap_or(old_kind);
+    if kind.is_hiring() || old_kind.is_hiring() {
+        return Err(Error::BadRequest(
+            "invalid_config",
+            "A hiring system and its company pages are read by the system's own reader: they have no config."
+                .to_owned(),
+        ));
+    }
     if kind != old_kind && row.status() == Status::Approved {
         return Err(Error::Conflict(
             "kind_locked",
@@ -1208,11 +1331,12 @@ pub async fn suggest(
     let url = Url::parse(raw).map_err(|_| invalid())?;
     net::check(&url, deps.config.allow_private_hosts()).map_err(|_| invalid())?;
     let host = host_of(&url).ok_or_else(invalid)?;
-    let existing: Option<Uuid> =
-        sqlx::query_scalar("SELECT id FROM sources.job_boards WHERE host = $1")
-            .bind(&host)
-            .fetch_optional(&state.db)
-            .await?;
+    let existing: Option<Uuid> = sqlx::query_scalar(
+        "SELECT id FROM sources.job_boards WHERE host = $1 AND kind <> 'company_page'",
+    )
+    .bind(&host)
+    .fetch_optional(&state.db)
+    .await?;
     if let Some(id) = existing {
         let row = fetch(&state.db, id).await?;
         return Ok((

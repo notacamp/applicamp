@@ -3407,7 +3407,7 @@
           "pipeline"
         ],
         "summary": "Approve the draft.",
-        "description": "Refused (409 `lines_flagged`) while any line or skill cannot be traced to\nthe profile. The draft is frozen, its text rendered as a PDF with the\n`template` and `length` asked for (Clean, 1 page by default), the PDF read\nback out and compared with the CV, and the PDF kept as the next version:\nall or nothing. If it does not fit the length (`cv_doesnt_fit`) or the\nread-back finds it lacking (`cv_pdf_check_failed`, with the reasons, one\nper line), nothing is approved. Contact details are read from the profile\nagain. No model call.",
+        "description": "Refused (409 `lines_flagged`) while any line or skill cannot be traced to\nthe profile. The draft is frozen, its text rendered as a PDF with the\n`template` and `length` asked for (the preview's when left out, else\nClean on 1 page), the PDF read back out and compared with the CV, and the\nPDF kept as the next version: all or nothing. The preview's PDF is kept\nas it is when the draft has not changed since it was made, its layout is\nthe one asked for and its read-back passed. If it does not fit the length (`cv_doesnt_fit`) or the\nread-back finds it lacking (`cv_pdf_check_failed`, with the reasons, one\nper line), nothing is approved. Contact details are read from the profile\nagain. No model call.",
         "operationId": "pipeline.cv_approve",
         "parameters": [
           {
@@ -3598,7 +3598,7 @@
           "pipeline"
         ],
         "summary": "Change one line of a draft.",
-        "description": "`{text}` edits it: the new text is checked against the **same sources**\n(an edited line that is not a summary drops its company-fact citations).\n`{remove: true}` removes the line (a position left with no line goes to\n\"left out\"), or the skill. No model call. Only a draft can change.",
+        "description": "`{text}` edits it: the new text is checked against the **same sources**\n(an edited line that is not a summary drops its company-fact citations,\nand a bullet drops another position's), and the app's question about it,\nif any, goes. The preview is made again.\n`{remove: true}` removes the line (a position left with no line goes to\n\"left out\"), or the skill. No model call. Only a draft can change.",
         "operationId": "pipeline.cv_line",
         "parameters": [
           {
@@ -3706,8 +3706,8 @@
         "tags": [
           "pipeline"
         ],
-        "summary": "\"It's true: add it to my profile.\"",
-        "description": "The person's own words become a fact kept on the line's position (its\n`quote` is the text; `area` defaults to `results`), as Grill me's Keep\ndoes, and the line is checked again with that fact as an extra source.\nFor a skill it adds the skill to the profile instead. A summary or\nheadline puts the fact on the most recent position. No model call.",
+        "summary": "\"Yes, keep it\", or \"It's true\" in the person's words.",
+        "description": "`{proposal: true}` keeps the fact the app proposed for a flagged line\n(its question's, else the line's own words) on the line's position as a\n**confirmed assumption**, based on this CV draft; refused\n(`cannot_keep`) for a company fact used as an achievement, another job's\nline, or one longer than a fact (its `waiting` item says which). `{text}`\nkeeps the person's own words as a fact (its `quote` is the text; `area`\ndefaults to `results`), as Grill me's Keep does. Either way the line is\nchecked again with that fact as a source (and none another position's or\na company's), and the preview is made again. For a skill it adds the\nskill to the profile instead. A summary or headline puts the fact on the\nmost recent position. No model call.",
         "operationId": "pipeline.cv_confirm",
         "parameters": [
           {
@@ -3793,7 +3793,215 @@
             }
           },
           "409": {
-            "description": "`draft_frozen`; `profile_changed`",
+            "description": "`draft_frozen`; `profile_changed`; `cannot_keep`; `not_flagged`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/cv/drafts/{n}/preview": {
+      "post": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "See the draft in another layout, or make its PDF again.",
+        "description": "Renders the draft's text with the `template` and `length` asked for (what\nthe preview has when left out) and keeps it as its preview. **No model\ncall.** What the read-back finds is a note, never a refusal. Refused when\nit does not fit the length (`cv_doesnt_fit`): the preview stays as it was.\nOnly a draft has a preview to change. At most 30 a day per account\n(`cv_previews_daily_cap`).",
+        "operationId": "pipeline.cv_preview",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "n",
+            "in": "path",
+            "description": "The draft.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LayoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The CV, with the new preview.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cv"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_layout`; `invalid_length`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`draft_frozen`; `cv_doesnt_fit`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`cv_previews_daily_cap`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`cv_pdf_unavailable`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/cv/drafts/{n}/preview.pdf": {
+      "get": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "The PDF of a draft's preview.",
+        "description": "`Content-Type: application/pdf`, shown inline, named\n`<Name> CV - <Company> (draft).pdf`; `?download=1` serves it as an\nattachment. Never cached, never sniffed. A draft with no preview, and\nanother account's, are not found.",
+        "operationId": "pipeline.cv_preview_pdf",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "n",
+            "in": "path",
+            "description": "The draft.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "download",
+            "in": "query",
+            "description": "`1` serves it as an attachment.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "v",
+            "in": "query",
+            "description": "Anything: lets the page ask for the newest preview (it is never\ncached).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The PDF.",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "$ref": "#/components/schemas/PdfFile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3894,6 +4102,86 @@
           },
           "409": {
             "description": "`draft_frozen`; `already_on_cv`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/cv/drafts/{n}/unapprove": {
+      "post": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Undo an approval, for a moment.",
+        "description": "Within 15 seconds of approving, before the cover letter that comes next\nstarts, the draft becomes a draft again: its PDF version goes, the\nletter waits for the CV again, and the preview is made again. Refused\nafter that (`too_late`), or when it is not approved (`not_approved`). No\nmodel call.",
+        "operationId": "pipeline.cv_unapprove",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "n",
+            "in": "path",
+            "description": "The draft.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The CV, with the draft back.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cv"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`not_approved`; `too_late`",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -9032,7 +9320,9 @@
           "json_api",
           "rss",
           "jsonld_sitemap",
-          "hn"
+          "hn",
+          "hiring_system",
+          "company_page"
         ]
       },
       "BoardList": {
@@ -9040,18 +9330,29 @@
         "description": "The job boards, highest average salary first (none last).",
         "required": [
           "can_manage",
-          "boards"
+          "boards",
+          "company_pages",
+          "web_search"
         ],
         "properties": {
           "boards": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/BoardSummary"
-            }
+            },
+            "description": "The boards and the hiring systems, with the company pages that wait\nfirst and the newest (at most [`SHOWN_COMPANY_PAGES`])."
           },
           "can_manage": {
             "type": "boolean",
             "description": "The signed-in person manages the boards."
+          },
+          "company_pages": {
+            "$ref": "#/components/schemas/CompanyPageCounts",
+            "description": "Every company page there is."
+          },
+          "web_search": {
+            "$ref": "#/components/schemas/WebSearchState",
+            "description": "The web search."
           }
         }
       },
@@ -9359,6 +9660,13 @@
             "type": "string",
             "description": "How its jobs are credited (\"From Himalayas\")."
           },
+          "company_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For a company page, the company on its system (`acme`)."
+          },
           "contact_email": {
             "type": [
               "string",
@@ -9476,6 +9784,13 @@
           },
           "status": {
             "$ref": "#/components/schemas/BoardStatus"
+          },
+          "system": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For a hiring system and a company page, the system (`lever`)."
           },
           "tags": {
             "type": "array",
@@ -9926,6 +10241,15 @@
           }
         }
       },
+      "CannotKeep": {
+        "type": "string",
+        "description": "Why \"Yes, keep it\" is not offered for a flagged line.",
+        "enum": [
+          "company",
+          "other_position",
+          "too_long"
+        ]
+      },
       "CareersPage": {
         "type": "object",
         "description": "A careers page (or a link to a job board) someone pasted.",
@@ -10239,6 +10563,40 @@
             "items": {
               "$ref": "#/components/schemas/WatchedCompany"
             }
+          }
+        }
+      },
+      "CompanyPageCounts": {
+        "type": "object",
+        "description": "How many company pages there are, by where they stand.",
+        "required": [
+          "total",
+          "approved",
+          "waiting",
+          "declined"
+        ],
+        "properties": {
+          "approved": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Read by the app or the owner.",
+            "minimum": 0
+          },
+          "declined": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "waiting": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Not approved yet: their system waits, or no recent job was seen.",
+            "minimum": 0
           }
         }
       },
@@ -10562,7 +10920,7 @@
       },
       "ConfirmRequest": {
         "type": "object",
-        "description": "\"It's true\": the person's words.",
+        "description": "\"Yes, keep it\", or \"It's true\" in the person's words.",
         "properties": {
           "area": {
             "type": [
@@ -10571,12 +10929,19 @@
             ],
             "description": "What it is about (Grill me's areas); `results` when left out."
           },
+          "proposal": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Keep the fact the app proposed for this line (its `waiting` item's\n`proposal`) as a confirmed assumption on the position."
+          },
           "text": {
             "type": [
               "string",
               "null"
             ],
-            "description": "In their own words, up to 300 characters. Not needed for a skill."
+            "description": "In their own words, up to 300 characters. Not needed for a skill or\nwith `proposal`."
           }
         },
         "additionalProperties": false
@@ -10719,6 +11084,17 @@
             "format": "double",
             "description": "About what one draft costs, in euros."
           },
+          "next": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CvNext",
+                "description": "What the app starts next by itself, when it does."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "opportunity_id": {
             "type": "string",
             "format": "uuid"
@@ -10829,7 +11205,10 @@
           "flagged",
           "can_approve",
           "keywords",
-          "changes"
+          "changes",
+          "fixed_by_app",
+          "waiting",
+          "needs_version"
         ],
         "properties": {
           "approved_at": {
@@ -10880,6 +11259,12 @@
             ],
             "description": "The first of them, as the page shows them."
           },
+          "fixed_by_app": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many lines the app rewrote to say only what their sources say.",
+            "minimum": 0
+          },
           "flagged": {
             "type": "integer",
             "format": "int32",
@@ -10918,6 +11303,21 @@
             "description": "Its number for this opportunity, from 1.",
             "minimum": 0
           },
+          "needs_version": {
+            "type": "boolean",
+            "description": "Approved, but with no PDF yet (approved before PDFs were made): offer\nto make it."
+          },
+          "preview": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CvPreview",
+                "description": "The draft as a PDF, made at once and after every change; none once\napproved (the versions are the PDFs then)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "skills": {
             "type": "array",
             "items": {
@@ -10937,6 +11337,14 @@
               }
             ]
           },
+          "undo_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Just approved: until then `…/unapprove` puts it back as a draft."
+          },
           "version": {
             "type": [
               "integer",
@@ -10945,6 +11353,13 @@
             "format": "int32",
             "description": "Once approved: the version, from 1.",
             "minimum": 0
+          },
+          "waiting": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Waiting"
+            },
+            "description": "What waits on the person, in the order the page shows it."
           }
         }
       },
@@ -11068,6 +11483,104 @@
             "format": "int32",
             "description": "The version, for a PDF.",
             "minimum": 0
+          }
+        }
+      },
+      "CvNext": {
+        "type": "object",
+        "description": "What the app starts by itself now that the CV is approved.",
+        "required": [
+          "step",
+          "eur",
+          "at"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it starts: Undo stops it until then."
+          },
+          "eur": {
+            "type": "number",
+            "format": "double",
+            "description": "About what it costs, in euros."
+          },
+          "step": {
+            "type": "string",
+            "description": "`letter`: the cover letter and the job's answers."
+          }
+        }
+      },
+      "CvPreview": {
+        "type": "object",
+        "description": "What the preview of a draft is, as the review page shows it.",
+        "required": [
+          "ready",
+          "stale"
+        ],
+        "properties": {
+          "at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it was made."
+          },
+          "checks": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PdfChecks",
+                "description": "What the read-back found: a note, never a refusal."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the last render failed: `cv_doesnt_fit` or `cv_pdf_unavailable`."
+          },
+          "length": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The most pages it may take: 1 or 2.",
+            "minimum": 0
+          },
+          "pages": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The pages it takes.",
+            "minimum": 0
+          },
+          "ready": {
+            "type": "boolean",
+            "description": "There is a PDF to show (`…/preview.pdf`)."
+          },
+          "stale": {
+            "type": "boolean",
+            "description": "The PDF was made before the draft's last change: \"Make the PDF\"\n(`POST …/preview`) makes it again."
+          },
+          "template": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Template",
+                "description": "The layout it was made with (or tried, when it failed)."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -12993,7 +13506,8 @@
           "mark",
           "sources",
           "flags",
-          "claims"
+          "claims",
+          "fixed_by_app"
         ],
         "properties": {
           "claims": {
@@ -13002,6 +13516,10 @@
               "type": "string"
             },
             "description": "The words of the line that the check looks for in its sources."
+          },
+          "fixed_by_app": {
+            "type": "boolean",
+            "description": "The app rewrote it to say only what its sources say."
           },
           "flags": {
             "type": "array",
@@ -13015,6 +13533,13 @@
           },
           "mark": {
             "$ref": "#/components/schemas/Mark"
+          },
+          "original": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What it said before the app rewrote it."
           },
           "sources": {
             "type": "array",
@@ -14600,6 +15125,29 @@
                 "type": "string",
                 "enum": [
                   "company_fact_outside_summary"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A bullet cites what the profile says about another position: the\nline belongs to another job.",
+            "required": [
+              "cites",
+              "kind"
+            ],
+            "properties": {
+              "cites": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The other positions' sources it cites."
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "other_position"
                 ]
               }
             }
@@ -16339,6 +16887,90 @@
           "result": {}
         }
       },
+      "Waiting": {
+        "type": "object",
+        "description": "A line (or skill) the check flagged and the app could not fix: a\nquestion only the person can answer.",
+        "required": [
+          "line_id",
+          "kind",
+          "text",
+          "flags"
+        ],
+        "properties": {
+          "cannot_keep": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CannotKeep",
+                "description": "Why \"Yes, keep it\" is not offered: `company` (it is about the\ncompany), `other_position` (another job's line), `too_long` (longer\nthan a fact the profile keeps). None when it is."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "company": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The company of that position (\"You told us about …\")."
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Reason"
+            },
+            "description": "Why it is flagged."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/WaitingKind"
+          },
+          "line_id": {
+            "type": "string",
+            "description": "The line (or skill) id: what `…/lines/{line_id}/confirm` and\n`…/lines/{line_id}` are given."
+          },
+          "proposal": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What \"Yes, keep it\" (`{proposal: true}`) keeps on the profile: the\napp's sentence, else the line's own words, or the skill. None when it\ncannot be kept (`cannot_keep` says why)."
+          },
+          "question": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The app's own question about it, when it asked one."
+          },
+          "quote": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The person's own words the line was made from, as the profile has\nthem on that position: what \"Change it\" starts from. None when it\ncites none."
+          },
+          "role": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "\"Title · Company\" of the position a kept fact lands on."
+          },
+          "text": {
+            "type": "string",
+            "description": "The line's text, or the skill."
+          }
+        }
+      },
+      "WaitingKind": {
+        "type": "string",
+        "description": "What a waiting item is.",
+        "enum": [
+          "line",
+          "skill"
+        ]
+      },
       "WaitingOn": {
         "type": "string",
         "description": "What a preparation waits on.",
@@ -16356,6 +16988,10 @@
           "greenhouse",
           "lever",
           "ashby",
+          "workable",
+          "recruitee",
+          "teamtailor",
+          "personio",
           "jsonld",
           "none"
         ]
@@ -16434,6 +17070,33 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "WebSearchState": {
+        "type": "object",
+        "description": "The optional web search that finds company pages.",
+        "required": [
+          "on",
+          "queries_this_month",
+          "monthly_limit"
+        ],
+        "properties": {
+          "monthly_limit": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The most a month asks.",
+            "minimum": 0
+          },
+          "on": {
+            "type": "boolean",
+            "description": "A key is set on the server."
+          },
+          "queries_this_month": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Queries asked this calendar month.",
+            "minimum": 0
           }
         }
       },

@@ -15,8 +15,10 @@ import {
 } from "~/lib/ui";
 
 import type { Cv, CvDraft, CvKeyword } from "../../api/cv";
-import { PdfPanel } from "./PdfPanel";
 import { formatCost, formatLimit } from "../../api/labels";
+import type { LineActions } from "./LineRow";
+import { PdfPanel } from "./PdfPanel";
+import { WaitingCards } from "./WaitingCards";
 
 const STATE_HUES: Record<CvKeyword["state"], LabelHue> = {
   on_cv: "green",
@@ -56,12 +58,15 @@ function KeywordGroup({
   );
 }
 
-/** The state of the check, the job's keywords, what changed and what it cost. */
+/**
+ * What waits on the person (the questions the app could not answer), the
+ * job's keywords, what changed and what it cost; once approved, the PDF.
+ */
 export function ReviewAside({
   cv,
   draft,
   spend,
-  onFirst,
+  actions,
   onBack,
   onOpenPdf,
 }: {
@@ -69,8 +74,8 @@ export function ReviewAside({
   draft: CvDraft;
   /** The month's AI spend line (the sources module's). */
   spend: ReactNode;
-  /** Go to the first flagged line. */
-  onFirst: () => void;
+  /** What the person can do with a line: Yes, keep it, Change it, Remove it. */
+  actions: LineActions;
   /** Back to the pipeline, once approved. */
   onBack: () => void;
   /** Open a version's PDF. */
@@ -78,7 +83,6 @@ export function ReviewAside({
 }) {
   const { t, i18n } = useTranslation("pipeline");
   const { changes, keywords } = draft;
-  const nextVersion = (cv.versions[0]?.version ?? 0) + 1;
   const newest = cv.versions[0];
   const lines: string[] = [
     t("cv.changes.reworded", { count: changes.reworded }),
@@ -113,29 +117,8 @@ export function ReviewAside({
       {draft.status === "approved" && newest !== undefined ? (
         <PdfPanel opportunity={cv.opportunity_id} version={newest} onOpen={onOpenPdf} />
       ) : null}
-      {draft.status === "approved" ? null : draft.flagged > 0 ? (
-        <Tagged testId="cv-banner-flagged">
-          <Banner
-            tone="danger"
-            icon="warning"
-            title={t("cv.aside.flagged", { count: draft.flagged })}
-          >
-            <Stack gap="sm">
-              <Text>{t("cv.aside.flaggedBody")}</Text>
-              <Cluster>
-                <Button variant="secondary" data-testid="cv-first-flagged" onClick={onFirst}>
-                  {t("cv.aside.goFirst")}
-                </Button>
-              </Cluster>
-            </Stack>
-          </Banner>
-        </Tagged>
-      ) : (
-        <Tagged testId="cv-banner-clean">
-          <Banner icon="check" title={t("cv.aside.clean")}>
-            {t("cv.aside.cleanBody", { version: nextVersion })}
-          </Banner>
-        </Tagged>
+      {draft.status === "approved" ? null : (
+        <WaitingCards waiting={draft.waiting} fixed={draft.fixed_by_app} actions={actions} />
       )}
       <Tagged testId="cv-keywords">
         <Stack gap="sm">

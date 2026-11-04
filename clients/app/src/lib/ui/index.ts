@@ -77,6 +77,8 @@ export {
   type PdfViewerLabels,
   type PdfViewerProps,
 } from "./components/PdfViewer/PdfViewer";
+export { PdfPages, type PdfPagesLabels, type PdfPagesProps } from "./components/PdfPages/PdfPages";
+export { ActionDock, TouchTargets, type ActionDockProps } from "./components/ActionDock/ActionDock";
 export { Placeholder, type PlaceholderProps } from "./components/Placeholder/Placeholder";
 export {
   RowItem,

@@ -553,7 +553,18 @@
             "description": "What to show; every board when left out.",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/BoardShow"
+              "type": "string",
+              "description": "What the \"Show\" select picks.",
+              "enum": [
+                "all",
+                "waiting",
+                "checking",
+                "reading",
+                "notAllowed",
+                "paused",
+                "site",
+                "company"
+              ]
             }
           },
           {

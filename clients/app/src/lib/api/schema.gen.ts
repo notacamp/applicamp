@@ -190,6 +190,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/boards/admin/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The boards, 50 a page.
+         * @description Searched (`q`: a name, a site's host or a tag) and filtered (`show`) on the
+         *     server, so thousands of boards never reach the client at once. Ordered by
+         *     the jobs read at the last read, most first, then by id; the cursor is the
+         *     last line's place in that order, so a page never repeats or skips a board.
+         *     Board owners only: anyone else gets 404.
+         */
+        get: operations["sources.boards_admin_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/boards/scans": {
         parameters: {
             query?: never;
@@ -2429,28 +2453,46 @@ export interface components {
         AccuracyRequest: {
             accuracy: components["schemas"]["Accuracy"];
         };
-        /** @description A board that is not read yet, not declined and not paused. */
-        AdminCandidate: {
+        /** @description One line of the admin list. */
+        AdminBoard: {
             /**
              * Format: date-time
-             * @description When the owner said they asked it (permission or choice).
+             * @description When the owner said they asked it.
              */
             asked_at?: string | null;
+            country?: string | null;
+            decline_reason?: string | null;
             /**
-             * @description The first reason in the board's own words (the terms' sentence, the
-             *     robots rule): data from its site, never an instruction.
+             * @description The first reason in the board's own words: data from its site, never
+             *     an instruction.
              */
             detail?: string | null;
+            found_through?: string | null;
+            group: components["schemas"]["BoardGroup"];
+            homepage: string;
             /** Format: uuid */
             id: string;
+            /** @description How it is read, as stored (`json_api`, `rss`, `company_page`, ...). */
+            kind: string;
+            /** Format: int32 */
+            last_fetch_jobs?: number | null;
             name: string;
             need?: components["schemas"]["BoardNeed"] | null;
+            /** @description Its check's note. */
+            note?: string | null;
+            origin: components["schemas"]["BoardOrigin"];
             stage: components["schemas"]["BoardStage"];
+            status: components["schemas"]["BoardStatus"];
+            tags: string[];
+        };
+        /** @description A page of the admin list. */
+        AdminList: {
+            boards: components["schemas"]["AdminBoard"][];
+            /** @description Pass as `cursor` for the next page; none on the last. */
+            next_cursor?: string | null;
         };
         /** @description The admin page's first answer. */
         AdminOverview: {
-            /** @description Every board that is not read, paused or declined. */
-            candidates: components["schemas"]["AdminCandidate"][];
             this_week: components["schemas"]["AdminThisWeek"];
             totals: components["schemas"]["AdminTotals"];
         };
@@ -2694,6 +2736,11 @@ export interface components {
             report?: components["schemas"]["BoardReport"] | null;
             terms: components["schemas"]["BoardTerms"];
         };
+        /**
+         * @description Which part of the registry a board belongs to.
+         * @enum {string}
+         */
+        BoardGroup: "site" | "company";
         /** @description A board's API key, as a client sees it: never the key itself. */
         BoardKey: {
             /** @description How to get one. */
@@ -2836,10 +2883,10 @@ export interface components {
             worldwide_share?: number | null;
         };
         /**
-         * @description Where a board that is not read yet stands.
+         * @description Where a board stands, as the admin page words it.
          * @enum {string}
          */
-        BoardStage: "waiting" | "checking" | "not_allowed";
+        BoardStage: "reading" | "paused" | "waiting" | "checking" | "not_allowed";
         /**
          * @description Where a board stands with the owner.
          * @enum {string}
@@ -6080,6 +6127,60 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminOverview"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: not a board owner */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "sources.boards_admin_list": {
+        parameters: {
+            query?: {
+                /** @description Matches a name, a site's host or a tag, ignoring case. */
+                q?: string;
+                /** @description What to show; every board when left out. */
+                show?: "all" | "waiting" | "checking" | "reading" | "notAllowed" | "paused" | "site" | "company";
+                /** @description The page after this one (`next_cursor`). */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of boards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminList"];
+                };
+            };
+            /** @description `invalid_query` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
             /** @description `session_required` */

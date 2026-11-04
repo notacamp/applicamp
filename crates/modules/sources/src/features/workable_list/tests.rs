@@ -259,7 +259,6 @@ async fn the_next_download_is_conditional_and_a_304_changes_nothing(db: PgPool) 
     Mock::given(method("GET"))
         .and(path("/boards/workable.xml"))
         .and(header("if-none-match", "\"v1\""))
-        .and(header("if-modified-since", "Wed, 04 Nov 2026 16:18:18 GMT"))
         .respond_with(ResponseTemplate::new(304))
         .with_priority(1)
         .mount(&server)
@@ -280,6 +279,12 @@ async fn the_next_download_is_conditional_and_a_304_changes_nothing(db: PgPool) 
     let second = run(&h.deps, &h.db).await.unwrap();
     assert_eq!(second.outcome, "unchanged");
     assert_eq!(second.bytes, 0);
+    let asked = server.received_requests().await.unwrap();
+    let last = &asked[asked.len() - 1];
+    assert_eq!(
+        last.headers.get("if-modified-since").and_then(|v| v.to_str().ok()),
+        Some("Wed, 04 Nov 2026 16:18:18 GMT")
+    );
     // The cache validators are kept for the day after.
     let (etag, outcome): (Option<String>, Option<String>) =
         sqlx::query_as("SELECT etag, outcome FROM sources.workable_list_state")

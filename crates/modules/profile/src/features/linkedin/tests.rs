@@ -11,7 +11,7 @@ use crate::{
 };
 
 /// The master profile: the same person as the export, known a little better
-/// (Kafka, and a fact they kept), and never their contact details.
+/// (Kafka), and never their contact details.
 fn profile() -> Value {
     json!({
         "basics": {
@@ -22,10 +22,7 @@ fn profile() -> Value {
         "work": [
             { "name": "Example Org", "position": "Senior Engineer", "startDate": "2021-03",
               "summary": "Runs the billing platform in Rust, with Kafka between its services.",
-              "highlights": [],
-              "facts": [{ "id": "f-1", "text": "Moved invoicing onto PostgreSQL",
-                          "quote": "Moved invoicing onto PostgreSQL", "area": "results",
-                          "kept_at": "2026-10-30T09:00:00Z" }] },
+              "highlights": [] },
             { "name": "Sample Labs", "position": "Engineer", "startDate": "2017-06",
               "endDate": "2021-02", "summary": "Built the data pipeline.", "highlights": [] },
         ],
@@ -66,7 +63,7 @@ fn review_reply() -> (&'static str, String) {
                 finding("skills", None, "could_be_better", vec![
                     proposal("skill", "Rust", &["w0"]),
                     proposal("skill", "Kafka", &["w0"]),
-                    proposal("skill", "PostgreSQL", &["w0f0"]),
+                    proposal("skill", "PostgreSQL", &["l.skills"]),
                 ]),
                 finding("education", None, "good", vec![]),
             ],
@@ -206,7 +203,7 @@ async fn a_checkup_from_the_export_reviews_linkedin_against_the_profile_and_goal
         "Staff Engineer",
         "Backend engineer · Rust and Postgres",
         "Kafka",
-        "\"w0f0\"",
+        "\"l.skills\"",
     ] {
         assert!(body.contains(shown), "{shown} not in the prompt");
     }
@@ -416,6 +413,11 @@ async fn start_over_throws_the_review_away_and_an_untouched_one_expires(db: PgPo
         Value::Null,
         "an expired review is not shown"
     );
+    // The sweep was queued for the day it expires; it is due now.
+    sqlx::query("UPDATE kernel.jobs SET run_at = now() WHERE kind = 'profile.expire_imports'")
+        .execute(&h.db)
+        .await
+        .unwrap();
     h.work().await;
     assert_eq!(
         h.count("SELECT count(*) FROM profile.linkedin_reviews")

@@ -47,8 +47,8 @@ function ChangeTag({ change }: { change: Change }) {
 }
 
 /**
- * The draft beside the profile: what was found in each part ("Found 13
- * jobs, 31 achievements…") and what came back empty, every value marked new,
+ * The draft beside the profile: what was found in each part ("Found 6
+ * jobs, 18 achievements…") and what came back empty, every value marked new,
  * changed or the same, what the source check left out, then Replace, Merge
  * or Discard. Nothing is saved before a choice.
  */
@@ -84,7 +84,7 @@ export function ImportReview({ id, current, onDone, onRestart }: ImportReviewPro
     );
   }
 
-  const { draft: next, dropped, kind } = draft.data;
+  const { draft: next, dropped, kind, stopped } = draft.data;
   const empty = emptySections(next);
   const found = new Intl.ListFormat(i18n.language, { style: "long", type: "conjunction" }).format(
     foundIn(next).map(({ key, count }) => t(`review.counts.${key}`, { count })),
@@ -114,6 +114,13 @@ export function ImportReview({ id, current, onDone, onRestart }: ImportReviewPro
           {found === "" ? null : (
             <Tagged testId="review-found">
               <Banner icon="check" title={t("review.found", { list: found })} />
+            </Tagged>
+          )}
+          {stopped === null || stopped === undefined ? null : (
+            <Tagged testId="review-stopped">
+              <Banner icon="warning" title={t("review.stopped.title")}>
+                {t("review.stopped.body")}
+              </Banner>
             </Tagged>
           )}
           {dropped > 0 ? (

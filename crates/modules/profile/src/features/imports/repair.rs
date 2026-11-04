@@ -2,34 +2,238 @@
 //! code, with no model (#72).
 //!
 //! A LinkedIn PDF puts each position's place on the line under its dates
-//! ("Lisbon, Portugal"), and a model can answer it as the position's
-//! `summary`: a CV drafter then sees thirteen places and no work. So:
+//! ("Porto, Portugal"), and a model can answer it as the position's
+//! `summary`: a CV drafter then sees a list of places and no work. So:
 //!
-//! - a `summary` that is a place (the position's own `location`, or a short
-//!   line that reads like "City, Region, Country" and says no verb) moves to
-//!   `location` (or goes, when the position already has one);
+//! - a `summary` that is a place moves to `location` (or goes, when the
+//!   position already has one), and so does a place on the first line of a
+//!   longer summary;
 //! - a `summary` that only says the title or the company again goes;
 //! - bullet lines in a `summary` become `highlights`;
-//! - dates written as words or numbers (`Jul 2023`, `07/2023`, `2023-7`)
-//!   become `YYYY-MM`, and an end date that says "Present" goes.
+//! - dates written as words or numbers (`Jul 2023`, `07/2023`, `15/03/2021`,
+//!   `2023-7`) become `YYYY-MM` (or `YYYY-MM-DD`), and an end date that says
+//!   "Present" goes.
+//!
+//! A place is told from a description without a model, and on the side of
+//! caution: a line with a comma is a place when every part of it reads like a
+//! name and it ends with a country, or it is the position's own location; a
+//! line without one only when it is a part of the known location, a region
+//! ("Greater Example Area", "Lisboa e região"), a country, or a place with a
+//! way of working ("Porto - Remote"). "Head of Engineering" and "Rust, Kafka,
+//! PostgreSQL" are never places.
 //!
 //! Nothing is invented: a value only moves or goes, and the source check
 //! still runs after this.
 
-use applicamp_kernel::claims::squash;
+use applicamp_kernel::{claims::squash, tech};
 
 use crate::schema::{Profile, Work};
 
 use super::source_check::MONTHS;
 
-/// Longest value that may be read as a place, in characters.
+/// Longest line without a comma that may be read as a place, in characters.
 const MAX_PLACE: usize = 40;
+/// Longest "City, Region, Country" line, in characters ("Washington,
+/// District of Columbia, United States").
+const MAX_PLACE_PARTS: usize = 80;
 
-/// Small words a place's name may hold in lower case ("Bruxelas e Região",
+/// Small words a place's name may hold in lower case ("Lisboa e região",
 /// "Área Metropolitana de Lisboa", "Frankfurt am Main").
 const CONNECTORS: [&str; 25] = [
     "e", "and", "et", "y", "i", "de", "da", "do", "das", "dos", "del", "la", "le", "les", "los",
     "las", "di", "du", "des", "of", "the", "am", "an", "der", "upon",
+];
+
+/// Words that make a line a region rather than a name ("Greater Example
+/// Area", "Antuérpia e Região"). Lower case, in the app's four languages.
+const REGION_WORDS: [&str; 18] = [
+    "area",
+    "área",
+    "região",
+    "regiao",
+    "region",
+    "région",
+    "región",
+    "metropolitan",
+    "metropolitana",
+    "metropolitaine",
+    "greater",
+    "grande",
+    "grand",
+    "county",
+    "district",
+    "distrito",
+    "province",
+    "província",
+];
+
+/// Ways of working a place line may end with ("Porto - Remote", "Porto,
+/// Portugal (Remote)"), or be. Lower case.
+const WORK_MODES: [&str; 17] = [
+    "remote",
+    "hybrid",
+    "on-site",
+    "onsite",
+    "on site",
+    "remoto",
+    "remota",
+    "híbrido",
+    "híbrida",
+    "hibrido",
+    "presencial",
+    "teletrabajo",
+    "a distancia",
+    "télétravail",
+    "hybride",
+    "sur site",
+    "à distance",
+];
+
+/// Countries, as a place line ends ("…, Portugal"), in the app's four
+/// languages. Lower case.
+const COUNTRIES: [&str; 142] = [
+    "portugal",
+    "spain",
+    "españa",
+    "espanha",
+    "espagne",
+    "france",
+    "frança",
+    "francia",
+    "germany",
+    "deutschland",
+    "alemanha",
+    "alemania",
+    "allemagne",
+    "italy",
+    "italia",
+    "itália",
+    "italie",
+    "belgium",
+    "bélgica",
+    "belgique",
+    "belgië",
+    "netherlands",
+    "the netherlands",
+    "países baixos",
+    "países bajos",
+    "pays-bas",
+    "nederland",
+    "luxembourg",
+    "luxemburgo",
+    "switzerland",
+    "suíça",
+    "suiza",
+    "suisse",
+    "schweiz",
+    "austria",
+    "áustria",
+    "autriche",
+    "österreich",
+    "ireland",
+    "irlanda",
+    "irlande",
+    "united kingdom",
+    "uk",
+    "reino unido",
+    "royaume-uni",
+    "england",
+    "scotland",
+    "wales",
+    "denmark",
+    "dinamarca",
+    "danemark",
+    "sweden",
+    "suécia",
+    "suecia",
+    "suède",
+    "norway",
+    "noruega",
+    "norvège",
+    "finland",
+    "finlândia",
+    "finlandia",
+    "finlande",
+    "iceland",
+    "poland",
+    "polónia",
+    "polonia",
+    "pologne",
+    "czechia",
+    "czech republic",
+    "chéquia",
+    "greece",
+    "grécia",
+    "grecia",
+    "grèce",
+    "romania",
+    "roménia",
+    "rumania",
+    "roumanie",
+    "hungary",
+    "hungria",
+    "hongrie",
+    "croatia",
+    "estonia",
+    "latvia",
+    "lithuania",
+    "ukraine",
+    "ucrânia",
+    "turkey",
+    "türkiye",
+    "united states",
+    "united states of america",
+    "usa",
+    "estados unidos",
+    "états-unis",
+    "canada",
+    "canadá",
+    "mexico",
+    "méxico",
+    "mexique",
+    "brazil",
+    "brasil",
+    "brésil",
+    "argentina",
+    "argentine",
+    "chile",
+    "chili",
+    "colombia",
+    "colômbia",
+    "colombie",
+    "peru",
+    "perú",
+    "pérou",
+    "uruguay",
+    "uruguai",
+    "angola",
+    "mozambique",
+    "moçambique",
+    "cabo verde",
+    "cape verde",
+    "morocco",
+    "marrocos",
+    "marruecos",
+    "maroc",
+    "south africa",
+    "nigeria",
+    "egypt",
+    "israel",
+    "united arab emirates",
+    "india",
+    "índia",
+    "inde",
+    "china",
+    "chine",
+    "japan",
+    "japão",
+    "japón",
+    "japon",
+    "singapore",
+    "australia",
+    "austrália",
+    "australie",
+    "new zealand",
 ];
 
 /// Words that say what someone did, or how they were employed: a line that
@@ -110,7 +314,7 @@ const NOT_A_PLACE: [&str; 72] = [
 ];
 
 /// What an end date says when the position has not ended.
-const NOW: [&str; 14] = [
+const NOW: [&str; 21] = [
     "present",
     "now",
     "current",
@@ -121,58 +325,154 @@ const NOW: [&str; 14] = [
     "atualmente",
     "actualmente",
     "actualidad",
+    "la actualidad",
+    "o momento",
+    "momento",
+    "até ao momento",
+    "até o momento",
     "hoje",
     "hoy",
     "aujourd'hui",
+    "à ce jour",
     "présent",
+    "en cours",
 ];
 
 /// Marks that open a bullet line.
 const BULLETS: [char; 9] = ['•', '·', '-', '–', '—', '*', '▪', '●', '◦'];
 
-/// Whether `value` is a place rather than a description: it is the
-/// position's own `location`, or a short line that reads like "City,
-/// Region, Country" (every word capitalised or a small joining word, no
-/// digit, no sentence, no word that says what someone did).
-pub(crate) fn is_place(value: &str, location: Option<&str>) -> bool {
-    let value = value.trim();
-    if value.is_empty() {
-        return false;
+/// `text` with typographic apostrophes made plain, in lower case.
+fn plain(text: &str) -> String {
+    text.trim().replace(['’', '‘'], "'").to_lowercase()
+}
+
+/// `value` without a way of working at its end ("Porto - Remote", "Porto,
+/// Portugal (Remote)"), and whether it had one. A value that is only a way of
+/// working is returned empty.
+fn without_work_mode(value: &str) -> (&str, bool) {
+    if WORK_MODES.contains(&plain(value).as_str()) {
+        return ("", true);
     }
-    if let Some(location) = location.filter(|l| !l.trim().is_empty()) {
-        // The same place, or one part of it ("Lisbon" of "Lisbon, Portugal").
-        let parts = |s: &str| -> Vec<String> {
-            s.split(',').map(squash).filter(|p| !p.is_empty()).collect()
-        };
-        let (said, place) = (squash(value), squash(location));
-        if said == place || parts(location).contains(&said) || parts(value).contains(&place) {
-            return true;
+    if let Some(open) = value.rfind('(')
+        && value.ends_with(')')
+        && WORK_MODES.contains(&plain(&value[open + 1..value.len() - 1]).as_str())
+    {
+        return (value[..open].trim_end(), true);
+    }
+    for separator in [" - ", " – ", " — ", " · ", " | "] {
+        if let Some((place, mode)) = value.rsplit_once(separator)
+            && WORK_MODES.contains(&plain(mode).as_str())
+        {
+            return (place.trim_end(), true);
         }
     }
-    if value.chars().count() > MAX_PLACE
-        || value.ends_with('.')
+    (value, false)
+}
+
+/// Whether a full stop in `value` ends a sentence, not an abbreviation ("St.
+/// Gallen"): one after a word of more than three letters, or one that is
+/// not followed by a space.
+fn has_sentence_stop(value: &str) -> bool {
+    value.split_whitespace().any(|word| {
+        word.strip_suffix('.').map_or(word.contains('.'), |stem| {
+            stem.contains('.') || stem.chars().count() > 3
+        })
+    })
+}
+
+/// Whether `part` reads like a place's name: up to five words, the first
+/// capitalised, each capitalised or a joining word, none that says what
+/// someone did, and no technology.
+fn reads_like_a_name(part: &str) -> bool {
+    let words: Vec<&str> = part.split_whitespace().collect();
+    (1..=5).contains(&words.len())
+        && words
+            .first()
+            .and_then(|w| w.chars().next())
+            .is_some_and(char::is_uppercase)
+        && words.iter().all(|word| {
+            let lower = plain(word);
+            !NOT_A_PLACE.contains(&lower.as_str())
+                && (word.chars().next().is_some_and(char::is_uppercase)
+                    || CONNECTORS.contains(&lower.as_str())
+                    || REGION_WORDS.contains(&lower.as_str()))
+        })
+        && !tech::mentions(part)
+}
+
+/// The parts of a place line, squashed ("Lisbon, Portugal": `lisbon`,
+/// `portugal`).
+fn parts_of(value: &str) -> Vec<String> {
+    value
+        .split(',')
+        .map(squash)
+        .filter(|p| !p.is_empty())
+        .collect()
+}
+
+/// Whether `value` is a place rather than a description. The length, the
+/// sentences and the line breaks are checked first; then a line with commas
+/// is a place when it is the known `location`, or every part reads like a
+/// name and the last is a country (or every part is a part of the location);
+/// a line without one only when it is a part of the known location, a region,
+/// a country, or a name with a way of working.
+pub(crate) fn is_place(value: &str, location: Option<&str>) -> bool {
+    let value = value.trim();
+    if value.is_empty() || value.contains('\n') {
+        return false;
+    }
+    let value = value.strip_suffix('.').unwrap_or(value).trim_end();
+    let (value, with_mode) = without_work_mode(value);
+    if value.is_empty() {
+        return with_mode;
+    }
+    let commas = value.contains(',');
+    if has_sentence_stop(value)
         || value
             .chars()
-            .any(|c| c.is_ascii_digit() || "!?;:()@/\"\n|".contains(c))
+            .any(|c| c.is_ascii_digit() || "!?;:()@/\"|".contains(c))
+        || value.chars().count() > if commas { MAX_PLACE_PARTS } else { MAX_PLACE }
     {
         return false;
     }
-    let parts: Vec<&str> = value.split(',').map(str::trim).collect();
-    parts.len() <= 4
-        && parts.iter().all(|part| {
-            let words: Vec<&str> = part.split_whitespace().collect();
-            (1..=5).contains(&words.len())
-                && words.iter().all(|word| {
-                    let lower = word.to_lowercase();
-                    !NOT_A_PLACE.contains(&lower.as_str())
-                        && (word.chars().next().is_some_and(char::is_uppercase)
-                            || CONNECTORS.contains(&lower.as_str()))
-                })
-                && words
-                    .first()
-                    .and_then(|w| w.chars().next())
-                    .is_some_and(char::is_uppercase)
-        })
+    let location = location.map(str::trim).filter(|l| !l.is_empty());
+    let known = location.map(parts_of).unwrap_or_default();
+    if location.is_some_and(|l| squash(l) == squash(value)) {
+        return true;
+    }
+    if commas {
+        let parts: Vec<&str> = value.split(',').map(str::trim).collect();
+        let named = (2..=4).contains(&parts.len()) && parts.iter().all(|p| reads_like_a_name(p));
+        let country = parts
+            .last()
+            .is_some_and(|last| COUNTRIES.contains(&plain(last).as_str()));
+        let inside = !known.is_empty() && parts_of(value).iter().all(|p| known.contains(p));
+        return named && (country || inside);
+    }
+    if !reads_like_a_name(value) {
+        return false;
+    }
+    let lower = plain(value);
+    known.contains(&squash(value))
+        || COUNTRIES.contains(&lower.as_str())
+        || lower
+            .split_whitespace()
+            .any(|word| REGION_WORDS.contains(&word))
+        || with_mode
+}
+
+/// Whether `a` and `b` name the same place: the same words, or one is a part
+/// of the other ("Lisbon" and "Lisbon, Portugal").
+pub(crate) fn same_place(a: &str, b: &str) -> bool {
+    let (a, b) = (
+        a.trim().trim_end_matches('.').trim(),
+        b.trim().trim_end_matches('.').trim(),
+    );
+    if a.is_empty() || b.is_empty() {
+        return false;
+    }
+    let (pa, pb) = (parts_of(a), parts_of(b));
+    squash(a) == squash(b) || pa.iter().all(|p| pb.contains(p)) || pb.iter().all(|p| pa.contains(p))
 }
 
 /// Letters and digits only, in lower case: "Staff Engineer · Example Org"
@@ -231,39 +531,83 @@ fn month_number(raw: &str) -> Option<usize> {
         .filter(|m| (1..=12).contains(m))
 }
 
+fn day_number(raw: &str) -> Option<usize> {
+    (1..=2)
+        .contains(&raw.len())
+        .then(|| raw.parse::<usize>().ok())
+        .flatten()
+        .filter(|d| (1..=31).contains(d))
+}
+
+/// `value` without what follows it in brackets ("Present (1 year 4 months)").
+fn without_brackets(value: &str) -> &str {
+    value
+        .split_once('(')
+        .map_or(value, |(before, _)| before)
+        .trim()
+}
+
 /// `value` as `YYYY`, `YYYY-MM` or `YYYY-MM-DD` when it is a date written
-/// another common way (`Jul 2023`, `julho de 2023`, `07/2023`, `2023-7`);
-/// as it is otherwise (the limits then drop and count it).
+/// another common way (`Jul 2023`, `julho de 2023`, `07/2023`, `2023-7`,
+/// `15/03/2021`, `15 Jul 2023`); as it is otherwise (the limits then drop
+/// and count it). A day before a month is read the European way.
 pub(crate) fn normalised_date(value: &str) -> String {
-    let trimmed = value.trim();
+    let trimmed = without_brackets(value);
     let month = |year: u32, month: usize| format!("{year:04}-{month:02}");
-    // 2023-07, 2023-7, 2023/07, 2023.07
+    let day = |year: u32, month: usize, day: usize| format!("{year:04}-{month:02}-{day:02}");
     let numeric: Vec<&str> = trimmed.split(['-', '/', '.']).collect();
-    if let [first, second] = numeric.as_slice() {
-        if let (Some(year), Some(m)) = (year_of(first), month_number(second)) {
-            return month(year, m);
+    match numeric.as_slice() {
+        // 2023-07, 2023-7, 2023/07, 2023.07; 07/2023
+        [first, second] => {
+            if let (Some(year), Some(m)) = (year_of(first), month_number(second)) {
+                return month(year, m);
+            }
+            if let (Some(m), Some(year)) = (month_number(first), year_of(second)) {
+                return month(year, m);
+            }
         }
-        if let (Some(m), Some(year)) = (month_number(first), year_of(second)) {
-            return month(year, m);
+        // 15/03/2021, 15.03.2021; 2021-03-15 is already right
+        [first, second, third] => {
+            if let (Some(d), Some(m), Some(year)) =
+                (day_number(first), month_number(second), year_of(third))
+            {
+                return day(year, m, d);
+            }
         }
+        _ => {}
     }
-    // Jul 2023, July 2023, julho de 2023, juil. 2023, Jul, 2023
+    // Jul 2023, July 2023, julho de 2023, juil. 2023, Jul, 2023, 15 Jul 2023
     let words: Vec<String> = trimmed
         .split(|c: char| c.is_whitespace() || c == ',')
         .filter(|w| !w.is_empty() && !matches!(w.to_lowercase().as_str(), "de" | "of"))
         .map(str::to_owned)
         .collect();
-    if let [name, year] = words.as_slice()
-        && let (Some(m), Some(year)) = (month_of(name), year_of(year))
-    {
-        return month(year, m);
+    match words.as_slice() {
+        [name, year] => {
+            if let (Some(m), Some(year)) = (month_of(name), year_of(year)) {
+                return month(year, m);
+            }
+        }
+        [d, name, year] => {
+            if let (Some(d), Some(m), Some(year)) = (day_number(d), month_of(name), year_of(year)) {
+                return day(year, m, d);
+            }
+        }
+        _ => {}
     }
     trimmed.to_owned()
 }
 
-/// Whether an end date says the position has not ended.
+/// Whether an end date says the position has not ended ("Present", "o
+/// momento", "aujourd’hui", "Present (1 year 4 months)").
 fn says_now(value: &str) -> bool {
-    NOW.contains(&value.trim().trim_end_matches('.').to_lowercase().as_str())
+    let said = plain(without_brackets(value));
+    let said = said.trim_end_matches('.');
+    NOW.contains(&said)
+        || said
+            .strip_prefix("até ")
+            .or_else(|| said.strip_prefix("until "))
+            .is_some_and(|rest| NOW.contains(&rest))
 }
 
 /// A date put right; none when it says "Present".
@@ -292,7 +636,7 @@ fn split_bullets(summary: &str) -> (Option<String>, Vec<String>) {
 /// What [`repaired`] changed, counted (for the logs: never the values).
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Repairs {
-    /// Summaries that were a place.
+    /// Summaries that were a place, or began with one.
     pub(crate) places: u32,
     /// Summaries that only said the title or the company again.
     pub(crate) titles: u32,
@@ -300,27 +644,42 @@ pub(crate) struct Repairs {
     pub(crate) bullets: u32,
 }
 
+/// `place` as the position's location when it has none.
+fn place_into(work: &mut Work, place: &str) {
+    if work.location.as_deref().is_none_or(|l| l.trim().is_empty()) {
+        work.location = Some(place.trim().trim_end_matches('.').to_owned());
+    }
+}
+
 /// One position put right.
 fn repair_work(work: &mut Work, repairs: &mut Repairs) {
     work.start_date = date(work.start_date.take());
     work.end_date = date(work.end_date.take());
     if let Some(summary) = work.summary.take() {
+        let summary = summary.trim().to_owned();
+        let (first, rest) = summary
+            .split_once('\n')
+            .map_or((summary.as_str(), ""), |(first, rest)| {
+                (first.trim(), rest.trim())
+            });
         // The title said again first: "Staff Engineer" would read as a place.
-        if repeats_title(&summary, work) {
+        let rest = if repeats_title(&summary, work) {
             repairs.titles += 1;
-        } else if is_place(&summary, work.location.as_deref()) {
+            String::new()
+        } else if is_place(first, work.location.as_deref()) {
+            // A place, alone or on the first line of the description.
             repairs.places += 1;
-            if work.location.as_deref().is_none_or(|l| l.trim().is_empty()) {
-                work.location = Some(summary.trim().to_owned());
-            }
+            place_into(work, first);
+            rest.to_owned()
         } else {
-            let (rest, bullets) = split_bullets(&summary);
-            repairs.bullets += u32::try_from(bullets.len()).unwrap_or(u32::MAX);
-            for bullet in bullets {
-                add_highlight(&mut work.highlights, bullet);
-            }
-            work.summary = rest;
+            summary.clone()
+        };
+        let (rest, bullets) = split_bullets(&rest);
+        repairs.bullets += u32::try_from(bullets.len()).unwrap_or(u32::MAX);
+        for bullet in bullets {
+            add_highlight(&mut work.highlights, bullet);
         }
+        work.summary = rest;
     }
     let mut seen = Vec::new();
     work.highlights.retain(|h| {
@@ -379,55 +738,92 @@ mod tests {
     #[test]
     fn places_are_places() {
         for place in [
-            "Lisboa, Lisboa, Portugal",
-            "Bruxelas e Região",
-            "Lisbon",
-            "Greater Lisbon Area",
-            "Área Metropolitana de Lisboa",
+            "Coimbra, Coimbra, Portugal",
             "Porto, Portugal",
+            "Lisboa, Portugal.",
+            "Porto, Portugal (Remote)",
+            "Porto - Remote",
+            "Remote",
+            "Lisboa e região",
+            "Antuérpia e Região",
+            "Greater Example Area",
+            "Área Metropolitana de Lisboa",
+            "Portugal",
             "Frankfurt am Main, Germany",
             "Région de Bruxelles-Capitale, Belgique",
             "St. Gallen, Switzerland",
+            "Washington, District of Columbia, United States",
         ] {
             assert!(is_place(place, None), "{place}");
         }
-        for not in [
-            "Built the billing platform.",
-            "Led the platform team",
-            "Led Engineering",
-            "Full-time",
-            "Freelance",
-            "Jul 2023 - Apr 2024 (10 months)",
-            "I build boring, reliable backends for small teams.",
-            "Responsible for payments, invoicing and the team",
-            "Runs the billing platform in Rust, with Kafka between its services, for 40 shops",
-            "",
+    }
+
+    #[test]
+    fn descriptions_titles_and_tools_are_not_places() {
+        for (not, location) in [
+            (
+                "Sold to retailers in Spain, Portugal, France",
+                Some("Portugal"),
+            ),
+            ("Sold to retailers in Spain, Portugal, France", None),
+            ("Head of Engineering", None),
+            ("Head of Engineering", Some("Porto, Portugal")),
+            ("Customer Success", None),
+            ("Rust, Kafka, PostgreSQL", None),
+            ("Rust, Kafka, PostgreSQL", Some("Porto, Portugal")),
+            ("Sales, Marketing", None),
+            ("Built the billing platform.", None),
+            ("Led the platform team", None),
+            ("Led Engineering", None),
+            ("Full-time", None),
+            ("Freelance", None),
+            ("Jul 2023 - Apr 2024 (10 months)", None),
+            ("I build boring, reliable backends for small teams.", None),
+            ("Responsible for payments, invoicing and the team", None),
+            ("Porto, Portugal\nBuilt the billing platform.", None),
+            (
+                "Built the billing platform for shops in Lisbon, Portugal and Spain.",
+                Some("Lisbon, Portugal"),
+            ),
+            // No comma and nothing that says it is a place.
+            ("Lisbon", None),
+            ("", None),
         ] {
-            assert!(!is_place(not, None), "{not}");
+            assert!(!is_place(not, location), "{not} / {location:?}");
         }
-        // The position's own location is a place, however it is written.
+    }
+
+    #[test]
+    fn the_known_location_makes_a_place() {
         assert!(is_place("lisbon,  portugal", Some("Lisbon, Portugal")));
         assert!(is_place("Lisbon", Some("Lisbon, Portugal")));
-        assert!(!is_place(
-            "Built the billing platform for shops in Lisbon, Portugal and Spain.",
-            Some("Lisbon, Portugal")
+        assert!(is_place(
+            "Lisbon, Lisbon District",
+            Some("Lisbon, Lisbon District, Exampleland")
         ));
+        assert!(!is_place("Porto", Some("Lisbon, Portugal")));
     }
 
     #[test]
     fn a_place_in_the_summary_moves_to_the_location() {
         let (draft, repairs) = repaired(Profile {
             work: vec![
-                position("Lisboa, Lisboa, Portugal", None),
+                position("Coimbra, Coimbra, Portugal", None),
                 position("Lisbon", Some("Lisbon, Portugal")),
                 position("Built the billing platform.", Some("Porto, Portugal")),
+                // On the first line of the description.
+                position("Porto, Portugal\nBuilt the billing platform.", None),
+                position(
+                    "Lisboa e região\nRan the payments team.\n• Cut refunds by half",
+                    None,
+                ),
             ],
             ..Profile::default()
         });
         assert_eq!(draft.work[0].summary, None);
         assert_eq!(
             draft.work[0].location.as_deref(),
-            Some("Lisboa, Lisboa, Portugal")
+            Some("Coimbra, Coimbra, Portugal")
         );
         assert_eq!(draft.work[1].summary, None, "never a place in a summary");
         assert_eq!(draft.work[1].location.as_deref(), Some("Lisbon, Portugal"));
@@ -435,7 +831,18 @@ mod tests {
             draft.work[2].summary.as_deref(),
             Some("Built the billing platform.")
         );
-        assert_eq!(repairs.places, 2);
+        assert_eq!(
+            draft.work[3].summary.as_deref(),
+            Some("Built the billing platform.")
+        );
+        assert_eq!(draft.work[3].location.as_deref(), Some("Porto, Portugal"));
+        assert_eq!(
+            draft.work[4].summary.as_deref(),
+            Some("Ran the payments team.")
+        );
+        assert_eq!(draft.work[4].location.as_deref(), Some("Lisboa e região"));
+        assert_eq!(draft.work[4].highlights, ["Cut refunds by half"]);
+        assert_eq!(repairs.places, 4);
     }
 
     #[test]
@@ -485,16 +892,34 @@ mod tests {
             ("julho de 2023", "2023-07"),
             ("juil. 2023", "2023-07"),
             ("Sept 2019", "2019-09"),
+            ("mai 2021", "2021-05"),
+            ("set 2021", "2021-09"),
+            ("out 2021", "2021-10"),
+            ("dez 2021", "2021-12"),
             ("07/2023", "2023-07"),
             ("7/2023", "2023-07"),
             ("2023-7", "2023-07"),
             ("2023/07", "2023-07"),
+            ("15/03/2021", "2021-03-15"),
+            ("15 Jul 2023", "2023-07-15"),
+            ("Jul 2023 (1 year 4 months)", "2023-07"),
             ("2023", "2023"),
             ("2023-07", "2023-07"),
             ("2023-07-15", "2023-07-15"),
             ("sometime", "sometime"),
         ] {
             assert_eq!(normalised_date(written), want, "{written}");
+        }
+        for now in [
+            "Present",
+            "Present (1 year 4 months)",
+            "o momento",
+            "até o momento",
+            "aujourd’hui",
+            "aujourd'hui",
+            "la actualidad",
+        ] {
+            assert!(says_now(now), "{now}");
         }
         let (draft, _) = repaired(Profile {
             work: vec![Work {

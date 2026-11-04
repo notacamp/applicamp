@@ -56,7 +56,7 @@
   },
   "review": {
     "title": "Vérifiez ce que nous avons trouvé",
-    "lead": "Rien n’est enregistré tant que vous n’avez pas choisi. Remplacer en fait votre profil. Fusionner garde votre profil et ajoute ce qui est nouveau.",
+    "lead": "Rien n’est enregistré tant que vous n’avez pas choisi. Remplacer en fait votre profil. Fusionner garde vos modifications, complète ce qui manque et retire un lieu du résumé d’un poste.",
     "found": "Nous avons trouvé {{list}}.",
     "counts": {
       "jobs_one": "{{count}} poste",
@@ -93,6 +93,7 @@
       "label": "Aucun titre trouvé dans ce fichier",
       "summary": "Aucun résumé trouvé dans ce fichier",
       "work": "Aucun poste trouvé dans ce fichier",
+      "achievements": "Aucune réalisation trouvée dans ce fichier",
       "education": "Aucune formation trouvée dans ce fichier",
       "skills": "Aucune compétence trouvée dans ce fichier",
       "languages": "Aucune langue trouvée dans ce fichier",
@@ -100,6 +101,10 @@
       "projects": "Aucun projet trouvé dans ce fichier",
       "hint": "Ajoutez-les à la main après avoir appliqué, ou importez votre export de données LinkedIn, qui contient compétences, formation et langues.",
       "hintZip": "Ajoutez-les à la main après avoir appliqué."
+    },
+    "stopped": {
+      "title": "Votre limite d’IA nous a empêchés de relire les parties manquantes.",
+      "body": "Voici ce que nous avons trouvé. Ajoutez les parties manquantes à la main, ou réessayez demain."
     }
   },
   "source": {

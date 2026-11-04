@@ -21,8 +21,9 @@ use super::{repair::repaired, source_check::keep_sourced};
 /// its heading when it comes back empty.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Section {
-    /// `basics.summary`, the About text.
-    Summary,
+    /// `basics.label` and `basics.summary`: the headline and the About text,
+    /// asked together on the top of the document.
+    Basics,
     Education,
     Skills,
     Languages,
@@ -32,7 +33,7 @@ enum Section {
 
 impl Section {
     const ALL: [Self; 6] = [
-        Self::Summary,
+        Self::Basics,
         Self::Education,
         Self::Skills,
         Self::Languages,
@@ -43,7 +44,7 @@ impl Section {
     /// The profile's key it is answered in.
     const fn key(self) -> &'static str {
         match self {
-            Self::Summary => "basics",
+            Self::Basics => "basics",
             Self::Education => "education",
             Self::Skills => "skills",
             Self::Languages => "languages",
@@ -55,7 +56,10 @@ impl Section {
     /// What the model is told about it when it is asked again.
     const fn line(self) -> &'static str {
         match self {
-            Self::Summary => "- `basics`: only `summary`, their About text, whole.",
+            Self::Basics => {
+                "- `basics`: only `label`, their headline (the line under their name), and \
+`summary`, their About text, whole."
+            }
             Self::Education => {
                 "- `education`: one entry per school or degree, with `institution`, `studyType`, \
 `area` and dates."
@@ -75,7 +79,7 @@ impl Section {
     /// languages, lower case.
     const fn headings(self) -> &'static [&'static str] {
         match self {
-            Self::Summary => &[
+            Self::Basics => &[
                 "about",
                 "summary",
                 "profile",
@@ -130,11 +134,9 @@ impl Section {
     /// Whether `draft` has nothing of it.
     fn is_empty_in(self, draft: &Profile) -> bool {
         match self {
-            Self::Summary => draft
-                .basics
-                .summary
-                .as_deref()
-                .is_none_or(|s| s.trim().is_empty()),
+            Self::Basics => [&draft.basics.label, &draft.basics.summary]
+                .iter()
+                .any(|v| v.as_deref().is_none_or(|v| v.trim().is_empty())),
             Self::Education => draft.education.is_empty(),
             Self::Skills => draft.skills.is_empty(),
             Self::Languages => draft.languages.is_empty(),
@@ -146,7 +148,16 @@ impl Section {
     /// `again`'s answer for it, into `draft` (which has none).
     fn fill(self, draft: &mut Profile, again: &mut Profile) {
         match self {
-            Self::Summary => draft.basics.summary = again.basics.summary.take(),
+            Self::Basics => {
+                for (mine, theirs) in [
+                    (&mut draft.basics.label, &mut again.basics.label),
+                    (&mut draft.basics.summary, &mut again.basics.summary),
+                ] {
+                    if mine.as_deref().is_none_or(|v| v.trim().is_empty()) {
+                        *mine = theirs.take();
+                    }
+                }
+            }
             Self::Education => draft.education = std::mem::take(&mut again.education),
             Self::Skills => draft.skills = std::mem::take(&mut again.skills),
             Self::Languages => draft.languages = std::mem::take(&mut again.languages),
@@ -182,7 +193,8 @@ const OTHER_HEADINGS: [&str; 22] = [
     "recommendations",
 ];
 
-/// Longest text under a heading that is asked again, in characters.
+/// Longest text asked again, all the sections' text together, in
+/// characters.
 const MAX_SLICE: usize = 8_000;
 
 /// A line as a heading is compared: trimmed, spaced once, without a closing
@@ -205,10 +217,12 @@ fn is_heading(line: &str) -> bool {
                 .any(|s| s.headings().contains(&line.as_str())))
 }
 
-/// The text under `section`'s heading in `text`, up to the next heading (its
-/// heading line included); none when the text has no such heading.
-fn slice_of(text: &str, section: Section) -> Option<String> {
-    let lines: Vec<&str> = text.lines().collect();
+/// The lines of `lines` under `section`'s heading, up to the next heading
+/// (its heading line included); none when there is no such heading or
+/// nothing under it. The headline and the About text are read from the top
+/// of the document down to the end of the About text: the headline is the
+/// line under the name, above it.
+fn range_of(lines: &[&str], section: Section) -> Option<std::ops::Range<usize>> {
     let start = lines
         .iter()
         .position(|line| section.headings().contains(&heading_of(line).as_str()))?;
@@ -218,9 +232,15 @@ fn slice_of(text: &str, section: Section) -> Option<String> {
         .skip(start + 1)
         .find(|(_, line)| is_heading(line))
         .map_or(lines.len(), |(at, _)| at);
-    let slice: String = lines[start..end].join("\n");
-    let slice: String = slice.chars().take(MAX_SLICE).collect();
-    (end > start + 1).then_some(slice)
+    let from = if section == Section::Basics { 0 } else { start };
+    (end > start + 1).then_some(from..end)
+}
+
+/// The text under `section`'s heading in `text` (see [`range_of`]).
+#[cfg(test)]
+fn slice_of(text: &str, section: Section) -> Option<String> {
+    let lines: Vec<&str> = text.lines().collect();
+    range_of(&lines, section).map(|range| lines[range].join("\n"))
 }
 
 /// What one call is asked for.
@@ -276,15 +296,15 @@ impl Part {
             Self::Work => "Answer with `work` only: one entry per position in the document, every \
 one of them, however many.\n\
 - `name` is the company and `position` the title.\n\
-- `location` is the line that says where: a city, a region or a country (\"Lisbon, Portugal\", \
-\"Greater Brussels Area\", \"Remote\").\n\
+- `location` is the line that says where: a city, a region or a country (\"Sampleton, \
+Exampleland\", \"Greater Sampleton Area\", \"Remote\").\n\
 - `summary` is the paragraph that describes the work, as the document writes it. It is never a \
 place: a city, region or country line is the `location`. Leave `summary` out when the position \
 has no such paragraph.\n\
 - `highlights` are the bullet lines under the position, one entry per line, without the bullet.\n\
-- `startDate` and `endDate` come from the dates line (\"Jul 2023 - Apr 2024\", \"Mar 2021 - \
-Present\"), as `YYYY-MM` (`Jul 2023` is `2023-07`) or `YYYY` when only a year is given. Leave \
-`endDate` out only when the position is current (\"Present\")."
+- `startDate` and `endDate` come from the dates line (\"Feb 2019 - Nov 2020\", \"Sep 2021 - \
+Present\"), as `YYYY-MM` (`Feb 2019` is `2019-02`) or `YYYY` when only a year is given. Leave \
+`endDate` out when the position is current (\"Present\") or the document gives no end date."
                 .to_owned(),
             Self::Rest => "Answer with every one of these sections, filled from the document \
 wherever it has them, and an empty list or no value where it does not:\n\
@@ -382,44 +402,89 @@ async fn ask(ai: &Gateway, caller: Caller<'_>, part: &Part, text: &str) -> Resul
 }
 
 /// The sections `rest` left empty whose heading `text` has, and the text
-/// under those headings, to ask again.
+/// under those headings, once each and in the document's order, at most
+/// [`MAX_SLICE`] characters in all.
 fn to_ask_again(rest: &Profile, text: &str) -> Option<(Vec<Section>, String)> {
+    let lines: Vec<&str> = text.lines().collect();
     let mut sections = Vec::new();
-    let mut slices: Vec<String> = Vec::new();
+    let mut ranges: Vec<std::ops::Range<usize>> = Vec::new();
     for section in Section::ALL {
         if !section.is_empty_in(rest) {
             continue;
         }
-        if let Some(slice) = slice_of(text, section) {
+        if let Some(range) = range_of(&lines, section) {
             sections.push(section);
-            if !slices.contains(&slice) {
-                slices.push(slice);
-            }
+            ranges.push(range);
         }
     }
-    (!sections.is_empty()).then(|| (sections, slices.join("\n\n")))
+    if sections.is_empty() {
+        return None;
+    }
+    // Overlapping slices (the top of the document holds a two-column PDF's
+    // sidebar) are read once.
+    ranges.sort_by_key(|r| r.start);
+    let mut merged: Vec<std::ops::Range<usize>> = Vec::new();
+    for range in ranges {
+        match merged.last_mut() {
+            Some(last) if range.start <= last.end => last.end = last.end.max(range.end),
+            _ => merged.push(range),
+        }
+    }
+    let slice: String = merged
+        .into_iter()
+        .map(|range| lines[range].join("\n"))
+        .collect::<Vec<_>>()
+        .join("\n\n")
+        .chars()
+        .take(MAX_SLICE)
+        .collect();
+    Some((sections, slice))
+}
+
+/// A draft read from a document.
+#[derive(Debug, Clone)]
+pub struct Structured {
+    /// The draft, put right and checked against the document.
+    pub draft: Profile,
+    /// Values the source check dropped.
+    pub dropped: u32,
+    /// The problem code (`ai_budget_reached`, `ai_daily_limit_reached`) that
+    /// stopped reading the empty sections again; the two answers already paid
+    /// for are kept.
+    pub stopped: Option<&'static str>,
 }
 
 /// The draft profile in `text`, and how many values the source check
 /// dropped. Fails with `ai_unavailable` when the `complete` role is not
 /// configured, `ai_daily_limit_reached` over the cap, `ai_failed` when the
 /// model's answer is cut off or unusable, even after a retry: a draft is
-/// complete or it does not exist.
-///
-/// A section the second call leaves empty although the text has its heading
-/// ("Education", "Idiomas") is asked once more, on the text under its
-/// heading only; if that fails too, the section stays empty and the review
-/// says so. Then the draft is put right in code ([`super::repair`]): a place
-/// is never a position's summary.
+/// complete or it does not exist. [`read`] says more.
 pub async fn structure(
     ai: Option<&Gateway>,
     caller: Caller<'_>,
     text: &str,
 ) -> Result<(Profile, u32)> {
+    let read = read(ai, caller, text).await?;
+    Ok((read.draft, read.dropped))
+}
+
+/// The draft profile in `text`, as [`structure`], and what stopped reading
+/// the empty sections again, if anything.
+///
+/// A section the second call leaves empty although the text has its heading
+/// ("Education", "Idiomas"; the headline and the About text when there is an
+/// About heading) is asked once more, in one call (and its one retry after a
+/// cut-off), on the text under those headings only. If that fails the
+/// sections stay empty and the review says so; a spending limit or the daily
+/// cap there keeps the two answers already paid for and says what stopped it.
+/// Then the draft is put right in code ([`super::repair`]): a place is never a
+/// position's summary.
+pub async fn read(ai: Option<&Gateway>, caller: Caller<'_>, text: &str) -> Result<Structured> {
     let ai = ai.ok_or(Error::Unavailable(applicamp_ai::AI_UNAVAILABLE))?;
     let positions = ask(ai, caller, &Part::Work, text).await?;
     let mut rest = ask(ai, caller, &Part::Rest, text).await?;
     let mut asked_again = 0;
+    let mut stopped = None;
     if let Some((sections, slice)) = to_ask_again(&rest, text) {
         asked_again = sections.len();
         match ask(ai, caller, &Part::Again(sections.clone()), &slice).await {
@@ -428,13 +493,14 @@ pub async fn structure(
                     section.fill(&mut rest, &mut again);
                 }
             }
-            // Spending limits stop the import as any call's would.
-            Err(error) if is_limit(&error) => return Err(error),
             Err(error) => {
                 tracing::warn!(
                     error = error.code(),
                     "asking again for empty sections failed"
                 );
+                if is_limit(&error) {
+                    stopped = Some(error.code());
+                }
             }
         }
     }
@@ -451,10 +517,15 @@ pub async fn structure(
         bullets = repairs.bullets,
         "a profile import was structured"
     );
-    Ok(keep_sourced(draft.tidied(), text))
+    let (draft, dropped) = keep_sourced(draft.tidied(), text);
+    Ok(Structured {
+        draft,
+        dropped,
+        stopped,
+    })
 }
 
-/// A spending limit or a daily cap: the import stops.
+/// A spending limit or the daily cap.
 fn is_limit(error: &Error) -> bool {
     matches!(
         error.code(),
@@ -588,23 +659,35 @@ mod tests {
         let (sections, slice) = to_ask_again(&rest, LINKEDIN).unwrap();
         assert_eq!(
             sections,
-            [Section::Summary, Section::Education, Section::Languages],
+            [Section::Basics, Section::Education, Section::Languages],
             "skills came back; no certificates or projects heading"
         );
         assert!(slice.contains("Sample University"));
         assert!(slice.contains("English (Full Professional)"));
+        assert!(
+            slice.contains("Staff engineer"),
+            "the headline, above the About text"
+        );
+        assert!(slice.contains("I build calm backends."));
         assert!(!slice.contains("Example Org"), "never the positions");
+        assert_eq!(
+            slice.matches("English (Full Professional)").count(),
+            1,
+            "the sidebar once, though two sections hold it"
+        );
         let again = Part::Again(sections);
         assert_eq!(again.sections(), ["basics", "education", "languages"]);
         assert_eq!(
             again.schema()["required"],
             serde_json::json!(again.sections())
         );
-        assert!(again.instructions().contains("only `summary`"));
+        assert!(again.instructions().contains("only `label`"));
+        assert!(again.instructions().contains("`summary`"));
         assert_eq!(again.budgets(), Part::Rest.budgets());
         // Nothing empty, nothing asked again.
         let full = Profile {
             basics: crate::schema::Basics {
+                label: Some("Staff engineer".into()),
                 summary: Some("I build calm backends.".into()),
                 ..crate::schema::Basics::default()
             },
@@ -619,5 +702,17 @@ mod tests {
             ..rest
         };
         assert_eq!(to_ask_again(&full, LINKEDIN), None);
+    }
+
+    #[test]
+    fn what_is_asked_again_is_at_most_eight_thousand_characters() {
+        let long = format!(
+            "Education\n{}\nLanguages\n{}",
+            "Sample University, a long line. ".repeat(200),
+            "Portuguese. ".repeat(500)
+        );
+        let (sections, slice) = to_ask_again(&Profile::default(), &long).unwrap();
+        assert_eq!(sections, [Section::Education, Section::Languages]);
+        assert_eq!(slice.chars().count(), MAX_SLICE);
     }
 }

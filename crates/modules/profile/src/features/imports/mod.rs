@@ -127,6 +127,10 @@ pub struct Import {
     /// Values left out of the draft: ones a model gave that the file does
     /// not say (the source check), or that did not fit.
     pub dropped: u32,
+    /// What stopped reading the sections that came back empty a second time
+    /// (`ai_budget_reached`, `ai_daily_limit_reached`), if anything: the draft
+    /// has what the first reads found.
+    pub stopped: Option<String>,
     /// When it was made.
     pub created_at: DateTime<Utc>,
     /// When the draft is deleted if it is not applied.
@@ -289,7 +293,8 @@ pub async fn create(
         account: principal.account_id,
         now,
     };
-    let (draft, dropped) = match kind {
+    let read = |read: structure::Structured| (read.draft, read.dropped, read.stopped);
+    let (draft, dropped, stopped) = match kind {
         ImportKind::LinkedinZip => {
             let bytes = upload
                 .file
@@ -297,7 +302,7 @@ pub async fn create(
             let draft = tokio::task::spawn_blocking(move || linkedin::read_export(&bytes))
                 .await
                 .map_err(Error::internal)??;
-            (draft, 0)
+            (draft, 0, None)
         }
         ImportKind::Pdf => {
             let bytes = upload.file.ok_or_else(|| upload_error("Choose a PDF."))?;
@@ -305,11 +310,11 @@ pub async fn create(
                 return Err(too_large("This PDF is over 8 MB."));
             }
             let text = checked_text(pdf::text_of(bytes).await?)?;
-            structure::structure(ai.0.as_ref(), caller, &text).await?
+            read(structure::read(ai.0.as_ref(), caller, &text).await?)
         }
         ImportKind::Text => {
             let text = checked_text(upload.text.unwrap_or_default())?;
-            structure::structure(ai.0.as_ref(), caller, &text).await?
+            read(structure::read(ai.0.as_ref(), caller, &text).await?)
         }
     };
     let (draft, unfit) = draft.sanitized();
@@ -325,19 +330,21 @@ pub async fn create(
         status: ImportStatus::Ready,
         draft,
         dropped: dropped.saturating_add(unfit),
+        stopped: stopped.map(str::to_owned),
         created_at: now,
         expires_at: now + DRAFT_LIFETIME,
     };
     let mut tx = state.db.begin().await?;
     sqlx::query(
-        "INSERT INTO profile.imports (id, account_id, kind, status, draft, dropped, created_at, \
-         expires_at) VALUES ($1, $2, $3, 'ready', $4, $5, $6, $7)",
+        "INSERT INTO profile.imports (id, account_id, kind, status, draft, dropped, stopped, \
+         created_at, expires_at) VALUES ($1, $2, $3, 'ready', $4, $5, $6, $7, $8)",
     )
     .bind(import.id)
     .bind(principal.account_id)
     .bind(kind.as_str())
     .bind(sqlx::types::Json(&import.draft))
     .bind(i32::try_from(import.dropped).unwrap_or(i32::MAX))
+    .bind(&import.stopped)
     .bind(import.created_at)
     .bind(import.expires_at)
     .execute(&mut *tx)
@@ -345,7 +352,13 @@ pub async fn create(
     jobs::enqueue_at(&mut tx, &ExpireImports {}, import.expires_at).await?;
     tx.commit().await?;
     // Ids, kinds and counts only.
-    tracing::info!(import = %import.id, kind = kind.as_str(), dropped = import.dropped, "profile import drafted");
+    tracing::info!(
+        import = %import.id,
+        kind = kind.as_str(),
+        dropped = import.dropped,
+        stopped = import.stopped.as_deref(),
+        "profile import drafted"
+    );
     Ok((StatusCode::CREATED, Json(import)))
 }
 
@@ -356,6 +369,7 @@ struct ImportRow {
     status: String,
     draft: sqlx::types::Json<Profile>,
     dropped: i32,
+    stopped: Option<String>,
     created_at: DateTime<Utc>,
     expires_at: DateTime<Utc>,
 }
@@ -369,6 +383,7 @@ impl ImportRow {
             status: ImportStatus::parse(&self.status),
             draft: self.draft.0,
             dropped: u32::try_from(self.dropped).unwrap_or(0),
+            stopped: self.stopped,
             created_at: self.created_at,
             expires_at: self.expires_at,
         })
@@ -400,7 +415,8 @@ pub async fn get(
     Path(id): Path<Uuid>,
 ) -> Result<Json<Import>> {
     let row: ImportRow = sqlx::query_as(
-        "SELECT id, kind, status, draft, dropped, created_at, expires_at FROM profile.imports
+        "SELECT id, kind, status, draft, dropped, stopped, created_at, expires_at
+           FROM profile.imports
           WHERE id = $1 AND account_id = $2 AND expires_at > $3 AND draft IS NOT NULL",
     )
     .bind(id)
@@ -479,7 +495,8 @@ pub async fn apply(
     let now = state.clock.now();
     let mut tx = state.db.begin().await?;
     let row: ImportRow = sqlx::query_as(
-        "SELECT id, kind, status, draft, dropped, created_at, expires_at FROM profile.imports
+        "SELECT id, kind, status, draft, dropped, stopped, created_at, expires_at
+           FROM profile.imports
           WHERE id = $1 AND account_id = $2 AND expires_at > $3 AND draft IS NOT NULL
             FOR UPDATE",
     )

@@ -199,7 +199,7 @@ async fn companies_with_a_recent_job_become_company_pages_that_wait_with_their_s
 
     // The owner approves Workable: the pages follow, with no sample read.
     approve_workable(&h.db).await;
-    assert_eq!(approve_listed(&h.db, h.clock.now()).await.unwrap(), 2);
+    assert_eq!(approve_listed(&h.db, today()).await.unwrap(), 2);
     let found = pages(&h.db).await;
     assert!(
         found

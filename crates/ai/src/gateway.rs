@@ -418,6 +418,12 @@ impl Gateway {
         self.config.is_configured(role)
     }
 
+    /// The role longer writing (CVs, letters) goes to: `write` when it is
+    /// configured, else `complete`.
+    pub fn writer(&self) -> Role {
+        self.config.writer()
+    }
+
     /// The price of `role`'s model, if it is configured.
     pub fn price(&self, role: Role) -> Option<Price> {
         self.config.provider(role).ok().map(price::price_of)
@@ -490,7 +496,17 @@ impl Gateway {
         caller: Caller<'_>,
         request: ChatRequest,
     ) -> Result<ChatResponse, Error> {
-        let role = Role::Complete;
+        self.complete_as(Role::Complete, caller, request).await
+    }
+
+    /// One chat completion on `role`, with the same checks, limits and
+    /// ledger as [`Gateway::complete`]; the ledger records the role.
+    pub async fn complete_as(
+        &self,
+        role: Role,
+        caller: Caller<'_>,
+        request: ChatRequest,
+    ) -> Result<ChatResponse, Error> {
         let provider = self.config.provider(role)?;
         if let Some(cap) = self.config.daily_token_cap() {
             let used = usage::used_today(caller.db, caller.account, caller.now)

@@ -111,6 +111,9 @@ services:
       APPLICAMP_SOURCES__WATCH_EVERY_SECS: "0"
       APPLICAMP_AI__COMPLETE__BASE_URL: http://fake-jobs:9020/v1
       APPLICAMP_AI__COMPLETE__MODEL: fake/model
+      # The longer writing (the CV, the letter) on its own role, as in prod.
+      APPLICAMP_AI__WRITE__BASE_URL: http://fake-jobs:9020/v1
+      APPLICAMP_AI__WRITE__MODEL: fake/writer
       # Agent runs (the Agents page's Run a check): the runner as a child
       # process of the server behind a policy proxy, not a sandbox; tests
       # only. The image carries the runner at /app/applicamp-agent.

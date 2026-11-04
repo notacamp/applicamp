@@ -26,6 +26,11 @@
 //! - `APPLICAMP_AI__COMPLETE__PRICE_IN_USD_PER_MTOK` and `…_PRICE_OUT_…`: the
 //!   model's price in US dollars per million tokens, when the built-in table
 //!   ([`crate::price`]) does not know it.
+//! - `APPLICAMP_AI__WRITE__…`: the same settings for the `write` role, the
+//!   model for longer writing (CVs, letters). When it is not set, the
+//!   callers use `complete` ([`AiConfig::writer`]), so one model still runs
+//!   everything. Price it with `APPLICAMP_AI__WRITE__PRICE_IN_USD_PER_MTOK`
+//!   and `…_PRICE_OUT_…` when the built-in table does not know it.
 //! - Spending limits in euros ([`BudgetConfig`]):
 //!   `APPLICAMP_AI__BUDGET__ACCOUNT_DAILY_EUR` (default 0.30),
 //!   `…__ACCOUNT_MONTHLY_EUR` (3), `…__INSTANCE_MONTHLY_EUR` (15), each `0`
@@ -70,13 +75,28 @@ pub const DEFAULT_USD_TO_EUR: f64 = 0.92;
 pub enum Role {
     /// Free-form generation and structuring (a CV into a profile).
     Complete,
+    /// Longer writing: CVs, letters. Falls back to `complete` when it is not
+    /// configured ([`AiConfig::writer`]).
+    Write,
 }
 
 impl Role {
+    /// Every role.
+    pub const ALL: [Self; 2] = [Self::Complete, Self::Write];
+
     /// Lower-case name, as in config keys and the usage ledger.
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Complete => "complete",
+            Self::Write => "write",
+        }
+    }
+
+    /// The variable its key is read from.
+    const fn key_variable(self) -> &'static str {
+        match self {
+            Self::Complete => "APPLICAMP_AI__COMPLETE__API_KEY",
+            Self::Write => "APPLICAMP_AI__WRITE__API_KEY",
         }
     }
 }
@@ -195,6 +215,9 @@ pub struct AiConfig {
     /// The `complete` role (`APPLICAMP_AI__COMPLETE__…`).
     #[serde(default)]
     pub complete: Option<ProviderConfig>,
+    /// The `write` role (`APPLICAMP_AI__WRITE__…`).
+    #[serde(default)]
+    pub write: Option<ProviderConfig>,
     /// Tokens per account per UTC day (`APPLICAMP_AI__DAILY_TOKENS`); read it
     /// through [`daily_token_cap`](Self::daily_token_cap), which applies the
     /// default.
@@ -270,23 +293,31 @@ impl AiConfig {
         let mut section: Dict = figment
             .extract_inner("ai")
             .map_err(|e| Error::Config(e.to_string()))?;
-        if let Some(Value::Dict(_, role)) = section.get_mut(Role::Complete.as_str()) {
-            role.retain(|_, value| !is_blank(value));
-            if !role.contains_key("base_url") && !role.contains_key("model") {
-                section.remove(Role::Complete.as_str());
+        for role in Role::ALL {
+            if let Some(Value::Dict(_, settings)) = section.get_mut(role.as_str()) {
+                settings.retain(|_, value| !is_blank(value));
+                if !settings.contains_key("base_url") && !settings.contains_key("model") {
+                    section.remove(role.as_str());
+                }
             }
         }
         let mut config: Self = Figment::from(Serialized::defaults(section))
             .extract()
             .map_err(|e| Error::Config(format!("APPLICAMP_AI__…: {e}")))?;
-        if let Some(provider) = config.complete.as_mut() {
-            provider.api_key = read_secret(
-                "APPLICAMP_AI__COMPLETE__API_KEY",
-                provider.api_key.as_ref(),
-                provider.api_key_file.as_deref(),
-            )
-            .map_err(|e| Error::Config(e.to_string()))?;
-            provider.api_key_file = None;
+        for role in Role::ALL {
+            let slot = match role {
+                Role::Complete => config.complete.as_mut(),
+                Role::Write => config.write.as_mut(),
+            };
+            if let Some(provider) = slot {
+                provider.api_key = read_secret(
+                    role.key_variable(),
+                    provider.api_key.as_ref(),
+                    provider.api_key_file.as_deref(),
+                )
+                .map_err(|e| Error::Config(e.to_string()))?;
+                provider.api_key_file = None;
+            }
         }
         Ok(config)
     }
@@ -295,8 +326,19 @@ impl AiConfig {
     pub fn provider(&self, role: Role) -> Result<&ProviderConfig, Error> {
         match role {
             Role::Complete => self.complete.as_ref(),
+            Role::Write => self.write.as_ref(),
         }
         .ok_or(Error::NotConfigured(role))
+    }
+
+    /// The role longer writing goes to: `write` when it is configured, else
+    /// `complete` (one model runs everything).
+    pub fn writer(&self) -> Role {
+        if self.is_configured(Role::Write) {
+            Role::Write
+        } else {
+            Role::Complete
+        }
     }
 
     /// Whether `role` has a provider.
@@ -469,6 +511,39 @@ mod tests {
         assert_eq!(complete.model, "some/model");
         assert_eq!(bearer(complete), Some("sk-test"));
         assert_eq!(config.daily_token_cap(), Some(50_000));
+    }
+
+    #[test]
+    fn the_write_role_is_read_and_falls_back_to_complete() {
+        let one = load(serde_json::json!({ "ai": { "complete": {
+            "base_url": "https://x.example.com/v1",
+            "model": "cheap/model",
+        }}}))
+        .unwrap();
+        assert!(!one.is_configured(Role::Write));
+        assert_eq!(one.writer(), Role::Complete);
+
+        let both = load(serde_json::json!({ "ai": {
+            "complete": { "base_url": "https://x.example.com/v1", "model": "cheap/model" },
+            "write": {
+                "base_url": "https://x.example.com/v1",
+                "model": "strong/model",
+                "api_key": "sk-write",
+                "price_in_usd_per_mtok": "1",
+                "price_out_usd_per_mtok": "4",
+            },
+        }}))
+        .unwrap();
+        assert_eq!(both.writer(), Role::Write);
+        let write = both.provider(Role::Write).unwrap();
+        assert_eq!(write.model, "strong/model");
+        assert_eq!(bearer(write), Some("sk-write"));
+        assert_eq!(write.price_out_usd_per_mtok, Some(4.0));
+        assert_eq!(Role::Write.as_str(), "write");
+
+        let blank = load(serde_json::json!({ "ai": { "write": { "base_url": "", "model": "" } } }))
+            .unwrap();
+        assert!(!blank.is_configured(Role::Write));
     }
 
     #[test]

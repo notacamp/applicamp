@@ -213,7 +213,7 @@ test("the owner's Job sites page: totals, what waits for them, and a board's dec
   // Its panel: the email to send first, then the facts, then each check with the quoted sentence.
   await row.getByTestId("boards-admin-waiting-open").click();
   const permission = page.getByTestId("boards-admin-permission");
-  await expect(permission).toContainText("May Applicamp show jobs from Fake Forbidding Board?");
+  await expect(permission).toContainText("Send this from your own email");
   await expect(page.getByTestId("boards-admin-asked")).toBeVisible();
   await expect(page.getByTestId("boards-admin-facts")).toBeVisible();
   await expect(page.getByTestId("boards-admin-checks")).toContainText(

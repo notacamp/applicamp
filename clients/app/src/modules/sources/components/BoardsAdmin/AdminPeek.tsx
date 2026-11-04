@@ -500,7 +500,7 @@ function KeyDecision({
 
 function ChoiceDecision({ row, onDeclined }: { row: AdminRow; onDeclined: (id: string) => void }) {
   const { t } = useTranslation("sources");
-  const answer = useAnswerRequest(row.board.id);
+  const action = useBoardAction(row.board.id);
   return (
     <Section
       title={t("admin.choice.title")}
@@ -512,10 +512,10 @@ function ChoiceDecision({ row, onDeclined }: { row: AdminRow; onDeclined: (id: s
           <Button
             variant="primary"
             size="lg"
-            disabled={answer.isPending}
+            disabled={action.isPending}
             data-testid="boards-admin-choice-yes"
             onClick={() => {
-              answer.mutate({ answer: "yes", kind: "choice" });
+              action.mutate({ kind: "approve" });
             }}
           >
             {t("admin.choice.yes")}
@@ -523,11 +523,11 @@ function ChoiceDecision({ row, onDeclined }: { row: AdminRow; onDeclined: (id: s
           <Button
             variant="secondary"
             size="lg"
-            disabled={answer.isPending}
+            disabled={action.isPending}
             data-testid="boards-admin-choice-no"
             onClick={() => {
-              answer.mutate(
-                { answer: "no", kind: "choice" },
+              action.mutate(
+                { kind: "decline", reason: DECLINED_HERE },
                 {
                   onSuccess: () => {
                     onDeclined(row.board.id);
@@ -539,8 +539,8 @@ function ChoiceDecision({ row, onDeclined }: { row: AdminRow; onDeclined: (id: s
             {t("admin.choice.no")}
           </Button>
         </Cluster>
-        {answer.isError ? (
-          <ErrorLine testId="boards-admin-choice-error" error={answer.error} />
+        {action.isError ? (
+          <ErrorLine testId="boards-admin-choice-error" error={action.error} />
         ) : null}
       </Stack>
     </Section>

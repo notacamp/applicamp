@@ -203,7 +203,8 @@ async fn a_checkup_from_the_export_reviews_linkedin_against_the_profile_and_goal
         "Staff Engineer",
         "Backend engineer · Rust and Postgres",
         "Kafka",
-        "\"l.skills\"",
+        // Inside the message (a JSON string), the id is quoted and escaped.
+        "l.skills",
     ] {
         assert!(body.contains(shown), "{shown} not in the prompt");
     }

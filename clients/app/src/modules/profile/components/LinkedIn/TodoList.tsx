@@ -33,7 +33,7 @@ export function TodoList({ proposals }: TodoListProps) {
               <Tagged
                 key={proposal.id}
                 testId={`linkedin-todo-${proposal.id}`}
-                data={{ status: proposal.status }}
+                data={{ "data-status": proposal.status }}
               >
                 <Stack gap="sm">
                   {proposal.status === "done" ? (

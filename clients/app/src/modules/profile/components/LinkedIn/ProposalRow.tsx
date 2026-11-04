@@ -148,7 +148,7 @@ export function ProposalRow({ proposal }: ProposalRowProps) {
   };
 
   return (
-    <Tagged testId={`linkedin-proposal-${id}`} data={{ status: proposal.status }}>
+    <Tagged testId={`linkedin-proposal-${id}`} data={{ "data-status": proposal.status }}>
       <Stack gap="sm">
         <Text weight="semibold" size="sm">
           {t(`linkedin.proposal.fields.${proposal.field}`)}

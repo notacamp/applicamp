@@ -112,7 +112,7 @@ function FindingBlock({
     <Section
       title={title}
       action={
-        <Tagged testId={`linkedin-state-${finding.id}`} data={{ state: finding.state }}>
+        <Tagged testId={`linkedin-state-${finding.id}`} data={{ "data-state": finding.state }}>
           <Tag
             icon={ICONS[finding.state]}
             tone={finding.state === "missing" ? "danger" : "neutral"}

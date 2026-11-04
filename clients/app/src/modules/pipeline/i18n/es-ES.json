@@ -286,6 +286,7 @@
         "letter_approval": "Tu carta de presentación y tus respuestas están escritas y esperan tu revisión."
       },
       "steps": {
+        "shortlist": "añadió la oferta a tu lista ({{date}})",
         "site": "encontró la web ({{date}})",
         "read": "leyó la empresa ({{date}})",
         "compare": "comparó la oferta ({{date}})",

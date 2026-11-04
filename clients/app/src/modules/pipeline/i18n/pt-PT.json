@@ -286,6 +286,7 @@
         "letter_approval": "A carta de apresentação e as respostas estão escritas e esperam pela sua revisão."
       },
       "steps": {
+        "shortlist": "pôs a vaga na lista ({{date}})",
         "site": "encontrou o site ({{date}})",
         "read": "leu a empresa ({{date}})",
         "compare": "comparou a vaga ({{date}})",

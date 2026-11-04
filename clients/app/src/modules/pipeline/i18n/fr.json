@@ -286,6 +286,7 @@
         "letter_approval": "Votre lettre de motivation et vos réponses sont rédigées et attendent votre relecture."
       },
       "steps": {
+        "shortlist": "retenu l’offre ({{date}})",
         "site": "trouvé le site ({{date}})",
         "read": "lu l’entreprise ({{date}})",
         "compare": "comparé l’offre ({{date}})",

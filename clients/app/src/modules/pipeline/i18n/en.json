@@ -286,6 +286,7 @@
         "letter_approval": "Your cover letter and answers are written and wait for your review."
       },
       "steps": {
+        "shortlist": "shortlisted the job ({{date}})",
         "site": "found the website ({{date}})",
         "read": "read the company ({{date}})",
         "compare": "compared the job ({{date}})",

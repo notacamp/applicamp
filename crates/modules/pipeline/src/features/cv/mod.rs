@@ -9,14 +9,23 @@
 //!   the sources it comes from. It never sees a name or how to reach the
 //!   person: the server prints those itself.
 //! - **Fact check** (no model, [`check`]): each line may say only what the
-//!   sources it cites say; a company fact may be cited in the summary only;
-//!   every skill must be on the profile. A line that fails is blocked, with
-//!   the reason, and **Approve stays off** while any is.
-//! - **Review**: remove a line, edit it (checked again against the same
-//!   sources), say "it's true" (the person's words become a fact kept on the
-//!   position, and the line is checked again with it as a source), put back
-//!   what was left out as the profile has it. Approve freezes the draft as a
-//!   version; part B (#38) renders it as a PDF.
+//!   sources it cites say (the claims that matter: numbers, tools, employers,
+//!   acronyms, places the profile does not name); a bullet cites its own
+//!   position only; a company fact may be cited in the summary only; every
+//!   skill must be on the profile. A line that fails is blocked, with the
+//!   reason, and **Approve stays off** while any is.
+//! - **The app fixes first** ([`fix`], #73): one more call rewrites each
+//!   flagged line to what its sources say, or leaves one question with the
+//!   fact "Yes, keep it" would keep. Only the person's answer reaches the
+//!   profile.
+//! - **A PDF at once** ([`preview`], #73): every draft is rendered as a PDF as
+//!   soon as it is made and after every change, so the person sees what they
+//!   approve.
+//! - **Review**: answer a question ("Yes, keep it" keeps the proposed fact on
+//!   the position as a confirmed assumption), remove a line, edit it (checked
+//!   again against the same sources), say "it's true" in their own words, put
+//!   back what was left out as the profile has it. Approve freezes the draft
+//!   as a version with its PDF (part B, #38).
 //!
 //! Every model call starts with a click, or with the preparation of a job the
 //! person shortlisted ([`crate::features::prepare`]); nothing runs on a timer
@@ -25,10 +34,13 @@
 //! through the AI budget.
 
 pub mod check;
+pub mod fix;
+pub mod fix_prompt;
 pub mod judge;
 pub mod letter;
 pub mod model;
 pub mod pdf;
+pub mod preview;
 pub mod prompt;
 #[cfg(test)]
 pub(crate) mod tests;
@@ -50,10 +62,10 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use self::{
-    check::Checks,
+    check::{Checks, Known},
     judge::{MAX_BULLET, MAX_HEADLINE, MAX_SKILL, MAX_SUMMARY, RawCv},
-    model::{CompanyFact, Content, Frame, Line, Role as CvRole, Source, SourceKind, short},
-    pdf::{Length, Template},
+    model::{CompanyFact, Content, Frame, Line, Place, Role as CvRole, Source, SourceKind, short},
+    pdf::{Length, Template, readback::PdfChecks},
     versions::LayoutRequest,
     view::{CvDraftView, CvVersion, DraftParts, DraftStatus},
 };
@@ -159,11 +171,16 @@ pub struct LineChange {
     pub remove: Option<bool>,
 }
 
-/// "It's true": the person's words.
+/// "Yes, keep it", or "It's true" in the person's words.
 #[derive(Debug, Clone, Default, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ConfirmRequest {
-    /// In their own words, up to 300 characters. Not needed for a skill.
+    /// Keep the fact the app proposed for this line (its `waiting` item's
+    /// `proposal`) as a confirmed assumption on the position.
+    #[serde(default)]
+    pub proposal: Option<bool>,
+    /// In their own words, up to 300 characters. Not needed for a skill or
+    /// with `proposal`.
     #[serde(default)]
     pub text: Option<String>,
     /// What it is about (Grill me's areas); `results` when left out.
@@ -218,8 +235,17 @@ struct Row {
     frame: sqlx::types::Json<Frame>,
     checks: sqlx::types::Json<Checks>,
     created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
     approved_at: Option<DateTime<Utc>>,
     expires_at: Option<DateTime<Utc>>,
+    /// The preview's PDF is there (its bytes are read only to serve it).
+    preview_ready: bool,
+    preview_template: Option<String>,
+    preview_length: Option<i16>,
+    preview_pages: Option<i16>,
+    preview_checks: Option<sqlx::types::Json<PdfChecks>>,
+    preview_error: Option<String>,
+    preview_at: Option<DateTime<Utc>>,
 }
 
 /// A select of a draft's columns, with `$tail` after the table.
@@ -227,7 +253,9 @@ macro_rules! select_draft {
     ($tail:literal) => {
         concat!(
             "SELECT id, n, language, status, version, content, frame, checks, created_at, \
-             approved_at, expires_at FROM pipeline.cv_drafts ",
+             updated_at, approved_at, expires_at, preview_pdf IS NOT NULL AS preview_ready, \
+             preview_template, preview_length, preview_pages, preview_checks, preview_error, \
+             preview_at FROM pipeline.cv_drafts ",
             $tail
         )
     };
@@ -262,6 +290,18 @@ async fn by_n(db: &PgPool, account: Uuid, opp: Uuid, n: u32, now: DateTime<Utc>)
     .fetch_optional(db)
     .await?
     .ok_or(Error::NotFound)
+}
+
+/// The newest approved draft of `opp`.
+async fn latest_approved(db: &PgPool, account: Uuid, opp: Uuid) -> Result<Option<Row>> {
+    Ok(sqlx::query_as(select_draft!(
+        "WHERE opportunity_id = $1 AND account_id = $2 AND status = 'approved'
+          ORDER BY n DESC LIMIT 1"
+    ))
+    .bind(opp)
+    .bind(account)
+    .fetch_optional(db)
+    .await?)
 }
 
 async fn wants_of(db: &PgPool, opp: Uuid) -> Result<Vec<BriefWant>> {
@@ -318,7 +358,7 @@ fn can_draft(stage: &str, here: i64, today: i64, ai: bool) -> CanDraft {
 }
 
 fn draft_view(row: &Row, wants: &[BriefWant], opp: &Opp) -> CvDraftView {
-    view::draft_view(
+    let mut view = view::draft_view(
         &DraftParts {
             id: row.id,
             n: counted(i64::from(row.n)),
@@ -335,7 +375,20 @@ fn draft_view(row: &Row, wants: &[BriefWant], opp: &Opp) -> CvDraftView {
         wants,
         &opp.title,
         opp.description.as_deref().unwrap_or_default(),
-    )
+    );
+    view.preview = preview::view(row);
+    view
+}
+
+/// What the check allows a draft of `opp` to say without citing it: the
+/// posting's words, the places the profile names.
+fn known_of(opp: &Opp, frame: &Frame, content: &Content) -> Known {
+    let posting = format!(
+        "{}\n{}",
+        opp.title,
+        opp.description.as_deref().unwrap_or_default()
+    );
+    Known::new(frame, &content.contact, &posting)
 }
 
 #[derive(sqlx::FromRow)]
@@ -399,12 +452,14 @@ async fn build(
         .await?
         .map(|row| draft_view(&row, &wants, opp));
     let versions = versions_of(db, account, opp.id).await?;
-    // An approved draft is shown as its newest PDF's version.
+    // An approved draft is shown as its newest PDF's version; one approved
+    // before PDFs were made has none yet, and offers to make it.
     let draft = draft.map(|mut draft| {
-        if draft.status == DraftStatus::Approved
-            && let Some(newest) = versions.iter().find(|v| v.n == draft.n)
-        {
-            draft.version = Some(newest.version);
+        if draft.status == DraftStatus::Approved {
+            match versions.iter().find(|v| v.n == draft.n) {
+                Some(newest) => draft.version = Some(newest.version),
+                None => draft.needs_version = true,
+            }
         }
         draft
     });
@@ -579,7 +634,8 @@ fn invalid_text(most: usize) -> Error {
     )
 }
 
-/// The checks of `content` after a change, saved with it.
+/// The checks of `content` after a change, saved with it, and its preview
+/// made again in the layout the person sees.
 #[allow(clippy::too_many_arguments)]
 async fn recheck_and_save(
     state: &AppState,
@@ -591,8 +647,20 @@ async fn recheck_and_save(
     frame: &Frame,
     now: DateTime<Utc>,
 ) -> Result<Json<Cv>> {
-    let checks = check::check(content, frame);
+    let checks = check::check(content, frame, &known_of(opp, frame, content));
     save(&state.db, row, content, frame, &checks, now).await?;
+    let start = preview::layout_of(row).unwrap_or((Template::Clean, Length::One));
+    preview::refresh(
+        &state.db,
+        opp,
+        row.id,
+        content,
+        frame,
+        &row.language,
+        start,
+        now,
+    )
+    .await;
     Ok(Json(build(deps, &state.db, account, opp, now).await?))
 }
 
@@ -793,11 +861,29 @@ pub(crate) async fn draft(
         &user,
     )
     .await?;
-    let content =
+    let mut content =
         judge::judge(raw, &frame, &profile).ok_or(Error::Unavailable(applicamp_ai::AI_FAILED))?;
-    let checks = check::check(&content, &frame);
+    let known = known_of(&opp, &frame, &content);
+    let mut checks = check::check(&content, &frame, &known);
+    // The app fixes what it can before the person is asked (#73).
+    let fixed = fix::fix(
+        gateway,
+        db,
+        account,
+        now,
+        &mut content,
+        &frame,
+        &known,
+        &checks,
+        &language,
+    )
+    .await;
+    if fixed.rewritten > 0 {
+        checks = check::check(&content, &frame, &known);
+    }
 
     let expires_at = now + LIFETIME;
+    let id = Uuid::now_v7();
     let mut tx = db.begin().await?;
     let n: i32 = sqlx::query_scalar(
         "SELECT coalesce(max(n), 0) + 1 FROM pipeline.cv_drafts WHERE opportunity_id = $1",
@@ -806,7 +892,8 @@ pub(crate) async fn draft(
     .fetch_one(&mut *tx)
     .await?;
     sqlx::query(
-        "UPDATE pipeline.cv_drafts SET status = 'discarded', updated_at = $2
+        "UPDATE pipeline.cv_drafts
+            SET status = 'discarded', updated_at = $2, preview_pdf = NULL
           WHERE opportunity_id = $1 AND status = 'draft'",
     )
     .bind(opp.id)
@@ -819,7 +906,7 @@ pub(crate) async fn draft(
              created_at, updated_at, expires_at)
          VALUES ($1, $2, $3, $4, $5, 'draft', $6, $7, $8, $9, $9, $10)",
     )
-    .bind(Uuid::now_v7())
+    .bind(id)
     .bind(account)
     .bind(opp.id)
     .bind(n)
@@ -838,15 +925,31 @@ pub(crate) async fn draft(
         prompt = prompt::VERSION,
         positions = content.experience.len(),
         flagged = checks.len(),
+        fixed = fixed.rewritten,
+        asked = fixed.asked,
         "a CV drafted"
     );
+    // The PDF at once: the person sees what they will approve.
+    preview::refresh(
+        db,
+        &opp,
+        id,
+        &content,
+        &frame,
+        &language,
+        (Template::Clean, Length::One),
+        now,
+    )
+    .await;
     Ok(())
 }
 
 /// Change one line of a draft.
 ///
 /// `{text}` edits it: the new text is checked against the **same sources**
-/// (an edited line that is not a summary drops its company-fact citations).
+/// (an edited line that is not a summary drops its company-fact citations,
+/// and a bullet drops another position's), and the app's question about it,
+/// if any, goes. The preview is made again.
 /// `{remove: true}` removes the line (a position left with no line goes to
 /// "left out"), or the skill. No model call. Only a draft can change.
 #[utoipa::path(
@@ -901,14 +1004,24 @@ pub async fn change_line(
                 };
                 let text = judge::edited(&text, most).ok_or_else(|| invalid_text(most))?;
                 let frame = &row.frame.0;
+                let place = content.place_of(&line);
                 if let Some(target) = line_mut(&mut content, slot) {
                     target.text = text;
                     target.edited = true;
+                    target.fixed_by_app = false;
+                    target.ask = None;
                     if slot != Slot::Summary {
                         // The person rewrote it: a company fact is not an
-                        // achievement of theirs, so it no longer backs it.
+                        // achievement of theirs, and another position's line
+                        // is not this one's, so they no longer back it.
                         target.sources.retain(|id| {
-                            frame.get(id).is_none_or(|s| s.kind != SourceKind::Company)
+                            frame.get(id).is_none_or(|s| {
+                                s.kind != SourceKind::Company
+                                    && !matches!(
+                                        (place, s.position),
+                                        (Some(Place::Bullet(own)), Some(at)) if at != own
+                                    )
+                            })
                         });
                     }
                 }
@@ -949,13 +1062,18 @@ pub async fn change_line(
     .await
 }
 
-/// "It's true: add it to my profile."
+/// "Yes, keep it", or "It's true" in the person's words.
 ///
-/// The person's own words become a fact kept on the line's position (its
-/// `quote` is the text; `area` defaults to `results`), as Grill me's Keep
-/// does, and the line is checked again with that fact as an extra source.
-/// For a skill it adds the skill to the profile instead. A summary or
-/// headline puts the fact on the most recent position. No model call.
+/// `{proposal: true}` keeps the fact the app proposed for a flagged line
+/// (its question's, else the line's own words) on the line's position as a
+/// **confirmed assumption**, based on this CV draft; refused
+/// (`cannot_keep`) for a company fact used as an achievement. `{text}`
+/// keeps the person's own words as a fact (its `quote` is the text; `area`
+/// defaults to `results`), as Grill me's Keep does. Either way the line is
+/// checked again with that fact as a source (and none another position's or
+/// a company's), and the preview is made again. For a skill it adds the
+/// skill to the profile instead. A summary or headline puts the fact on the
+/// most recent position. No model call.
 #[utoipa::path(
     post,
     path = "/api/v1/opportunities/{id}/cv/drafts/{n}/lines/{line_id}/confirm",
@@ -974,8 +1092,8 @@ pub async fn change_line(
             content_type = "application/problem+json"),
         (status = 404, description = "`not_found`", body = Problem,
             content_type = "application/problem+json"),
-        (status = 409, description = "`draft_frozen`; `profile_changed`", body = Problem,
-            content_type = "application/problem+json"),
+        (status = 409, description = "`draft_frozen`; `profile_changed`; `cannot_keep`; \
+            `not_flagged`", body = Problem, content_type = "application/problem+json"),
     ),
 )]
 pub async fn confirm_line(
@@ -1002,6 +1120,80 @@ pub async fn confirm_line(
         neighbours.add_skill(&state, account, &name).await?;
         if !check::skill_on_profile(&name, &frame) {
             frame.skills.push(name);
+        }
+    } else if request.proposal == Some(true) {
+        let known = known_of(&opp, &frame, &content);
+        let reasons = check::check(&content, &frame, &known)
+            .remove(&line)
+            .ok_or_else(|| {
+                Error::Conflict(
+                    "not_flagged",
+                    "This line traces to your profile already.".to_owned(),
+                )
+            })?;
+        if !check::keepable(&reasons) {
+            return Err(Error::Conflict(
+                "cannot_keep",
+                "A fact about the company can't be your achievement. Change the line or remove it."
+                    .to_owned(),
+            ));
+        }
+        let place = content.place_of(&line).ok_or(Error::NotFound)?;
+        let target = content
+            .lines()
+            .map(|(l, _)| l)
+            .find(|l| l.id == line)
+            .cloned()
+            .ok_or(Error::NotFound)?;
+        let proposal = target
+            .ask
+            .as_ref()
+            .and_then(|a| a.proposal.clone())
+            .filter(|p| fix::backs(p, &target, place, &frame, &known, frame.latest))
+            .unwrap_or_else(|| target.text.clone());
+        if proposal.chars().count() > MAX_FACT {
+            return Err(Error::BadRequest(
+                "invalid_fact",
+                format!("Change the line to {MAX_FACT} characters or fewer to keep it."),
+            ));
+        }
+        let position = content.position_of(&line, frame.latest).ok_or_else(|| {
+            Error::BadRequest(
+                "no_position",
+                "The profile has no position to put it on.".to_owned(),
+            )
+        })?;
+        let info = frame.position(position).cloned().ok_or(Error::NotFound)?;
+        let fact = neighbours
+            .keep_assumption(
+                &state,
+                account,
+                position,
+                info.title.as_deref(),
+                info.company.as_deref(),
+                &proposal,
+                &format!("The CV draft for {}", opp.company),
+            )
+            .await?;
+        let source = format!("w{position}.f{}", short(&fact));
+        let order = frame
+            .of_position(position)
+            .filter_map(|s| s.order)
+            .max()
+            .map_or(0, |o| o + 1);
+        let usable = check::usable_sources(&target, place, &frame);
+        frame.sources.push(Source {
+            id: source.clone(),
+            kind: SourceKind::Fact,
+            text: proposal,
+            position: Some(position),
+            order: Some(order),
+            url: None,
+        });
+        if let Some(changed) = line_mut(&mut content, slot) {
+            changed.sources = usable;
+            changed.sources.push(source);
+            changed.ask = None;
         }
     } else {
         let area = request.area.as_deref().unwrap_or("results");
@@ -1050,10 +1242,16 @@ pub async fn confirm_line(
             order: Some(order),
             url: None,
         });
-        if let Some(target) = line_mut(&mut content, slot)
-            && !target.sources.contains(&source)
-        {
-            target.sources.push(source);
+        let place = content.place_of(&line);
+        if let Some(target) = line_mut(&mut content, slot) {
+            target.ask = None;
+            if let Some(place) = place {
+                // A company fact or another position's line no longer backs it.
+                target.sources = check::usable_sources(target, place, &frame);
+            }
+            if !target.sources.contains(&source) {
+                target.sources.push(source);
+            }
         }
     }
     recheck_and_save(&state, &deps, account, &opp, &row, &content, &frame, now).await
@@ -1134,6 +1332,7 @@ pub async fn put_back(
                     text: s.text,
                     sources: vec![s.id],
                     edited: false,
+                    ..Line::default()
                 })
                 .collect();
             let at = content
@@ -1171,6 +1370,7 @@ pub async fn put_back(
                 text: found.text.clone(),
                 sources: vec![source],
                 edited: false,
+                ..Line::default()
             };
             match content
                 .experience
@@ -1208,9 +1408,11 @@ pub async fn put_back(
 ///
 /// Refused (409 `lines_flagged`) while any line or skill cannot be traced to
 /// the profile. The draft is frozen, its text rendered as a PDF with the
-/// `template` and `length` asked for (Clean, 1 page by default), the PDF read
-/// back out and compared with the CV, and the PDF kept as the next version:
-/// all or nothing. If it does not fit the length (`cv_doesnt_fit`) or the
+/// `template` and `length` asked for (the preview's when left out, else
+/// Clean on 1 page), the PDF read back out and compared with the CV, and the
+/// PDF kept as the next version: all or nothing. The preview's PDF is kept
+/// as it is when the draft has not changed since it was made, its layout is
+/// the one asked for and its read-back passed. If it does not fit the length (`cv_doesnt_fit`) or the
 /// read-back finds it lacking (`cv_pdf_check_failed`, with the reasons, one
 /// per line), nothing is approved. Contact details are read from the profile
 /// again. No model call.
@@ -1245,12 +1447,14 @@ pub async fn approve(
     body: Option<Json<LayoutRequest>>,
 ) -> Result<Json<Cv>> {
     let request = body.map(|Json(b)| b).unwrap_or_default();
-    let (template, length) = versions::layout(&request, (Template::Clean, Length::One))?;
     let account = principal.account_id;
     let now = state.clock.now();
     let (opp, row) = open_draft(&state, account, id, n, now).await?;
+    let fallback = preview::layout_of(&row).unwrap_or((Template::Clean, Length::One));
+    let (template, length) = versions::layout(&request, fallback)?;
     // Checked again now, not trusted from the last change.
-    if !check::check(&row.content.0, &row.frame.0).is_empty() {
+    let known = known_of(&opp, &row.frame.0, &row.content.0);
+    if !check::check(&row.content.0, &row.frame.0, &known).is_empty() {
         return Err(Error::Conflict(
             "lines_flagged",
             "Some lines cannot be traced to your profile. Fix or remove them first.".to_owned(),
@@ -1262,24 +1466,38 @@ pub async fn approve(
     {
         content.contact = profile.contact.into();
     }
-    // The PDF first (it takes a moment and needs no lock); then, in one
-    // transaction, the approval and the version.
-    let made = versions::render(
-        &state.db,
-        &opp,
-        &content,
-        &row.frame.0,
-        &row.language,
-        template,
-        length,
-    )
-    .await?;
+    // The PDF first (it takes a moment and needs no lock): the preview's when
+    // it is this text in this layout; then, in one transaction, the approval
+    // and the version.
+    let kept = if content == row.content.0 {
+        preview::reusable(&state.db, &row, (template, length)).await?
+    } else {
+        None
+    };
+    let made = match kept {
+        Some(made) => made,
+        None => {
+            versions::render(
+                &state.db,
+                &opp,
+                &content,
+                &row.frame.0,
+                &row.language,
+                template,
+                length,
+            )
+            .await?
+        }
+    };
     let mut tx = state.db.begin().await?;
     let version = versions::next_version(&mut tx, opp.id).await?;
     let approved = sqlx::query(
         "UPDATE pipeline.cv_drafts
             SET status = 'approved', version = $2, approved_at = $3, updated_at = $3,
-                expires_at = NULL, content = $4, checks = '{}'::jsonb
+                expires_at = NULL, content = $4, checks = '{}'::jsonb,
+                preview_pdf = NULL, preview_template = NULL, preview_length = NULL,
+                preview_pages = NULL, preview_checks = NULL, preview_error = NULL,
+                preview_at = NULL
           WHERE id = $1 AND status = 'draft'",
     )
     .bind(row.id)
@@ -1346,7 +1564,8 @@ pub async fn discard(
     let now = state.clock.now();
     let (opp, row) = open_draft(&state, account, id, n, now).await?;
     sqlx::query(
-        "UPDATE pipeline.cv_drafts SET status = 'discarded', updated_at = $2
+        "UPDATE pipeline.cv_drafts
+            SET status = 'discarded', updated_at = $2, preview_pdf = NULL
           WHERE id = $1 AND status = 'draft'",
     )
     .bind(row.id)

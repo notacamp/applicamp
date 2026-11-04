@@ -106,8 +106,10 @@ impl Evidence {
         }
     }
 
-    /// Whether the evidence says `claim` (a word).
-    fn says(&self, claim: &str) -> bool {
+    /// Whether the evidence says `claim` (a word): a number as a whole
+    /// number, a word of up to three letters as a whole word, anything else
+    /// as written.
+    pub fn says(&self, claim: &str) -> bool {
         let squashed = squash(claim);
         if squashed.is_empty() {
             return true;
@@ -162,9 +164,38 @@ fn is_acronym(part: &str) -> bool {
             .all(char::is_uppercase)
 }
 
+/// What kind of claim a word makes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClaimKind {
+    /// It holds a digit: a number, an amount, a percentage, a year, a version.
+    Number,
+    /// A technology's name ([`crate::tech`]).
+    Tool,
+    /// Two or more capitals and no small letter (`GDPR`).
+    Acronym,
+    /// A capital in the middle of a sentence: a company, a product, a place,
+    /// or only a word written with a capital (`Developer`). Whether it
+    /// matters is the caller's to say.
+    Name,
+}
+
+/// A word of a line that claims something, and what kind of claim it is.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Claim {
+    pub text: String,
+    pub kind: ClaimKind,
+}
+
 /// The words of `line` that claim something.
 pub fn claims(line: &str) -> Vec<String> {
-    let mut found: Vec<String> = Vec::new();
+    classified(line).into_iter().map(|c| c.text).collect()
+}
+
+/// The words of `line` that claim something, each with its kind (the first
+/// that fits: a number, a tool, an acronym, a name). The same words as
+/// [`claims`], in the same order.
+pub fn classified(line: &str) -> Vec<Claim> {
+    let mut found: Vec<Claim> = Vec::new();
     let mut sentence_start = true;
     for raw in line.split_whitespace() {
         let token = raw
@@ -185,12 +216,29 @@ pub fn claims(line: &str) -> Vec<String> {
             let capital = part.chars().next().is_some_and(char::is_uppercase)
                 && !(sentence_start && at == 0)
                 && !COMMON.contains(&part.to_lowercase().as_str());
-            if digit || capital || is_acronym(part) || tech::is_name(part) {
-                found.push(part.to_owned());
+            let kind = if digit {
+                Some(ClaimKind::Number)
+            } else if tech::is_name(part) {
+                Some(ClaimKind::Tool)
+            } else if is_acronym(part) {
+                Some(ClaimKind::Acronym)
+            } else if capital {
+                Some(ClaimKind::Name)
+            } else {
+                None
+            };
+            if let Some(kind) = kind {
+                found.push(Claim {
+                    text: part.to_owned(),
+                    kind,
+                });
             }
         }
-        if tech_name && !found.iter().any(|c| c.eq_ignore_ascii_case(token)) {
-            found.push(token.to_owned());
+        if tech_name && !found.iter().any(|c| c.text.eq_ignore_ascii_case(token)) {
+            found.push(Claim {
+                text: token.to_owned(),
+                kind: ClaimKind::Tool,
+            });
         }
         sentence_start = ends_sentence;
     }
@@ -272,6 +320,26 @@ mod tests {
         let e = Evidence::of("shipped the ledger", &json!({}));
         assert!(e.unsupported("Shipped the ledger").is_empty());
         assert!(e.unsupported("Shipped the ledger. Cut costs").is_empty());
+    }
+
+    #[test]
+    fn each_claim_has_its_kind_and_the_same_words_as_claims() {
+        let line = "Cut runs to 40 minutes with Rust and GDPR audits at Example Org";
+        let kinds: Vec<(String, ClaimKind)> = classified(line)
+            .into_iter()
+            .map(|c| (c.text, c.kind))
+            .collect();
+        assert_eq!(
+            kinds,
+            [
+                ("40".to_owned(), ClaimKind::Number),
+                ("Rust".to_owned(), ClaimKind::Tool),
+                ("GDPR".to_owned(), ClaimKind::Acronym),
+                ("Example".to_owned(), ClaimKind::Name),
+                ("Org".to_owned(), ClaimKind::Name),
+            ]
+        );
+        assert_eq!(claims(line), ["40", "Rust", "GDPR", "Example", "Org"]);
     }
 
     #[test]

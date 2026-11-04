@@ -55,6 +55,9 @@ pub(crate) struct Fake {
     pub(crate) cv_profile: Mutex<Option<CvProfile>>,
     /// The facts kept from a CV: `(position, text, area)`.
     pub(crate) kept: Mutex<Vec<(usize, String, String)>>,
+    /// The facts the app proposed and the person kept from a CV:
+    /// `(position, text, basis)`.
+    pub(crate) assumed: Mutex<Vec<(usize, String, String)>>,
     /// The skills added from a CV.
     pub(crate) added_skills: Mutex<Vec<String>>,
     /// The Autonomy goal; not answered until a test sets it.
@@ -178,6 +181,20 @@ impl Neighbours for Fake {
         area: &'a str,
     ) -> BoxFuture<'a, Result<String>> {
         lock(&self.kept).push((position, text.to_owned(), area.to_owned()));
+        Box::pin(async move { Ok(Uuid::now_v7().to_string()) })
+    }
+
+    fn keep_assumption<'a>(
+        &'a self,
+        _state: &'a AppState,
+        _account: Uuid,
+        position: usize,
+        _title: Option<&'a str>,
+        _company: Option<&'a str>,
+        text: &'a str,
+        basis: &'a str,
+    ) -> BoxFuture<'a, Result<String>> {
+        lock(&self.assumed).push((position, text.to_owned(), basis.to_owned()));
         Box::pin(async move { Ok(Uuid::now_v7().to_string()) })
     }
 
@@ -349,7 +366,12 @@ struct Routed {
     analysis: Mutex<Value>,
     cv: Mutex<Value>,
     letter: Mutex<Value>,
+    /// The CV fix prompt's answer, from the lines it is shown.
+    fix: Mutex<Option<Fixer>>,
 }
+
+/// What the fake model answers the CV fix prompt with, from its user message.
+pub(crate) type Fixer = Box<dyn Fn(&str) -> Value + Send + Sync>;
 
 impl wiremock::Respond for Routed {
     fn respond(&self, request: &wiremock::Request) -> wiremock::ResponseTemplate {
@@ -357,6 +379,11 @@ impl wiremock::Respond for Routed {
         let system = body["messages"][0]["content"].as_str().unwrap_or_default();
         let answer = if system.starts_with("You read pages from a company") {
             lock(&self.facts).clone()
+        } else if system.starts_with(crate::features::cv::fix_prompt::PREFIX) {
+            let user = body["messages"][1]["content"].as_str().unwrap_or_default();
+            lock(&self.fix)
+                .as_ref()
+                .map_or(Value::Null, |fixer| fixer(user))
         } else if system.starts_with(crate::features::cv::prompt::PREFIX) {
             lock(&self.cv).clone()
         } else if system.starts_with(crate::features::cv::letter::prompt::PREFIX) {
@@ -395,6 +422,18 @@ impl Model {
         cv: Value,
         letter: Value,
     ) -> Self {
+        Self::with_fixer(facts, analysis, cv, letter, None).await
+    }
+
+    /// A model that also answers the CV fix prompt with what `fix` makes of
+    /// its user message (nothing usable when none).
+    pub(crate) async fn with_fixer(
+        facts: Value,
+        analysis: Value,
+        cv: Value,
+        letter: Value,
+        fix: Option<Fixer>,
+    ) -> Self {
         // Its own server, not one from wiremock's pool, which is shared across the
         // tests' runtimes: the calls counted are this test's alone.
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -409,6 +448,7 @@ impl Model {
                 analysis: Mutex::new(analysis),
                 cv: Mutex::new(cv),
                 letter: Mutex::new(letter),
+                fix: Mutex::new(fix),
             })
             .mount(&server)
             .await;

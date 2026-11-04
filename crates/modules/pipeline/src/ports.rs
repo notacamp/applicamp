@@ -3,8 +3,8 @@
 //! link (sources), how far a person is (profile), their latest search
 //! (sources), a company's own pages (sources), the profile as a job is
 //! read against it, and facts from an answer (profile); and, for a tailored CV,
-//! the whole profile and the two things the person may add to it from the CV
-//! (a fact, a skill).
+//! the whole profile and the things the person may add to it from the CV (a
+//! fact in their words, a fact the app proposed, a skill).
 
 use applicamp_kernel::{AppState, BoxFuture, Result};
 use chrono::{DateTime, Utc};
@@ -351,6 +351,22 @@ pub trait Neighbours: Send + Sync + 'static {
         company: Option<&'a str>,
         text: &'a str,
         area: &'a str,
+    ) -> BoxFuture<'a, Result<String>>;
+
+    /// Keep `text`, which the app proposed and the person said is true, as a
+    /// **confirmed assumption** on position `position` (which must still be
+    /// `title` at `company`: else 409 `profile_changed`), with `basis` saying
+    /// what it was based on. Returns the fact's id.
+    #[allow(clippy::too_many_arguments)]
+    fn keep_assumption<'a>(
+        &'a self,
+        state: &'a AppState,
+        account: Uuid,
+        position: usize,
+        title: Option<&'a str>,
+        company: Option<&'a str>,
+        text: &'a str,
+        basis: &'a str,
     ) -> BoxFuture<'a, Result<String>>;
 
     /// Add `skill` to the person's skills.

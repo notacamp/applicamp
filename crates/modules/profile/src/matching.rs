@@ -14,7 +14,7 @@ use uuid::Uuid;
 use crate::{
     features::completion,
     goals::Goals,
-    schema::{Area, Profile, ProfileFact, Skill},
+    schema::{Area, FactStatus, Profile, ProfileFact, Skill},
     strength::{self, Strength},
 };
 
@@ -366,6 +366,48 @@ pub async fn keep_fact(
     text: &str,
     area: Area,
 ) -> Result<String> {
+    keep(state, account, position, title, company, text, area, None).await
+}
+
+/// Keep `text`, which Applicamp proposed from a tailored CV and the person
+/// said is true ("Yes, keep it"), as a **confirmed assumption** on position
+/// `position`, with `basis` (what it was based on, e.g. "The CV draft for
+/// Example Co"), in area `results`: a new profile version. The same checks as
+/// [`keep_fact`]. Returns the fact's id.
+#[allow(clippy::too_many_arguments)]
+pub async fn keep_assumption(
+    state: &AppState,
+    account: Uuid,
+    position: usize,
+    title: Option<&str>,
+    company: Option<&str>,
+    text: &str,
+    basis: &str,
+) -> Result<String> {
+    keep(
+        state,
+        account,
+        position,
+        title,
+        company,
+        text,
+        Area::Results,
+        Some(basis),
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn keep(
+    state: &AppState,
+    account: Uuid,
+    position: usize,
+    title: Option<&str>,
+    company: Option<&str>,
+    text: &str,
+    area: Area,
+    basis: Option<&str>,
+) -> Result<String> {
     let text = text.trim();
     if text.is_empty() || text.chars().count() > MAX_CV_FACT {
         return Err(Error::BadRequest(
@@ -393,8 +435,15 @@ pub async fn keep_fact(
         quote: text.to_owned(),
         area,
         kept_at: state.clock.now(),
-        status: Default::default(),
-        basis: None,
+        status: if basis.is_some() {
+            FactStatus::ConfirmedAssumption
+        } else {
+            FactStatus::Told
+        },
+        basis: basis
+            .map(str::trim)
+            .filter(|b| !b.is_empty())
+            .map(|b| b.chars().take(crate::schema::MAX_SHORT).collect::<String>()),
     });
     let profile = profile.tidied();
     profile.validate()?;
@@ -970,6 +1019,34 @@ mod tests {
         assert!(matches!(long, Err(Error::BadRequest("invalid_fact", _))));
         assert!(matches!(
             keep_fact(&state, account, 5, None, None, "x", Area::Results).await,
+            Err(Error::Conflict("profile_changed", _))
+        ));
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_cv_keeps_a_proposed_fact_as_a_confirmed_assumption_with_its_basis(db: sqlx::PgPool) {
+        let (state, account) = with_profile(db).await;
+        let id = keep_assumption(
+            &state,
+            account,
+            0,
+            Some("Engineer"),
+            Some("Example Org"),
+            "I cut invoice runs to 20 minutes.",
+            "The CV draft for Example Co",
+        )
+        .await
+        .unwrap();
+        let profile = current_profile(&state.db, account).await.unwrap().unwrap();
+        let fact = &profile.work[0].facts[0];
+        assert_eq!(fact.id, id);
+        assert_eq!(fact.text, "I cut invoice runs to 20 minutes.");
+        assert_eq!(fact.status, FactStatus::ConfirmedAssumption);
+        assert_eq!(fact.basis.as_deref(), Some("The CV draft for Example Co"));
+        assert_eq!(fact.area, Area::Results);
+        // The same checks as a fact in the person's words.
+        assert!(matches!(
+            keep_assumption(&state, account, 0, Some("Manager"), None, "x", "y").await,
             Err(Error::Conflict("profile_changed", _))
         ));
     }

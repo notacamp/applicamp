@@ -1,0 +1,11 @@
+# Tasks
+- [x] 1 Migration `pipeline.cv_drafts` preview columns
+- [x] 2 `kernel::claims::classified`: each claim with its kind; unit test
+- [x] 3 The check: plain words, places and languages of the profile, the posting's words in the summary, titles in the headline, a bullet's own position; unit tests (Senior Full Stack Developer, Lisbon, Kubernetes, 20 minutes against 40, a bullet citing another position)
+- [x] 4 `pdf::Cause` (kinds and counts, logged), the slot wait, a lenient render for the preview
+- [x] 5 `preview::render_draft`, the ladder of layouts, the preview after every draft and change, `POST …/preview`, `GET …/preview.pdf`, Approve keeps the preview's PDF
+- [x] 6 The fix round: prompt, one call, rewrites checked, questions with a fact that backs the line; unit tests
+- [x] 7 `confirm {proposal: true}`: the confirmed assumption on the profile (`Neighbours::keep_assumption`, `profile::matching::keep_assumption`); `waiting`, `fixed_by_app`, `needs_version` on the CV
+- [x] 8 Server tests: preview served and owned, layouts without a model, falling to two pages, the app's fixes and Yes keep it, a failed fix, an approved CV with no PDF
+- [x] 9 Client: the PDF first, question cards, "Checked every line against your profile · fixed N", layout pills, Download draft; i18n en, pt-PT, es-ES, fr; the e2e spec filmed; the fake model answers the fix prompt
+- [ ] 10 OpenAPI regenerated, client types regenerated, changelog entry file (changelog/unreleased/added/73-cv-preview-and-self-check.md), gates green in CI, recording (UI at 375px and desktop)

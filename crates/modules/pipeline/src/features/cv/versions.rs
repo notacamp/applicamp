@@ -23,11 +23,11 @@ use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use super::{
-    Cv, Opp, Row, build, counted, json_body, load,
+    Cv, Opp, build, counted, json_body, latest_approved, load,
     model::{Content, Frame},
-    pdf::{self, Length, Made, Refusal, Template},
+    pdf::{Length, Made, Refusal, Template},
+    preview::render_draft,
     view::{DraftStatus, KeywordState, keywords},
-    wants_of,
 };
 use crate::{PipelineDeps, features::brief::BriefWant};
 
@@ -63,7 +63,12 @@ pub(super) fn layout(
 }
 
 /// The job keywords the review shows as on the CV: what the PDF must keep.
-fn keywords_on_cv(wants: &[BriefWant], opp: &Opp, content: &Content, frame: &Frame) -> Vec<String> {
+pub(super) fn keywords_on_cv(
+    wants: &[BriefWant],
+    opp: &Opp,
+    content: &Content,
+    frame: &Frame,
+) -> Vec<String> {
     keywords(
         wants,
         &opp.title,
@@ -78,7 +83,8 @@ fn keywords_on_cv(wants: &[BriefWant], opp: &Opp, content: &Content, frame: &Fra
     .collect()
 }
 
-/// The PDF of `content`, or why it cannot be made.
+/// The PDF of `content`, read back and found to say what it says, or why it
+/// cannot be made: what a version is.
 pub(super) async fn render(
     db: &PgPool,
     opp: &Opp,
@@ -88,10 +94,8 @@ pub(super) async fn render(
     template: Template,
     length: Length,
 ) -> Result<Made> {
-    let wants = wants_of(db, opp.id).await?;
-    let keywords = keywords_on_cv(&wants, opp, content, frame);
-    pdf::make(content, frame, language, template, length, keywords)
-        .await
+    render_draft(db, opp, content, frame, language, template, length, true)
+        .await?
         .map_err(|refusal| match refusal {
             Refusal::DoesntFit { length: 1, .. } => Error::Conflict(
                 "cv_doesnt_fit",
@@ -111,7 +115,10 @@ pub(super) async fn render(
                 );
                 Error::Conflict("cv_pdf_check_failed", checks.reasons().join("\n"))
             }
-            Refusal::Unavailable => Error::Unavailable("cv_pdf_unavailable"),
+            Refusal::Unavailable(cause) => {
+                cause.log("cv");
+                Error::Unavailable("cv_pdf_unavailable")
+            }
         })
 }
 
@@ -226,18 +233,7 @@ pub async fn create(
     let now = state.clock.now();
     let db = &state.db;
     let opp = load(db, account, id).await?;
-    let row: Row = sqlx::query_as(
-        "SELECT id, n, language, status, version, content, frame, checks, created_at,
-                approved_at, expires_at
-           FROM pipeline.cv_drafts
-          WHERE opportunity_id = $1 AND account_id = $2 AND status = 'approved'
-          ORDER BY n DESC LIMIT 1",
-    )
-    .bind(opp.id)
-    .bind(account)
-    .fetch_optional(db)
-    .await?
-    .ok_or_else(|| {
+    let row = latest_approved(db, account, opp.id).await?.ok_or_else(|| {
         Error::Conflict(
             "not_approved",
             "Approve the CV first: a PDF is made from the approved text.".to_owned(),

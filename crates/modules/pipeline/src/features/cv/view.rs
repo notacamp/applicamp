@@ -11,9 +11,11 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use super::{
-    check::{Checks, Reason, claims_of, flagged_in_order},
+    check::{Checks, Reason, claims_of, flagged_in_order, keepable},
+    fix::MAX_PROPOSAL,
     model::{Content, Frame, Line, PositionInfo, SourceKind},
     pdf::{Template, readback::PdfChecks},
+    preview::CvPreview,
 };
 use crate::features::brief::BriefWant;
 
@@ -58,6 +60,42 @@ pub struct LineView {
     pub flags: Vec<Reason>,
     /// The words of the line that the check looks for in its sources.
     pub claims: Vec<String>,
+    /// The app rewrote it to say only what its sources say.
+    pub fixed_by_app: bool,
+    /// What it said before the app rewrote it.
+    pub original: Option<String>,
+}
+
+/// What a waiting item is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum WaitingKind {
+    /// A line of the CV.
+    Line,
+    /// A skill the profile does not list.
+    Skill,
+}
+
+/// A line (or skill) the check flagged and the app could not fix: a
+/// question only the person can answer.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct Waiting {
+    /// The line (or skill) id: what `…/lines/{line_id}/confirm` and
+    /// `…/lines/{line_id}` are given.
+    pub line_id: String,
+    pub kind: WaitingKind,
+    /// The line's text, or the skill.
+    pub text: String,
+    /// The app's own question about it, when it asked one.
+    pub question: Option<String>,
+    /// What "Yes, keep it" (`{proposal: true}`) keeps on the profile: the
+    /// app's sentence, else the line's own words, or the skill. None when it
+    /// cannot be kept (a company fact used as an achievement).
+    pub proposal: Option<String>,
+    /// "Title · Company" of the position a kept fact lands on.
+    pub role: Option<String>,
+    /// Why it is flagged.
+    pub flags: Vec<Reason>,
 }
 
 /// A position on the CV.
@@ -253,6 +291,16 @@ pub struct CvDraftView {
     pub can_approve: bool,
     pub keywords: Keywords,
     pub changes: Changes,
+    /// How many lines the app rewrote to say only what their sources say.
+    pub fixed_by_app: u32,
+    /// What waits on the person, in the order the page shows it.
+    pub waiting: Vec<Waiting>,
+    /// The draft as a PDF, made at once and after every change; none once
+    /// approved (the versions are the PDFs then).
+    pub preview: Option<CvPreview>,
+    /// Approved, but with no PDF yet (approved before PDFs were made): offer
+    /// to make it.
+    pub needs_version: bool,
 }
 
 /// An approved version: the approved text as a PDF.
@@ -333,7 +381,53 @@ fn line_view(line: &Line, index: usize, frame: &Frame, checks: &Checks) -> LineV
             .collect(),
         flags: checks.get(&line.id).cloned().unwrap_or_default(),
         claims: claims_of(&line.text),
+        fixed_by_app: line.fixed_by_app,
+        original: line.original.clone(),
     }
+}
+
+/// What waits on the person: every flagged line and skill, as a question.
+fn waiting(content: &Content, frame: &Frame, checks: &Checks) -> Vec<Waiting> {
+    flagged_in_order(content, checks)
+        .into_iter()
+        .filter_map(|id| {
+            let flags = checks.get(&id).cloned().unwrap_or_default();
+            if let Some(skill) = content.skills.iter().find(|s| s.id == id) {
+                return Some(Waiting {
+                    line_id: id,
+                    kind: WaitingKind::Skill,
+                    text: skill.name.clone(),
+                    question: None,
+                    proposal: Some(skill.name.clone()),
+                    role: None,
+                    flags,
+                });
+            }
+            let (line, _) = content.lines().find(|(l, _)| l.id == id)?;
+            let proposal = keepable(&flags)
+                .then(|| {
+                    line.ask
+                        .as_ref()
+                        .and_then(|a| a.proposal.clone())
+                        .unwrap_or_else(|| line.text.clone())
+                })
+                .filter(|p| p.chars().count() <= MAX_PROPOSAL);
+            let role = content
+                .position_of(&id, frame.latest)
+                .and_then(|p| frame.position(p))
+                .map(role_of)
+                .filter(|r| !r.is_empty());
+            Some(Waiting {
+                line_id: id,
+                kind: WaitingKind::Line,
+                text: line.text.clone(),
+                question: line.ask.as_ref().and_then(|a| a.question.clone()),
+                proposal,
+                role,
+                flags,
+            })
+        })
+        .collect()
 }
 
 /// The sources of the profile that are lines a person can put back, on the
@@ -617,6 +711,7 @@ pub fn draft_view(
     changes.left_out_roles = to_u32(left_out.roles.len());
     changes.left_out_lines = to_u32(left_out.lines.len());
     let flagged_ids = flagged_in_order(content, checks);
+    let draft = parts.status == DraftStatus::Draft;
     CvDraftView {
         n: parts.n,
         status: parts.status,
@@ -674,9 +769,17 @@ pub fn draft_view(
         left_out,
         flagged: to_u32(flagged_ids.len()),
         first_flagged: flagged_ids.first().cloned(),
-        can_approve: parts.status == DraftStatus::Draft && flagged_ids.is_empty(),
+        can_approve: draft && flagged_ids.is_empty(),
         keywords: keywords(wants, title, posting, content, frame),
         changes,
+        fixed_by_app: to_u32(content.lines().filter(|(l, _)| l.fixed_by_app).count()),
+        waiting: if draft {
+            waiting(content, frame, checks)
+        } else {
+            Vec::new()
+        },
+        preview: None,
+        needs_version: false,
     }
 }
 
@@ -711,6 +814,7 @@ mod tests {
             text: text.into(),
             sources: sources.iter().map(|s| (*s).to_owned()).collect(),
             edited: false,
+            ..Line::default()
         }
     }
 

@@ -83,6 +83,9 @@ pub const CAP_PER_DAY: i64 = 20;
 pub const DRAFT_EUR: f64 = 0.002;
 /// How long a draft nobody approves is kept after its last change.
 pub const LIFETIME: TimeDelta = TimeDelta::days(7);
+/// How long a CV just approved can be put back as a draft (Undo); the cover
+/// letter a preparation writes next waits as long.
+pub const UNDO_WINDOW: TimeDelta = TimeDelta::seconds(15);
 /// Longest fact the person adds from a CV, in characters.
 const MAX_FACT: usize = 300;
 /// What a fact added from a CV can be about (Grill me's areas).
@@ -134,6 +137,17 @@ pub struct CvCaps {
     pub month_limit_eur: Option<f64>,
 }
 
+/// What the app starts by itself now that the CV is approved.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct CvNext {
+    /// `letter`: the cover letter and the job's answers.
+    pub step: String,
+    /// About what it costs, in euros.
+    pub eur: f64,
+    /// When it starts: Undo stops it until then.
+    pub at: DateTime<Utc>,
+}
+
 /// The tailored CV of an opportunity.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct Cv {
@@ -147,6 +161,8 @@ pub struct Cv {
     pub caps: CvCaps,
     /// About what one draft costs, in euros.
     pub draft_eur: f64,
+    /// What the app starts next by itself, when it does.
+    pub next: Option<CvNext>,
 }
 
 /// What to make a draft of.
@@ -452,16 +468,29 @@ async fn build(
         .map(|row| draft_view(&row, &wants, opp));
     let versions = versions_of(db, account, opp.id).await?;
     // An approved draft is shown as its newest PDF's version; one approved
-    // before PDFs were made has none yet, and offers to make it.
+    // before PDFs were made has none yet, and offers to make it. Just
+    // approved, it can be undone for a moment.
     let draft = draft.map(|mut draft| {
         if draft.status == DraftStatus::Approved {
             match versions.iter().find(|v| v.n == draft.n) {
                 Some(newest) => draft.version = Some(newest.version),
                 None => draft.needs_version = true,
             }
+            draft.undo_until = draft
+                .approved_at
+                .map(|at| at + UNDO_WINDOW)
+                .filter(|until| *until > now);
         }
         draft
     });
+    let next: Option<(DateTime<Utc>,)> = sqlx::query_as(
+        "SELECT updated_at FROM pipeline.preparations
+          WHERE opportunity_id = $1 AND account_id = $2 AND state = 'queued' AND step = 'letter'",
+    )
+    .bind(opp.id)
+    .bind(account)
+    .fetch_optional(db)
+    .await?;
     let here = drafts_here(db, opp.id).await?;
     let today = drafts_today(db, account, now).await?;
     let spend = match &deps.ai {
@@ -484,6 +513,11 @@ async fn build(
             month_limit_eur: spend.month_limit_eur,
         },
         draft_eur: DRAFT_EUR,
+        next: next.map(|(queued,)| CvNext {
+            step: "letter".to_owned(),
+            eur: letter::DRAFT_EUR,
+            at: queued + UNDO_WINDOW,
+        }),
     })
 }
 
@@ -1526,6 +1560,148 @@ pub async fn approve(
     tracing::info!(version, pages = made.pages, "a CV approved");
     crate::features::prepare::nudge(&deps, &state.db, account, opp.id, now).await;
     Ok(Json(build(&deps, &state.db, account, &opp, now).await?))
+}
+
+/// Undo an approval, for a moment.
+///
+/// Within 15 seconds of approving, before the cover letter that comes next
+/// starts, the draft becomes a draft again: its PDF version goes, the
+/// letter waits for the CV again, and the preview is made again. Refused
+/// after that (`too_late`), or when it is not approved (`not_approved`). No
+/// model call.
+#[utoipa::path(
+    post,
+    path = "/api/v1/opportunities/{id}/cv/drafts/{n}/unapprove",
+    tag = "pipeline",
+    operation_id = "pipeline.cv_unapprove",
+    security(("session" = [])),
+    params(("id" = Uuid, Path, description = "The opportunity."),
+        ("n" = u32, Path, description = "The draft.")),
+    responses(
+        (status = 200, description = "The CV, with the draft back.", body = Cv),
+        (status = 401, description = "`session_required`", body = Problem,
+            content_type = "application/problem+json"),
+        (status = 404, description = "`not_found`", body = Problem,
+            content_type = "application/problem+json"),
+        (status = 409, description = "`not_approved`; `too_late`", body = Problem,
+            content_type = "application/problem+json"),
+    ),
+)]
+pub async fn unapprove(
+    axum::extract::State(state): axum::extract::State<AppState>,
+    SignedIn(principal): SignedIn,
+    Extension(deps): Extension<PipelineDeps>,
+    Path((id, n)): Path<(Uuid, u32)>,
+) -> Result<Json<Cv>> {
+    let account = principal.account_id;
+    let now = state.clock.now();
+    let db = &state.db;
+    let opp = load(db, account, id).await?;
+    let row = by_n(db, account, opp.id, n, now).await?;
+    if DraftStatus::parse(&row.status) != DraftStatus::Approved {
+        return Err(Error::Conflict(
+            "not_approved",
+            "This CV is not approved.".to_owned(),
+        ));
+    }
+    let too_late = || {
+        Error::Conflict(
+            "too_late",
+            "It's too late to undo. Make the CV again to change it.".to_owned(),
+        )
+    };
+    let approved_at = row.approved_at.ok_or_else(too_late)?;
+    if approved_at + UNDO_WINDOW <= now {
+        return Err(too_late());
+    }
+    let mut tx = db.begin().await?;
+    let preparing: Option<(String, String)> = sqlx::query_as(
+        "SELECT state, step FROM pipeline.preparations WHERE opportunity_id = $1 FOR UPDATE",
+    )
+    .bind(opp.id)
+    .fetch_optional(&mut *tx)
+    .await?;
+    let letters: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM pipeline.letter_drafts
+          WHERE opportunity_id = $1 AND created_at >= $2",
+    )
+    .bind(opp.id)
+    .bind(approved_at)
+    .fetch_one(&mut *tx)
+    .await?;
+    let later: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM pipeline.cv_drafts WHERE opportunity_id = $1 AND n > $2",
+    )
+    .bind(opp.id)
+    .bind(row.n)
+    .fetch_one(&mut *tx)
+    .await?;
+    let writing = preparing
+        .as_ref()
+        .is_some_and(|(state, step)| state == "running" && step == "letter");
+    if writing || letters > 0 || later > 0 {
+        return Err(too_late());
+    }
+    // The letter the preparation would write next waits for the CV again.
+    sqlx::query(
+        "UPDATE pipeline.preparations
+            SET state = 'waiting', waiting_on = 'cv_approval', updated_at = $2
+          WHERE opportunity_id = $1 AND state = 'queued' AND step = 'letter'",
+    )
+    .bind(opp.id)
+    .bind(now)
+    .execute(&mut *tx)
+    .await?;
+    let layout: Option<(String, i16)> = sqlx::query_as(
+        "SELECT template, length FROM pipeline.cv_versions
+          WHERE draft_id = $1 ORDER BY version DESC LIMIT 1",
+    )
+    .bind(row.id)
+    .fetch_optional(&mut *tx)
+    .await?;
+    sqlx::query("DELETE FROM pipeline.cv_versions WHERE draft_id = $1")
+        .bind(row.id)
+        .execute(&mut *tx)
+        .await?;
+    let content = row.content.0.clone();
+    let frame = row.frame.0.clone();
+    let checks = check::check(&content, &frame, &known_of(&opp, &frame, &content));
+    let expires_at = now + LIFETIME;
+    sqlx::query(
+        "UPDATE pipeline.cv_drafts
+            SET status = 'draft', version = NULL, approved_at = NULL, updated_at = $2,
+                expires_at = $3, checks = $4
+          WHERE id = $1 AND status = 'approved'",
+    )
+    .bind(row.id)
+    .bind(now)
+    .bind(expires_at)
+    .bind(sqlx::types::Json(&checks))
+    .execute(&mut *tx)
+    .await?;
+    jobs::enqueue_at(&mut tx, &ExpireCvDrafts {}, expires_at).await?;
+    tx.commit().await?;
+    tracing::info!("a CV approval undone");
+    let start = layout
+        .and_then(|(template, length)| {
+            Some((
+                Template::parse(&template)?,
+                Length::from_pages(u8::try_from(length).ok()?)?,
+            ))
+        })
+        .unwrap_or((Template::Clean, Length::One));
+    preview::refresh(
+        db,
+        &opp,
+        row.id,
+        &content,
+        &frame,
+        &row.language,
+        start,
+        now,
+    )
+    .await;
+    Ok(Json(build(&deps, db, account, &opp, now).await?))
 }
 
 /// Put a draft away.

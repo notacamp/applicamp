@@ -58,7 +58,12 @@ as an achievement, `not_flagged` for a line that passes). `GET …/cv` adds to t
 `needs_version`.
 
 ## Undo
-Change it, Remove it and put back stay; a kept fact is removed from the profile as any fact is; Make
+`POST …/drafts/{n}/unapprove` puts a draft approved less than 15 s ago (`cv::UNDO_WINDOW`) back as a
+draft: its version row goes (the only exception to "versions are never overwritten", and only in that
+moment), the preview is made again, and a letter step the preparation queued goes back to waiting
+on the CV. The letter step's job is enqueued 15 s late for that reason; once it runs, or a letter
+draft exists, Undo is `too_late`. `GET …/cv` carries `undo_until` on the draft and `next` (`letter`,
+its cost, when it starts). Change it, Remove it and put back stay; a kept fact is removed from the profile as any fact is; Make
 again makes a new draft; a draft nobody approved still goes after 7 days.
 
 ## Cost

@@ -103,6 +103,7 @@ pub fn module(deps: PipelineDeps) -> Module {
         .routes(routes!(cv::preview::make))
         .routes(routes!(cv::preview::pdf_file))
         .routes(routes!(cv::approve))
+        .routes(routes!(cv::unapprove))
         .routes(routes!(cv::versions::create))
         .routes(routes!(cv::versions::pdf_file))
         .routes(routes!(cv::versions::list_all))

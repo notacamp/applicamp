@@ -11,7 +11,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use super::{
-    check::{Checks, Reason, claims_of, flagged_in_order, keepable},
+    check::{Checks, Reason, claims_of, flagged_in_order, keepable, usable_sources},
     fix::MAX_PROPOSAL,
     model::{Content, Frame, Line, PositionInfo, SourceKind},
     pdf::{Template, readback::PdfChecks},
@@ -94,6 +94,11 @@ pub struct Waiting {
     pub proposal: Option<String>,
     /// "Title · Company" of the position a kept fact lands on.
     pub role: Option<String>,
+    /// The company of that position ("You told us about …").
+    pub company: Option<String>,
+    /// The person's own words the line was made from, as the profile has
+    /// them: what "Change it" starts from. None when it cites none.
+    pub quote: Option<String>,
     /// Why it is flagged.
     pub flags: Vec<Reason>,
 }
@@ -301,6 +306,8 @@ pub struct CvDraftView {
     /// Approved, but with no PDF yet (approved before PDFs were made): offer
     /// to make it.
     pub needs_version: bool,
+    /// Just approved: until then `…/unapprove` puts it back as a draft.
+    pub undo_until: Option<DateTime<Utc>>,
 }
 
 /// An approved version: the approved text as a PDF.
@@ -400,10 +407,12 @@ fn waiting(content: &Content, frame: &Frame, checks: &Checks) -> Vec<Waiting> {
                     question: None,
                     proposal: Some(skill.name.clone()),
                     role: None,
+                    company: None,
+                    quote: None,
                     flags,
                 });
             }
-            let (line, _) = content.lines().find(|(l, _)| l.id == id)?;
+            let (line, place) = content.placed_lines().find(|(l, _)| l.id == id)?;
             let proposal = keepable(&flags)
                 .then(|| {
                     line.ask
@@ -412,11 +421,28 @@ fn waiting(content: &Content, frame: &Frame, checks: &Checks) -> Vec<Waiting> {
                         .unwrap_or_else(|| line.text.clone())
                 })
                 .filter(|p| p.chars().count() <= MAX_PROPOSAL);
-            let role = content
+            let position = content
                 .position_of(&id, frame.latest)
-                .and_then(|p| frame.position(p))
-                .map(role_of)
-                .filter(|r| !r.is_empty());
+                .and_then(|p| frame.position(p));
+            let role = position.map(role_of).filter(|r| !r.is_empty());
+            let company = position
+                .and_then(|p| p.company.clone())
+                .filter(|c| !c.trim().is_empty());
+            // The person's own words, never the model's or a company's page.
+            let quote = usable_sources(line, place, frame)
+                .iter()
+                .filter_map(|source| frame.get(source))
+                .find(|source| {
+                    matches!(
+                        source.kind,
+                        SourceKind::Highlight
+                            | SourceKind::Fact
+                            | SourceKind::PositionSummary
+                            | SourceKind::Summary
+                            | SourceKind::Headline
+                    )
+                })
+                .map(|source| source.text.clone());
             Some(Waiting {
                 line_id: id,
                 kind: WaitingKind::Line,
@@ -424,6 +450,8 @@ fn waiting(content: &Content, frame: &Frame, checks: &Checks) -> Vec<Waiting> {
                 question: line.ask.as_ref().and_then(|a| a.question.clone()),
                 proposal,
                 role,
+                company,
+                quote,
                 flags,
             })
         })
@@ -780,6 +808,7 @@ pub fn draft_view(
         },
         preview: None,
         needs_version: false,
+        undo_until: None,
     }
 }
 

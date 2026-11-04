@@ -4,4 +4,4 @@
   "Developer" or the city on your profile are no longer flagged. When a line says more than your profile
   does, the app rewrites it to what your profile says. When it can't, it asks you one question: "Is this
   true?" with Yes, keep it, Change it or Remove it. A yes adds that fact to your profile. Approving keeps
-  the PDF you saw. Nothing is sent to anyone.
+  the PDF you saw, and you can undo it for a few seconds. Nothing is sent to anyone.

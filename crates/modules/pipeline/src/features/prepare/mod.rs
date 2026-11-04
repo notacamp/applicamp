@@ -385,7 +385,18 @@ async fn queue(
     if queued.is_none() {
         return Ok(false);
     }
-    jobs::enqueue(&mut *conn, &Prepare { opportunity: opp }).await?;
+    if step == PreparationStep::Letter {
+        // The CV was just approved: the letter waits while the approval can
+        // still be undone.
+        jobs::enqueue_at(
+            &mut *conn,
+            &Prepare { opportunity: opp },
+            now + cv::UNDO_WINDOW,
+        )
+        .await?;
+    } else {
+        jobs::enqueue(&mut *conn, &Prepare { opportunity: opp }).await?;
+    }
     Ok(true)
 }
 

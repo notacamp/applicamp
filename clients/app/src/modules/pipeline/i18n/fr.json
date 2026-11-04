@@ -464,7 +464,8 @@
       "invalid_length": "Choisissez 1 ou 2 pages.",
       "invalid_layout": "Choisissez un modèle et 1 ou 2 pages.",
       "cannot_keep": "Cette ligne concerne l’entreprise, pas vous. Modifiez-la ou retirez-la.",
-      "not_flagged": "Cette ligne correspond déjà à votre profil."
+      "not_flagged": "Cette ligne correspond déjà à votre profil.",
+      "too_late": "Il est trop tard pour annuler. Refaites le CV pour le modifier."
     },
     "layout": {
       "template": "Modèle",
@@ -529,9 +530,8 @@
     },
     "waiting": {
       "title": "À vous de voir · {{count}}",
-      "question": "Est-ce vrai ?",
-      "skillQuestion": "Avez-vous cette compétence ?",
-      "quoted": "« {{text}} »",
+      "question": "Est-ce vrai ? « {{text}} »",
+      "skillQuestion": "Avez-vous cette compétence ? {{skill}}",
       "where": "Si vous la gardez, elle va dans votre profil sous {{role}}.",
       "whereNoRole": "Si vous la gardez, elle va dans votre profil.",
       "skillWhere": "Si vous la gardez, elle est ajoutée à vos compétences.",
@@ -547,12 +547,19 @@
       "checkedFixed_other": "Chaque ligne vérifiée avec votre profil · {{count}} lignes corrigées",
       "ready": "Approuvez quand il vous convient.",
       "answer_one": "Répondez à la question pour approuver.",
-      "answer_other": "Répondez aux {{count}} questions pour approuver."
+      "answer_other": "Répondez aux {{count}} questions pour approuver.",
+      "toldUs": "Vous nous avez parlé de {{company}} : « {{quote}} ». Si vous la gardez, elle va dans votre profil."
     },
     "needsVersion": {
       "title": "Ce CV est approuvé mais n’a pas encore de PDF",
       "body": "Créez le PDF à partir du texte approuvé. Aucune IA n’est utilisée.",
       "make": "Créer le PDF"
+    },
+    "dock": {
+      "approved": "Approuvé",
+      "undo": "Annuler",
+      "undoing": "Annulation…",
+      "next": "Nous écrivons ensuite votre lettre de motivation, environ {{cost}}. Annuler l’arrête."
     }
   },
   "cvs": {

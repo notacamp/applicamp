@@ -21,6 +21,11 @@ export interface PdfPagesProps {
   testId: string;
   /** Load it: off while the PDF is not to be shown. */
   enabled?: boolean | undefined;
+  /**
+   * The narrowest a page is drawn, in CSS pixels, so its text stays
+   * readable: wider than the space it is given, the pages scroll sideways.
+   */
+  minWidth?: number | undefined;
 }
 
 type Pdfjs = typeof PdfjsModule;
@@ -60,7 +65,7 @@ type State =
  * carries `data-drawn`; while a new address loads, the pages already drawn
  * stay.
  */
-export function PdfPages({ url, labels, testId, enabled = true }: PdfPagesProps) {
+export function PdfPages({ url, labels, testId, enabled = true, minWidth = 200 }: PdfPagesProps) {
   const root = useRef<HTMLDivElement>(null);
   const canvases = useRef(new Map<number, HTMLCanvasElement>());
   const [loadedState, setState] = useState<State | null>(null);
@@ -111,7 +116,7 @@ export function PdfPages({ url, labels, testId, enabled = true }: PdfPagesProps)
       return;
     }
     const measure = () => {
-      setWidth(Math.max(200, element.clientWidth));
+      setWidth(Math.max(minWidth, element.clientWidth));
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -119,7 +124,7 @@ export function PdfPages({ url, labels, testId, enabled = true }: PdfPagesProps)
     return () => {
       observer.disconnect();
     };
-  }, [ready]);
+  }, [ready, minWidth]);
 
   // Draw every page, fitted to the width, at the device's pixel ratio.
   useEffect(() => {

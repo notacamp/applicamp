@@ -564,6 +564,119 @@ function completion(content: unknown) {
   };
 }
 
+/** What the LinkedIn check-up's prompt shows (`<linkedin>`, `<goals>`). */
+interface LinkedInShown {
+  headline?: string | null;
+  summary?: string | null;
+  positions?: { index: number; title?: string | null; company?: string | null }[];
+  skills?: string[];
+}
+
+/**
+ * The LinkedIn check-up (#84, system prompt "You review one person's LinkedIn
+ * profile…"): a headline that keeps LinkedIn's own words and names the role
+ * wanted (clean), an About text with a buzzword (flagged), a description of
+ * the first position that adds a tool no source names (flagged, to edit), a
+ * skill the profile has and LinkedIn lacks (clean) and one that cites nothing
+ * (flagged), and education left as it is.
+ */
+function linkedinReview(userContent: string) {
+  const sources = parsedBetween<AboutSource[]>(userContent, "sources", []);
+  const goals = parsedBetween<{ roles?: string[] }>(userContent, "goals", {});
+  const linkedin = parsedBetween<LinkedInShown>(userContent, "linkedin", {});
+  const role = goals.roles?.[0] ?? null;
+  const has = (id: string) => sources.some((source) => source.id === id);
+  const text = (id: string) => sources.find((source) => source.id === id)?.text ?? "";
+  const headlineNow = linkedin.headline ?? "";
+  const headline = {
+    field: "headline",
+    text:
+      role !== null && has("goals")
+        ? `${headlineNow} · open to ${role} roles`.trim()
+        : headlineNow || text("p.headline"),
+    sources: [
+      ...(headlineNow === "" ? ["p.headline"] : ["l.headline"]),
+      ...(has("goals") ? ["goals"] : []),
+    ],
+    why: "Says the role you want next, in your own words.",
+  };
+  const summary = {
+    field: "summary",
+    text: `Passionate about this work. ${text("w0")}`.trim(),
+    sources: ["w0"],
+    why: "An About text that says what you do today.",
+  };
+  const description = {
+    field: "position_description",
+    text: `${text("w0")} Also runs Kubernetes.`.trim(),
+    sources: ["w0"],
+    why: "A description that says what the role was.",
+  };
+  const onLinkedin = new Set((linkedin.skills ?? []).map((skill) => skill.toLowerCase()));
+  const known = text("skills")
+    .replace(/^Skills:\s*/, "")
+    .replace(/\.$/, "")
+    .split(",")
+    .map((skill) => skill.trim())
+    .filter((skill) => skill !== "" && !onLinkedin.has(skill.toLowerCase()));
+  const skills = [
+    ...known.slice(0, 1).map((skill) => ({
+      field: "skill",
+      text: skill,
+      sources: ["skills"],
+      why: "Your profile has it; LinkedIn does not.",
+    })),
+    { field: "skill", text: "Kubernetes", sources: [], why: "Often asked for in such roles." },
+  ];
+  const first = linkedin.positions?.[0];
+  return {
+    overall: `Your headline says what you do today, not the ${role ?? "role"} you want next. Your About text is ${
+      (linkedin.summary ?? "") === "" ? "empty" : "short"
+    }.`,
+    findings: [
+      {
+        part: "headline",
+        position: null,
+        state: "could_be_better",
+        why: "A recruiter for that role does not see it named here.",
+        proposals: [headline],
+      },
+      {
+        part: "summary",
+        position: null,
+        state: (linkedin.summary ?? "") === "" ? "missing" : "could_be_better",
+        why: "The About text is where you say what you want next.",
+        proposals: [summary],
+      },
+      ...(first === undefined
+        ? []
+        : [
+            {
+              part: "position",
+              position: first.index,
+              state: "could_be_better",
+              why: "The description says little about what you did.",
+              proposals: [description],
+            },
+          ]),
+      {
+        part: "skills",
+        position: null,
+        state: "could_be_better",
+        why: "Recruiters filter on skills; some of yours are missing here.",
+        proposals: skills,
+      },
+      {
+        part: "education",
+        position: null,
+        state: "good",
+        why: "It says what it needs to.",
+        proposals: [],
+      },
+    ],
+  };
+}
+
 /**
  * Answers a chat completion as the model would, by what it is asked, or (any
  * other) the scoring of every posting of the last user message, with its
@@ -580,6 +693,10 @@ async function complete(request: IncomingMessage, response: ServerResponse) {
     const user = messages.findLast((message) => message.role === "user");
     if (system.startsWith("You write what a job-hunting app knows about one person")) {
       json(response, 200, completion(aboutPortrait(user?.content ?? "")));
+      return;
+    }
+    if (system.startsWith("You review one person's LinkedIn profile")) {
+      json(response, 200, completion(linkedinReview(user?.content ?? "")));
       return;
     }
     if (system.startsWith("You read what a person wrote about themselves")) {

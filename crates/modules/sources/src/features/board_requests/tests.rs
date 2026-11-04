@@ -313,11 +313,13 @@ async fn a_decline_can_be_taken_back(db: PgPool) {
     assert_eq!(detail["board"]["decline_reason"], Value::Null);
     // One that was read before goes back to being read.
     let read = board(&h.db, "read", "approved", "/private", json!([])).await;
-    sqlx::query("UPDATE sources.job_boards SET approved_at = now() WHERE id = $1")
-        .bind(read)
-        .execute(&h.db)
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE sources.job_boards SET approved_at = now(), approved_by = 'owner' WHERE id = $1",
+    )
+    .bind(read)
+    .execute(&h.db)
+    .await
+    .unwrap();
     send(
         &h,
         "POST",

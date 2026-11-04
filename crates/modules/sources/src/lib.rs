@@ -9,7 +9,7 @@
 //!   Arbeitnow and HN first); remote jobs anywhere, open to where the
 //!   person lives. Public APIs and feeds only, never LinkedIn or Indeed
 //!   (ADR 0006).
-//! - **Discovery** ([`features::discovery`]): every week, new boards from a
+//! - **Discovery** ([`features::discovery`]): every day, new boards from a
 //!   CC0 list are checked automatically (robots rules, terms sentences, a
 //!   feed, a sample) and wait on the Boards page ([`features::boards`]),
 //!   ranked by average salary ([`pay`]); nothing is read for jobs before
@@ -77,6 +77,7 @@ pub mod requirements;
 pub mod robots;
 pub mod scans;
 pub mod scoring;
+pub mod terms;
 
 use std::sync::Arc;
 
@@ -228,7 +229,7 @@ pub fn module(deps: SourcesDeps) -> Module {
 /// list and the registry the job boards' (new boards added, the owner's
 /// decisions kept), check the seeded boards waiting for the owner that were
 /// never checked with their config, schedule the nightly search and the
-/// weekly discovery (when they are on), and check the requirements of
+/// daily discovery (when they are on), and check the requirements of
 /// opportunities found before the rules (once each).
 pub async fn start(db: &PgPool, deps: &SourcesDeps) -> Result<(), String> {
     let seed = boards::seed(&deps.config)?;

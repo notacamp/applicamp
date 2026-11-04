@@ -376,21 +376,13 @@ pub async fn overview(
     }))
 }
 
-/// The board's contact, read straight from its row when the column is
-/// there: the board finder (#75) adds `contact_email`, and this page reads it
-/// without depending on that migration.
-async fn contact_of(db: &PgPool, id: Uuid) -> Result<Option<String>> {
-    let row: Option<serde_json::Value> =
-        sqlx::query_scalar("SELECT to_jsonb(b) FROM sources.job_boards b WHERE b.id = $1")
-            .bind(id)
-            .fetch_optional(db)
-            .await?;
-    Ok(row
-        .and_then(|v| {
-            v.get("contact_email")
-                .and_then(|e| e.as_str().map(|e| e.trim().to_owned()))
-        })
-        .filter(|e| e.contains('@') && e.len() <= 254 && !e.contains(char::is_whitespace)))
+/// The board's contact when its check found one.
+fn contact_of(row: &BoardRow) -> Option<String> {
+    row.contact_email
+        .as_deref()
+        .map(str::trim)
+        .filter(|e| e.contains('@') && e.len() <= 254 && !e.contains(char::is_whitespace))
+        .map(str::to_owned)
 }
 
 /// The email's subject and body, filled with what the board is and what
@@ -424,7 +416,7 @@ pub fn draft_for(row: &BoardRow) -> (String, String) {
 
 async fn email_of(db: &PgPool, id: Uuid) -> Result<PermissionEmail> {
     let row = boards::fetch(db, id).await?;
-    let to = contact_of(db, id).await?;
+    let to = contact_of(&row);
     let (subject, body) = draft_for(&row);
     let latest: Option<LatestRequest> = sqlx::query_as(
         "SELECT asked_at, answered_at, answer FROM sources.board_requests
@@ -711,7 +703,7 @@ pub async fn reopen(
     }
     sqlx::query(
         "UPDATE sources.job_boards
-            SET status = CASE WHEN approved_at IS NOT NULL THEN 'approved' ELSE 'candidate' END,
+            SET status = CASE WHEN approved_by IS NOT NULL THEN 'approved' ELSE 'candidate' END,
                 decline_reason = NULL, updated_at = $2
           WHERE id = $1",
     )

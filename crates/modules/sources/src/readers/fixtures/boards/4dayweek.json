@@ -1,0 +1,259 @@
+{
+ "data": [
+  {
+   "id": "01a19b72-3ec7-7910-8a17-55d07683ffd5",
+   "slug": "staff-engineer-at-ledgebrook-2efc6629",
+   "title": "Staff Engineer",
+   "description": "#### Description\n\nLedgebrook is an AI-native specialty insurance platform. When a business needs coverage that is custom and complex, its broker comes to us, and our underwriters give them an answer, often in hours rather than weeks.\n\nWe built our technology from scratch, with AI in it from the",
+   "url": "https://4dayweek.io/job/staff-engineer-at-ledgebrook-2efc6629",
+   "category": "engineering",
+   "role": "Software Engineer",
+   "level": "senior",
+   "contract_type": "permanent",
+   "schedule_type": "unlimited_pto",
+   "hours_per_week_min": 40,
+   "hours_per_week_max": 40,
+   "work_arrangement": "remote",
+   "locations": [
+    {
+     "country": "United States",
+     "continent": "North America",
+     "latitude": 39.83,
+     "longitude": -98.58,
+     "work_arrangement": "remote",
+     "is_primary": true
+    },
+    {
+     "country": "Canada",
+     "continent": "North America",
+     "latitude": 56.13,
+     "longitude": -106.35,
+     "work_arrangement": "remote"
+    }
+   ],
+   "salary_min": 15000000,
+   "salary_max": 20000000,
+   "salary_currency": "USD",
+   "salary_period": "year",
+   "posted_at": "2026-11-02T08:48:38Z",
+   "company": {
+    "id": "01a057d1-212f-7615-8a7f-73534d19b3ea",
+    "slug": "ledgebrook",
+    "name": "Ledgebrook",
+    "url": "https://4dayweek.io/company/ledgebrook",
+    "website": "https://www.ledgebrook.com",
+    "country": "United States"
+   }
+  },
+  {
+   "id": "01a19a6f-562a-7d5e-9907-754c714e4ecf",
+   "slug": "sr-specialist-supplier-quality-engineer-composites-at-l3harris-technologies-6751f7ab",
+   "title": "Sr. Specialist, Supplier Quality Engineer (Composites)",
+   "description": "L3Harris is dedicated to recruiting and developing high-performing talent who are passionate about what they do. Our employees are unified in a shared dedication to our customers’ mission and quest for professional growth. L3Harris provides an inclusive, engaging environment designed to empower",
+   "url": "https://4dayweek.io/job/sr-specialist-supplier-quality-engineer-composites-at-l3harris-technologies-6751f7ab",
+   "category": "engineering",
+   "role": "Supplier Quality Engineer",
+   "level": "senior",
+   "schedule_type": "9_day_fortnight",
+   "hours_per_week_min": 40,
+   "hours_per_week_max": 40,
+   "work_arrangement": "remote",
+   "locations": [
+    {
+     "city": "Lincoln",
+     "state": "Nebraska",
+     "country": "United States",
+     "continent": "North America",
+     "latitude": 40.8136634,
+     "longitude": -96.7025764,
+     "work_arrangement": "remote",
+     "is_primary": true
+    },
+    {
+     "city": "Denver",
+     "state": "Colorado",
+     "country": "United States",
+     "continent": "North America",
+     "latitude": 39.7392358,
+     "longitude": -104.990251,
+     "work_arrangement": "remote"
+    }
+   ],
+   "salary_min": 8400000,
+   "salary_max": 17800000,
+   "salary_currency": "USD",
+   "salary_period": "year",
+   "posted_at": "2026-11-02T04:05:50Z",
+   "company": {
+    "id": "019e0e1b-13ff-7e98-b5b9-1c2753102005",
+    "slug": "l3harris",
+    "name": "L3Harris Technologies",
+    "url": "https://4dayweek.io/company/l3harris",
+    "website": "https://www.l3harris.com",
+    "country": "United States"
+   }
+  },
+  {
+   "id": "01a18f7c-f63b-7943-b97d-941a60621816",
+   "slug": "director-gtm-ai-engineering-at-samsara-1b2aa8ea",
+   "title": "Director, GTM AI Engineering",
+   "description": "**Who we are**\n\nSamsara (NYSE: IOT) is the pioneer of the Connected Operations™ Cloud, which is a platform that enables organizations that depend on physical operations to harness Internet of Things (IoT) data to develop actionable insights and improve their operations. At Samsara, we are helping",
+   "url": "https://4dayweek.io/job/director-gtm-ai-engineering-at-samsara-1b2aa8ea",
+   "category": "engineering",
+   "role": "AI Engineering Manager",
+   "level": "executive",
+   "contract_type": "permanent",
+   "schedule_type": "best_place_to_work",
+   "hours_per_week_min": 40,
+   "hours_per_week_max": 40,
+   "work_arrangement": "remote",
+   "locations": [
+    {
+     "country": "United States",
+     "continent": "North America",
+     "latitude": 39.83,
+     "longitude": -98.58,
+     "work_arrangement": "remote",
+     "is_primary": true
+    }
+   ],
+   "salary_min": 18200000,
+   "salary_max": 32500000,
+   "salary_currency": "USD",
+   "salary_period": "year",
+   "posted_at": "2026-10-31T01:04:54Z",
+   "company": {
+    "id": "019e8336-fca7-71b0-a237-9e3c08c2476f",
+    "slug": "samsara",
+    "name": "Samsara",
+    "url": "https://4dayweek.io/company/samsara",
+    "website": "https://www.samsara.com",
+    "country": "United States"
+   }
+  },
+  {
+   "id": "01a18f63-cc8a-7ef1-bc4b-d7e81103195f",
+   "slug": "staff-developer-relations-engineer-at-render-cbd132a0",
+   "title": "Staff Developer Relations Engineer",
+   "description": "At Render, we’re building the modern cloud platform for developers creating AI-native, full-stack, multi-service applications. Our mission is to eliminate the tradeoff between the power of hyperscalers and the simplicity of developer-friendly platforms—so teams can ship fast, scale reliably, and",
+   "url": "https://4dayweek.io/job/staff-developer-relations-engineer-at-render-cbd132a0",
+   "category": "engineering",
+   "role": "Developer Relations Engineer",
+   "level": "senior",
+   "schedule_type": "best_place_to_work",
+   "hours_per_week_min": 40,
+   "hours_per_week_max": 40,
+   "work_arrangement": "remote",
+   "locations": [
+    {
+     "country": "United States",
+     "continent": "North America",
+     "latitude": 39.83,
+     "longitude": -98.58,
+     "work_arrangement": "remote",
+     "is_primary": true
+    },
+    {
+     "city": "San Francisco",
+     "state": "California",
+     "country": "United States",
+     "continent": "North America",
+     "latitude": 37.7749295,
+     "longitude": -122.4194155,
+     "work_arrangement": "remote"
+    }
+   ],
+   "salary_min": 20400000,
+   "salary_max": 25000000,
+   "salary_currency": "USD",
+   "salary_period": "year",
+   "posted_at": "2026-10-31T00:37:25Z",
+   "company": {
+    "id": "019e8865-8ff4-76e7-a607-7c50030dd03c",
+    "slug": "render",
+    "name": "Render",
+    "url": "https://4dayweek.io/company/render",
+    "website": "https://www.render.com",
+    "country": "United States"
+   }
+  },
+  {
+   "id": "01a18ebb-71cd-7700-b5fa-15afdeff7eb4",
+   "slug": "manager-software-engineering-at-toast-0dc33528",
+   "title": "Manager, Software Engineering",
+   "description": "Toast creates technology to help restaurants and local businesses succeed in a digital world, helping business owners operate, increase sales, engage customers, and keep employees happy.\n\nAs an Engineering Manager focused on GTM, you will be accountable for the delivery of solutions supporting",
+   "url": "https://4dayweek.io/job/manager-software-engineering-at-toast-0dc33528",
+   "category": "engineering",
+   "role": "Software Engineering Manager",
+   "level": "lead",
+   "schedule_type": "best_place_to_work",
+   "hours_per_week_min": 40,
+   "hours_per_week_max": 40,
+   "work_arrangement": "remote",
+   "locations": [
+    {
+     "country": "United States",
+     "continent": "North America",
+     "latitude": 39.83,
+     "longitude": -98.58,
+     "work_arrangement": "remote",
+     "is_primary": true
+    }
+   ],
+   "salary_min": 15100000,
+   "salary_max": 30900000,
+   "salary_currency": "USD",
+   "salary_period": "year",
+   "posted_at": "2026-10-30T21:33:31Z",
+   "company": {
+    "id": "019e8336-458c-7bde-8557-75fc6c77accf",
+    "slug": "toast",
+    "name": "Toast",
+    "url": "https://4dayweek.io/company/toast",
+    "website": "https://pos.toasttab.com",
+    "country": "United States"
+   }
+  },
+  {
+   "id": "01a18e90-bbf9-7dbf-a824-22f6201dd7f5",
+   "slug": "vp-of-engineering-at-optimal-dynamics-f52da1ae",
+   "title": "VP of Engineering",
+   "description": "**About Our Company**\n\nBuilt on over four decades of pioneering research at Princeton University, our platform represents the leading edge of innovation in freight and transportation planning. We help customers unlock double-digit revenue gains and drive smarter, data-driven operations at",
+   "url": "https://4dayweek.io/job/vp-of-engineering-at-optimal-dynamics-f52da1ae",
+   "category": "engineering",
+   "role": "Engineering Leader",
+   "level": "executive",
+   "schedule_type": "unlimited_pto",
+   "hours_per_week_min": 40,
+   "hours_per_week_max": 40,
+   "work_arrangement": "remote",
+   "locations": [
+    {
+     "country": "United States",
+     "continent": "North America",
+     "latitude": 39.83,
+     "longitude": -98.58,
+     "work_arrangement": "remote",
+     "is_primary": true
+    }
+   ],
+   "salary_min": 24000000,
+   "salary_max": 28000000,
+   "salary_currency": "USD",
+   "salary_period": "year",
+   "posted_at": "2026-10-30T20:46:52Z",
+   "company": {
+    "id": "019e0e24-40c7-7cc0-aefd-9dc617f90d73",
+    "slug": "optimal-dynamics",
+    "name": "Optimal Dynamics",
+    "url": "https://4dayweek.io/company/optimal-dynamics",
+    "website": "https://www.optimaldynamics.com",
+    "country": "United States"
+   }
+  }
+ ],
+ "page": 1,
+ "limit": 100,
+ "total": 1997,
+ "has_more": true
+}

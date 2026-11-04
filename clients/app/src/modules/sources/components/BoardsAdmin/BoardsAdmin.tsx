@@ -23,7 +23,7 @@ import {
   type DataColumn,
 } from "~/lib/ui";
 
-import { useAdminOverview, useReopen, withFinder, type AdminOverview } from "../../api/admin";
+import { useAdminOverview, useReopen, type AdminOverview } from "../../api/admin";
 import {
   adminRows,
   filterRows,
@@ -470,7 +470,7 @@ function boardColumns(t: TFunction<"sources">, locale: string): DataColumn<Admin
 
 /** Where the app first heard of a board, in plain words. */
 function foundThrough(row: AdminRow, t: TFunction<"sources">): string {
-  const finder = withFinder(row.board).found_through;
+  const finder = row.board.found_through;
   if (finder !== undefined && finder !== null && finder.trim() !== "") {
     return finder;
   }

@@ -23,13 +23,7 @@ import {
   TextField,
 } from "~/lib/ui";
 
-import {
-  useAnswerRequest,
-  useMarkAsked,
-  usePermissionEmail,
-  withFinder,
-  useReopen,
-} from "../../api/admin";
+import { useAnswerRequest, useMarkAsked, usePermissionEmail, useReopen } from "../../api/admin";
 import type { AdminRow } from "../../api/admin-rows";
 import {
   boardErrorOf,
@@ -645,7 +639,7 @@ function ReadingDecision({ row }: { row: AdminRow }) {
 function Facts({ row, detail }: { row: AdminRow; detail: BoardDetail }) {
   const { t, i18n } = useTranslation("sources");
   const { board, report } = detail;
-  const finder = withFinder(board);
+  const finder = board;
   const found = finder.found_through ?? t(`admin.origin.${board.origin}`);
   const checked = report?.checked_at ?? null;
   return (
@@ -682,7 +676,7 @@ interface CheckLine {
 function checksOf(detail: BoardDetail, t: TFunction<"sources">): CheckLine[] {
   const lines: CheckLine[] = [];
   const blockers = detail.blockers;
-  const finder = withFinder(detail.board);
+  const finder = detail.board;
   const checked = detail.report?.checked_at !== undefined && detail.report.checked_at !== null;
   lines.push(
     detail.endpoint === undefined || detail.endpoint === null

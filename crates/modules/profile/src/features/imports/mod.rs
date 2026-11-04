@@ -152,7 +152,7 @@ fn upload_error(detail: &str) -> Error {
 
 impl ImportUpload {
     /// Read the form, never holding more than an upload's limit.
-    async fn read(mut form: Multipart) -> Result<Self> {
+    pub(crate) async fn read(mut form: Multipart) -> Result<Self> {
         let mut upload = Self::default();
         while let Some(mut field) = form
             .next_field()
@@ -607,6 +607,11 @@ impl Job for ExpireImports {
             .rows_affected();
         // And what "Tell me about you" kept for a week.
         deleted += sqlx::query("DELETE FROM profile.about_you WHERE expires_at <= now()")
+            .execute(&ctx.db)
+            .await?
+            .rows_affected();
+        // And a LinkedIn review nobody touched for 30 days.
+        deleted += sqlx::query("DELETE FROM profile.linkedin_reviews WHERE expires_at <= now()")
             .execute(&ctx.db)
             .await?
             .rows_affected();

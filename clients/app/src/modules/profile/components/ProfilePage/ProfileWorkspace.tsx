@@ -9,6 +9,7 @@ import type { Question } from "../../api/questions";
 import { ImportPanel } from "../ImportPanel/ImportPanel";
 import { ImportReview } from "../ImportReview/ImportReview";
 import { GoalsSection } from "../GoalsSection/GoalsSection";
+import { LinkedInSection } from "../LinkedInSection/LinkedInSection";
 import { ProfileView } from "../ProfileView/ProfileView";
 import { StrengthCard } from "../StrengthCard/StrengthCard";
 
@@ -23,6 +24,8 @@ export interface ProfileWorkspaceProps {
   onAction: (action: Action) => void;
   /** Open "Tell me about you": from the strength card, and from a role's kept facts. */
   onAbout: () => void;
+  /** Open "Your LinkedIn": the check-up of the LinkedIn profile. */
+  onLinkedIn: () => void;
 }
 
 /**
@@ -36,6 +39,7 @@ export function ProfileWorkspace({
   onStartGoals,
   onAction,
   onAbout,
+  onLinkedIn,
 }: ProfileWorkspaceProps) {
   const { t } = useTranslation("profile");
   const profile = useProfile();
@@ -112,6 +116,7 @@ export function ProfileWorkspace({
   return (
     <Stack gap="lg">
       <StrengthCard onAction={onAction} onAbout={onAbout} />
+      <LinkedInSection onOpen={onLinkedIn} />
       <ProfileView
         view={view}
         onAbout={onAbout}

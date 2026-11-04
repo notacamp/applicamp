@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Remote Ruby Jobs RSS - RemoteFirstJobs.com</title>
+    <link>https://remotefirstjobs.com/rss/jobs/ruby.rss</link>
+    <description>Remote Ruby Jobs RSS Feed - RemoteFirstJobs.com</description>
+    <image>
+      <url>https://remotefirstjobs.com/web-app-manifest-512x512.png</url>
+      <title>Remote First Jobs Logo</title>
+      <link>https://remotefirstjobs.com/rss/jobs/ruby.rss</link>
+    </image>
+    <item>
+      <title>Lead Engineer, Order Management at Stitch Fix</title>
+      <link>https://remotefirstjobs.com/companies/stitch-fix/jobs/lead-engineer-order-management-878819</link>
+      <description>&lt;h3&gt;&lt;strong&gt;About Stitch Fix, Inc.&lt;/strong&gt;&lt;/h3&gt;&#xA;&#xA;&lt;p&gt;</description>
+      <guid isPermaLink="true">lead-engineer-order-management-878819</guid>
+      <pubDate>Tue, 03 Nov 2026 20:32:22 +0000</pubDate>
+    </item>
+    <item>
+      <title>Senior Software Engineer, Developer Enablement at Fleetio</title>
+      <link>https://remotefirstjobs.com/companies/fleetio/jobs/senior-software-engineer-developer-enablement-878644</link>
+      <description>&lt;p&gt;A little about us…Fleetio is a modern software platform that helps thousands of organizations worldwide manage their fleet operations. Transportation technology is a hot market, and we’re leading the charge with raving fans and new customers signing up every day. We raised $450M in our</description>
+      <guid isPermaLink="true">senior-software-engineer-developer-enablement-878644</guid>
+      <pubDate>Tue, 03 Nov 2026 06:18:46 +0000</pubDate>
+    </item>
+    <item>
+      <title>Sr. Software Engineer, Fullstack (UK) at Firstup</title>
+      <link>https://remotefirstjobs.com/companies/firstup/jobs/sr-software-engineer-fullstack-uk-878391</link>
+      <description>&lt;p&gt;Who We Are&lt;/p&gt;&#xA;&#xA;&lt;p&gt;</description>
+      <guid isPermaLink="true">sr-software-engineer-fullstack-uk-878391</guid>
+      <pubDate>Sun, 01 Nov 2026 20:53:52 +0000</pubDate>
+    </item>
+    <item>
+      <title>Senior Software Engineer, Membership Experience at Chime</title>
+      <link>https://remotefirstjobs.com/companies/chime/jobs/senior-software-engineer-membership-experience-878282</link>
+      <description>&lt;h3&gt;&lt;strong&gt;About the role&lt;/strong&gt;&lt;/h3&gt;&#xA;&#xA;&lt;p&gt;</description>
+      <guid isPermaLink="true">senior-software-engineer-membership-experience-878282</guid>
+      <pubDate>Sat, 31 Oct 2026 19:45:14 +0000</pubDate>
+    </item>
+    <item>
+      <title>Software Engineer, Jade - AI Financial Partner at Chime</title>
+      <link>https://remotefirstjobs.com/companies/chime/jobs/software-engineer-jade-ai-financial-partner-878278</link>
+      <description>&lt;h3&gt;&lt;strong&gt;About the role&lt;/strong&gt;&lt;/h3&gt;&#xA;&#xA;&lt;p&gt;</description>
+      <guid isPermaLink="true">software-engineer-jade-ai-financial-partner-878278</guid>
+      <pubDate>Sat, 31 Oct 2026 19:40:50 +0000</pubDate>
+    </item>
+    <item>
+      <title>Software Engineer, Membership Experience at Chime</title>
+      <link>https://remotefirstjobs.com/companies/chime/jobs/software-engineer-membership-experience-878276</link>
+      <description>&lt;h3&gt;About the role&lt;/h3&gt;&#xA;&#xA;&lt;p&gt;</description>
+      <guid isPermaLink="true">software-engineer-membership-experience-878276</guid>
+      <pubDate>Sat, 31 Oct 2026 19:38:44 +0000</pubDate>
+    </item>
+  </channel>
+</rss>

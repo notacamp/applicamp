@@ -1857,6 +1857,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/profile/linkedin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Where the check-up is: the review, if any, and whether one can be made.
+         *     Never calls a model.
+         */
+        get: operations["profile.linkedin"];
+        put?: never;
+        /**
+         * Check the LinkedIn profile in the file against the profile and goals: the
+         *     file is read as the import reads it (never stored), then one model call
+         *     writes the review, which replaces the account's. The LinkedIn profile is
+         *     kept without the person's name or contact details.
+         */
+        post: operations["profile.linkedin_check"];
+        /** Start over: throw the review away. Nothing else changes. */
+        delete: operations["profile.linkedin_discard"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/linkedin/proposals/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Keep, drop or mark done one proposal, or rewrite it. Keep is refused while
+         *     a flag remains; Done is allowed only on a kept proposal. Every decision can
+         *     be taken back with `ready`.
+         */
+        patch: operations["profile.linkedin_decide"];
+        trace?: never;
+    };
     "/api/v1/profile/skills/order": {
         parameters: {
             query?: never;
@@ -2601,7 +2649,7 @@ export interface components {
         /** @description Why a board cannot be approved yet. */
         BoardBlocker: {
             /**
-             * @description `terms_forbid`, `robots_disallowed`, `needs_key`, `no_endpoint`,
+             * @description `terms_forbid`, `robots_disallowed`, `needs_key`, `needs_permission`, `no_endpoint`,
              *     `config_invalid`, `check_needed`; clients translate the ones they
              *     know and show `detail` for any other.
              */
@@ -2625,7 +2673,7 @@ export interface components {
             approvable: boolean;
             /**
              * @description The first blocker's code (`terms_forbid`, `robots_disallowed`,
-             *     `needs_key`, `no_endpoint`, `config_invalid`, `check_needed`), or
+             *     `needs_key`, `needs_permission`, `no_endpoint`, `config_invalid`, `check_needed`), or
              *     none.
              */
             blocked?: string | null;
@@ -2769,6 +2817,11 @@ export interface components {
             /** @description A fingerprint of the terms page, to notice a change. */
             terms_fingerprint?: string;
             /**
+             * @description The fingerprint of the terms sentences the model read (its verdict
+             *     and tags are kept until the terms change).
+             */
+            terms_read_for?: string;
+            /**
              * @description Its sentences about scraping, robots, automation, aggregation, the
              *     API, linking back, attribution or commercial use, verbatim (at most
              *     10).
@@ -2799,13 +2852,28 @@ export interface components {
         };
         /** @description A job board, as the Boards page lists it. */
         BoardSummary: {
+            /**
+             * Format: date-time
+             * @description When it was approved.
+             */
+            approved_at?: string | null;
+            /** @description Who approved it: `owner` or `app`. */
+            approved_by?: string | null;
             /** @description How its jobs are credited ("From Himalayas"). */
             attribution: string;
+            /** @description Where to ask it for permission. */
+            contact_email?: string | null;
+            /** @description What its site rules say about use of its content (search, ai-train). */
+            content_signal?: {
+                [key: string]: string;
+            } | null;
             /** @description The one country its jobs are in, when it is country-scoped. */
             country?: string | null;
             decline_reason?: string | null;
             /** @description What the owner should know (from its check). */
             flags: string[];
+            /** @description How the app found it, in plain words. */
+            found_through?: string | null;
             homepage: string;
             /** Format: uuid */
             id: string;
@@ -2828,6 +2896,14 @@ export interface components {
             /** @description Its stable name: the source its jobs carry. */
             slug: string;
             status: components["schemas"]["BoardStatus"];
+            /** @description Plain lowercase words that describe it ("tech", "europe"). */
+            tags: string[];
+            /** @description The sentence of its terms that decided the verdict. */
+            terms_quote?: string | null;
+            /** @description The page its terms are on. */
+            terms_url?: string | null;
+            /** @description What its terms say: `allow`, `silent`, `forbid`, `ask_first` or `personal_only`. */
+            terms_verdict?: string | null;
             /** @description Over the last 30 days. */
             totals_30d: components["schemas"]["BoardTotals"];
             /** @description The person's searches on it over the last 7 days. */
@@ -4202,6 +4278,141 @@ export interface components {
             url: string;
         };
         /**
+         * @description What a proposal changes on LinkedIn.
+         * @enum {string}
+         */
+        LinkedInField: "headline" | "summary" | "position_description" | "skill";
+        /**
+         * @description One finding, as shown: its part, what LinkedIn says there now, its state,
+         *     why, and its proposals' ids.
+         */
+        LinkedInFindingView: {
+            id: string;
+            /** @description What LinkedIn says in this part now; none when it is empty. */
+            now?: string | null;
+            part: components["schemas"]["LinkedInPart"];
+            /**
+             * Format: int32
+             * @description For a position: its index in the LinkedIn profile.
+             */
+            position?: number | null;
+            proposals: string[];
+            state: components["schemas"]["LinkedInState"];
+            /** @description For a position: "Title at Company". */
+            title?: string | null;
+            why: string;
+        };
+        /** @description A flag on a proposal: shown, never a reason to drop it. */
+        LinkedInFlag: {
+            /** @description The claim, or the buzzword. */
+            claim: string;
+            kind: components["schemas"]["LinkedInFlagKind"];
+        };
+        /**
+         * @description What is wrong with a proposal.
+         * @enum {string}
+         */
+        LinkedInFlagKind: "claim" | "buzzword";
+        /**
+         * @description What a check-up is made from.
+         * @enum {string}
+         */
+        LinkedInKind: "linkedin_zip" | "pdf";
+        /**
+         * @description A part of a LinkedIn profile.
+         * @enum {string}
+         */
+        LinkedInPart: "headline" | "summary" | "position" | "skills" | "education" | "languages" | "certifications" | "projects";
+        /** @description A judged proposal, with what the person did with it. */
+        LinkedInProposal: {
+            /** @description The person rewrote it. */
+            edited: boolean;
+            field: components["schemas"]["LinkedInField"];
+            flags: components["schemas"]["LinkedInFlag"][];
+            id: string;
+            /**
+             * Format: int32
+             * @description For a position's description: its index in the LinkedIn profile.
+             */
+            position?: number | null;
+            /** @description What it rests on. */
+            sources: components["schemas"]["LinkedInSource"][];
+            status: components["schemas"]["ProposalStatus"];
+            /** @description The text to paste on LinkedIn (a skill: its name). */
+            text: string;
+            /** @description What it does for the goals. */
+            why: string;
+        };
+        /** @description A review of the LinkedIn profile. */
+        LinkedInReview: {
+            /**
+             * Format: int32
+             * @description Proposals changed on LinkedIn.
+             */
+            done: number;
+            findings: components["schemas"]["LinkedInFindingView"][];
+            /**
+             * Format: int32
+             * @description Proposals kept, still to change on LinkedIn.
+             */
+            kept: number;
+            kind: components["schemas"]["LinkedInKind"];
+            /** @description The language it was written in. */
+            language: string;
+            /** Format: date-time */
+            made_at: string;
+            /**
+             * Format: int32
+             * @description Proposals waiting for Keep or Drop.
+             */
+            open: number;
+            /** @description How the LinkedIn profile reads to a recruiter for the wanted roles. */
+            overall: string;
+            proposals: components["schemas"]["LinkedInProposal"][];
+            /** @description The profile changed since the review was made. */
+            stale: boolean;
+        };
+        /** @description One source a proposal rests on, as shown. */
+        LinkedInSource: {
+            id: string;
+            /** @description `profile`, `told` or `linkedin`. */
+            kind: string;
+            text: string;
+        };
+        /**
+         * @description How a part does for the goals.
+         * @enum {string}
+         */
+        LinkedInState: "good" | "could_be_better" | "missing";
+        /** @description The file a check-up is made from. */
+        LinkedInUpload: {
+            /**
+             * Format: binary
+             * @description The file: the ZIP (up to 20 MB) or the PDF (up to 8 MB).
+             */
+            file: string;
+            /** @description `linkedin_zip` or `pdf`. */
+            kind: components["schemas"]["LinkedInKind"];
+        };
+        /** @description Where the check-up is. */
+        LinkedInView: {
+            /** @description A model is set up, so a check-up can be made. */
+            ai_available: boolean;
+            /**
+             * Format: int32
+             * @description Check-ups made today by this account, of `daily_cap`.
+             */
+            checkups_today: number;
+            /**
+             * Format: int32
+             * @description The most check-ups an account can make in a UTC day.
+             */
+            daily_cap: number;
+            /** @description There is a profile to compare with. */
+            has_profile: boolean;
+            review?: components["schemas"]["LinkedInReview"] | null;
+        };
+        /**
          * @description How a line relates to the profile.
          * @enum {string}
          */
@@ -4617,6 +4828,21 @@ export interface components {
             /** @description Where to see it. */
             url?: string | null;
         };
+        /** @description What the person does with a proposal: a status, a rewrite, or both. */
+        ProposalDecision: {
+            status?: components["schemas"]["ProposalStatus"] | null;
+            /**
+             * @description The text as the person rewrote it; checked again against the same
+             *     sources. A rewrite of a kept or done proposal makes it `ready` again
+             *     unless a status is given too.
+             */
+            text?: string | null;
+        };
+        /**
+         * @description Where a proposal is.
+         * @enum {string}
+         */
+        ProposalStatus: "ready" | "kept" | "dropped" | "done";
         /**
          * @description A sign-in provider.
          * @enum {string}
@@ -4716,6 +4942,13 @@ export interface components {
         };
         /** @description What a board's robots.txt says to us. */
         RobotsReport: {
+            /**
+             * @description Its `Content-Signal` line (`search`, `ai-input`, `ai-train`: `yes` or
+             *     `no`). Recorded and shown, never a reason not to read.
+             */
+            content_signal?: {
+                [key: string]: string;
+            } | null;
             /**
              * Format: double
              * @description Seconds between requests it asks for.
@@ -6063,7 +6296,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `not_waiting`: it is approved or declined; else its first blocker: `terms_forbid`, `robots_disallowed`, `needs_key`, `no_endpoint`, `config_invalid`, `check_needed`; the detail says what exactly */
+            /** @description `not_waiting`: it is approved or declined; else its first blocker: `terms_forbid`, `robots_disallowed`, `needs_key`, `needs_permission`, `no_endpoint`, `config_invalid`, `check_needed`; the detail says what exactly */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -10125,6 +10358,197 @@ export interface operations {
                 };
             };
             /** @description `import_not_ready`: already applied */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.linkedin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The check-up's state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkedInView"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.linkedin_check": {
+        parameters: {
+            query?: {
+                /** @description A language tag such as `pt-PT`; English when left out. */
+                locale?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["LinkedInUpload"];
+            };
+        };
+        responses: {
+            /** @description The check-up's state, with the review. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkedInView"];
+                };
+            };
+            /** @description `invalid_upload`, `invalid_kind`, `file_too_large`, `text_too_long`, `not_a_zip`, `archive_too_many_entries`, `archive_entry_too_large`, `archive_too_large`, `archive_unsafe_path`, `not_a_pdf`, `pdf_unreadable`, `pdf_too_many_pages`, `pdf_no_text`, `nothing_found` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `profile_needed` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `linkedin_daily_cap` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.linkedin_discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Gone (or there was none). */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.linkedin_decide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The proposal's id in the review. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalDecision"];
+            };
+        };
+        responses: {
+            /** @description The check-up's state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkedInView"];
+                };
+            };
+            /** @description `invalid_decision`; `invalid_text` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: no review, or no such proposal */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `proposal_flagged`: it cannot be kept as it is; `proposal_not_kept`: only a kept proposal can be done */
             409: {
                 headers: {
                     [name: string]: unknown;

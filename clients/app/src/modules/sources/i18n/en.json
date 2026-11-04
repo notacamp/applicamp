@@ -110,6 +110,7 @@
       "suggestion_limit_reached": "That’s 10 suggestions today. Try again tomorrow.",
       "terms_forbid": "Its terms forbid automated reading, so it can’t be approved.",
       "needs_key": "It needs an API key first: set one below.",
+      "needs_permission": "It asks for permission first. Ask them, then approve it yourself.",
       "no_endpoint": "It has no feed address yet. Check the board to look for one.",
       "invalid_key": "That key can’t be used.",
       "no_key_needed": "This board doesn’t need a key.",
@@ -135,6 +136,9 @@
     "days30": "30 days",
     "flagsTitle": "To check",
     "homepage": "Open the board",
+    "approvedByApp": "Approved by the app on {{when}}",
+    "contentSignalNoTrain": "Its site asks that its content is not used to train models. Applicamp never trains on jobs.",
+    "foundThrough": "Found through {{source}}",
     "robots": {
       "unchecked": "Not checked yet.",
       "none": "No robots.txt: everything is allowed.",
@@ -167,6 +171,7 @@
       "config_invalid": "Its config doesn’t read: {{detail}}",
       "terms_forbid": "Its terms forbid automated reading: {{detail}}",
       "needs_key": "Needs an API key from {{board}}: {{how}}",
+      "needs_permission": "It asks for permission first: {{detail}}",
       "no_endpoint": "It has no feed address yet. Check looks for one and proposes a config.",
       "unknown": "It can’t be approved yet: {{detail}}",
       "source": "Where it says so"
@@ -230,6 +235,36 @@
       "notJson": "That isn’t valid JSON.",
       "notObject": "The config is a JSON object.",
       "advanced": "Advanced: edit the config as JSON"
+    },
+    "tags": {
+      "kind": {
+        "tech": "Tech",
+        "data": "Data",
+        "design": "Design",
+        "product": "Product",
+        "marketing": "Marketing",
+        "sales": "Sales",
+        "finance": "Finance",
+        "legal": "Legal",
+        "people": "People and HR",
+        "operations": "Operations",
+        "support": "Customer support",
+        "health-care": "Health and care",
+        "education": "Education",
+        "hospitality-travel": "Hotels and travel",
+        "retail": "Retail",
+        "logistics": "Logistics",
+        "trades": "Trades",
+        "climate": "Climate",
+        "nonprofit": "Nonprofit",
+        "public-sector": "Public sector",
+        "media": "Media",
+        "science": "Science"
+      },
+      "remote": {
+        "remote": "Mostly remote",
+        "some-remote": "Some remote"
+      }
     }
   },
   "scanned": {

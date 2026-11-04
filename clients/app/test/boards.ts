@@ -44,6 +44,7 @@ export function board(overrides: Partial<BoardSummary> = {}): BoardSummary {
     last_fetch_at: "2026-10-26T21:00:00Z",
     last_fetch_jobs: 100,
     flags: [],
+    tags: [],
     totals_7d: { read: 412, matched: 9, cost_eur: 0.012 },
     totals_30d: { read: 1200, matched: 20, cost_eur: 0.04 },
     ...overrides,

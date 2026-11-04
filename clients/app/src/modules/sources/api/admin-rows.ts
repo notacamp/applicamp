@@ -1,4 +1,4 @@
-import { withFinder, type AdminCandidate, type AdminOverview, type BoardNeed } from "./admin";
+import type { AdminCandidate, type AdminOverview, type BoardNeed } from "./admin";
 import type { BoardSummary } from "./boards";
 
 /** Where a board stands, as the page words it. */
@@ -50,7 +50,7 @@ export function adminRows(boards: readonly BoardSummary[], overview: AdminOvervi
       need: candidate?.need ?? undefined,
       detail: candidate?.detail ?? undefined,
       askedAt: candidate?.asked_at ?? undefined,
-      tags: withFinder(board).tags ?? [],
+      tags: board.tags,
     };
   });
 }

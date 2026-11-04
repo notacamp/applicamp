@@ -44,3 +44,26 @@ export function hostOf(url: string | null | undefined): string | null {
 export function shortDate(iso: string, locale: string): string {
   return new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }).format(new Date(iso));
 }
+
+/** A day for a sentence ("4 November"); English reads day first. */
+export function formatDay(iso: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale === "en" ? "en-GB" : locale, {
+    day: "numeric",
+    month: "long",
+  }).format(new Date(iso));
+}
+
+/** A tag as the person reads it: the fixed ones translated, the rest capitalised. */
+export function tagText(
+  tag: string,
+  t: (key: string) => string,
+  known: (key: string) => boolean,
+): string {
+  for (const key of [`board.tags.kind.${tag}`, `board.tags.remote.${tag}`]) {
+    if (known(key)) {
+      return t(key);
+    }
+  }
+  const words = tag.replaceAll("-", " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}

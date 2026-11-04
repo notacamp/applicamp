@@ -954,7 +954,11 @@ mod tests {
                     line("l1", "Rebuilt billing in Rust for 12 teams", &["w0.h1"]),
                     line("l2", "Built ingestion for 3 partner feeds", &["w1.h1"]),
                     line("l3", long.trim(), &["w0.h1"]),
-                    line("l4", "Moved invoicing onto PostgreSQL in 3 weeks", &["w0.f11111111"]),
+                    line(
+                        "l4",
+                        "Moved invoicing onto PostgreSQL in 3 weeks",
+                        &["w0.f11111111"],
+                    ),
                 ],
             }],
             ..Content::default()

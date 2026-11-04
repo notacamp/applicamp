@@ -181,10 +181,10 @@
       }
     },
     "readLead": "Lee el anuncio y la web de la propia empresa (solo esa web, donde robots.txt lo permite) y crea los datos: una llamada a la IA, reutilizada durante 30 días. Después, otra compara la oferta con tu perfil.",
-    "read": "Leer sobre {{company}} · unos {{cost}}",
+    "read": "Leer sobre {{company}}",
     "reading": "Leyendo…",
     "readingLead": "Leyendo las páginas de {{company}} y comparando la oferta con tu perfil. Tarda unos segundos.",
-    "readAgain": "Leer otra vez · unos {{cost}}",
+    "readAgain": "Leer otra vez",
     "noFacts": "No se ha podido citar nada sobre {{company}} en sus páginas.",
     "facts": {
       "title": "Lo que dicen las páginas de {{company}}",
@@ -286,6 +286,7 @@
         "letter_approval": "Tu carta de presentación y tus respuestas están escritas y esperan tu revisión."
       },
       "steps": {
+        "shortlist": "añadió la oferta a tu lista el {{date}}",
         "site": "encontró la web ({{date}})",
         "read": "leyó la empresa ({{date}})",
         "compare": "comparó la oferta ({{date}})",
@@ -309,7 +310,8 @@
         "profile_needed": "Parado: añade primero un puesto a tu perfil.",
         "generic": "Algo salió mal al preparar esta oferta."
       }
-    }
+    },
+    "readCost": "Leer cuesta unos {{cost}}."
   },
   "cv": {
     "eyebrow": "CV a medida",
@@ -327,23 +329,25 @@
       "draftPill": "Borrador",
       "approvedPill": "Aprobado · v{{version}}",
       "language": "Escrito en {{language}}",
-      "makeAgain": "Rehacer · unos {{cost}}",
+      "makeAgain": "Escribir de nuevo",
       "making": "Redactando…",
       "approve": "Aprobar v{{version}}",
       "approving": "Aprobando…",
-      "approveWhy": "Aprobar se activa cuando todas las líneas bloqueadas están corregidas o eliminadas."
+      "approveWhy": "Aprobar se activa cuando todas las líneas bloqueadas están corregidas o eliminadas.",
+      "cost": "Escribirlo de nuevo cuesta unos {{cost}}."
     },
     "draft": {
-      "draft": "Redactar el CV · unos {{cost}}",
+      "draft": "Redactar el CV",
       "drafting": "Redactando…",
       "review": "Revisar el CV",
-      "hint": "Una llamada de IA. Después, cada línea se comprueba contra tu perfil, sin IA.",
+      "hint": "Hasta cuatro llamadas de IA: el borrador y las correcciones de la propia app. Después, cada línea se comprueba contra tu perfil, sin IA.",
       "blocked": {
         "stage_too_early": "Preselecciona antes esta oferta: el CV se hace para las ofertas que persigues.",
         "per_opportunity_cap": "Ya has hecho 10 borradores para esta oferta. Revisa uno de ellos.",
         "daily_cap": "Ya has hecho 20 borradores hoy. Puedes seguir mañana.",
         "ai_unavailable": "La IA no está configurada en este servidor, así que no se puede redactar nada."
-      }
+      },
+      "cost": "Redactar el CV cuesta unos {{cost}}."
     },
     "sheet": {
       "label": "Tu CV a medida",
@@ -352,7 +356,9 @@
       "skills": "Habilidades",
       "education": "Formación",
       "languages": "Idiomas",
-      "now": "actual"
+      "now": "actual",
+      "earlier": "Experiencia anterior",
+      "earlierRemove": "Quitar del CV"
     },
     "marks": {
       "as_in_profile": "Como en el perfil",
@@ -467,10 +473,11 @@
       "cannot_keep": "Esta línea trata de la empresa, no de ti. Cámbiala o quítala.",
       "not_flagged": "Esta línea ya coincide con tu perfil.",
       "too_late": "Ya es tarde para deshacerlo. Vuelve a hacer el CV para cambiarlo.",
+      "company_reads_daily_cap": "Puedes leer 20 empresas al día. La lectura sigue mañana.",
       "cv_previews_daily_cap": "Has hecho 30 PDF de borradores hoy. Sigue mañana; cambiar una línea vuelve a hacer el PDF igualmente."
     },
     "layout": {
-      "template": "Plantilla",
+      "template": "Estilo",
       "templates": {
         "clean": "Limpia",
         "compact": "Compacta"
@@ -479,12 +486,14 @@
       "pages_one": "{{count}} página",
       "pages_other": "{{count}} páginas",
       "language": "Idioma",
-      "note": "La plantilla y la extensión hacen un PDF con el mismo texto aprobado, sin IA. Otro idioma es un borrador nuevo: una llamada a la IA y una revisión. Usa «Rehacer».",
+      "note": "El estilo y la longitud rehacen el PDF, sin IA. Para otro idioma, elígelo y pulsa Escribir de nuevo.",
       "confirmTitle": "¿Hacer una versión nueva?",
       "confirmBody": "Esto deja la v{{version}} como está y hace la v{{next}} con el mismo texto aprobado, con la plantilla {{template}} en {{pages}}. No se usa IA.",
       "confirm": "Hacer la v{{next}}",
       "cancel": "Cancelar",
-      "making": "Haciendo el PDF…"
+      "making": "Haciendo el PDF…",
+      "languageNext": "Pulsa Escribir de nuevo para tenerlo en {{language}}.",
+      "title": "Formato · idioma"
     },
     "pdf": {
       "open": "Abrir el PDF",
@@ -527,8 +536,11 @@
       "making": "Haciendo el PDF…",
       "note": "Algunas palabras pueden no salir bien cuando un portal de empleo lea este PDF.",
       "doesntFit": "El CV no cabe en 2 páginas. Quita algunas líneas.",
-      "unavailable": "No se ha podido hacer el PDF ahora. Cambia una línea o elige un formato para intentarlo de nuevo.",
+      "unavailable": "No se ha podido hacer el PDF para {{company}}. El texto del CV está guardado.",
       "lines": "Cada línea y de dónde viene",
+      "retry": "Intentarlo de nuevo",
+      "downloadText": "Descargar el texto",
+      "textFile": "CV - {{company}}.txt",
       "stale": "El PDF es anterior a tu último cambio.",
       "make": "Hacer el PDF",
       "none": "Este borrador aún no tiene PDF."
@@ -552,6 +564,7 @@
       "answer_one": "Responde a la pregunta para aprobar.",
       "answer_other": "Responde a las {{count}} preguntas para aprobar.",
       "toldUs": "Nos contaste sobre {{company}}: «{{quote}}».",
+      "profileSays": "Tu perfil dice sobre {{company}}: «{{quote}}».",
       "keeps": "Si lo mantienes, esto se guarda en tu perfil: «{{proposal}}»",
       "cannotKeepOther": "Esta línea trata de otro trabajo de tu perfil. Cámbiala o quítala.",
       "cannotKeepLong": "Esta línea es demasiado larga para guardarla así en tu perfil. Acórtala o quítala."
@@ -565,7 +578,52 @@
       "approved": "Aprobado",
       "undo": "Deshacer",
       "undoing": "Deshaciendo…",
-      "next": "Ahora escribimos tu carta de presentación, unos {{cost}}. Deshacer lo detiene."
+      "next": "Ahora escribimos tu carta de presentación, unos {{cost}}. Deshacer lo detiene.",
+      "started": "Aprobado. Tu carta de presentación se está escribiendo ahora."
+    },
+    "wants": {
+      "title": "Lo que pide la oferta",
+      "nice": "deseable",
+      "notInProfile": "no está en tu perfil",
+      "notOnCv": "no está en este CV",
+      "covered": "Está en tu CV",
+      "notCovered": "No está en tu CV"
+    },
+    "done": {
+      "title": "Hecho por la app · {{cost}}",
+      "row": "{{step}} · {{cost}}",
+      "doneLabel": "Hecho",
+      "steps": {
+        "shortlist": "Añadió esta oferta a tu lista",
+        "site": "Encontró la web de la empresa",
+        "read": "Leyó la web de la empresa",
+        "compare": "Comparó la oferta con tu perfil",
+        "draft": "Escribió el CV",
+        "checked": "Comprobó cada línea con tu perfil",
+        "pdf": "Hizo el PDF"
+      }
+    },
+    "fixed": {
+      "title_one": "Corregido por la app · {{count}} línea",
+      "title_other": "Corregido por la app · {{count}} líneas",
+      "now": "«{{text}}»",
+      "was": "Decía: «{{text}}»"
+    },
+    "site": {
+      "robots": "La web pide a las apps que no la lean. El CV se escribió solo con la oferta y tu perfil.",
+      "unread": "No se ha podido leer la web de la empresa. El CV se escribió solo con la oferta y tu perfil.",
+      "paste": "Pegar lo que dice la web",
+      "cost": "Leerlo cuesta unos {{cost}}.",
+      "dialogTitle": "Pega lo que dice la web de la empresa",
+      "hint": "Copia el texto de las páginas de la propia empresa. Los datos se sacan solo de estas palabras.",
+      "label": "Las palabras de la web",
+      "read": "Leer este texto",
+      "reading": "Leyendo…",
+      "cancel": "Cancelar",
+      "done": "Leído. Escríbelo de nuevo para usar lo que dice la web."
+    },
+    "writing": {
+      "title": "Escribiendo tu CV para {{company}}. Suele tardar menos de un minuto. Aparece en Hoy cuando esté listo."
     }
   },
   "cvs": {
@@ -634,7 +692,7 @@
       "body": "Tu CV está aprobado. Escribe la carta que lo acompaña, con el mismo perfil y los mismos datos."
     },
     "slot": {
-      "write": "Escribir la carta de presentación · unos {{cost}}",
+      "write": "Escribir la carta de presentación",
       "writing": "Escribiendo…",
       "review": "Revisar la carta de presentación",
       "hint": "Una llamada de IA. Después, cada frase se comprueba contra tu perfil, sin IA.",
@@ -644,7 +702,8 @@
         "per_opportunity_cap": "Ya has escrito 10 borradores de carta para esta oferta. Revisa uno de ellos.",
         "daily_cap": "Ya has escrito 20 borradores de carta hoy. Puedes seguir mañana.",
         "ai_unavailable": "La IA no está configurada en este servidor, así que no se puede escribir nada."
-      }
+      },
+      "cost": "Escribirla cuesta unos {{cost}}."
     },
     "toolbar": {
       "draft": "Borrador {{n}}",
@@ -658,11 +717,12 @@
         "standard": "Normal · unas 300"
       },
       "note": "Otra extensión u otro idioma es un borrador nuevo: Rehacer.",
-      "makeAgain": "Rehacer · unos {{cost}}",
+      "makeAgain": "Escribir de nuevo",
       "making": "Escribiendo…",
       "approve": "Aprobar",
       "approving": "Aprobando…",
-      "approveWhy": "Aprobar se activa cuando todas las frases y preguntas bloqueadas están corregidas, eliminadas o respondidas."
+      "approveWhy": "Aprobar se activa cuando todas las frases y preguntas bloqueadas están corregidas, eliminadas o respondidas.",
+      "cost": "Escribirla de nuevo cuesta unos {{cost}}."
     },
     "sheet": {
       "label": "Tu carta de presentación"

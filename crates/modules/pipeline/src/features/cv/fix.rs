@@ -23,7 +23,7 @@
 //! person. No fact reaches the profile here: only the person's "Yes, keep
 //! it" does that.
 
-use applicamp_ai::Gateway;
+use applicamp_ai::{Gateway, Role};
 use applicamp_kernel::claims::{Evidence, classified};
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
@@ -38,7 +38,7 @@ use super::{
 use crate::features::brief::{self, Attempt};
 
 /// The most tokens the answer may take.
-const MAX_TOKENS: u32 = 3_000;
+pub(super) const MAX_TOKENS: u32 = 3_000;
 /// Longest question and fact kept, in characters.
 const MAX_QUESTION: usize = 200;
 pub(super) const MAX_PROPOSAL: usize = 300;
@@ -193,7 +193,7 @@ fn flagged<'a>(content: &'a Content, frame: &Frame, checks: &'a Checks) -> Vec<F
 /// Clear what it can of `content`'s flags with **one model call** (none when
 /// no line is flagged), and leave a question on the rest. Never fails the
 /// draft: a call that cannot be made or answers nothing usable leaves it as
-/// it was.
+/// it was. Also says what the call cost, in US dollars.
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn fix(
     gateway: &Gateway,
@@ -205,15 +205,16 @@ pub(super) async fn fix(
     known: &Known,
     checks: &Checks,
     language: &str,
-) -> Fixed {
+) -> (Fixed, f64) {
     let lines = flagged(content, frame, checks);
     if lines.is_empty() {
-        return Fixed::default();
+        return (Fixed::default(), 0.0);
     }
     let count = lines.len();
     let user = fix_prompt::message(&lines, frame, language);
-    let answers = match brief::ask_attempt::<RawFixes>(
+    let (answers, cost) = match brief::ask_attempt_as::<RawFixes>(
         gateway,
+        Role::Complete,
         db,
         account,
         now,
@@ -225,15 +226,23 @@ pub(super) async fn fix(
     )
     .await
     {
-        Ok(Attempt::Done(answers)) => answers,
-        Ok(Attempt::Retry(error)) | Err(error) => {
+        Ok((Attempt::Done(answers), cost)) => (answers, cost),
+        Ok((Attempt::Retry(error), cost)) => {
             // Codes only: the lines are the person's.
             tracing::warn!(
                 error = error.code(),
                 flagged = count,
                 "the app could not fix a CV's flags"
             );
-            return Fixed::default();
+            return (Fixed::default(), cost);
+        }
+        Err(error) => {
+            tracing::warn!(
+                error = error.code(),
+                flagged = count,
+                "the app could not fix a CV's flags"
+            );
+            return (Fixed::default(), 0.0);
         }
     };
     let fixed = apply(content, frame, known, checks, answers);
@@ -244,7 +253,7 @@ pub(super) async fn fix(
         asked = fixed.asked,
         "a CV's flags fixed by the app"
     );
-    fixed
+    (fixed, cost)
 }
 
 #[cfg(test)]

@@ -227,6 +227,23 @@ pub struct CvLanguage {
     pub fluency: Option<String>,
 }
 
+/// A project of the person's.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CvProject {
+    pub name: String,
+    pub description: Option<String>,
+    pub start_date: Option<String>,
+    pub end_date: Option<String>,
+}
+
+/// A certificate the person holds.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CvCertificate {
+    pub name: String,
+    pub issuer: Option<String>,
+    pub date: Option<String>,
+}
+
 /// The whole profile as a tailored CV is made from it: the contact apart
 /// from the rest, so the part the model is shown can never hold it.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -240,6 +257,13 @@ pub struct CvProfile {
     pub skills: Vec<String>,
     pub education: Vec<CvEducation>,
     pub languages: Vec<CvLanguage>,
+    /// Where the person comes from, in their words (`basics.background`).
+    pub background: Option<String>,
+    pub projects: Vec<CvProject>,
+    pub certificates: Vec<CvCertificate>,
+    /// The languages they work in (their goals' BCP 47 tags), the first the
+    /// one a CV is written in unless they ask for another.
+    pub work_languages: Vec<String>,
     /// The most recent position (its `index`).
     pub latest: Option<usize>,
 }
@@ -336,6 +360,14 @@ pub trait Neighbours: Send + Sync + 'static {
         db: &'a PgPool,
         account: Uuid,
     ) -> BoxFuture<'a, Result<Option<CvProfile>>>;
+
+    /// The languages `account` works in (their goals, as language tags), in
+    /// their order: what a CV's language choice offers first.
+    fn work_languages<'a>(
+        &'a self,
+        db: &'a PgPool,
+        account: Uuid,
+    ) -> BoxFuture<'a, Result<Vec<String>>>;
 
     /// Keep `text`, in the person's own words, as a fact on position
     /// `position` (which must still be `title` at `company`: else 409

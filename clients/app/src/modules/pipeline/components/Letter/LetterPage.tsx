@@ -243,11 +243,7 @@ function Review({
               again.mutate();
             }}
           >
-            {again.isPending
-              ? t("letter.toolbar.making")
-              : t("letter.toolbar.makeAgain", {
-                  cost: formatCost(letter.draft_eur, i18n.language),
-                })}
+            {again.isPending ? t("letter.toolbar.making") : t("letter.toolbar.makeAgain")}
           </Button>
           {editable ? (
             <Button
@@ -264,6 +260,11 @@ function Review({
             </Button>
           ) : null}
         </Cluster>
+      </Tagged>
+      <Tagged testId="letter-make-again-cost">
+        <Text tone="secondary" size="sm">
+          {t("letter.toolbar.cost", { cost: formatCost(letter.draft_eur, i18n.language) })}
+        </Text>
       </Tagged>
       <Tagged testId="letter-controls">
         <Cluster>

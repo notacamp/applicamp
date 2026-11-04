@@ -756,6 +756,11 @@ async function complete(request: IncomingMessage, response: ServerResponse) {
       json(response, 200, completion(cvFixes(user?.content ?? "")));
       return;
     }
+    if (system.startsWith("You add bullets to a CV")) {
+      // What the job wants that the profile shows: nothing more to add here.
+      json(response, 200, completion({ bullets: [] }));
+      return;
+    }
     if (system.startsWith("You write a cover letter")) {
       json(response, 200, completion(coverLetter(user?.content ?? "")));
       return;

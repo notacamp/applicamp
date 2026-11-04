@@ -97,3 +97,20 @@
   --mark-bg: var(--text-primary);
   --mark-fg: var(--surface-base);
 }
+
+/* Buttons big enough to tap: 36 px on a desktop, 44 px on a phone. */
+:root,
+[data-theme],
+[data-accent],
+[data-density] {
+  --btn-height: 36px;
+}
+
+@media (width < 48rem) {
+  :root,
+  [data-theme],
+  [data-accent],
+  [data-density] {
+    --btn-height: var(--size-hit);
+  }
+}

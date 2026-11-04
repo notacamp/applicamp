@@ -170,6 +170,18 @@ impl Neighbours for Fake {
         Box::pin(async move { Ok(profile) })
     }
 
+    fn work_languages<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        _account: Uuid,
+    ) -> BoxFuture<'a, Result<Vec<String>>> {
+        let languages = lock(&self.cv_profile)
+            .as_ref()
+            .map(|p| p.work_languages.clone())
+            .unwrap_or_default();
+        Box::pin(async move { Ok(languages) })
+    }
+
     fn keep_fact<'a>(
         &'a self,
         _state: &'a AppState,
@@ -368,6 +380,8 @@ struct Routed {
     letter: Mutex<Value>,
     /// The CV fix prompt's answer, from the lines it is shown.
     fix: Mutex<Option<Fixer>>,
+    /// The answer to the second look at what the job wants.
+    adds: Mutex<Value>,
 }
 
 /// What the fake model answers the CV fix prompt with, from its user message.
@@ -384,6 +398,8 @@ impl wiremock::Respond for Routed {
             lock(&self.fix)
                 .as_ref()
                 .map_or(Value::Null, |fixer| fixer(user))
+        } else if system.starts_with(crate::features::cv::wants::PREFIX) {
+            lock(&self.adds).clone()
         } else if system.starts_with(crate::features::cv::prompt::PREFIX) {
             lock(&self.cv).clone()
         } else if system.starts_with(crate::features::cv::letter::prompt::PREFIX) {
@@ -400,6 +416,10 @@ impl wiremock::Respond for Routed {
             "usage": { "prompt_tokens": 900, "completion_tokens": 300 },
         }))
     }
+}
+
+fn json_null() -> Value {
+    Value::Null
 }
 
 impl Model {
@@ -434,6 +454,19 @@ impl Model {
         letter: Value,
         fix: Option<Fixer>,
     ) -> Self {
+        Self::with_adds(facts, analysis, cv, letter, fix, json_null()).await
+    }
+
+    /// A model that also answers the second look at what the job wants with
+    /// `adds`.
+    pub(crate) async fn with_adds(
+        facts: Value,
+        analysis: Value,
+        cv: Value,
+        letter: Value,
+        fix: Option<Fixer>,
+        adds: Value,
+    ) -> Self {
         // Its own server, not one from wiremock's pool, which is shared across the
         // tests' runtimes: the calls counted are this test's alone.
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -449,6 +482,7 @@ impl Model {
                 cv: Mutex::new(cv),
                 letter: Mutex::new(letter),
                 fix: Mutex::new(fix),
+                adds: Mutex::new(adds),
             })
             .mount(&server)
             .await;

@@ -1818,7 +1818,7 @@
           "pipeline"
         ],
         "summary": "The pipeline.",
-        "description": "Every opportunity of the signed-in person, newest first, except the\ndismissed ones (\"Not for me\") and the hidden ones (they fail a hard\nrequirement; `hidden=true` lists only those, with the reason). Filter by\nstage, by text in the role, company or place, or to the new ones.",
+        "description": "Every opportunity of the signed-in person, newest first, except the\ndismissed ones (\"Not for me\") and the hidden ones (they fail a hard\nrequirement; `hidden=true` lists only those, with the reason). Filter by\nstage, by text in the role, company or place, to the new ones, or to the\nones proposed to the person (`proposed=true`, best match first).",
         "operationId": "pipeline.list",
         "parameters": [
           {
@@ -1852,6 +1852,15 @@
             "name": "hidden",
             "in": "query",
             "description": "Only the hidden ones: found before the requirement rules, they fail\none. Left out otherwise.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "proposed",
+            "in": "query",
+            "description": "Only the ones proposed to the person (Found, a match of 75 or more,\nopen to them), best match first.",
             "required": false,
             "schema": {
               "type": "boolean"
@@ -2306,6 +2315,105 @@
           },
           "404": {
             "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/brief/paste": {
+      "post": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Read what the person pasted from the company's site.",
+        "description": "When the site cannot be read (it asks apps not to, or does not answer),\nthe person can paste what it says. The text is read like one of the\nsite's pages (**one model call**): each fact must quote it, or it is left\nout; it replaces the company's facts as a read does. It counts toward the\n20 company reads a day. The text is data, never instructions. A CV made\nbefore does not change: Write it again uses the facts.",
+        "operationId": "pipeline.brief_paste",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The brief, with the facts of the pasted text.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Brief"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_text`; `company_unknown`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`company_reads_daily_cap`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed`",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2868,7 +2976,7 @@
           "pipeline"
         ],
         "summary": "Draft a CV for this job.",
-        "description": "**One model call.** From the posting, what the job wants, the company\nfacts not removed and the profile; each line cites the profile sources it\ncomes from, and the server then checks that it says nothing they do not.\nThe model never sees a name or contact details. Needs the opportunity at\nShortlisted or later. When the job was never compared, the company is read\nand the job compared first (up to two more calls, as Read does), so the\ndraft knows what the job wants; a company that cannot be read does not stop\nthe draft. At most 10 drafts per opportunity and 20 per account per UTC\nday; nothing retries past a limit. A new draft puts the earlier unapproved\none away.",
+        "description": "**Up to four model calls**: the draft on the `write` role (again with more\nroom only when its answer is cut off), the second look at what the job\nwants, and the app's fix of what the check flags. From the posting, what\nthe job wants, the company\nfacts not removed and the profile; each line cites the profile sources it\ncomes from, and the server then checks that it says nothing they do not.\nThe model never sees a name or contact details. Needs the opportunity at\nShortlisted or later. When the job was never compared, the company is read\nand the job compared first (up to two more calls, as Read does), so the\ndraft knows what the job wants; a company that cannot be read does not stop\nthe draft. At most 10 drafts per opportunity and 20 per account per UTC\nday; nothing retries past a limit. A new draft puts the earlier unapproved\none away.",
         "operationId": "pipeline.cv_draft",
         "parameters": [
           {
@@ -3146,6 +3254,106 @@
           },
           "409": {
             "description": "`draft_frozen`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/cv/drafts/{n}/hide-position": {
+      "post": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Take a position off \"Earlier\".",
+        "description": "The position is no longer named under \"Earlier\", in the PDF or on the\npage. It stays among what the CV left out, and putting it back shows it\nagain. The preview is made again. No model call. Only a draft can change.",
+        "operationId": "pipeline.cv_hide_position",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "n",
+            "in": "path",
+            "description": "The draft.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HidePositionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The CV, without that position.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cv"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_request`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such draft or position",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`draft_frozen`; `already_on_cv`",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -10347,7 +10555,11 @@
           "versions",
           "can_draft",
           "caps",
-          "draft_eur"
+          "draft_eur",
+          "done",
+          "read_eur",
+          "writing",
+          "work_languages"
         ],
         "properties": {
           "can_draft": {
@@ -10355,6 +10567,20 @@
           },
           "caps": {
             "$ref": "#/components/schemas/CvCaps"
+          },
+          "company_read_failure": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the company's site could not be read, when it could not:\n`robots_disallows`, `no_pages_readable` or `site_unreachable`. The\nperson can paste what it says (`…/brief/paste`)."
+          },
+          "done": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CvDoneStep"
+            },
+            "description": "What the app did by itself for this CV, in order: the job's\npreparation (when it prepared it) and the draft."
           },
           "draft": {
             "oneOf": [
@@ -10387,12 +10613,35 @@
             "type": "string",
             "format": "uuid"
           },
+          "read_eur": {
+            "type": "number",
+            "format": "double",
+            "description": "About what reading pasted text costs, in euros."
+          },
+          "suggested_language": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The posting's language, when the CV is in another: offered, never\nchosen for the person."
+          },
           "versions": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CvVersion"
             },
             "description": "The PDF versions, newest first."
+          },
+          "work_languages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The languages the person works in (their goals), in their order: what\nthe CV's language choice offers first."
+          },
+          "writing": {
+            "type": "boolean",
+            "description": "The app is getting this CV ready by itself right now (reading the\ncompany or writing the draft): the page waits for it."
           }
         }
       },
@@ -10462,6 +10711,30 @@
           "letter"
         ]
       },
+      "CvDoneStep": {
+        "type": "object",
+        "description": "A step the app did by itself for this job, with what it cost.",
+        "required": [
+          "step",
+          "eur",
+          "at"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "eur": {
+            "type": "number",
+            "format": "double",
+            "description": "About what it cost, in euros."
+          },
+          "step": {
+            "type": "string",
+            "description": "`shortlist`, `site`, `read`, `compare` or `draft`."
+          }
+        }
+      },
       "CvDraftRequest": {
         "type": "object",
         "description": "What to make a draft of.",
@@ -10471,7 +10744,7 @@
               "string",
               "null"
             ],
-            "description": "A language tag such as `pt-PT`; the posting's when it says, else\nEnglish."
+            "description": "A language tag such as `pt-PT`; when left out, the first language the\nperson works in (their goals), else one their profile says they speak\nwell enough, else English. The posting's is only offered."
           }
         },
         "additionalProperties": false
@@ -10490,13 +10763,16 @@
           "education",
           "languages",
           "left_out",
+          "earlier",
           "flagged",
           "can_approve",
           "keywords",
           "changes",
           "fixed_by_app",
           "waiting",
-          "needs_version"
+          "needs_version",
+          "wants",
+          "company_facts"
         ],
         "properties": {
           "approved_at": {
@@ -10513,12 +10789,33 @@
           "changes": {
             "$ref": "#/components/schemas/Changes"
           },
+          "company_facts": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The company facts the draft could use: none means it was written\nfrom the posting and the profile only.",
+            "minimum": 0
+          },
           "contact": {
             "$ref": "#/components/schemas/ContactView"
+          },
+          "cost_eur": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "What the app's calls for this draft cost, in euros (the draft, the\nsecond look at what the job wants, the fix of what was flagged)."
           },
           "created_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "earlier": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EarlierLine"
+            },
+            "description": "The positions named under \"Earlier\", newest first, as in the PDF:\nevery one left out that has a title or a company and that the person\ndid not take off."
           },
           "education": {
             "type": "array",
@@ -10648,6 +10945,13 @@
               "$ref": "#/components/schemas/Waiting"
             },
             "description": "What waits on the person, in the order the page shows it."
+          },
+          "wants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WantView"
+            },
+            "description": "What the job wants, each covered by the CV or why not."
           }
         }
       },
@@ -10973,6 +11277,26 @@
           "approved",
           "discarded"
         ]
+      },
+      "EarlierLine": {
+        "type": "object",
+        "description": "A position the CV names only, under \"Earlier\", as the PDF prints it.",
+        "required": [
+          "position",
+          "text"
+        ],
+        "properties": {
+          "position": {
+            "type": "integer",
+            "format": "int32",
+            "description": "For `…/hide-position` and `…/put-back`.",
+            "minimum": 0
+          },
+          "text": {
+            "type": "string",
+            "description": "\"Title, Company (2015–2017)\"."
+          }
+        }
       },
       "Education": {
         "type": "object",
@@ -11714,6 +12038,22 @@
           "below_floor"
         ]
       },
+      "HidePositionRequest": {
+        "type": "object",
+        "description": "A position to take off the CV.",
+        "required": [
+          "position"
+        ],
+        "properties": {
+          "position": {
+            "type": "integer",
+            "format": "int32",
+            "description": "A position the CV names under \"Earlier\" (its place in the profile's\n`work`).",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
       "Import": {
         "type": "object",
         "description": "A draft profile waiting for review.",
@@ -12345,7 +12685,7 @@
               "string",
               "null"
             ],
-            "description": "A language tag such as `pt-PT`; the posting's when it says, else\nEnglish."
+            "description": "A language tag such as `pt-PT`; when left out, the approved CV's."
           },
           "size": {
             "oneOf": [
@@ -13369,7 +13709,8 @@
           "gaps",
           "reasons_updated",
           "dismissed",
-          "editable"
+          "editable",
+          "proposed"
         ],
         "properties": {
           "apply_url": {
@@ -13483,6 +13824,10 @@
             "format": "date-time",
             "description": "When the posting was published."
           },
+          "proposed": {
+            "type": "boolean",
+            "description": "Proposed to the person: Found, a match of 75 or more, open to them."
+          },
           "reasons_updated": {
             "type": "boolean",
             "description": "Some of its reasons were stripped: they claimed things the profile never says."
@@ -13493,6 +13838,17 @@
               "null"
             ],
             "description": "Pay, as the posting says."
+          },
+          "shortlisted_by": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ShortlistedBy",
+                "description": "Who shortlisted it, once someone did."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "source": {
             "type": "string",
@@ -13683,7 +14039,8 @@
           "stage",
           "new",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "proposed"
         ],
         "properties": {
           "company": {
@@ -13734,6 +14091,10 @@
               "null"
             ]
           },
+          "proposed": {
+            "type": "boolean",
+            "description": "Proposed to the person: Found, a match of 75 or more, open to them."
+          },
           "region_note": {
             "type": [
               "string",
@@ -13747,6 +14108,17 @@
               "null"
             ],
             "description": "Pay, as the posting says."
+          },
+          "shortlisted_by": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ShortlistedBy",
+                "description": "Who shortlisted it, once someone did."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "source": {
             "type": "string",
@@ -13800,6 +14172,20 @@
           "failed",
           "cancelled"
         ]
+      },
+      "PasteRequest": {
+        "type": "object",
+        "description": "What the company's site says, pasted by the person.",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The site's words, 1 to 20,000 characters."
+          }
+        },
+        "additionalProperties": false
       },
       "PdfChecks": {
         "type": "object",
@@ -14289,6 +14675,14 @@
           "answered",
           "skipped",
           "dont_have"
+        ]
+      },
+      "QuoteFrom": {
+        "type": "string",
+        "description": "Where the quote of a waiting line comes from.",
+        "enum": [
+          "you",
+          "profile"
         ]
       },
       "RankingBasis": {
@@ -15492,6 +15886,14 @@
           }
         }
       },
+      "ShortlistedBy": {
+        "type": "string",
+        "description": "Who shortlisted an opportunity.",
+        "enum": [
+          "person",
+          "app"
+        ]
+      },
       "SiteOrigin": {
         "type": "string",
         "description": "Where the company's site came from.",
@@ -15638,7 +16040,10 @@
           "company",
           "skills",
           "education",
-          "languages"
+          "languages",
+          "background",
+          "project",
+          "certificate"
         ]
       },
       "SourceView": {
@@ -16173,6 +16578,17 @@
             ],
             "description": "The person's own words the line was made from, as the profile has\nthem on that position: what \"Change it\" starts from. None when it\ncites none."
           },
+          "quote_from": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/QuoteFrom",
+                "description": "Whether the quote is something the person told the app or their\nprofile's words. None when there is no quote."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "role": {
             "type": [
               "string",
@@ -16203,6 +16619,42 @@
           "cv_approval",
           "letter_approval"
         ]
+      },
+      "WantReason": {
+        "type": "string",
+        "description": "Why a want is or is not on the CV.",
+        "enum": [
+          "on_cv",
+          "in_profile",
+          "not_in_profile"
+        ]
+      },
+      "WantView": {
+        "type": "object",
+        "description": "What the job wants, against the CV.",
+        "required": [
+          "text",
+          "level",
+          "covered",
+          "reason"
+        ],
+        "properties": {
+          "covered": {
+            "type": "boolean",
+            "description": "The CV says it."
+          },
+          "level": {
+            "type": "string",
+            "description": "`must` or `nice`."
+          },
+          "reason": {
+            "$ref": "#/components/schemas/WantReason"
+          },
+          "text": {
+            "type": "string",
+            "description": "What it wants, in short."
+          }
+        }
       },
       "WatchBoardKind": {
         "type": "string",

@@ -762,6 +762,7 @@ pub struct AdminListQuery {
     /// Matches a name, a site's host or a tag, ignoring case.
     pub q: Option<String>,
     /// What to show; every board when left out.
+    #[param(inline)]
     pub show: Option<Show>,
     /// The page after this one (`next_cursor`).
     pub cursor: Option<String>,

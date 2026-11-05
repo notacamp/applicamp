@@ -32,8 +32,8 @@ function linkIn(page: Page, testId: string, href?: string): Promise<Link | null>
     ({ testId, href }) => {
       const link = document.querySelector(
         href === undefined
-          ? `[data-testid="${testId}"] a`
-          : `[data-testid="${testId}"] a[href="${href}"]`,
+          ? `[data-testid="${CSS.escape(testId)}"] a`
+          : `[data-testid="${CSS.escape(testId)}"] a[href="${CSS.escape(href)}"]`,
       );
       if (!(link instanceof HTMLElement) || link.getClientRects().length === 0) {
         return null;
@@ -43,7 +43,7 @@ function linkIn(page: Page, testId: string, href?: string): Promise<Link | null>
         x: box.x + box.width / 2,
         y: box.y + box.height / 2,
         height: box.height,
-        label: link.textContent?.trim() ?? "",
+        label: link.textContent.trim(),
         current: link.getAttribute("aria-current") === "page",
       };
     },
@@ -54,7 +54,8 @@ function linkIn(page: Page, testId: string, href?: string): Promise<Link | null>
 /** The h1 of the page with this test id. */
 const heading = (page: Page, testId: string) =>
   page.evaluate(
-    (testId) => document.querySelector(`[data-testid="${testId}"] h1`)?.textContent?.trim() ?? "",
+    (testId) =>
+      document.querySelector(`[data-testid="${CSS.escape(testId)}"] h1`)?.textContent.trim() ?? "",
     testId,
   );
 
@@ -80,14 +81,9 @@ test("Three places: Today, Jobs and You, no key hinted, the design system's own 
   // The look: the package's fonts, and its accent, not a blue of the app's own.
   await expect
     .poll(() =>
-      page.evaluate(async () => {
-        await document.fonts.ready;
-        let loaded = false;
-        document.fonts.forEach((face) => {
-          loaded ||= face.family.includes("Funnel Sans") && face.status === "loaded";
-        });
-        return loaded;
-      }),
+      page.evaluate(
+        async () => (await document.fonts.load('1em "Funnel Sans Variable"')).length > 0,
+      ),
     )
     .toBe(true);
   expect(await page.evaluate(() => getComputedStyle(document.body).fontFamily)).toContain(
@@ -102,13 +98,11 @@ test("Three places: Today, Jobs and You, no key hinted, the design system's own 
   // Three places, in this order, and nothing else; no key hinted anywhere.
   if (phone) {
     expect(
-      await page.evaluate(() => {
-        const labels: string[] = [];
-        document.querySelectorAll('[data-testid="tab-bar"] a').forEach((tab) => {
-          labels.push(tab.textContent?.trim() ?? "");
-        });
-        return labels;
-      }),
+      await page.evaluate(() =>
+        Array.from(document.querySelectorAll('[data-testid="tab-bar"] a'), (tab) =>
+          tab.textContent.trim(),
+        ),
+      ),
     ).toEqual(["Today", "Jobs", "You"]);
     expect(await linkIn(page, "nav-today")).toBeNull();
   } else {

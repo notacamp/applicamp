@@ -222,9 +222,13 @@ describe("The Searches tab", () => {
         matched,
       }),
     );
+    const { funnel } = run();
+    if (funnel === null || funnel === undefined) {
+      throw new Error("a search has a funnel");
+    }
     const search = run({
       lines: [line({ matched: 4 }), ...pages],
-      funnel: { ...lastNight().funnel!, good_matches: 14 },
+      funnel: { ...funnel, good_matches: 14 },
     });
     renderSearches([search]);
     const from = await screen.findByTestId("scanned-from");

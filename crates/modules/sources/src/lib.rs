@@ -27,6 +27,11 @@
 //!   names a company page, registered with no request, and a daily check
 //!   approves it after one sample read when its system is approved and it
 //!   posted lately. Searches do not read them yet (a job store comes first).
+//! - **The Workable list** ([`features::workable_list`], #88): once a day
+//!   Workable's documented list of every company's jobs is streamed (never
+//!   held), and each company with a job posted in the last 60 days becomes a
+//!   Workable company page of the registry, approved by the app with its
+//!   system. No model; the jobs themselves are not kept.
 //! - **The search** ([`features::search`]): the same job seen on several
 //!   boards merged into one ([`dedupe`]), crediting each; the goals' hard
 //!   limits on the boards' structured fields (a board's regions too:
@@ -192,7 +197,7 @@ impl SourcesDeps {
 pub fn module(deps: SourcesDeps) -> Module {
     use features::{
         board_requests as requests, boards as board, company_pages, discovery, recheck, reground,
-        search, watch,
+        search, watch, workable_list,
     };
     let router = OpenApiRouter::new()
         .routes(routes!(search::start))
@@ -234,6 +239,8 @@ pub fn module(deps: SourcesDeps) -> Module {
             .job_with::<company_pages::CheckPages, _>(deps.clone())
             .job_with::<company_pages::CheckPagesSoon, _>(deps.clone())
             .job_with::<company_pages::web_search::WebSearch, _>(deps.clone())
+            .job_with::<workable_list::ReadList, _>(deps.clone())
+            .job_with::<workable_list::ReadListSoon, _>(deps.clone())
             .job_with::<watch::FindBoard, _>(deps)
             .publishes::<events::SearchFinished>(),
         kinds: Vec::new(),
@@ -264,6 +271,9 @@ pub async fn start(db: &PgPool, deps: &SourcesDeps) -> Result<(), String> {
     let web_search = features::company_pages::web_search::schedule(db, deps)
         .await
         .map_err(|e| e.to_string())?;
+    let workable_list = features::workable_list::schedule(db, deps)
+        .await
+        .map_err(|e| e.to_string())?;
     let discovery = features::discovery::schedule(db, deps)
         .await
         .map_err(|e| e.to_string())?;
@@ -290,6 +300,7 @@ pub async fn start(db: &PgPool, deps: &SourcesDeps) -> Result<(), String> {
         company_pages_added,
         page_checks,
         web_search,
+        workable_list,
         company_boards = deps.config.company_boards(),
         discovery,
         seeded_checks,
@@ -329,7 +340,9 @@ mod tests {
                 "sources.recheck_requirements",
                 "sources.reground_reasons",
                 "sources.search",
-                "sources.web_search_pages"
+                "sources.web_search_pages",
+                "sources.workable_list",
+                "sources.workable_list_soon"
             ]
         );
     }

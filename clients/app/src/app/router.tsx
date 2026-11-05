@@ -222,13 +222,16 @@ const cvsRoute = createRoute({
   },
 });
 
-/** `?tab=scanned` shows what each search scanned; anything else, the boards. */
-const boardsSearch = z.object({ tab: z.literal("scanned") });
+/**
+ * `?tab=scanned` shows what each search scanned, `?tab=list` the boards by status; none, the
+ * owners' page (the list, for everyone else).
+ */
+const boardsSearch = z.object({ tab: z.enum(["scanned", "list"]) });
 
 const boardsRoute = createRoute({
   getParentRoute: () => frameRoute,
   path: "/boards",
-  validateSearch: (search: Record<string, unknown>): { tab?: "scanned" | undefined } => {
+  validateSearch: (search: Record<string, unknown>): { tab?: "scanned" | "list" | undefined } => {
     const parsed = boardsSearch.safeParse(search);
     return { tab: parsed.success ? parsed.data.tab : undefined };
   },
@@ -237,9 +240,9 @@ const boardsRoute = createRoute({
     const navigate = boardsRoute.useNavigate();
     return (
       <Boards
-        tab={search.tab ?? "boards"}
+        tab={search.tab === undefined ? "admin" : search.tab === "list" ? "boards" : search.tab}
         onTab={(tab) => {
-          void navigate({ search: tab === "scanned" ? { tab } : {}, replace: true });
+          void navigate({ search: { tab: tab === "scanned" ? "scanned" : "list" }, replace: true });
         }}
       />
     );

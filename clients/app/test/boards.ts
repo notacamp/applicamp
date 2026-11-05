@@ -215,6 +215,8 @@ export function run(overrides: Partial<ScanRun> = {}): ScanRun {
     // 1,112 read: 6 good matches and 1,106 left out (the reasons add up).
     funnel: {
       read: 1112,
+      from_sites: 4,
+      from_company_pages: 212,
       quick_looked: 681,
       read_in_full: 131,
       good_matches: 6,
@@ -223,7 +225,8 @@ export function run(overrides: Partial<ScanRun> = {}): ScanRun {
         seen_before: 431,
         too_old: 0,
         not_remote: 245,
-        quick_look: 305,
+        quick_look: 205,
+        preselect: 100,
         language: 12,
         not_open_to_location: 4,
         below_floor: 2,

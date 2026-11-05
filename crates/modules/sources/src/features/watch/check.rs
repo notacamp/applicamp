@@ -152,11 +152,8 @@ pub async fn read_due(
                     tx.commit().await?;
                 }
                 store::read_done(db, row.watch, &listed, None, now).await?;
-                // A company page of the registry keeps what its watcher read
-                // (searches read company pages of watched companies when
-                // `APPLICAMP_SOURCES__SEARCH_COMPANY_PAGES` is on).
-                if deps.config.search_company_pages()
-                    && let Some(page) = row.page_id
+                // A company page of the registry keeps what its watcher read.
+                if let Some(page) = row.page_id
                     && let Err(e) =
                         crate::company_pages::note_read(db, page, listed.len(), now).await
                 {

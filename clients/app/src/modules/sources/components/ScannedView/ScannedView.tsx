@@ -33,6 +33,7 @@ export const LEFT_OUT_REASONS = [
   "too_old",
   "not_remote",
   "quick_look",
+  "preselect",
   "language",
   "not_open_to_location",
   "below_floor",
@@ -253,6 +254,16 @@ function RunDetail({ run }: { run: ScanRun }) {
         {runTitle(run, locale, t)}
       </Heading>
       <Figures items={runFigures(run, funnel, locale, t)} testId="scanned-figures" />
+      {funnel.from_sites === null || funnel.from_sites === undefined ? null : (
+        <Tagged testId="scanned-from-store">
+          <Text tone="secondary">
+            {t("scanned.fromStore", {
+              sites: t("scanned.fromSites", { count: funnel.from_sites }),
+              pages: t("scanned.fromPages", { count: funnel.from_company_pages ?? 0 }),
+            })}
+          </Text>
+        </Tagged>
+      )}
       {funnel.stopped === null || funnel.stopped === undefined ? null : (
         <Tagged testId="scanned-stopped">
           <Text tone="secondary">{t(`stopped.${funnel.stopped}`)}</Text>

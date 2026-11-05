@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import {
   callApi,
+  callApiJson,
   expectAccessible,
   expectNoSidewaysScroll,
   expectPageFillsTheScreen,
@@ -33,6 +34,17 @@ test("the Searches tab says what each search read, read in full and found, why t
   await signIn(page);
   expect(await callApi(page, "PUT", "/api/v1/profile", PROFILE)).toBe(200);
   expect(await callApi(page, "PUT", "/api/v1/goals", GOALS)).toBe(200);
+  // A search reads the job store, which the stack fills by itself from its
+  // approved fake board: wait for it to hold jobs rather than sleep.
+  await expect
+    .poll(
+      async () => {
+        const { body } = await callApiJson(page, "GET", "/api/v1/boards/store");
+        return (body as { jobs_stored?: number }).jobs_stored ?? 0;
+      },
+      { timeout: 120_000, intervals: [2000] },
+    )
+    .toBeGreaterThan(0);
   const started = await callApi(page, "POST", "/api/v1/searches");
   expect([202, 409, 429]).toContain(started);
   await expect.poll(() => latestSearchStatus(page), { timeout: 60_000 }).toBe("finished");

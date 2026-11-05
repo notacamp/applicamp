@@ -200,6 +200,119 @@ pub async fn find(
     .await?)
 }
 
+/// Jobs a search's pool holds, at most.
+pub const POOL_MAX: i64 = 100_000;
+
+/// What a search draws its candidates from.
+#[derive(Debug, Clone, Copy)]
+pub struct PoolQuery<'a> {
+    /// The job sites the person has On; every approved company page is
+    /// always in.
+    pub sites: &'a [Uuid],
+    /// First stored since: a nightly search takes only the jobs the store
+    /// first saw after the person's last search.
+    pub first_seen_since: Option<DateTime<Utc>>,
+    /// Words of the person's roles and skills, for ranking only.
+    pub text: &'a [String],
+}
+
+/// A job of the pool, without its description, and how close it is to the
+/// person's roles and skills.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct PoolJob {
+    #[sqlx(flatten)]
+    pub job: StoredJob,
+    /// Full-text rank of the title, company and tags against the person's
+    /// words (0 to 1), plus a little for how new it is. No model.
+    pub rank: f32,
+}
+
+/// The open jobs of the person's On sites and of every approved company
+/// page, with their rank. Descriptions are left out ([`descriptions`] reads
+/// them for the jobs a search goes on with).
+pub async fn pool(db: &PgPool, query: &PoolQuery<'_>, now: DateTime<Utc>) -> Result<Vec<PoolJob>> {
+    let text = text_query(query.text);
+    Ok(sqlx::query_as(
+        "SELECT j.id, j.board_id, j.source_ref, j.title, j.company, j.url, j.apply_url,
+                j.company_url, j.location, j.regions, j.work_mode, j.salary_min, j.salary_max,
+                j.salary_currency, j.salary_period, j.salary_text, j.posted_at, j.expires_at,
+                ''::text AS description, j.language, j.tags, j.url_key, j.dedupe_key,
+                j.first_seen_at, j.last_seen_at, b.slug AS board_slug, b.kind AS board_kind,
+                b.system AS board_system,
+                coalesce(nullif(btrim(b.terms->>'attribution'), ''), b.name) AS attribution,
+                (CASE WHEN $4::text IS NULL THEN 0::float8
+                      ELSE ts_rank(j.search, to_tsquery('simple', $4), 32)::float8 END
+                 + 0.3 / (1 + greatest(extract(epoch FROM ($1 - coalesce(j.posted_at, j.first_seen_at)))::float8
+                                       / 86400.0, 0) / 7.0))::float4 AS rank
+           FROM sources.store_jobs j
+           JOIN sources.job_boards b ON b.id = j.board_id
+           LEFT JOIN sources.job_boards s ON s.id = b.system_id
+          WHERE j.closed_at IS NULL
+            AND (j.expires_at IS NULL OR j.expires_at > $1)
+            AND b.status = 'approved'
+            AND ((b.kind <> 'company_page' AND b.id = ANY($2))
+                 OR (b.kind = 'company_page' AND s.status = 'approved'))
+            AND ($3::timestamptz IS NULL OR j.first_seen_at > $3)
+          ORDER BY j.id
+          LIMIT $5",
+    )
+    .bind(now)
+    .bind(query.sites)
+    .bind(query.first_seen_since)
+    .bind(text)
+    .bind(POOL_MAX)
+    .fetch_all(db)
+    .await?)
+}
+
+/// The descriptions of the stored jobs `ids`.
+pub async fn descriptions(db: &PgPool, ids: &[Uuid]) -> Result<std::collections::HashMap<Uuid, String>> {
+    let rows: Vec<(Uuid, String)> =
+        sqlx::query_as("SELECT id, description FROM sources.store_jobs WHERE id = ANY($1)")
+            .bind(ids)
+            .fetch_all(db)
+            .await?;
+    Ok(rows.into_iter().collect())
+}
+
+/// About how many jobs of the pool `account` has no score for yet, for these
+/// versions of the profile, goals and rules (no hard limit applied): what a
+/// search's quick looks draw from.
+pub async fn unscored(
+    db: &PgPool,
+    account: Uuid,
+    sites: &[Uuid],
+    versions: (&str, i32, i32),
+    now: DateTime<Utc>,
+) -> Result<i64> {
+    Ok(sqlx::query_scalar(
+        "SELECT count(*)
+           FROM sources.store_jobs j
+           JOIN sources.job_boards b ON b.id = j.board_id
+           LEFT JOIN sources.job_boards s ON s.id = b.system_id
+          WHERE j.closed_at IS NULL
+            AND (j.expires_at IS NULL OR j.expires_at > $1)
+            AND b.status = 'approved'
+            AND ((b.kind <> 'company_page' AND b.id = ANY($2))
+                 OR (b.kind = 'company_page' AND s.status = 'approved'))
+            AND NOT EXISTS (
+                SELECT 1 FROM sources.scores c
+                 WHERE c.account_id = $3
+                   AND c.source = CASE WHEN b.kind = 'company_page' THEN b.system ELSE b.slug END
+                   AND c.source_ref = j.source_ref
+                   AND c.profile_version = $4 AND c.goals_version = $5
+                   AND c.rules_version = $6)",
+    )
+    .bind(now)
+    .bind(sites)
+    .bind(account)
+    .bind(versions.0)
+    .bind(versions.1)
+    .bind(versions.2)
+    .fetch_one(db)
+    .await?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

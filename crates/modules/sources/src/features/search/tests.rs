@@ -1373,3 +1373,147 @@ async fn quick_looks_about_no_job_of_the_batch_count_as_failed_calls(db: PgPool)
     assert_eq!(reasons["waiting"], 30, "{reasons}");
     assert_eq!(search["added"], 0);
 }
+
+/// An approved JSON API site `alpha` at `server`, as a seed list writes it.
+fn store_site(server: &MockServer) -> String {
+    format!(
+        r#"
+[[board]]
+slug = "alpha"
+name = "Board alpha"
+homepage = "https://alpha.example"
+kind = "json_api"
+priority = "high"
+status = "approved"
+
+[board.config]
+endpoint = "{uri}/alpha"
+items = "/jobs"
+poll_minutes = 15
+
+[board.config.fields]
+ref = "/id"
+title = "/title"
+company = "/company"
+url = "/url"
+description = "/description"
+posted_at = "/posted"
+
+[board.terms]
+attribution = "Board alpha"
+"#,
+        uri = server.uri()
+    )
+}
+
+/// What the site lists: jobs 1 to `n`, "Senior Backend Engineer <n>".
+async fn serve_site(server: &MockServer, n: u64) {
+    server.reset().await;
+    let jobs: Vec<Value> = (1..=n)
+        .map(|id| {
+            json!({
+                "id": id.to_string(), "title": format!("Senior Backend Engineer {id}"),
+                "company": "Acme", "url": format!("https://example.com/jobs/{id}"),
+                "description": "<p>Rust services.</p>", "posted": "2026-10-25T10:00:00Z",
+            })
+        })
+        .collect();
+    Mock::given(method("GET"))
+        .and(path("/alpha"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(
+            json!({ "jobs": jobs }).to_string().into_bytes(),
+            "application/json",
+        ))
+        .mount(server)
+        .await;
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_search_takes_its_jobs_from_the_store_and_a_cheap_preselect_limits_the_quick_looks(
+    db: PgPool,
+) {
+    let site = MockServer::start().await;
+    serve_site(&site, 30).await;
+    let seed = crate::job_boards::parse(&store_site(&site)).unwrap();
+    crate::job_boards::sync(&db, &seed, crate::testkit::today())
+        .await
+        .unwrap();
+    let model = model_by_number(0.000_4).await;
+    let mut settings = crate::testkit::boards_config();
+    settings.store = Some(true);
+    // Ten jobs of the store get a quick look, four are read in full.
+    settings.quick_look_per_search = Some(10);
+    settings.full_scores_per_search = Some(4);
+    let fake = Fake::ready();
+    let h = Harness::new(
+        db,
+        settings,
+        Some(gateway(&model, BudgetConfig::default())),
+        fake.clone(),
+    )
+    .await;
+    // The store reads the site by itself; a search never does.
+    crate::features::store::run_tick(&h.deps, &h.db)
+        .await
+        .unwrap();
+    let reads = crate::testkit::requests_to(&site, "/alpha").await;
+    assert_eq!(reads, 1);
+
+    h.post("/api/v1/searches").await;
+    h.work().await;
+    assert_eq!(
+        crate::testkit::requests_to(&site, "/alpha").await,
+        reads,
+        "a search does not read the site"
+    );
+    let search = latest(&h).await;
+    assert_eq!(search["status"], "finished", "{search}");
+    assert_eq!(search["fetched"], 30);
+    assert_eq!(search["added"], 4);
+    // Equal words and age: the preselect keeps the first ten by reference
+    // ("1", "10" to "18"); the best four of them by fit are read in full.
+    assert_eq!(added_numbers(&h), [15, 16, 17, 18]);
+    // One quick look of ten, one full read of four.
+    assert_eq!(model_calls(&model).await, 2);
+    let (quick, full, _, reasons) = funnel_row(&h).await;
+    assert_eq!((quick, full), (10, 4));
+    assert_eq!(reasons["preselect"], 20, "{reasons}");
+    assert_eq!(reasons["quick_look"], 6, "{reasons}");
+    assert_eq!(left_out_total(&reasons) + 4, 30, "the counts add up");
+    let expected: Option<f64> = sqlx::query_scalar("SELECT expected_cost_usd FROM sources.searches")
+        .fetch_one(&h.db)
+        .await
+        .unwrap();
+    assert!(expected.unwrap() > 0.0, "the expected cost is recorded");
+
+    // What the Searches tab says: where the jobs came from, and per site.
+    let (_, page) = h.get("/api/v1/boards/scans").await;
+    let run = &page["runs"][0];
+    assert_eq!(run["funnel"]["from_sites"], 1, "{run}");
+    assert_eq!(run["funnel"]["from_company_pages"], 0);
+    assert_eq!(run["lines"][0]["board_slug"], "alpha");
+    assert_eq!(run["lines"][0]["jobs_read"], 30);
+
+    // Nothing new in the store: no nightly search starts, though 20 jobs
+    // have no look yet (a nightly search only takes jobs new since the last).
+    fake.accounts.lock().unwrap().push(h.account);
+    let before = latest(&h).await["id"].clone();
+    h.clock.advance(TimeDelta::hours(1));
+    super::nightly(&h.deps, &h.db).await.unwrap();
+    h.work().await;
+    assert_eq!(latest(&h).await["id"], before);
+
+    // A new job reaches the store: the night runs and looks at it alone.
+    serve_site(&site, 31).await;
+    h.clock.advance(TimeDelta::hours(1));
+    crate::features::store::run_tick(&h.deps, &h.db)
+        .await
+        .unwrap();
+    super::nightly(&h.deps, &h.db).await.unwrap();
+    h.work().await;
+    let night = latest(&h).await;
+    assert_ne!(night["id"], before, "a night with a new job runs");
+    assert_eq!(night["trigger"], "nightly");
+    assert_eq!(night["fetched"], 1, "{night}");
+    assert_eq!(added_numbers(&h), [15, 16, 17, 18, 31]);
+}

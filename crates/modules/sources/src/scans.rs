@@ -175,6 +175,8 @@ pub struct RunRow {
     pub quick_looked: Option<i32>,
     pub read_in_full: Option<i32>,
     pub kept_with_gap: Option<i32>,
+    pub from_sites: Option<i32>,
+    pub from_company_pages: Option<i32>,
     pub dropped_by_reason: Option<sqlx::types::Json<serde_json::Value>>,
     pub error_kind: Option<String>,
 }
@@ -212,10 +214,12 @@ pub async fn runs(
 ) -> Result<(Vec<RunRow>, Vec<ScanRow>)> {
     let runs: Vec<RunRow> = sqlx::query_as(
         "SELECT kind, id, at, trigger, cost_usd, fetched, added, scored, quick_looked,
-                read_in_full, kept_with_gap, dropped_by_reason, error_kind FROM (
+                read_in_full, kept_with_gap, from_sites, from_company_pages, dropped_by_reason,
+                error_kind FROM (
             SELECT 'search' AS kind, s.id, s.started_at AS at, s.trigger, s.cost_usd,
                    s.fetched, s.added, s.scored, s.quick_looked, s.read_in_full,
-                   s.kept_with_gap, s.dropped_by_reason, s.error_kind
+                   s.kept_with_gap, s.from_sites, s.from_company_pages, s.dropped_by_reason,
+                   s.error_kind
               FROM sources.searches s
              WHERE s.account_id = $1
                AND EXISTS (SELECT 1 FROM sources.board_scans b
@@ -224,7 +228,8 @@ pub async fn runs(
             UNION ALL
             SELECT 'discovery' AS kind, d.id, d.started_at AS at, 'weekly' AS trigger,
                    0::float8 AS cost_usd, NULL::integer, NULL::integer, NULL::integer,
-                   NULL::integer, NULL::integer, NULL::integer, NULL::jsonb, NULL::text
+                   NULL::integer, NULL::integer, NULL::integer, NULL::integer, NULL::integer,
+                   NULL::jsonb, NULL::text
               FROM sources.discovery_runs d
              WHERE EXISTS (SELECT 1 FROM sources.board_scans b
                             WHERE b.discovery_run_id = d.id

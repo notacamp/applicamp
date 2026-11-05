@@ -68,7 +68,10 @@ use crate::{
 };
 
 pub use keep::{Cleaned, Kept, Limits, clean};
-pub use read::{MAX_LIMIT, StoreQuery, StoredJob, find, text_query};
+pub use read::{
+    MAX_LIMIT, POOL_MAX, PoolJob, PoolQuery, StoreQuery, StoredJob, descriptions, find, pool,
+    text_query, unscored,
+};
 
 /// The time between two ticks.
 pub const TICK_EVERY: TimeDelta = TimeDelta::seconds(60);

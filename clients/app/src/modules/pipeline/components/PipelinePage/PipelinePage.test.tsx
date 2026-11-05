@@ -376,7 +376,7 @@ describe("the pipeline page", () => {
 
     const row = screen
       .getAllByTestId("pipeline-row-open")
-      .find((button) => button.closest("tr")?.textContent?.includes("Platform Engineer"));
+      .find((button) => button.closest("tr")?.textContent.includes("Platform Engineer"));
     if (row === undefined) {
       throw new TypeError("the row");
     }

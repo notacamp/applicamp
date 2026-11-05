@@ -156,6 +156,24 @@ describe("The Searches tab", () => {
     });
   });
 
+  it("says a cost of less than a tenth of a cent as under one", async () => {
+    stubApi({
+      "GET /api/v1/boards/scans": {
+        body: {
+          runs: [run({ cost_eur: 0.0004, lines: [line({ ai_cost_eur: 0.0002 })] })],
+          next_cursor: null,
+        },
+      },
+      "GET /api/v1/searches/estimate": { body: estimate({ cost_eur: 0.004 }) },
+      "GET /api/v1/searches/latest": { body: { search: null } },
+    });
+    renderWithProviders(<ScannedView />);
+    expect(await screen.findByTestId("scanned-cost")).toHaveTextContent("under €0.001");
+    await waitFor(() => {
+      expect(screen.getByTestId("scanned-search-cost")).toHaveTextContent("Under €0.01.");
+    });
+  });
+
   it("says when there is no search yet", async () => {
     renderSearches([]);
     expect(await screen.findByTestId("scanned-empty")).toHaveTextContent("No searches yet");

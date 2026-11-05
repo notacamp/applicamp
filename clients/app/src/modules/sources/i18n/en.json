@@ -347,6 +347,8 @@
     "more": "Show older",
     "nightlyLine": "The app searches every night at 21:00.",
     "about": "About {{cost}}.",
+    "aboutUnder": "Under {{cost}}.",
+    "costUnder": "under {{cost}}",
     "running": "Searching now. You can leave this page."
   },
   "companies": {

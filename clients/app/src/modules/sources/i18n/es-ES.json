@@ -347,6 +347,8 @@
     "more": "Ver más antiguas",
     "nightlyLine": "La app busca cada noche a las 21:00.",
     "about": "Unos {{cost}}.",
+    "aboutUnder": "Menos de {{cost}}.",
+    "costUnder": "menos de {{cost}}",
     "running": "Buscando ahora. Puedes salir de esta página."
   },
   "companies": {

@@ -45,6 +45,13 @@ function formatCount(value: number, locale: string): string {
   return new Intl.NumberFormat(locale).format(value);
 }
 
+/** What some AI cost: "€0.09", or "under €0.001" for less than a tenth of a cent. */
+export function costText(value: number, locale: string, t: TFunction<"sources">): string {
+  return value > 0 && value < 0.001
+    ? t("scanned.costUnder", { cost: formatEuros(0.001, locale) })
+    : formatEuros(value, locale);
+}
+
 /** A day in `locale`: "3 Nov". */
 function formatDate(iso: string, locale: string): string {
   return new Intl.DateTimeFormat(locale === "en" ? "en-GB" : locale, {
@@ -100,7 +107,7 @@ export function runFigures(
       testId: "scanned-good-matches",
     },
     {
-      value: formatEuros(run.cost_eur, locale),
+      value: costText(run.cost_eur, locale, t),
       label: t("scanned.figures.cost"),
       testId: "scanned-cost",
     },
@@ -189,7 +196,7 @@ export function siteText(line: ScanLine, locale: string, t: TFunction<"sources">
         quick: formatCount(line.quick_looked, locale),
         full: formatCount(line.scored_by_ai, locale),
         matched: formatCount(line.matched, locale),
-        cost: formatEuros(line.ai_cost_eur, locale),
+        cost: costText(line.ai_cost_eur, locale, t),
       });
       const partial = PARTIAL.exec(line.note ?? "");
       const notes = [
@@ -326,7 +333,9 @@ function SearchNowLine() {
       {cost > 0 ? (
         <Tagged testId="scanned-search-cost">
           <Text tone="secondary">
-            {t("scanned.about", { cost: formatEuros(cost, i18n.language) })}
+            {cost < 0.01
+              ? t("scanned.aboutUnder", { cost: formatEuros(0.01, i18n.language) })
+              : t("scanned.about", { cost: formatEuros(cost, i18n.language) })}
           </Text>
         </Tagged>
       ) : null}

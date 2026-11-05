@@ -702,5 +702,112 @@
     "declined": "Recusado",
     "open": "Abrir",
     "more": "Mostrar mais"
+  },
+  "sites": {
+    "loadFailed": "Não foi possível carregar os sites de emprego.",
+    "retry": "Tentar outra vez",
+    "views": {
+      "label": "Vista dos sites de emprego",
+      "mine": "Os seus sites",
+      "all": "Todos os sites",
+      "scanned": "Pesquisas"
+    },
+    "count": "{{available}} disponíveis, {{on}} ligados",
+    "find": "Procurar um site",
+    "show": {
+      "label": "Mostrar",
+      "all": "Todos os sites",
+      "on": "Sites ligados",
+      "remote": "Remoto",
+      "europe": "Europa",
+      "country": "O país onde vive",
+      "trade": "Por área"
+    },
+    "groups": {
+      "remote_worldwide": "Remoto, em todo o mundo",
+      "europe": "Europa",
+      "country": "O país onde vive",
+      "trade": "Por área",
+      "everything": "Startups e sites com todo o tipo de vagas"
+    },
+    "on": "Ligado",
+    "off": "Desligado",
+    "toggle": "{{state}}: {{name}}",
+    "addKey": "Adicionar a chave",
+    "adminAddsKey": "O administrador adiciona esta chave",
+    "saveFailed": "Não foi guardado. Tente outra vez.",
+    "noneYet": "Ainda não há sites prontos. Aparecem aqui à medida que a aplicação verifica novos.",
+    "noMatch": "Nenhum site corresponde. Experimente outra palavra ou mostre todos os sites.",
+    "salary": {
+      "listed": "Salário típico de {{pay}} por ano",
+      "country": "Paga cerca de {{pay}} por ano no país do site"
+    },
+    "kinds": {
+      "tech": "tecnologia",
+      "data": "dados",
+      "design": "design",
+      "product": "produto",
+      "marketing": "marketing",
+      "sales": "vendas",
+      "finance": "finanças",
+      "legal": "jurídico",
+      "people": "pessoas e recrutamento",
+      "operations": "operações",
+      "support": "apoio ao cliente",
+      "health-care": "saúde",
+      "education": "educação",
+      "hospitality-travel": "hotelaria e viagens",
+      "retail": "comércio",
+      "logistics": "logística",
+      "trades": "ofícios",
+      "climate": "clima",
+      "nonprofit": "sem fins lucrativos",
+      "public-sector": "setor público",
+      "media": "media",
+      "science": "ciência"
+    },
+    "places": {
+      "worldwide": "Todo o mundo",
+      "europe": "Europa",
+      "north-america": "América do Norte",
+      "latin-america": "América Latina",
+      "asia": "Ásia",
+      "africa": "África",
+      "oceania": "Oceânia"
+    },
+    "line": {
+      "trade": "Só vagas de {{what}}.",
+      "allKinds": "Vagas de todo o tipo.",
+      "mostly": "Sobretudo {{kinds}}.",
+      "remote": "Vagas remotas, sobretudo {{kinds}}.",
+      "remoteAll": "Vagas remotas, de todo o tipo.",
+      "place": "{{place}}. {{what}}",
+      "someRemote": "Algumas vagas são remotas.",
+      "needsKey": "Precisa de uma chave gratuita do site.",
+      "newThisWeek": "Cerca de {{n}} novas por semana."
+    },
+    "blocked": {
+      "sentence_one": "{{names}} não permite que aplicações o leiam, por isso não está na lista.",
+      "sentence_other": "{{names}} não permitem que aplicações os leiam, por isso não estão na lista.",
+      "more": "{{names}} e mais {{rest}} não permitem que aplicações os leiam, por isso não estão na lista."
+    },
+    "companyPages_one": "Lê também {{n}} página de emprego de empresa.",
+    "companyPages_other": "Lê também {{n}} páginas de emprego de empresas.",
+    "companies": {
+      "title": "Empresas",
+      "description": "{{followed}} seguidas, {{proposed}} propostas. Siga uma empresa e a aplicação verifica a página de emprego dela todos os dias.",
+      "checkedDaily": "Verificada todos os dias",
+      "following": "A seguir",
+      "stop": "Parar",
+      "keep": "Seguir",
+      "drop": "Dispensar",
+      "dropped": "Dispensada",
+      "stopped": "Parada",
+      "undo": "Anular",
+      "more_one": "Mais {{count}} proposta",
+      "more_other": "Mais {{count}} propostas",
+      "show": "Mostrar",
+      "empty": "Ainda não há empresas. Aparecem quando vagas que lhe servem continuam a vir da mesma empresa."
+    }
   }
 }

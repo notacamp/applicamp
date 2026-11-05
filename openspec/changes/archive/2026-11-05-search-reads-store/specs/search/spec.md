@@ -55,3 +55,17 @@ with a link to the original posting.
 #### Scenario: A board's polling limit
 - **WHEN** a search runs twice within Remotive's allowed interval
 - **THEN** Remotive is not requested by either search, and the store's jobs are used
+
+### Requirement: The sites a person has On are what a search will read
+A search SHALL draw from the job store only the approved job sites the person has On, after setting
+the app's defaults from their current goals (`ensure_defaults`, then `on_sites`), together with every
+approved company page. A site they turned Off SHALL contribute no job to their search, and neither
+live queries nor the store's jobs of that site are used.
+
+#### Scenario: Reading the person's sites
+- **WHEN** a person turned one approved site Off and the app turned two On from their goals
+- **THEN** a search for them uses the store's jobs of those two sites, and not the one
+
+#### Scenario: A site turned Off
+- **WHEN** a person turned a site Off
+- **THEN** none of its jobs is a candidate of their search, though other people's searches still use them

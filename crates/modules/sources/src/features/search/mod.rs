@@ -41,7 +41,7 @@ use uuid::Uuid;
 use crate::{
     SourcesDeps, boards, dedupe,
     events::SearchFinished,
-    features::{store, watch},
+    features::{my_sites, store, watch},
     job::{Job, WorkMode},
     job_boards::{self, BoardRow},
     lisbon,
@@ -647,7 +647,7 @@ pub async fn estimate(
         && let Some(neighbours) = &deps.neighbours
         && let Some(input) = neighbours.matching_input(&state.db, account, now).await?
     {
-        let sites: Vec<Uuid> = on_sites(&deps, &state.db, account)
+        let sites: Vec<Uuid> = on_sites(&deps, &state.db, account, &input, now)
             .await?
             .iter()
             .map(|row| row.id)
@@ -1108,18 +1108,31 @@ fn clamp_u32(n: i64) -> u32 {
     u32::try_from(n.max(0)).unwrap_or(u32::MAX)
 }
 
-/// The job sites a search draws from: the person's On sites (every approved
-/// site the instance reads, until each person chooses), in the registry's
-/// order.
-pub(crate) async fn on_sites(
-    deps: &SourcesDeps,
-    db: &PgPool,
-    _account: Uuid,
-) -> Result<Vec<BoardRow>> {
+/// Every approved job site the instance reads.
+pub(crate) async fn all_sites(deps: &SourcesDeps, db: &PgPool) -> Result<Vec<BoardRow>> {
     Ok(job_boards::approved(db)
         .await?
         .into_iter()
         .filter(|row| deps.config.is_enabled(&row.slug))
+        .collect())
+}
+
+/// The job sites `account` has On: the app's defaults are set from their
+/// profile and goals first (never over a choice of theirs), then the sites
+/// they have On, in the registry's order.
+pub(crate) async fn on_sites(
+    deps: &SourcesDeps,
+    db: &PgPool,
+    account: Uuid,
+    input: &MatchInput,
+    now: DateTime<Utc>,
+) -> Result<Vec<BoardRow>> {
+    my_sites::ensure_defaults(db, account, input, now).await?;
+    let on: HashSet<Uuid> = my_sites::on_sites(db, account).await?.into_iter().collect();
+    Ok(all_sites(deps, db)
+        .await?
+        .into_iter()
+        .filter(|row| on.contains(&row.id))
         .collect())
 }
 
@@ -1223,7 +1236,7 @@ pub(crate) async fn read_sources(
     input: &MatchInput,
     first_seen_since: Option<DateTime<Utc>>,
 ) -> Result<Reading> {
-    let rows = on_sites(deps, db, account).await?;
+    let rows = on_sites(deps, db, account, input, now).await?;
     let mut reading = read_live(deps, reader, db, &rows, now, fresh_since, queries).await?;
     let mut jobs = std::mem::take(&mut reading.jobs);
     if deps.config.store() {
@@ -2173,8 +2186,9 @@ pub(crate) async fn nightly(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
     let queries = night_queries(neighbours.as_ref(), db, &accounts, now).await?;
     // The store has the sites' own feeds already; what is read here is the
     // night's queries, so each search finds them in the cache.
-    let sites = on_sites(deps, db, Uuid::nil()).await?;
-    let site_ids: Vec<Uuid> = sites.iter().map(|row| row.id).collect();
+    // The night's queries are asked of every site: each person's own On
+    // sites use the cached answers.
+    let sites = all_sites(deps, db).await?;
     let jobs = dedupe::merge(unique(
         read_live(deps, reader, db, &sites, now, now, &queries)
             .await?
@@ -2194,6 +2208,11 @@ pub(crate) async fn nightly(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
         // Jobs the store first saw since their last search (the night's
         // search looks at no others), and what their queries found.
         let new: Vec<Job> = if deps.config.store() {
+            let site_ids: Vec<Uuid> = on_sites(deps, db, account, &input, now)
+                .await?
+                .iter()
+                .map(|row| row.id)
+                .collect();
             let since = last_search(db, account, now).await?;
             let terms = preselect_terms(&input);
             let query = pool_query(deps, &input, account, &site_ids, since, &terms);

@@ -26,6 +26,10 @@ export {
 // The Job boards page for board owners (#86): totals, what waits for them, every board.
 export { BoardsAdmin, type BoardsAdminProps } from "./components/BoardsAdmin/BoardsAdmin";
 export { useBoards } from "./api/boards";
+// The Job sites a person has On (#94): one list grouped by what the sites offer, and the
+// companies to follow; and what each search scanned.
+export { MySitesPage, type MySitesPageProps } from "./components/MySites/MySitesPage";
+export { ScannedView } from "./components/ScannedView/ScannedView";
 // Company watchers (#20): companies whose jobs keep fitting you, suggested
 // from your matches, whose own job board is read every day; Today's
 // compact suggestion.

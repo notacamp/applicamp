@@ -610,6 +610,7 @@ async fn hard_requirements_drop_jobs_whatever_their_score(db: PgPool) {
     )
     .await;
     crate::testkit::seed_fake_boards(&h.db, &boards, &["arbeitnow"]).await;
+    turn_on(&h, &["arbeitnow"]).await;
     let (status, _) = h.post("/api/v1/searches").await;
     assert_eq!(status, StatusCode::ACCEPTED);
     h.work().await;
@@ -748,6 +749,7 @@ async fn the_same_job_on_two_boards_is_one_opportunity_crediting_both(db: PgPool
     )
     .await;
     crate::testkit::seed_fake_boards(&h.db, &boards, &["himalayas", "remoteok"]).await;
+    turn_on(&h, &["himalayas", "remoteok"]).await;
     h.post("/api/v1/searches").await;
     h.work().await;
     let search = latest(&h).await;
@@ -820,6 +822,7 @@ async fn the_same_job_on_two_boards_is_one_opportunity_crediting_both(db: PgPool
     // The next search finds Example Co on Jobicy too: it is credited on the
     // opportunity already there, never added twice.
     crate::testkit::seed_fake_boards(&h.db, &boards, &["jobicy"]).await;
+    turn_on(&h, &["jobicy"]).await;
     h.clock.advance(TimeDelta::hours(2));
     h.post("/api/v1/searches").await;
     h.work().await;
@@ -853,6 +856,7 @@ async fn a_board_within_its_polling_limit_is_not_fetched_and_says_so(db: PgPool)
     .await;
     // Remotive: at most 4 fetches a day.
     crate::testkit::seed_fake_boards(&h.db, &boards, &["remotive"]).await;
+    turn_on(&h, &["remotive"]).await;
     h.post("/api/v1/searches").await;
     h.work().await;
     h.clock.advance(TimeDelta::hours(1));
@@ -1376,6 +1380,21 @@ async fn quick_looks_about_no_job_of_the_batch_count_as_failed_calls(db: PgPool)
     assert_eq!(search["added"], 0);
 }
 
+/// The sites `slugs` are On for the harness's person, as they chose.
+async fn turn_on(h: &Harness, slugs: &[&str]) {
+    let slugs: Vec<String> = slugs.iter().map(|s| (*s).to_owned()).collect();
+    sqlx::query(
+        "INSERT INTO sources.my_sites (account_id, board_id, is_on, set_by, updated_at)
+         SELECT $1, id, true, 'person', now() FROM sources.job_boards WHERE slug = ANY($2)
+         ON CONFLICT (account_id, board_id) DO UPDATE SET is_on = true, set_by = 'person'",
+    )
+    .bind(h.account)
+    .bind(&slugs)
+    .execute(&h.db)
+    .await
+    .unwrap();
+}
+
 /// An approved JSON API site `alpha` at `server`, as a seed list writes it.
 fn store_site(server: &MockServer) -> String {
     format!(
@@ -1454,6 +1473,7 @@ async fn a_search_takes_its_jobs_from_the_store_and_a_cheap_preselect_limits_the
         fake.clone(),
     )
     .await;
+    turn_on(&h, &["alpha"]).await;
     // The store reads the site by itself; a search never does.
     crate::features::store::run_tick(&h.deps, &h.db)
         .await

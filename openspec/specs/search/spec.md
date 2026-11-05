@@ -349,3 +349,17 @@ the estimate SHALL count the store's jobs without a score, at most that limit.
 #### Scenario: Looked at before
 - **WHEN** a job had a quick look in an earlier search
 - **THEN** it takes no slot of the 400 and competes again for a full read
+
+### Requirement: The sites a person has On are what a search will read
+A search SHALL draw from the job store only the approved job sites the person has On, after setting
+the app's defaults from their current goals (`ensure_defaults`, then `on_sites`), together with every
+approved company page. A site they turned Off SHALL contribute no job to their search, and neither
+live queries nor the store's jobs of that site are used.
+
+#### Scenario: Reading the person's sites
+- **WHEN** a person turned one approved site Off and the app turned two On from their goals
+- **THEN** a search for them uses the store's jobs of those two sites, and not the one
+
+#### Scenario: A site turned Off
+- **WHEN** a person turned a site Off
+- **THEN** none of its jobs is a candidate of their search, though other people's searches still use them

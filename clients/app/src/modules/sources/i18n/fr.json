@@ -702,5 +702,112 @@
     "declined": "Refusé",
     "open": "Ouvrir",
     "more": "Afficher plus"
+  },
+  "sites": {
+    "loadFailed": "Les sites d’emploi n’ont pas pu être chargés.",
+    "retry": "Réessayer",
+    "views": {
+      "label": "Vue des sites d’emploi",
+      "mine": "Vos sites",
+      "all": "Tous les sites",
+      "scanned": "Recherches"
+    },
+    "count": "{{available}} disponibles, {{on}} activés",
+    "find": "Chercher un site",
+    "show": {
+      "label": "Afficher",
+      "all": "Tous les sites",
+      "on": "Sites activés",
+      "remote": "À distance",
+      "europe": "Europe",
+      "country": "Votre pays",
+      "trade": "Par métier"
+    },
+    "groups": {
+      "remote_worldwide": "À distance, partout dans le monde",
+      "europe": "Europe",
+      "country": "Votre pays",
+      "trade": "Par métier",
+      "everything": "Startups et sites de tous les emplois"
+    },
+    "on": "Activé",
+    "off": "Désactivé",
+    "toggle": "{{state}}: {{name}}",
+    "addKey": "Ajouter la clé",
+    "adminAddsKey": "L’administrateur ajoute cette clé",
+    "saveFailed": "Ce n’est pas enregistré. Réessayez.",
+    "noneYet": "Aucun site n’est prêt pour le moment. Ils apparaissent ici au fil des vérifications de l’application.",
+    "noMatch": "Aucun site ne correspond. Essayez un autre mot ou affichez tous les sites.",
+    "salary": {
+      "listed": "Salaire typique de {{pay}} par an",
+      "country": "Paie environ {{pay}} par an dans le pays du site"
+    },
+    "kinds": {
+      "tech": "technologie",
+      "data": "données",
+      "design": "design",
+      "product": "produit",
+      "marketing": "marketing",
+      "sales": "vente",
+      "finance": "finance",
+      "legal": "droit",
+      "people": "ressources humaines",
+      "operations": "opérations",
+      "support": "service client",
+      "health-care": "santé",
+      "education": "éducation",
+      "hospitality-travel": "hôtellerie et voyage",
+      "retail": "commerce",
+      "logistics": "logistique",
+      "trades": "métiers manuels",
+      "climate": "climat",
+      "nonprofit": "associatif",
+      "public-sector": "secteur public",
+      "media": "médias",
+      "science": "sciences"
+    },
+    "places": {
+      "worldwide": "Monde entier",
+      "europe": "Europe",
+      "north-america": "Amérique du Nord",
+      "latin-america": "Amérique latine",
+      "asia": "Asie",
+      "africa": "Afrique",
+      "oceania": "Océanie"
+    },
+    "line": {
+      "trade": "Uniquement des offres {{what}}.",
+      "allKinds": "Offres de tous types.",
+      "mostly": "Surtout {{kinds}}.",
+      "remote": "Offres à distance, surtout {{kinds}}.",
+      "remoteAll": "Offres à distance de tous types.",
+      "place": "{{place}}. {{what}}",
+      "someRemote": "Certaines offres sont à distance.",
+      "needsKey": "Demande une clé gratuite du site.",
+      "newThisWeek": "Environ {{n}} nouvelles par semaine."
+    },
+    "blocked": {
+      "sentence_one": "{{names}} n’autorise pas les applications à le lire, il n’est donc pas dans la liste.",
+      "sentence_other": "{{names}} n’autorisent pas les applications à les lire, ils ne sont donc pas dans la liste.",
+      "more": "{{names}} et {{rest}} autres n’autorisent pas les applications à les lire, ils ne sont donc pas dans la liste."
+    },
+    "companyPages_one": "Lit aussi {{n}} page d’emploi d’entreprise.",
+    "companyPages_other": "Lit aussi {{n}} pages d’emploi d’entreprises.",
+    "companies": {
+      "title": "Entreprises",
+      "description": "{{followed}} suivies, {{proposed}} proposées. Suivez une entreprise et l’application vérifie sa page d’emploi chaque jour.",
+      "checkedDaily": "Vérifiée chaque jour",
+      "following": "Suivie",
+      "stop": "Arrêter",
+      "keep": "Suivre",
+      "drop": "Écarter",
+      "dropped": "Écartée",
+      "stopped": "Arrêtée",
+      "undo": "Annuler",
+      "more_one": "{{count}} proposition de plus",
+      "more_other": "{{count}} propositions de plus",
+      "show": "Afficher",
+      "empty": "Aucune entreprise pour le moment. Elles apparaissent quand des offres qui vous conviennent reviennent de la même entreprise."
+    }
   }
 }

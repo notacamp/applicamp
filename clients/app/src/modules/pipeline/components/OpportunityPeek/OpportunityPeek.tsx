@@ -32,6 +32,7 @@ import {
   formatCost,
   formatShortDate,
   hiddenReasonText,
+  placeText,
   sourceHue,
   sourceLabel,
 } from "../../api/labels";
@@ -373,6 +374,10 @@ function PeekBody({
   };
 
   const facts = opportunity.facts ?? null;
+  // What it asks of where the person is, beyond the region (#111).
+  const timeZones = facts?.time_zone_note?.trim() ?? "";
+  const workPermit = facts?.work_permit_note?.trim() ?? "";
+  const relocation = facts?.relocation_note?.trim() ?? "";
   const hiddenReason = opportunity.hidden_reason ?? null;
 
   return (
@@ -430,14 +435,7 @@ function PeekBody({
               testId="peek-where-edit"
             />
           ) : (
-            [
-              opportunity.location ?? null,
-              opportunity.work_mode === undefined || opportunity.work_mode === null
-                ? null
-                : t(`workModes.${opportunity.work_mode}`),
-            ]
-              .filter((part) => part !== null && part !== "")
-              .join(" · ") || t("peek.unknown")
+            placeText(opportunity, t) || t("peek.unknown")
           )}
         </Property>
         {opportunity.salary_text === undefined || opportunity.salary_text === null ? null : (
@@ -446,6 +444,21 @@ function PeekBody({
         {facts === null ? null : (
           <Property label={t("peek.requirements")} testId="peek-facts">
             {factsText(facts, i18n.language, t)}
+          </Property>
+        )}
+        {timeZones === "" ? null : (
+          <Property label={t("peek.timeZones")} testId="peek-time-zones">
+            {timeZones}
+          </Property>
+        )}
+        {workPermit === "" ? null : (
+          <Property label={t("peek.workPermit")} testId="peek-work-permit">
+            {workPermit}
+          </Property>
+        )}
+        {relocation === "" ? null : (
+          <Property label={t("peek.relocation")} testId="peek-relocation">
+            {relocation}
           </Property>
         )}
         <Property label={t("peek.match")}>

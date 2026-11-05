@@ -20,6 +20,7 @@
   "columns": {
     "role": "Função",
     "company": "Empresa",
+    "where": "Onde",
     "match": "Correspondência",
     "stage": "Fase",
     "source": "Origem",
@@ -102,6 +103,9 @@
     "cancel": "Cancelar",
     "saveFailed": "Não foi possível guardar a alteração. Tente de novo.",
     "requirements": "Os teus requisitos",
+    "timeZones": "Horário",
+    "workPermit": "Autorização de trabalho",
+    "relocation": "Mudança",
     "hidden": "Oculta: não cumpre os teus requisitos",
     "sources": "Encontrado em",
     "from": "Em {{name}}",
@@ -153,6 +157,12 @@
       "no": "Não está aberta a onde vives",
       "unclear": "Não diz a quem está aberta"
     }
+  },
+  "place": {
+    "open": "{{open}}: {{note}}",
+    "timeZones": "Horário: {{note}}",
+    "workPermit": "Autorização de trabalho: {{note}}",
+    "relocation": "Mudança: {{note}}"
   },
   "prepare": {
     "title": "Preparar",

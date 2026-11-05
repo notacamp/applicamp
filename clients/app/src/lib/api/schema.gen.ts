@@ -4643,15 +4643,31 @@ export interface components {
         };
         /**
          * @description What the posting says about the person's requirements, as their search
-         *     read it: "Remote · open to you · English".
+         *     read it: "Remote · open to you · English", and what it asks of where they
+         *     are (shown only; never used to hide it).
          */
         JobFacts: {
             /** @description Someone where the person lives can do it without moving. */
             open_to_candidate: components["schemas"]["Fact"];
             /** @description Where it is open, as the posting says ("Germany or Austria only"). */
             region_note?: string | null;
+            /**
+             * @description Moving for the job, as the posting says ("Move to Berlin; help
+             *     offered").
+             */
+            relocation_note?: string | null;
             /** @description It can be done fully remote. */
             remote: components["schemas"]["Fact"];
+            /**
+             * @description The hours or time zones it needs, as the posting says ("CET ± 2
+             *     hours"); none when it does not say, or it was read before #111.
+             */
+            time_zone_note?: string | null;
+            /**
+             * @description The right to work and visa sponsorship, as the posting says ("EU
+             *     work permit, no visa sponsorship").
+             */
+            work_permit_note?: string | null;
             /** @description The languages it needs, ISO 639-1 (`en`). */
             working_languages: string[];
         };
@@ -5485,6 +5501,7 @@ export interface components {
             company: string;
             /** Format: date-time */
             created_at: string;
+            facts?: components["schemas"]["JobFacts"] | null;
             hidden_reason?: components["schemas"]["HiddenReason"] | null;
             /** Format: uuid */
             id: string;

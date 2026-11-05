@@ -34,6 +34,8 @@ pub const MAX_WHY: (usize, usize) = (3, 200);
 pub const MAX_GAPS: (usize, usize) = (3, 200);
 /// The longest region note.
 pub const MAX_REGION_NOTE: usize = 80;
+/// The longest note on time zones, work permit or relocation.
+pub const MAX_PLACE_NOTE: usize = 80;
 /// Languages kept.
 pub const MAX_LANGUAGES: usize = 6;
 
@@ -119,6 +121,12 @@ pub struct Eligibility {
     pub region_note: Option<String>,
     /// The languages it needs, ISO 639-1.
     pub working_languages: Vec<String>,
+    /// The hours or time zones it needs, as the posting says (#111).
+    pub time_zone_note: Option<String>,
+    /// The right to work and visa sponsorship, as the posting says.
+    pub work_permit_note: Option<String>,
+    /// Moving for the job, as the posting says.
+    pub relocation_note: Option<String>,
 }
 
 impl Eligibility {
@@ -141,6 +149,9 @@ impl Eligibility {
         Some(Self {
             region_note: tidy(self.region_note.as_deref(), MAX_REGION_NOTE),
             working_languages: languages,
+            time_zone_note: tidy(self.time_zone_note.as_deref(), MAX_PLACE_NOTE),
+            work_permit_note: tidy(self.work_permit_note.as_deref(), MAX_PLACE_NOTE),
+            relocation_note: tidy(self.relocation_note.as_deref(), MAX_PLACE_NOTE),
             ..self
         })
     }
@@ -305,9 +316,10 @@ pub(crate) async fn insert(
             (id, account_id, title, company, location, work_mode, url, source, source_ref,
              posted_at, salary_text, description, match_score, match_why, match_gaps,
              created_at, updated_at, remote, open_to_candidate, region_note, working_languages,
-             apply_url, expires_at, canonical_url, dedupe_key, proposed_at)
+             apply_url, expires_at, canonical_url, dedupe_key, proposed_at, time_zone_note,
+             work_permit_note, relocation_note)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $16,
-                 $17, $18, $19, $20, $21, $22, $23, $24, $25)
+                 $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
          ON CONFLICT (account_id, source, source_ref) DO NOTHING
          RETURNING id",
     )
@@ -336,6 +348,9 @@ pub(crate) async fn insert(
     .bind(&row.canonical_url)
     .bind(&row.dedupe_key)
     .bind(proposed.then_some(now))
+    .bind(eligibility.and_then(|e| e.time_zone_note.as_deref()))
+    .bind(eligibility.and_then(|e| e.work_permit_note.as_deref()))
+    .bind(eligibility.and_then(|e| e.relocation_note.as_deref()))
     .fetch_optional(&mut *conn)
     .await?;
     if let Some(opportunity) = id {
@@ -533,7 +548,8 @@ pub async fn set_eligibility(
     let done = sqlx::query(
         "UPDATE pipeline.opportunities
             SET remote = $3, open_to_candidate = $4, region_note = $5, working_languages = $6,
-                hidden_reason = $7,
+                hidden_reason = $7, time_zone_note = $8, work_permit_note = $9,
+                relocation_note = $10,
                 -- Not open to the person, or failing a requirement: not proposed.
                 proposed_at = CASE WHEN $7::text IS NULL AND $4 <> 'no' THEN proposed_at END
           WHERE id = $1 AND account_id = $2 AND stage IN ('found', 'shortlisted')
@@ -546,6 +562,9 @@ pub async fn set_eligibility(
     .bind(&eligibility.region_note)
     .bind(&eligibility.working_languages)
     .bind(hidden_reason)
+    .bind(&eligibility.time_zone_note)
+    .bind(&eligibility.work_permit_note)
+    .bind(&eligibility.relocation_note)
     .execute(db)
     .await?;
     Ok(done.rows_affected() == 1)
@@ -899,10 +918,19 @@ mod tests {
             open_to_candidate: "no".into(),
             region_note: Some(format!(" {} ", "x".repeat(100))),
             working_languages: vec!["EN".into(), "en".into(), "German".into(), "de".into()],
+            time_zone_note: Some(" CET ± 2 hours ".into()),
+            work_permit_note: Some("  ".into()),
+            relocation_note: Some("y".repeat(100)),
         }
         .tidied()
         .unwrap();
         assert_eq!(eligibility.region_note.map(|n| n.chars().count()), Some(80));
+        assert_eq!(eligibility.time_zone_note.as_deref(), Some("CET ± 2 hours"));
+        assert_eq!(eligibility.work_permit_note, None);
+        assert_eq!(
+            eligibility.relocation_note.map(|n| n.chars().count()),
+            Some(80)
+        );
         assert_eq!(eligibility.working_languages, ["en", "de"]);
         let unknown = Eligibility {
             remote: "maybe".into(),
@@ -1029,6 +1057,7 @@ mod tests {
             open_to_candidate: "no".into(),
             region_note: Some("Germany or Austria only".into()),
             working_languages: vec!["en".into()],
+            ..Eligibility::default()
         }
     }
 

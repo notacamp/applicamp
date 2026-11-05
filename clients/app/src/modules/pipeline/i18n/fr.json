@@ -20,6 +20,7 @@
   "columns": {
     "role": "Poste",
     "company": "Entreprise",
+    "where": "Lieu",
     "match": "Adéquation",
     "stage": "Étape",
     "source": "Source",
@@ -102,6 +103,9 @@
     "cancel": "Annuler",
     "saveFailed": "La modification n’a pas pu être enregistrée. Réessayez.",
     "requirements": "Vos critères",
+    "timeZones": "Horaires",
+    "workPermit": "Permis de travail",
+    "relocation": "Déménagement",
     "hidden": "Masquée : ne répond pas à vos critères",
     "sources": "Trouvé sur",
     "from": "Sur {{name}}",
@@ -153,6 +157,12 @@
       "no": "Pas ouverte là où vous vivez",
       "unclear": "Ne dit pas à qui elle est ouverte"
     }
+  },
+  "place": {
+    "open": "{{open}} : {{note}}",
+    "timeZones": "Horaires : {{note}}",
+    "workPermit": "Permis de travail : {{note}}",
+    "relocation": "Déménagement : {{note}}"
   },
   "prepare": {
     "title": "Préparer",

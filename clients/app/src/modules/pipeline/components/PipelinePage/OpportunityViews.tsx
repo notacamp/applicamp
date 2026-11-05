@@ -10,6 +10,7 @@ import {
   DataTable,
   Label,
   MatchBar,
+  Stack,
   Tagged,
   Text,
   type DataColumn,
@@ -18,6 +19,8 @@ import {
 import {
   formatShortDate,
   hiddenReasonText,
+  placeRequirements,
+  placeText,
   sourceHue,
   sourceLabel,
   STAGE_HUES,
@@ -38,10 +41,40 @@ export function titleOf(row: Pick<OpportunitySummary, "title">, untitled: string
   return row.title.trim() === "" ? untitled : row.title;
 }
 
-/** "Example Co · Remote - Europe". */
-function companyLine(row: OpportunitySummary): string {
-  const location = row.location ?? "";
-  return location === "" ? row.company : `${row.company} · ${location}`;
+/** "Example Co · Berlin, Germany · Hybrid". */
+function companyLine(row: OpportunitySummary, t: TFunction<"pipeline">): string {
+  return [row.company, placeText(row, t)].filter((part) => part !== "").join(" · ");
+}
+
+/**
+ * What `row` asks of where the person is, as one line: "Open to where you live: EU · Hours: CET
+ * ± 2 hours"; nothing when its posting was never checked.
+ */
+function PlaceRequirementsLine({ row }: { row: OpportunitySummary }) {
+  const { t } = useTranslation("pipeline");
+  const items = placeRequirements(row.facts, t);
+  if (items.length === 0) {
+    return null;
+  }
+  return (
+    <Tagged testId="pipeline-row-place-requirements">
+      <Text tone="secondary">{items.join(" · ")}</Text>
+    </Tagged>
+  );
+}
+
+/** The table's Where cell: the place and work mode, then what it asks of where the person is. */
+function WhereCell({ row }: { row: OpportunitySummary }) {
+  const { t } = useTranslation("pipeline");
+  const place = placeText(row, t);
+  return (
+    <Stack gap="sm">
+      <Tagged testId="pipeline-row-place">
+        <Text>{place === "" ? t("peek.unknown") : place}</Text>
+      </Tagged>
+      <PlaceRequirementsLine row={row} />
+    </Stack>
+  );
 }
 
 /** Why `row` is hidden, as one line; nothing for one in view. */
@@ -65,14 +98,15 @@ function CardMeta({ row }: { row: OpportunitySummary }) {
       <MatchBar value={row.match} label={t("columns.match")} />
       <Label hue={STAGE_HUES[row.stage]}>{t(`stages.${row.stage}`)}</Label>
       <Label hue={sourceHue(row.source)}>{sourceLabel(row, t)}</Label>
+      <PlaceRequirementsLine row={row} />
       <HiddenReasonLine row={row} />
     </Cluster>
   );
 }
 
 /**
- * The table's columns: role, company, match, stage, source, next step (or why it is hidden),
- * updated.
+ * The table's columns: role, company, where, match, stage, source, next step (or why it is
+ * hidden), updated.
  */
 function tableColumns(
   t: TFunction<"pipeline">,
@@ -89,6 +123,7 @@ function tableColumns(
   return [
     { id: "role", header: t("columns.role"), cell: (row) => titleOf(row, t("untitled")) },
     { id: "company", header: t("columns.company"), cell: (row) => row.company },
+    { id: "where", header: t("columns.where"), cell: (row) => <WhereCell row={row} /> },
     {
       id: "match",
       header: t("columns.match"),
@@ -117,7 +152,7 @@ function tableColumns(
   ];
 }
 
-/** "All opportunities" as the prototype's table: role, company, match, stage, source, next step, updated. */
+/** "All opportunities" as a table: role, company, where, match, stage, source, next step, updated. */
 export function OpportunityTable({ rows, selected, onOpen, hidden }: OpportunityViewProps) {
   const { t, i18n } = useTranslation("pipeline");
   const columns = tableColumns(t, i18n.language, hidden === true);
@@ -145,7 +180,7 @@ export function OpportunityCards({ rows, selected, onOpen }: OpportunityViewProp
         <BoardCard
           key={row.id}
           title={titleOf(row, t("untitled"))}
-          subtitle={companyLine(row)}
+          subtitle={companyLine(row, t)}
           meta={<CardMeta row={row} />}
           selected={row.id === selected}
           onOpen={() => {
@@ -177,11 +212,12 @@ export function OpportunityBoard({ rows, selected, onOpen }: OpportunityViewProp
               <BoardCard
                 key={row.id}
                 title={titleOf(row, t("untitled"))}
-                subtitle={companyLine(row)}
+                subtitle={companyLine(row, t)}
                 meta={
                   <Cluster>
                     <MatchBar value={row.match} label={t("columns.match")} />
                     <Label hue={sourceHue(row.source)}>{sourceLabel(row, t)}</Label>
+                    <PlaceRequirementsLine row={row} />
                   </Cluster>
                 }
                 selected={row.id === selected}

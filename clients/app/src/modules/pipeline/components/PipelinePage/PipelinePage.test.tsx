@@ -31,6 +31,27 @@ const hiddenOne = opportunity({
   },
 });
 
+const ABROAD = "0190a1b2-0000-7000-8000-000000000004";
+
+/** In view, with what it asks of where the person is (#111). */
+const abroad = opportunity({
+  id: ABROAD,
+  title: "Platform Engineer",
+  company: "Muster Systems GmbH",
+  location: "Berlin, Germany",
+  work_mode: "hybrid",
+  new: false,
+  facts: {
+    remote: "no",
+    open_to_candidate: "yes",
+    region_note: "EU",
+    working_languages: ["en"],
+    time_zone_note: "CET ± 2 hours",
+    work_permit_note: "EU work permit, no visa sponsorship",
+    relocation_note: "Move to Berlin, relocation package",
+  },
+});
+
 /** A server holding two opportunities in view (and `more`), keeping what the page changes. */
 function fakePipeline(extra: Record<string, Stub> = {}, more: Opportunity[] = []) {
   const store = new Map<string, Opportunity>([
@@ -339,6 +360,55 @@ describe("the pipeline page", () => {
     expect(screen.queryByTestId("pipeline-hidden-only")).toBeNull();
   });
 
+  it("shows where each job is and what it asks of where you are, in the table and the peek", async () => {
+    fakePipeline({ [`GET /api/v1/opportunities/${ABROAD}`]: () => ({ body: abroad }) }, [abroad]);
+    const user = userEvent.setup();
+    renderPage();
+    const table = await screen.findByTestId("pipeline-table");
+    expect(table).toHaveTextContent("Where");
+    const places = screen.getAllByTestId("pipeline-row-place").map((cell) => cell.textContent);
+    expect(places).toContain("Remote - Europe · Remote");
+    expect(places).toContain("Berlin, Germany · Hybrid");
+    expect(screen.getByTestId("pipeline-row-place-requirements")).toHaveTextContent(
+      "Open to where you live: EU · Hours: CET ± 2 hours · Work permit: EU work permit, no visa " +
+        "sponsorship · Moving: Move to Berlin, relocation package",
+    );
+
+    const row = screen
+      .getAllByTestId("pipeline-row-open")
+      .find((button) => button.closest("tr")?.textContent?.includes("Platform Engineer"));
+    if (row === undefined) {
+      throw new TypeError("the row");
+    }
+    await user.click(row);
+    expect(await screen.findByTestId("peek-where")).toHaveTextContent("Berlin, Germany · Hybrid");
+    expect(screen.getByTestId("peek-time-zones")).toHaveTextContent("CET ± 2 hours");
+    expect(screen.getByTestId("peek-work-permit")).toHaveTextContent(
+      "EU work permit, no visa sponsorship",
+    );
+    expect(screen.getByTestId("peek-relocation")).toHaveTextContent(
+      "Move to Berlin, relocation package",
+    );
+  });
+
+  it("leaves out what a posting does not say", async () => {
+    fakePipeline();
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByTestId("pipeline-table");
+    // Never checked: no requirement line.
+    expect(screen.queryByTestId("pipeline-row-place-requirements")).toBeNull();
+    const [first] = screen.getAllByTestId("pipeline-row-open");
+    if (first === undefined) {
+      throw new TypeError("a row");
+    }
+    await user.click(first);
+    await screen.findByTestId("peek-where");
+    expect(screen.queryByTestId("peek-time-zones")).toBeNull();
+    expect(screen.queryByTestId("peek-work-permit")).toBeNull();
+    expect(screen.queryByTestId("peek-relocation")).toBeNull();
+  });
+
   it("filters by stage", async () => {
     const { requests } = fakePipeline();
     const user = userEvent.setup();
@@ -391,6 +461,9 @@ describe("the pipeline page", () => {
     renderPage();
     expect(await screen.findByTestId("pipeline-cards")).toHaveTextContent("Staff Engineer");
     expect(screen.getAllByTestId("pipeline-row")).toHaveLength(2);
+    expect(screen.getByTestId("pipeline-cards")).toHaveTextContent(
+      "Example Co · Remote - Europe · Remote",
+    );
     expect(screen.queryByTestId("pipeline-table")).toBeNull();
   });
 

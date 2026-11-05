@@ -20,6 +20,7 @@
   "columns": {
     "role": "Role",
     "company": "Company",
+    "where": "Where",
     "match": "Match",
     "stage": "Stage",
     "source": "Source",
@@ -102,6 +103,9 @@
     "cancel": "Cancel",
     "saveFailed": "That change couldn’t be saved. Try again.",
     "requirements": "Your requirements",
+    "timeZones": "Hours",
+    "workPermit": "Work permit",
+    "relocation": "Moving",
     "hidden": "Hidden: it doesn’t meet your requirements",
     "sources": "Found on",
     "from": "From {{name}}",
@@ -153,6 +157,12 @@
       "no": "Not open to where you live",
       "unclear": "Who it’s open to not stated"
     }
+  },
+  "place": {
+    "open": "{{open}}: {{note}}",
+    "timeZones": "Hours: {{note}}",
+    "workPermit": "Work permit: {{note}}",
+    "relocation": "Moving: {{note}}"
   },
   "prepare": {
     "title": "Prepare",

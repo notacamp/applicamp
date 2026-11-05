@@ -211,6 +211,9 @@ function factsOf(posting: Posting) {
         remote: "yes",
         open_to_candidate: "no",
         region_note: "Germany or Austria only",
+        time_zones: "",
+        work_permit: "",
+        relocation: "",
         working_languages: ["en"],
         salary: null,
       }
@@ -218,6 +221,10 @@ function factsOf(posting: Posting) {
         remote: "yes",
         open_to_candidate: "yes",
         region_note: "Europe",
+        // What it asks of where the person is (#111): shown in the pipeline.
+        time_zones: "CET ± 3 hours",
+        work_permit: "EU work permit, no visa sponsorship",
+        relocation: "",
         working_languages: ["en"],
         salary: null,
       };

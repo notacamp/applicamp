@@ -20,6 +20,7 @@
   "columns": {
     "role": "Puesto",
     "company": "Empresa",
+    "where": "Dónde",
     "match": "Encaje",
     "stage": "Fase",
     "source": "Origen",
@@ -102,6 +103,9 @@
     "cancel": "Cancelar",
     "saveFailed": "No se pudo guardar el cambio. Inténtalo de nuevo.",
     "requirements": "Tus requisitos",
+    "timeZones": "Horario",
+    "workPermit": "Permiso de trabajo",
+    "relocation": "Mudanza",
     "hidden": "Oculta: no cumple tus requisitos",
     "sources": "Encontrado en",
     "from": "En {{name}}",
@@ -153,6 +157,12 @@
       "no": "No está abierta a donde vives",
       "unclear": "No dice a quién está abierta"
     }
+  },
+  "place": {
+    "open": "{{open}}: {{note}}",
+    "timeZones": "Horario: {{note}}",
+    "workPermit": "Permiso de trabajo: {{note}}",
+    "relocation": "Mudanza: {{note}}"
   },
   "prepare": {
     "title": "Preparar",

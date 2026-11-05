@@ -13880,7 +13880,7 @@
       },
       "JobFacts": {
         "type": "object",
-        "description": "What the posting says about the person's requirements, as their search\nread it: \"Remote · open to you · English\".",
+        "description": "What the posting says about the person's requirements, as their search\nread it: \"Remote · open to you · English\", and what it asks of where they\nare (shown only; never used to hide it).",
         "required": [
           "remote",
           "open_to_candidate",
@@ -13898,9 +13898,30 @@
             ],
             "description": "Where it is open, as the posting says (\"Germany or Austria only\")."
           },
+          "relocation_note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Moving for the job, as the posting says (\"Move to Berlin; help\noffered\")."
+          },
           "remote": {
             "$ref": "#/components/schemas/Fact",
             "description": "It can be done fully remote."
+          },
+          "time_zone_note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The hours or time zones it needs, as the posting says (\"CET ± 2\nhours\"); none when it does not say, or it was read before #111."
+          },
+          "work_permit_note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The right to work and visa sponsorship, as the posting says (\"EU\nwork permit, no visa sponsorship\")."
           },
           "working_languages": {
             "type": "array",
@@ -16063,6 +16084,17 @@
           "created_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "facts": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/JobFacts",
+                "description": "What the posting says about their requirements and about where they\nare, for the row; none when never checked."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "hidden_reason": {
             "oneOf": [

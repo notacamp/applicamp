@@ -34,6 +34,9 @@
 //!   floor's and outside the table, or per week, day or hour, is not
 //!   compared: it passes with a gap saying so.
 //! - `avoid` and everything else stay in the model's score.
+//! - **What a posting asks of where they are** beyond the region ([`PlaceNotes`]:
+//!   time zones, work permit, relocation, #111) is read in the same call and
+//!   shown to them; no rule decides on it.
 
 use serde::{Deserialize, Serialize};
 
@@ -126,6 +129,31 @@ pub struct Salary {
     pub period: Option<String>,
 }
 
+/// What a posting asks of where the person is, beyond the region, as it
+/// says it (#111): shown to them, never used to leave a job out. `None`
+/// when it does not say.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PlaceNotes {
+    /// The hours or time zones it needs ("CET ± 2 hours").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub time_zones: Option<String>,
+    /// The right to work it needs, and visa sponsorship ("UK right to work;
+    /// no sponsorship").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub work_permit: Option<String>,
+    /// Whether one has to move, and any help to ("Move to Berlin; help
+    /// offered").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relocation: Option<String>,
+}
+
+impl PlaceNotes {
+    /// Whether it says none of them.
+    pub fn is_empty(&self) -> bool {
+        self.time_zones.is_none() && self.work_permit.is_none() && self.relocation.is_none()
+    }
+}
+
 /// What the model read from a posting about the requirements, and only
 /// from the posting.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -140,6 +168,8 @@ pub struct Facts {
     pub working_languages: Vec<String>,
     /// The pay it states.
     pub salary: Option<Salary>,
+    /// What it asks of where they are beyond the region; never checked.
+    pub place: PlaceNotes,
 }
 
 /// Why a job was left out.
@@ -462,6 +492,7 @@ mod tests {
             region_note: None,
             working_languages: languages.iter().map(|l| (*l).to_owned()).collect(),
             salary: None,
+            place: PlaceNotes::default(),
         }
     }
 

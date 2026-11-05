@@ -257,6 +257,9 @@ fn eligibility(facts: Facts) -> Eligibility {
         open_to_candidate: facts.open_to_candidate.as_str().to_owned(),
         region_note: facts.region_note,
         working_languages: facts.working_languages,
+        time_zone_note: facts.place.time_zones,
+        work_permit_note: facts.place.work_permit,
+        relocation_note: facts.place.relocation,
     }
 }
 
@@ -529,6 +532,8 @@ impl applicamp_sources::Neighbours for SourcesWiring {
                         region_note: row.region_note,
                         working_languages: row.working_languages.unwrap_or_default(),
                         salary: None,
+                        // Not needed to apply the rules again.
+                        place: Default::default(),
                     },
                 })
                 .collect())
@@ -1030,7 +1035,10 @@ mod tests {
         goals::{CashFloor, Goals},
         schema::{Basics, Language, Profile, Work},
     };
-    use applicamp_sources::{requirements::Answer, scoring::Score};
+    use applicamp_sources::{
+        requirements::{Answer, PlaceNotes},
+        scoring::Score,
+    };
 
     use super::*;
 
@@ -1133,6 +1141,11 @@ mod tests {
                     region_note: Some("Lisbon office".into()),
                     working_languages: vec!["en".into()],
                     salary: None,
+                    place: PlaceNotes {
+                        time_zones: Some("CET ± 2 hours".into()),
+                        work_permit: None,
+                        relocation: Some("Move to Lisbon".into()),
+                    },
                 },
                 ungrounded: false,
             },
@@ -1151,6 +1164,12 @@ mod tests {
         assert_eq!(eligibility.remote, "no");
         assert_eq!(eligibility.open_to_candidate, "yes");
         assert_eq!(eligibility.working_languages, ["en"]);
+        assert_eq!(eligibility.time_zone_note.as_deref(), Some("CET ± 2 hours"));
+        assert_eq!(eligibility.work_permit_note, None);
+        assert_eq!(
+            eligibility.relocation_note.as_deref(),
+            Some("Move to Lisbon")
+        );
     }
 
     #[test]

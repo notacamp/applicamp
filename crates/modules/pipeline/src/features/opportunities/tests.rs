@@ -268,6 +268,9 @@ async fn a_match_that_fails_a_requirement_is_hidden_with_its_reason(db: PgPool) 
             open_to_candidate: "yes".into(),
             region_note: Some("EU".into()),
             working_languages: vec!["en".into()],
+            time_zone_note: Some("CET ± 2 hours".into()),
+            work_permit_note: Some("EU work permit, no visa sponsorship".into()),
+            relocation_note: None,
         }),
         ..found("exampleco:1", "Staff Engineer")
     };
@@ -293,6 +296,8 @@ async fn a_match_that_fails_a_requirement_is_hidden_with_its_reason(db: PgPool) 
             open_to_candidate: "no".into(),
             region_note: Some("Germany or Austria only".into()),
             working_languages: vec!["en".into()],
+            relocation_note: Some("Move to Munich".into()),
+            ..store::Eligibility::default()
         },
         Some("not_open_to_location"),
     )
@@ -306,6 +311,15 @@ async fn a_match_that_fails_a_requirement_is_hidden_with_its_reason(db: PgPool) 
     assert_eq!(list.len(), 1);
     assert_eq!(list[0]["title"], "Staff Engineer");
     assert_eq!(list[0]["hidden_reason"], serde_json::Value::Null);
+    // Each row says what it asks of where the person is (#111).
+    assert_eq!(list[0]["facts"]["open_to_candidate"], "yes");
+    assert_eq!(list[0]["facts"]["region_note"], "EU");
+    assert_eq!(list[0]["facts"]["time_zone_note"], "CET ± 2 hours");
+    assert_eq!(
+        list[0]["facts"]["work_permit_note"],
+        "EU work permit, no visa sponsorship"
+    );
+    assert_eq!(list[0]["facts"]["relocation_note"], serde_json::Value::Null);
     let (_, body) = h.get("/api/v1/opportunities?new=true").await;
     assert_eq!(body["opportunities"].as_array().unwrap().len(), 1);
 
@@ -325,6 +339,7 @@ async fn a_match_that_fails_a_requirement_is_hidden_with_its_reason(db: PgPool) 
     assert_eq!(body["facts"]["remote"], "yes");
     assert_eq!(body["facts"]["open_to_candidate"], "no");
     assert_eq!(body["facts"]["working_languages"], json!(["en"]));
+    assert_eq!(body["facts"]["relocation_note"], "Move to Munich");
     let (_, body) = h.get("/api/v1/opportunities?hidden=true&new=true").await;
     assert!(body["opportunities"].as_array().unwrap().is_empty());
 }

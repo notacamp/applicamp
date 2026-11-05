@@ -118,6 +118,7 @@ async fn a_job_that_fits_well_is_proposed_best_first_until_it_moves_or_is_set_as
             open_to_candidate: "no".into(),
             region_note: None,
             working_languages: vec![],
+            ..store::Eligibility::default()
         },
         None,
     )

@@ -164,7 +164,8 @@ impl HiddenReason {
 }
 
 /// What the posting says about the person's requirements, as their search
-/// read it: "Remote · open to you · English".
+/// read it: "Remote · open to you · English", and what it asks of where they
+/// are (shown only; never used to hide it).
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct JobFacts {
     /// It can be done fully remote.
@@ -175,6 +176,15 @@ pub struct JobFacts {
     pub region_note: Option<String>,
     /// The languages it needs, ISO 639-1 (`en`).
     pub working_languages: Vec<String>,
+    /// The hours or time zones it needs, as the posting says ("CET ± 2
+    /// hours"); none when it does not say, or it was read before #111.
+    pub time_zone_note: Option<String>,
+    /// The right to work and visa sponsorship, as the posting says ("EU
+    /// work permit, no visa sponsorship").
+    pub work_permit_note: Option<String>,
+    /// Moving for the job, as the posting says ("Move to Berlin; help
+    /// offered").
+    pub relocation_note: Option<String>,
 }
 
 /// An opportunity, as the table, the board and the list show it.
@@ -212,6 +222,9 @@ pub struct OpportunitySummary {
     pub hidden_reason: Option<HiddenReason>,
     /// Where it is open, as the posting says, to go with the reason.
     pub region_note: Option<String>,
+    /// What the posting says about their requirements and about where they
+    /// are, for the row; none when never checked.
+    pub facts: Option<JobFacts>,
     /// Proposed to the person: Found, a match of 75 or more, open to them.
     pub proposed: bool,
     /// Who shortlisted it, once someone did.
@@ -340,6 +353,9 @@ pub(crate) struct Row {
     open_to_candidate: Option<String>,
     region_note: Option<String>,
     working_languages: Option<Vec<String>>,
+    time_zone_note: Option<String>,
+    work_permit_note: Option<String>,
+    relocation_note: Option<String>,
     hidden_reason: Option<String>,
     apply_url: Option<String>,
     expires_at: Option<DateTime<Utc>>,
@@ -354,7 +370,8 @@ macro_rules! columns {
         "id, title, company, location, work_mode, url, source, posted_at, salary_text, \
          description, match_score, match_why, match_gaps, reasons_updated, stage, next_step, notes, \
          dismissed, opened_at, created_at, updated_at, remote, open_to_candidate, region_note, \
-         working_languages, hidden_reason, apply_url, expires_at, proposed_at, shortlisted_by, \
+         working_languages, time_zone_note, work_permit_note, relocation_note, hidden_reason, \
+         apply_url, expires_at, proposed_at, shortlisted_by, \
          (SELECT s.name FROM pipeline.opportunity_sources s \
            WHERE s.opportunity_id = opportunities.id ORDER BY s.seen_at, s.board LIMIT 1) \
          AS source_name"
@@ -393,6 +410,9 @@ impl Row {
             open_to_candidate: Fact::parse(self.open_to_candidate.as_deref()?)?,
             region_note: self.region_note.clone(),
             working_languages: self.working_languages.clone().unwrap_or_default(),
+            time_zone_note: self.time_zone_note.clone(),
+            work_permit_note: self.work_permit_note.clone(),
+            relocation_note: self.relocation_note.clone(),
         })
     }
 
@@ -403,6 +423,7 @@ impl Row {
 
     fn summary(self) -> OpportunitySummary {
         OpportunitySummary {
+            facts: self.facts(),
             new: self.is_new(),
             proposed: self.proposed(),
             shortlisted_by: self.shortlisted_by(),

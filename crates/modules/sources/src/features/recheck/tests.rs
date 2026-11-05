@@ -121,6 +121,7 @@ fn hidden(account: Uuid, languages: &[&str]) -> HiddenUnclear {
             region_note: None,
             working_languages: languages.iter().map(|l| (*l).to_owned()).collect(),
             salary: None,
+            place: Default::default(),
         },
     }
 }

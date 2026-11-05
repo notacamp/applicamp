@@ -56,17 +56,17 @@
       "approved": {
         "title": "Approuvés",
         "description": "Chaque recherche les lit, dans le respect de leurs conditions. Le salaire moyen le plus élevé d’abord.",
-        "empty": "Aucun site n’est encore approuvé."
+        "empty": "Les sites que vous approuvez apparaissent ici, avec leurs offres et les salaires affichés."
       },
       "waiting": {
         "title": "En attente de vous",
         "description": "Trouvés par la découverte hebdomadaire ou suggérés. Rien n’y est lu avant leur approbation.",
-        "empty": "Rien ne vous attend."
+        "empty": "Un nouveau site apparaît ici quand il attend votre approbation, une clé ou une permission."
       },
       "declined": {
         "title": "Refusés",
         "description": "Jamais lus, chacun avec sa raison.",
-        "empty": "Aucun site n’est refusé."
+        "empty": "Un site que vous refusez apparaît ici, avec la raison."
       }
     },
     "status": {
@@ -100,6 +100,7 @@
     "errors": {
       "not_board_owner": "Seuls les responsables des sites de cette instance peuvent faire cela.",
       "not_waiting": "Seul un site en attente, ou en pause, peut être approuvé.",
+      "not_asked": "Dites d’abord que vous l’avez envoyé.",
       "not_approved": "Seul un site approuvé peut être mis en pause.",
       "check_needed": "Vérifiez d’abord le site : ses règles robots ne sont pas encore connues.",
       "robots_disallowed": "Les règles robots du site interdisent de lire ce flux. Modifiez sa configuration vers un chemin autorisé.",
@@ -489,5 +490,210 @@
       },
       "limits": "Jusqu’à {{max}} entreprises suivies. Cela compte dans vos limites (0,30 € par jour, 5 € par mois), et rien n’est retenté au-delà d’une limite."
     }
+  },
+  "admin": {
+    "loadFailed": "Les sites d’emploi n’ont pas pu être chargés.",
+    "retry": "Réessayer",
+    "none": "Pas encore",
+    "worldwide": "Dans le monde entier",
+    "cancel": "Annuler",
+    "askedOn": "Demandé le {{date}}. Pas encore de réponse.",
+    "totals": {
+      "reading": "Lus",
+      "readingDetail": "{{sites}} sites d’emploi et {{companies}} entreprises",
+      "waiting": "En attente de vous",
+      "waitingDetail": "Permissions, clés et choix",
+      "checking": "En vérification",
+      "checkingDetail": "Trouvés récemment, l’app lit leurs règles",
+      "notAllowed": "Non autorisés",
+      "notAllowedDetail": "Leurs règles interdisent les apps",
+      "paused": "En pause",
+      "pausedDetail": "Arrêtés par vous pour le moment"
+    },
+    "week": {
+      "title": "Cette semaine",
+      "found_one": "{{count}} nouveau site trouvé et {{checked}} vérifiés.",
+      "found_other": "{{count}} nouveaux sites trouvés et {{checked}} vérifiés.",
+      "started_one": "{{count}} site a commencé à être lu.",
+      "started_other": "{{count}} sites ont commencé à être lus.",
+      "rechecked_one": "Les règles de {{count}} site ont été relues.",
+      "rechecked_other": "Les règles de {{count}} sites ont été relues.",
+      "nothing": "Rien de nouveau cette semaine. L’app cherche de nouveaux sites chaque semaine."
+    },
+    "waiting": {
+      "title": "En attente de vous",
+      "description": "Chacun demande quelque chose que vous seul pouvez faire.",
+      "emptyTitle": "Rien ne vous attend",
+      "emptyBody": "Un site apparaît ici quand ses règles demandent une permission, qu’il faut une clé ou qu’il ne manque que votre accord. L’app trouve et vérifie de nouveaux sites chaque semaine."
+    },
+    "need": {
+      "permission": "Ses règles demandent une permission écrite avant qu’une app lise ses offres.",
+      "key": "Il faut une clé gratuite que vous seul pouvez demander.",
+      "choice": "Un seul choix vaut pour toutes les entreprises de ce système de recrutement.",
+      "approve": "Toutes les vérifications ont réussi. Il ne manque que votre accord."
+    },
+    "cta": {
+      "permission": "Demander la permission",
+      "key": "Ajouter la clé",
+      "choice": "Choisir",
+      "approve": "Voir"
+    },
+    "status": {
+      "reading": "Lu",
+      "waiting": "En attente de vous",
+      "checking": "En vérification",
+      "notAllowed": "Non autorisé",
+      "paused": "En pause"
+    },
+    "kind": {
+      "site": "Site d’emploi",
+      "company": "Page d’entreprise"
+    },
+    "how": {
+      "json_api": "une liste publique d’offres pour les apps",
+      "rss": "un flux d’actualités avec ses offres",
+      "jsonld_sitemap": "des offres balisées dans ses pages",
+      "hn": "un fil mensuel de messages",
+      "company_page": "la page de recrutement de l’entreprise",
+      "hiring_system": "un système de recrutement pour de nombreuses entreprises"
+    },
+    "origin": {
+      "seed": "la première recherche",
+      "discovery": "la recherche hebdomadaire de sites",
+      "suggested": "une suggestion"
+    },
+    "table": {
+      "board": "Site",
+      "jobs": "Offres qu’il a",
+      "where": "Où",
+      "status": "Statut",
+      "found": "Trouvé grâce à"
+    },
+    "all": {
+      "title": "Tous les sites",
+      "search": "Chercher un site ou une entreprise",
+      "searchHint": "Hôtels, infirmiers, Lisbonne, Greenhouse",
+      "emptyTitle": "Aucun site ne correspond",
+      "emptyBody": "Aucun site ne correspond à ces filtres. Retirez un filtre pour en voir plus.",
+      "emptyNone": "Aucun site n’est encore connu. L’app en cherche de nouveaux chaque semaine.",
+      "clear": "Effacer les filtres",
+      "table": "Tous les sites",
+      "showing": "{{shown}} affichés"
+    },
+    "filters": {
+      "show": "Afficher",
+      "options": {
+        "all": "Tous les sites",
+        "waiting": "En attente de vous",
+        "checking": "En vérification",
+        "reading": "Lus",
+        "notAllowed": "Non autorisés",
+        "paused": "En pause",
+        "site": "Sites d’emploi",
+        "company": "Pages d’entreprises"
+      }
+    },
+    "peek": {
+      "eyebrow": "Site d’emploi",
+      "close": "Fermer",
+      "more": "Plus d’options"
+    },
+    "decline": {
+      "button": "Refuser",
+      "confirm": "Le refuser",
+      "sure": "Refuser {{name}} ? Il ne sera jamais lu."
+    },
+    "permission": {
+      "title": "Demander la permission",
+      "description": "Envoyez ceci depuis votre propre messagerie. Quand ils répondent, notez-le ici.",
+      "noContact": "Envoyez-le au contact indiqué sur son site.",
+      "to": "À {{to}}",
+      "email": "E-mail à envoyer",
+      "copy": "Copier l’e-mail",
+      "copied": "Copié",
+      "copyFailed": "Sélectionnez le texte et copiez-le",
+      "sent": "Je l’ai envoyé",
+      "yes": "Ils ont dit oui",
+      "no": "Ils ont dit non"
+    },
+    "key": {
+      "title": "Ajouter sa clé",
+      "description": "Vous seul pouvez la demander. Applicamp la garde scellée et ne l’envoie nulle part ailleurs.",
+      "open": "Ouvrez la page où {{name}} donne les clés.",
+      "page": "Obtenir une clé",
+      "paste": "Collez la clé ici.",
+      "field": "Clé",
+      "save": "Enregistrer et vérifier"
+    },
+    "choice": {
+      "title": "Votre choix",
+      "description": "Lire ces pages pour montrer leurs offres est permis. Leur site demande aux outils d’intelligence artificielle de ne pas apprendre de ses pages. L’app n’entraîne jamais un modèle sur des offres, mais elle demande bien à un modèle si une offre convient à la personne.",
+      "yes": "Les lire",
+      "no": "Ne pas les lire"
+    },
+    "approve": {
+      "title": "Prêt à lire",
+      "description": "Toutes les vérifications ont réussi. Approuvez-le et les recherches commencent à le lire.",
+      "button": "Approuver"
+    },
+    "checking": {
+      "title": "En vérification",
+      "description": "L’app lit ses règles et cherche ses offres. Rien n’est encore attendu de vous."
+    },
+    "notAllowed": {
+      "title": "Non autorisé",
+      "description": "Ses règles interdisent les apps, donc l’app ne le lit pas."
+    },
+    "reading": {
+      "title": "Lu",
+      "pause": "Mettre en pause",
+      "check": "Vérifier de nouveau",
+      "stop": "Arrêter de le lire",
+      "stopConfirm": "Arrêter de lire",
+      "stopSure": "Arrêter de lire {{name}} ? Les recherches ne l’utiliseront plus."
+    },
+    "paused": {
+      "title": "En pause",
+      "resume": "Le relire"
+    },
+    "facts": {
+      "jobs": "Offres qu’il a",
+      "where": "Où",
+      "how": "Comment il est lu",
+      "found": "Trouvé grâce à",
+      "checked": "Vérifié",
+      "now": "Maintenant",
+      "never": "Pas encore"
+    },
+    "errors": {
+      "not_asked": "Dites d’abord que vous l’avez envoyé.",
+      "not_waiting": "On ne peut répondre qu’à un site qui vous attend.",
+      "robots_disallowed": "Son site dit aux programmes de rester loin de cette liste, donc un oui ne peut pas le démarrer.",
+      "needs_key": "Il faut d’abord une clé. Ajoutez-la, puis répondez.",
+      "check_needed": "L’app n’a pas encore vérifié ses règles. Vérifiez-le d’abord de nouveau.",
+      "generic": "Cela n’a pas fonctionné. Réessayez."
+    },
+    "checks": {
+      "title": "Ce que l’app a vérifié",
+      "feedOk": "Il publie ses offres pour que les apps les lisent",
+      "feedWait": "Recherche d’une liste de ses offres",
+      "siteOk": "Son site permet aux apps de le lire",
+      "siteNo": "Son site dit aux programmes de rester loin de cette liste",
+      "siteWait": "Lecture des règles de son site",
+      "rulesOk": "Ses règles ne disent rien contre les apps",
+      "rulesNo": "Ses règles demandent d’abord la permission",
+      "rulesWait": "Lecture de ses règles",
+      "keyOk": "Une clé est ajoutée",
+      "keyNo": "Il faut une clé : aucune ajoutée pour l’instant",
+      "state": {
+        "ok": "Réussi",
+        "part": "Encore en vérification",
+        "none": "Demande de l’attention"
+      }
+    },
+    "undo": "Annuler",
+    "declined": "Refusé",
+    "open": "Ouvrir",
+    "more": "Afficher plus"
   }
 }

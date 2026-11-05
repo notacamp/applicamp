@@ -482,6 +482,150 @@
         ]
       }
     },
+    "/api/v1/boards/admin": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "The admin overview of the job boards.",
+        "description": "Totals (being read as job sites and companies, waiting for you, being\nchecked, not allowed, paused), what happened over the last 7 days from the\ndiscovery runs and approvals the app recorded, and every board that is not\nread, paused or declined with its stage and what it waits for. Board owners\nonly: anyone else gets 404.",
+        "operationId": "sources.boards_admin",
+        "responses": {
+          "200": {
+            "description": "The overview.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminOverview"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: not a board owner",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/boards/admin/list": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "The boards, 50 a page.",
+        "description": "Searched (`q`: a name, a site's host or a tag) and filtered (`show`) on the\nserver, so thousands of boards never reach the client at once. Ordered by\nthe jobs read at the last read, most first, then by id; the cursor is the\nlast line's place in that order, so a page never repeats or skips a board.\nBoard owners only: anyone else gets 404.",
+        "operationId": "sources.boards_admin_list",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Matches a name, a site's host or a tag, ignoring case.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "show",
+            "in": "query",
+            "description": "What to show; every board when left out.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "What the \"Show\" select picks.",
+              "enum": [
+                "all",
+                "waiting",
+                "checking",
+                "reading",
+                "notAllowed",
+                "paused",
+                "site",
+                "company"
+              ]
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "The page after this one (`next_cursor`).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of boards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_query`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: not a board owner",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/v1/boards/scans": {
       "get": {
         "tags": [
@@ -1262,6 +1406,292 @@
           },
           "409": {
             "description": "`not_approved`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/boards/{id}/permission-email": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "The permission email for a board.",
+        "description": "Addressed to the board's contact when its check found one. Fills in the\nboard's name, what Applicamp would read, the link back, the reading\nfrequency (at most hourly), no reposting and dropping closed jobs. It is\nsigned \"Applicamp\": the app does not know the owner's name. The app never\nsends it: the owner sends it from their own mailbox. Board owners only.",
+        "operationId": "sources.board_permission_email",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The board.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The draft.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionEmail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such board, or not a board owner",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/boards/{id}/permission/answer": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Record a board's answer.",
+        "description": "A permission only after it was asked (a choice needs no email). \"yes\" approves the board through the approve\npath (the note \"They said yes on <date>\" is kept): the terms and\npermission blockers are cleared, but robots rules that forbid the feed and\na missing key still refuse it (409, nothing recorded). \"no\" declines it\nthrough the decline path with the reason \"They said no on <date>\". Board\nowners only.",
+        "operationId": "sources.board_permission_answer",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The board.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BoardAnswer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Recorded: the board, approved or declined.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_request`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such board, or not a board owner",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`not_asked`: nothing was asked yet; `not_waiting`; or the first blocker that remains when the answer is yes",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/boards/{id}/permission/asked": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Record that the permission email was sent.",
+        "description": "Stores the date; asking twice keeps the first date. The app sends\nnothing. Board owners only.",
+        "operationId": "sources.board_permission_asked",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The board.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recorded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionEmail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such board, or not a board owner",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`not_waiting`: the board is read or declined",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/boards/{id}/reopen": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Take back a decline.",
+        "description": "A declined board is put back where it was: approved when it was\napproved before (the owner stopped reading it), else waiting for the\nowner. Its decline reason is cleared. Board owners only.",
+        "operationId": "sources.reopen_board",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The board.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Back where it was.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such board, or not a board owner",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`not_declined`",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8689,6 +9119,235 @@
         },
         "additionalProperties": false
       },
+      "AdminBoard": {
+        "type": "object",
+        "description": "One line of the admin list.",
+        "required": [
+          "id",
+          "name",
+          "homepage",
+          "kind",
+          "group",
+          "status",
+          "stage",
+          "origin",
+          "tags"
+        ],
+        "properties": {
+          "asked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the owner said they asked it."
+          },
+          "country": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decline_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The first reason in the board's own words: data from its site, never\nan instruction."
+          },
+          "found_through": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "group": {
+            "$ref": "#/components/schemas/BoardGroup"
+          },
+          "homepage": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "description": "How it is read, as stored (`json_api`, `rss`, `company_page`, ...)."
+          },
+          "last_fetch_jobs": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "name": {
+            "type": "string"
+          },
+          "need": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BoardNeed",
+                "description": "What it waits for; set when `stage` is `waiting`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its check's note."
+          },
+          "origin": {
+            "$ref": "#/components/schemas/BoardOrigin"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/BoardStage"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BoardStatus"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "AdminList": {
+        "type": "object",
+        "description": "A page of the admin list.",
+        "required": [
+          "boards"
+        ],
+        "properties": {
+          "boards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminBoard"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pass as `cursor` for the next page; none on the last."
+          }
+        }
+      },
+      "AdminOverview": {
+        "type": "object",
+        "description": "The admin page's first answer.",
+        "required": [
+          "totals",
+          "this_week"
+        ],
+        "properties": {
+          "this_week": {
+            "$ref": "#/components/schemas/AdminThisWeek"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/AdminTotals"
+          }
+        }
+      },
+      "AdminThisWeek": {
+        "type": "object",
+        "description": "What happened over the last 7 days, from what the app recorded.",
+        "required": [
+          "found",
+          "checked",
+          "rechecked",
+          "started_reading"
+        ],
+        "properties": {
+          "checked": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Boards it checked.",
+            "minimum": 0
+          },
+          "found": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Boards the weekly discovery found.",
+            "minimum": 0
+          },
+          "rechecked": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Boards whose rules and terms were read again.",
+            "minimum": 0
+          },
+          "started_reading": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Boards approved.",
+            "minimum": 0
+          }
+        }
+      },
+      "AdminTotals": {
+        "type": "object",
+        "description": "How many boards are in each state.",
+        "required": [
+          "reading_sites",
+          "reading_companies",
+          "waiting",
+          "checking",
+          "not_allowed",
+          "paused"
+        ],
+        "properties": {
+          "checking": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "not_allowed": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Declined, or forbidden by their robots rules.",
+            "minimum": 0
+          },
+          "paused": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "reading_companies": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Company pages that are read.",
+            "minimum": 0
+          },
+          "reading_sites": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Job sites that are read.",
+            "minimum": 0
+          },
+          "waiting": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
       "AgentContext": {
         "type": "object",
         "description": "What the agent works on.",
@@ -9029,6 +9688,30 @@
           "ai_unavailable"
         ]
       },
+      "BoardAnswer": {
+        "type": "object",
+        "description": "The answer to record.",
+        "required": [
+          "answer"
+        ],
+        "properties": {
+          "answer": {
+            "$ref": "#/components/schemas/RequestAnswer"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RequestKind",
+            "description": "Which request; permission when left out."
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What they said, in up to 500 characters; kept with the answer."
+          }
+        },
+        "additionalProperties": false
+      },
       "BoardBlocker": {
         "type": "object",
         "description": "Why a board cannot be approved yet.",
@@ -9162,6 +9845,14 @@
           }
         }
       },
+      "BoardGroup": {
+        "type": "string",
+        "description": "Which part of the registry a board belongs to.",
+        "enum": [
+          "site",
+          "company"
+        ]
+      },
       "BoardKey": {
         "type": "object",
         "description": "A board's API key, as a client sees it: never the key itself.",
@@ -9261,6 +9952,16 @@
             "description": "The web search."
           }
         }
+      },
+      "BoardNeed": {
+        "type": "string",
+        "description": "What a board waits on the owner for.",
+        "enum": [
+          "permission",
+          "key",
+          "choice",
+          "approve"
+        ]
       },
       "BoardOrigin": {
         "type": "string",
@@ -9481,6 +10182,17 @@
             "description": "Share of the sample open worldwide (0–1)."
           }
         }
+      },
+      "BoardStage": {
+        "type": "string",
+        "description": "Where a board stands, as the admin page words it.",
+        "enum": [
+          "reading",
+          "paused",
+          "waiting",
+          "checking",
+          "not_allowed"
+        ]
       },
       "BoardStatus": {
         "type": "string",
@@ -14975,6 +15687,55 @@
           "month"
         ]
       },
+      "PermissionEmail": {
+        "type": "object",
+        "description": "The email asking a board for permission, as a draft.",
+        "required": [
+          "subject",
+          "body"
+        ],
+        "properties": {
+          "answer": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RequestAnswer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "answered_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it was answered, and how."
+          },
+          "asked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the owner said they sent it."
+          },
+          "body": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "to": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The board's contact when its check found one."
+          }
+        }
+      },
       "Preparation": {
         "type": "object",
         "description": "What the app does by itself for a job.",
@@ -15571,6 +16332,22 @@
           "within_country",
           "within_eu",
           "anywhere"
+        ]
+      },
+      "RequestAnswer": {
+        "type": "string",
+        "description": "What a board said.",
+        "enum": [
+          "yes",
+          "no"
+        ]
+      },
+      "RequestKind": {
+        "type": "string",
+        "description": "What a request asks.",
+        "enum": [
+          "permission",
+          "choice"
         ]
       },
       "Resolution": {

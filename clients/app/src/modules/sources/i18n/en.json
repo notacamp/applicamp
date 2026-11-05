@@ -56,17 +56,17 @@
       "approved": {
         "title": "Approved",
         "description": "Every search reads these, within their terms. Highest average salary first.",
-        "empty": "No board is approved yet."
+        "empty": "Boards you approve show here, with their jobs and the salaries they list."
       },
       "waiting": {
         "title": "Waiting for you",
         "description": "Found by the weekly discovery or suggested. Nothing is read from them until they’re approved.",
-        "empty": "Nothing is waiting for you."
+        "empty": "A new board shows here when it needs your approval, a key or a permission."
       },
       "declined": {
         "title": "Declined",
         "description": "Never read, each with the reason.",
-        "empty": "No board is declined."
+        "empty": "A board you decline shows here, with the reason."
       }
     },
     "status": {
@@ -100,6 +100,7 @@
     "errors": {
       "not_board_owner": "Only the instance’s board owners can do that.",
       "not_waiting": "Only a board waiting for you, or paused, can be approved.",
+      "not_asked": "Say you sent it first.",
       "not_approved": "Only an approved board can be paused.",
       "check_needed": "Check the board first: its robots rules aren’t known yet.",
       "robots_disallowed": "The board’s robots rules forbid reading that feed. Edit its config to an allowed path.",
@@ -489,5 +490,210 @@
       },
       "limits": "Up to {{max}} watched companies. It counts against your limits (€0.30 a day, €5 a month), and nothing is retried past a limit."
     }
+  },
+  "admin": {
+    "loadFailed": "The job sites could not be loaded.",
+    "retry": "Try again",
+    "none": "Not yet",
+    "worldwide": "Worldwide",
+    "cancel": "Cancel",
+    "askedOn": "Asked on {{date}}. No answer yet.",
+    "totals": {
+      "reading": "Being read",
+      "readingDetail": "{{sites}} job sites and {{companies}} companies",
+      "waiting": "Waiting for you",
+      "waitingDetail": "Permissions, keys and choices",
+      "checking": "Being checked",
+      "checkingDetail": "Found lately, the app is reading their rules",
+      "notAllowed": "Not allowed",
+      "notAllowedDetail": "Their rules forbid apps",
+      "paused": "Paused",
+      "pausedDetail": "Stopped by you for now"
+    },
+    "week": {
+      "title": "This week",
+      "found_one": "Found {{count}} new site and checked {{checked}}.",
+      "found_other": "Found {{count}} new sites and checked {{checked}}.",
+      "started_one": "{{count}} site started reading.",
+      "started_other": "{{count}} sites started reading.",
+      "rechecked_one": "The rules of {{count}} site were read again.",
+      "rechecked_other": "The rules of {{count}} sites were read again.",
+      "nothing": "Nothing new this week. The app looks for new sites every week."
+    },
+    "waiting": {
+      "title": "Waiting for you",
+      "description": "Each one needs something only you can do.",
+      "emptyTitle": "Nothing waits for you",
+      "emptyBody": "A site shows up here when its rules ask for permission, it needs a key, or only your approval is left. The app finds and checks new sites every week."
+    },
+    "need": {
+      "permission": "Its rules ask for written permission before an app reads its jobs.",
+      "key": "Needs a free key that only you can ask for.",
+      "choice": "One choice covers every company on this hiring system.",
+      "approve": "Every check passed. Only your approval is left."
+    },
+    "cta": {
+      "permission": "Ask for permission",
+      "key": "Add the key",
+      "choice": "Choose",
+      "approve": "Review"
+    },
+    "status": {
+      "reading": "Reading",
+      "waiting": "Waiting for you",
+      "checking": "Being checked",
+      "notAllowed": "Not allowed",
+      "paused": "Paused"
+    },
+    "kind": {
+      "site": "Job site",
+      "company": "Company page"
+    },
+    "how": {
+      "json_api": "a public list of jobs for apps",
+      "rss": "a news feed of its jobs",
+      "jsonld_sitemap": "jobs marked up on its pages",
+      "hn": "a monthly thread of posts",
+      "company_page": "the company’s own hiring page",
+      "hiring_system": "one hiring system for many companies"
+    },
+    "origin": {
+      "seed": "the first research",
+      "discovery": "the weekly search for sites",
+      "suggested": "a suggestion"
+    },
+    "table": {
+      "board": "Site",
+      "jobs": "Jobs it has",
+      "where": "Where",
+      "status": "Status",
+      "found": "Found through"
+    },
+    "all": {
+      "title": "All sites",
+      "search": "Find a site or a company",
+      "searchHint": "Hotels, nurses, Lisbon, Greenhouse",
+      "emptyTitle": "No site matches",
+      "emptyBody": "No site matches these filters. Clear a filter to see more.",
+      "emptyNone": "No site is known yet. The app looks for new ones every week.",
+      "clear": "Clear filters",
+      "table": "All sites",
+      "showing": "Showing {{shown}}"
+    },
+    "filters": {
+      "show": "Show",
+      "options": {
+        "all": "All sites",
+        "waiting": "Waiting for you",
+        "checking": "Being checked",
+        "reading": "Reading",
+        "notAllowed": "Not allowed",
+        "paused": "Paused",
+        "site": "Job sites",
+        "company": "Company pages"
+      }
+    },
+    "peek": {
+      "eyebrow": "Job site",
+      "close": "Close",
+      "more": "More options"
+    },
+    "decline": {
+      "button": "Decline",
+      "confirm": "Decline it",
+      "sure": "Decline {{name}}? It will never be read."
+    },
+    "permission": {
+      "title": "Ask for permission",
+      "description": "Send this from your own email. When they answer, mark it here.",
+      "noContact": "Send it to the contact on its site.",
+      "to": "To {{to}}",
+      "email": "Email to send",
+      "copy": "Copy the email",
+      "copied": "Copied",
+      "copyFailed": "Select the text and copy it",
+      "sent": "I sent it",
+      "yes": "They said yes",
+      "no": "They said no"
+    },
+    "key": {
+      "title": "Add its key",
+      "description": "Only you can ask for it. Applicamp keeps it sealed and sends it nowhere else.",
+      "open": "Open the page where {{name}} gives out keys.",
+      "page": "Get a key",
+      "paste": "Paste the key here.",
+      "field": "Key",
+      "save": "Save and check"
+    },
+    "choice": {
+      "title": "Your choice",
+      "description": "Reading these pages to show their jobs is allowed. Their site asks artificial intelligence tools not to learn from its pages. The app never trains a model on jobs, but it does ask a model whether a job fits the person.",
+      "yes": "Read them",
+      "no": "Do not read them"
+    },
+    "approve": {
+      "title": "Ready to read",
+      "description": "Every check passed. Approve it and searches start reading it.",
+      "button": "Approve"
+    },
+    "checking": {
+      "title": "Being checked",
+      "description": "The app is reading its rules and looking for its jobs. Nothing is needed from you yet."
+    },
+    "notAllowed": {
+      "title": "Not allowed",
+      "description": "Its rules forbid apps, so the app does not read it."
+    },
+    "reading": {
+      "title": "Being read",
+      "pause": "Pause",
+      "check": "Check again",
+      "stop": "Stop reading it",
+      "stopConfirm": "Stop reading",
+      "stopSure": "Stop reading {{name}}? Searches will no longer use it."
+    },
+    "paused": {
+      "title": "Paused",
+      "resume": "Read it again"
+    },
+    "facts": {
+      "jobs": "Jobs it has",
+      "where": "Where",
+      "how": "How it is read",
+      "found": "Found through",
+      "checked": "Checked",
+      "now": "Now",
+      "never": "Not yet"
+    },
+    "errors": {
+      "not_asked": "Say you sent it first.",
+      "not_waiting": "Only a site waiting for you can be answered.",
+      "robots_disallowed": "Its site tells programs to stay away from that list, so a yes cannot start it.",
+      "needs_key": "It needs a key first. Add it, then answer.",
+      "check_needed": "The app has not checked its rules yet. Check it again first.",
+      "generic": "That did not work. Try again."
+    },
+    "checks": {
+      "title": "What the app checked",
+      "feedOk": "It publishes its jobs for apps to read",
+      "feedWait": "Looking for a list of its jobs",
+      "siteOk": "Its site allows apps to read it",
+      "siteNo": "Its site tells programs to stay away from that list",
+      "siteWait": "Reading the rules of its site",
+      "rulesOk": "Its rules say nothing against apps",
+      "rulesNo": "Its rules ask for permission first",
+      "rulesWait": "Reading its rules",
+      "keyOk": "A key is added",
+      "keyNo": "Needs a key: none added yet",
+      "state": {
+        "ok": "Passed",
+        "part": "Still being checked",
+        "none": "Needs attention"
+      }
+    },
+    "undo": "Undo",
+    "declined": "Declined",
+    "open": "Open",
+    "more": "Show more"
   }
 }

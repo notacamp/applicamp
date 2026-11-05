@@ -290,3 +290,53 @@ export function discoveryRun(): ScanRun {
     ],
   };
 }
+
+type AdminOverview = Schema<"AdminOverview">;
+type PermissionEmail = Schema<"PermissionEmail">;
+type AdminBoard = Schema<"AdminBoard">;
+
+/** The owners' overview. */
+export function adminOverview(overrides: Partial<AdminOverview> = {}): AdminOverview {
+  return {
+    totals: {
+      reading_sites: 412,
+      reading_companies: 2736,
+      waiting: 1,
+      checking: 0,
+      not_allowed: 1,
+      paused: 0,
+    },
+    this_week: { found: 184, checked: 190, rechecked: 40, started_reading: 162 },
+    ...overrides,
+  };
+}
+
+/** The email asking Example Remote for permission. */
+export function permissionEmail(overrides: Partial<PermissionEmail> = {}): PermissionEmail {
+  return {
+    to: null,
+    subject: "May Applicamp show jobs from Example Remote?",
+    body: "Hi Example Remote team,\n\nWe would read the list of jobs your site publishes at remote.example.\n\nThanks,\nApplicamp",
+    asked_at: null,
+    answered_at: null,
+    answer: null,
+    ...overrides,
+  };
+}
+
+/** A line of the owners' table: a job site that is read, unless `overrides` say otherwise. */
+export function adminBoard(overrides: Partial<AdminBoard> = {}): AdminBoard {
+  return {
+    id: HIMALAYAS,
+    name: "Himalayas",
+    homepage: "https://himalayas.app",
+    kind: "json_api",
+    group: "site",
+    status: "approved",
+    stage: "reading",
+    origin: "seed",
+    last_fetch_jobs: 100,
+    tags: [],
+    ...overrides,
+  };
+}

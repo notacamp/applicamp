@@ -1,0 +1,11 @@
+# Tasks
+- [x] 1 OpenSpec change: proposal, spec delta
+- [x] 2 Migration `sources.board_requests`: one open request per board and kind
+- [x] 3 Endpoints: admin overview, permission email draft, asked, answer (owners only, 404 for anyone else), in OpenAPI
+- [x] 4 Yes approves through the approve path, no declines through the decline path
+- [x] 5 Server tests: owner gate, overview classification, draft, yes, no, robots rules still refuse
+- [x] 6 Client: admin view of `/boards` (totals, this week, waiting for you, all boards with filters, side panel), back link, skeleton, empty states
+- [x] 7 Client tests; the full board panel stays one click away
+- [x] 8 Four languages, plain words
+- [x] 9 OpenAPI and client types regenerated, changelog entry file
+- [x] 10 Gates green in CI, recording (UI at 375px and desktop; by the reviewer)

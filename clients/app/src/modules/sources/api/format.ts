@@ -40,6 +40,11 @@ export function hostOf(url: string | null | undefined): string | null {
   }
 }
 
+/** "28 Oct": a day and a short month, in the person's language. */
+export function shortDate(iso: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }).format(new Date(iso));
+}
+
 /** A day for a sentence ("4 November"); English reads day first. */
 export function formatDay(iso: string, locale: string): string {
   return new Intl.DateTimeFormat(locale === "en" ? "en-GB" : locale, {

@@ -224,7 +224,7 @@ describe("The Searches tab", () => {
     );
     const search = run({
       lines: [line({ matched: 4 }), ...pages],
-      funnel: { ...(lastNight().funnel as NonNullable<ScanRun["funnel"]>), good_matches: 14 },
+      funnel: { ...lastNight().funnel!, good_matches: 14 },
     });
     renderSearches([search]);
     const from = await screen.findByTestId("scanned-from");
@@ -238,7 +238,7 @@ describe("The Searches tab", () => {
       "4 company hiring pages · 4",
     ]);
     // The counts add up to the good matches.
-    const total = items.reduce((sum, item) => sum + Number(item?.split(" · ")[1]), 0);
+    const total = items.reduce((sum, item) => sum + Number(item.split(" · ", 2)[1]), 0);
     expect(total).toBe(14);
   });
 

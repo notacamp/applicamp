@@ -599,6 +599,8 @@ async fn hard_requirements_drop_jobs_whatever_their_score(db: PgPool) {
     let model = model_reading_facts().await;
     let mut settings = config(&boards);
     settings.enabled = Some(vec!["greenhouse".into(), "arbeitnow".into()]);
+    // The sites are read live here (the store has its own tests).
+    settings.store = Some(false);
     // Someone in Lisbon who works remote only, in English and Portuguese.
     let h = Harness::new(
         db,

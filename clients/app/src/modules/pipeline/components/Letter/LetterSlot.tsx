@@ -6,7 +6,7 @@ import { formatCost } from "../../api/labels";
 import { letterBlockedReason, letterErrorCode, useLetter, useWriteLetter } from "../../api/letter";
 
 /**
- * "Write the cover letter · about €0.002": one AI call, then the check without
+ * "Write the cover letter", its cost on the line under it: one AI call, then the check without
  * AI. Off, with its reason, until the job's CV is approved (or when a cap or a
  * limit is hit). With a draft already made it says "Review the cover letter".
  */
@@ -56,7 +56,7 @@ export function LetterSlot({
               write.mutate(undefined, onReview === undefined ? {} : { onSuccess: onReview });
             }}
           >
-            {write.isPending ? t("letter.slot.writing") : t("letter.slot.write", { cost })}
+            {write.isPending ? t("letter.slot.writing") : t("letter.slot.write")}
           </Button>
         ) : (
           <Button
@@ -77,9 +77,11 @@ export function LetterSlot({
         </Tagged>
       ) : null}
       {draft === undefined && reason === undefined ? (
-        <Text tone="secondary" size="sm">
-          {t("letter.slot.hint")}
-        </Text>
+        <Tagged testId={`${testIdPrefix}-write-cost`}>
+          <Text tone="secondary" size="sm">
+            {t("letter.slot.cost", { cost })} {t("letter.slot.hint")}
+          </Text>
+        </Tagged>
       ) : null}
       {failure === undefined ? null : (
         <Tagged testId={`${testIdPrefix}-write-failed`}>

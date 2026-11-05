@@ -124,7 +124,6 @@ function Step({ question, answers, onQuestion, onLeave }: StepProps) {
               variant="primary"
               size="lg"
               type="submit"
-              keys="enter"
               icon="arrow-right"
               disabled={save.isPending}
               data-testid="interview-next"

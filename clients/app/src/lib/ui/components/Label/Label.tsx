@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import styles from "./Label.module.css";
 
-/** Notion's tag colours, each a soft fill under the primary text. */
+/** The label hues: each a soft fill of one of the design system's signal hues under the primary text. */
 export const LABEL_HUES = [
   "gray",
   "brown",
@@ -22,7 +22,7 @@ export interface LabelProps {
   children: ReactNode;
 }
 
-/** A small coloured label, like a Notion select value (a stage, a source). */
+/** A small coloured label (a stage, a source). */
 export function Label({ hue, children }: LabelProps) {
   return (
     <span className={styles["label"]} data-hue={hue}>

@@ -55,8 +55,25 @@
     }
   },
   "review": {
-    "title": "Revisa lo que se ha encontrado",
-    "lead": "No se guarda nada hasta que elijas. Sustituir convierte esto en tu perfil; Combinar mantiene el tuyo tal cual y añade solo lo nuevo.",
+    "title": "Mira lo que hemos encontrado",
+    "lead": "No se guarda nada hasta que elijas. Sustituir convierte esto en tu perfil. Combinar mantiene lo que editaste, completa lo que falta y saca un lugar del resumen de un empleo.",
+    "found": "Hemos encontrado {{list}}.",
+    "counts": {
+      "jobs_one": "{{count}} empleo",
+      "jobs_other": "{{count}} empleos",
+      "achievements_one": "{{count}} logro",
+      "achievements_other": "{{count}} logros",
+      "skills_one": "{{count}} habilidad",
+      "skills_other": "{{count}} habilidades",
+      "degrees_one": "{{count}} título",
+      "degrees_other": "{{count}} títulos",
+      "languages_one": "{{count}} idioma",
+      "languages_other": "{{count}} idiomas",
+      "certificates_one": "{{count}} certificación",
+      "certificates_other": "{{count}} certificaciones",
+      "projects_one": "{{count}} proyecto",
+      "projects_other": "{{count}} proyectos"
+    },
     "loading": "Cargando el borrador…",
     "loadFailed": "No se ha podido cargar el borrador.",
     "gone": "Este borrador ya no está: los borradores duran 24 horas.",
@@ -76,6 +93,7 @@
       "label": "No se encontró ningún titular en este archivo",
       "summary": "No se encontró ningún resumen en este archivo",
       "work": "No se encontró ningún puesto en este archivo",
+      "achievements": "No se encontró ningún logro en este archivo",
       "education": "No se encontró ninguna formación en este archivo",
       "skills": "No se encontró ninguna habilidad en este archivo",
       "languages": "No se encontró ningún idioma en este archivo",
@@ -83,6 +101,10 @@
       "projects": "No se encontró ningún proyecto en este archivo",
       "hint": "Añádelos a mano después de aplicar, o importa tu exportación de datos de LinkedIn, que incluye habilidades, formación e idiomas.",
       "hintZip": "Añádelos a mano después de aplicar."
+    },
+    "stopped": {
+      "title": "Tu límite de IA no nos dejó volver a leer las partes que faltan.",
+      "body": "Abajo está lo que encontramos. Añade a mano las partes que faltan, o inténtalo de nuevo mañana."
     }
   },
   "source": {
@@ -640,7 +662,9 @@
       "title": "Guardado",
       "banner": "Guardado en tu perfil.",
       "lead": "Tu perfil está ahora al {{score}}% de fuerza. Los agentes y los CV lo usarán desde ahora. Puedes volver cuando quieras para añadir más.",
-      "done": "Volver a Perfil y objetivos"
+      "done": "Volver a Perfil y objetivos",
+      "facts_one": "{{count}} dato te espera en Completa tu perfil.",
+      "facts_other": "{{count}} datos te esperan en Completa tu perfil."
     },
     "errors": {
       "generic": "No funcionó. Inténtalo de nuevo.",
@@ -823,5 +847,53 @@
       "invalid_text": "Escribe algo, dentro del tamaño de LinkedIn para esta parte.",
       "not_found": "Eso ya no está aquí. Vuelve atrás y mira de nuevo."
     }
+  },
+  "complete": {
+    "eyebrow": "Tu perfil",
+    "title": "Completa tu perfil",
+    "lead_one": "Hemos encontrado {{count}} dato sobre tu trabajo. Consérvalo si es correcto.",
+    "lead_other": "Hemos encontrado {{count}} datos sobre tu trabajo. Conserva los correctos.",
+    "leadNone": "Los datos que encontramos sobre tu trabajo aparecen aquí, para que los conserves o los descartes.",
+    "loading": "Cargando los datos…",
+    "loadFailed": "No se han podido cargar los datos.",
+    "cvRead": "Hemos leído tu CV otra vez.",
+    "progress": "{{decided}} de {{total}} decididos",
+    "keepAll": "Conservar todos",
+    "keep": "Conservar",
+    "drop": "Descartar",
+    "undo": "Deshacer",
+    "kept": "Conservado",
+    "dropped": "Descartado",
+    "keepLabel": "Conservar: {{text}}",
+    "dropLabel": "Descartar: {{text}}",
+    "undoLabel": "Deshacer: {{text}}",
+    "sources": {
+      "you_said": "lo dijiste tú",
+      "you_confirmed": "lo confirmaste",
+      "your_website": "de tu web",
+      "your_cv": "de tu CV"
+    },
+    "quoted": "«{{quote}}»",
+    "website": "De una página de tu web.",
+    "confirmed": "Dijiste que esto era correcto.",
+    "groups": {
+      "skills": "Tus habilidades",
+      "background": "Tu trayectoria"
+    },
+    "now": "hoy",
+    "years": "{{start}} – {{end}}",
+    "done_one": "{{count}} dato añadido a tu perfil.",
+    "done_other": "{{count}} datos añadidos a tu perfil.",
+    "doneUndo": "Puedes deshacerlo durante un día.",
+    "doneNone": "No se ha añadido nada a tu perfil.",
+    "failed": "No ha funcionado. Inténtalo de nuevo.",
+    "profileChanged": "Ese empleo ha cambiado en tu perfil. Revísalo e inténtalo de nuevo.",
+    "emptyTitle": "Nada nuevo que añadir",
+    "emptyLead": "Los datos nuevos aparecen aquí cuando respondes a las preguntas de Cuéntame de ti o importas tu CV.",
+    "back": "Volver a tu perfil",
+    "nudgeTitle_one": "{{count}} dato nuevo para tu perfil",
+    "nudgeTitle_other": "{{count}} datos nuevos para tu perfil",
+    "nudgeBody": "De tus respuestas, tu web y tu CV. Conserva los correctos.",
+    "nudgeOpen": "Ver los datos"
   }
 }

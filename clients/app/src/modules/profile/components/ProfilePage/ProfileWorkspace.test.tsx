@@ -75,6 +75,7 @@ function Workspace({ startImporting = false }: { startImporting?: boolean }) {
         onAction={vi.fn()}
         onAbout={vi.fn()}
         onLinkedIn={vi.fn()}
+        onComplete={vi.fn()}
       />
     </UndoProvider>
   );
@@ -113,14 +114,20 @@ describe("the profile workspace", () => {
     await user.click(screen.getByTestId("import-submit"));
 
     const review = await screen.findByTestId("import-review");
-    expect(review).toHaveTextContent("Review what was found");
+    expect(review).toHaveTextContent("Check what we found");
+    expect(screen.getByTestId("review-found")).toHaveTextContent(
+      "Found 2 jobs, 2 skills, 1 degree, and 1 language.",
+    );
     expect(screen.getByTestId("review-work")).toHaveTextContent("Senior Engineer");
     expect(screen.getByTestId("review-work")).toHaveTextContent("New");
     expect(screen.getByTestId("review-basics")).toHaveTextContent("Alex Demo");
     expect(screen.queryByTestId("review-dropped")).toBeNull();
     expect(screen.queryByTestId("review-merge")).toBeNull();
-    // FILLED has no summary, certifications or projects: only those are listed.
-    expect(screen.getByTestId("review-empty")).toHaveTextContent("3 parts");
+    // FILLED has no summary, achievements, certifications or projects: only those are listed.
+    expect(screen.getByTestId("review-empty")).toHaveTextContent("4 parts");
+    expect(screen.getByTestId("review-empty-achievements")).toHaveTextContent(
+      "No achievements found in this file",
+    );
     expect(screen.getByTestId("review-empty")).toHaveTextContent("Add them by hand");
     expect(screen.queryByTestId("review-empty-skills")).toBeNull();
 
@@ -170,6 +177,29 @@ describe("the profile workspace", () => {
     await user.upload(await screen.findByTestId("import-file"), zip());
     await user.click(screen.getByTestId("import-submit"));
     expect(await screen.findByTestId("import-error")).toHaveTextContent("That didn’t work");
+  });
+
+  it("reads a PDF picked as the LinkedIn export as a PDF", async () => {
+    stub({
+      "GET /api/v1/profile": {
+        body: { ...EMPTY_VIEW, import_kinds: ["linkedin_zip", "pdf", "text"] },
+      },
+      "POST /api/v1/profile/imports": async (request) => {
+        const form = await request.formData();
+        expect(form.get("kind")).toBe("pdf");
+        return { status: 201, body: { ...draftOf(FILLED), kind: "pdf" } };
+      },
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<Workspace />);
+
+    const kinds = await screen.findByTestId("import-kinds");
+    expect(kinds.querySelectorAll("input").item(0)).toBeChecked();
+    const pdf = new File(["%PDF-1.4"], "Profile.pdf", { type: "application/pdf" });
+    await user.upload(screen.getByTestId("import-file"), pdf);
+    expect(kinds.querySelectorAll("input").item(1)).toBeChecked();
+    await user.click(screen.getByTestId("import-submit"));
+    expect(await screen.findByTestId("import-review")).toBeInTheDocument();
   });
 
   it("reads pasted text with a model, and says what it left out", async () => {
@@ -452,13 +482,14 @@ describe("a draft's review", () => {
     );
 
     const empty = await screen.findByTestId("review-empty");
-    expect(empty).toHaveTextContent("Not found in this file: 7 parts");
+    expect(empty).toHaveTextContent("Not found in this file: 8 parts");
     expect(screen.getByTestId("review-empty-skills")).toHaveTextContent(
       "No skills found in this file",
     );
     for (const section of [
       "label",
       "summary",
+      "achievements",
       "education",
       "languages",
       "certificates",
@@ -468,5 +499,20 @@ describe("a draft's review", () => {
     }
     expect(screen.queryByTestId("review-empty-work")).toBeNull();
     expect(empty).toHaveTextContent("import your LinkedIn data export");
+    expect(screen.queryByTestId("review-stopped")).toBeNull();
+  });
+
+  it("says when the AI limit stopped reading the missing parts again", async () => {
+    stub({
+      [`GET /api/v1/profile/imports/${IMPORT_ID}`]: {
+        body: { ...draftOf(FILLED), kind: "pdf", stopped: "ai_daily_limit_reached" },
+      },
+    });
+    renderWithProviders(
+      <ImportReview id={IMPORT_ID} current={EMPTY_PROFILE} onDone={vi.fn()} onRestart={vi.fn()} />,
+    );
+    expect(await screen.findByTestId("review-stopped")).toHaveTextContent(
+      "Your AI limit stopped us reading the missing parts again.",
+    );
   });
 });

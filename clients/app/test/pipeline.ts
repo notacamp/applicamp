@@ -34,6 +34,7 @@ export function opportunity(overrides: Partial<Opportunity> = {}): Opportunity {
     dismissed: false,
     editable: false,
     sources: [],
+    proposed: true,
     ...overrides,
   };
 }
@@ -48,6 +49,8 @@ export function summary(whole: Opportunity): OpportunitySummary {
     source: whole.source,
     stage: whole.stage,
     new: whole.new,
+    proposed: whole.proposed,
+    ...(whole.shortlisted_by === undefined ? {} : { shortlisted_by: whole.shortlisted_by }),
     created_at: whole.created_at,
     updated_at: whole.updated_at,
     ...(whole.location === undefined ? {} : { location: whole.location }),
@@ -210,6 +213,7 @@ export function cvDraft(overrides: Partial<CvDraft> = {}): CvDraft {
       ],
       lines: [],
     },
+    earlier: [{ position: 2, text: "Junior Developer, Tiny Co (2015–2017)" }],
     flagged: 2,
     first_flagged: "l5",
     can_approve: false,
@@ -240,6 +244,7 @@ export function cvDraft(overrides: Partial<CvDraft> = {}): CvDraft {
         role: "Senior Engineer · Example Org",
         company: "Example Org",
         quote: "Cut invoice runs from 6 hours to 40 minutes",
+        quote_from: "profile",
         flags: [{ kind: "claim_not_in_sources", claim: "20", cites: ["w0.h1"] }],
       },
       {
@@ -259,6 +264,12 @@ export function cvDraft(overrides: Partial<CvDraft> = {}): CvDraft {
       at: "2026-10-31T10:00:01Z",
     },
     needs_version: false,
+    wants: [
+      { text: "Rust", level: "must", covered: true, reason: "on_cv" },
+      { text: "Kafka", level: "nice", covered: false, reason: "not_in_profile" },
+    ],
+    cost_eur: 0.004,
+    company_facts: 1,
     ...overrides,
   };
 }
@@ -280,7 +291,16 @@ export function cv(overrides: Partial<Cv> = {}): Cv {
       month_eur: 0.42,
       month_limit_eur: 5,
     },
-    draft_eur: 0.004,
+    draft_eur: 0.01,
+    done: [
+      { step: "read", eur: 0.002, at: "2026-10-31T09:59:00Z" },
+      { step: "draft", eur: 0.004, at: "2026-10-31T10:00:00Z" },
+    ],
+    suggested_language: null,
+    company_read_failure: null,
+    read_eur: 0.002,
+    writing: false,
+    work_languages: ["en", "fr"],
     ...overrides,
   };
 }

@@ -482,6 +482,150 @@
         ]
       }
     },
+    "/api/v1/boards/admin": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "The admin overview of the job boards.",
+        "description": "Totals (being read as job sites and companies, waiting for you, being\nchecked, not allowed, paused), what happened over the last 7 days from the\ndiscovery runs and approvals the app recorded, and every board that is not\nread, paused or declined with its stage and what it waits for. Board owners\nonly: anyone else gets 404.",
+        "operationId": "sources.boards_admin",
+        "responses": {
+          "200": {
+            "description": "The overview.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminOverview"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: not a board owner",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/boards/admin/list": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "The boards, 50 a page.",
+        "description": "Searched (`q`: a name, a site's host or a tag) and filtered (`show`) on the\nserver, so thousands of boards never reach the client at once. Ordered by\nthe jobs read at the last read, most first, then by id; the cursor is the\nlast line's place in that order, so a page never repeats or skips a board.\nBoard owners only: anyone else gets 404.",
+        "operationId": "sources.boards_admin_list",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Matches a name, a site's host or a tag, ignoring case.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "show",
+            "in": "query",
+            "description": "What to show; every board when left out.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "What the \"Show\" select picks.",
+              "enum": [
+                "all",
+                "waiting",
+                "checking",
+                "reading",
+                "notAllowed",
+                "paused",
+                "site",
+                "company"
+              ]
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "The page after this one (`next_cursor`).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of boards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_query`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: not a board owner",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/v1/boards/scans": {
       "get": {
         "tags": [
@@ -1325,6 +1469,292 @@
         ]
       }
     },
+    "/api/v1/boards/{id}/permission-email": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "The permission email for a board.",
+        "description": "Addressed to the board's contact when its check found one. Fills in the\nboard's name, what Applicamp would read, the link back, the reading\nfrequency (at most hourly), no reposting and dropping closed jobs. It is\nsigned \"Applicamp\": the app does not know the owner's name. The app never\nsends it: the owner sends it from their own mailbox. Board owners only.",
+        "operationId": "sources.board_permission_email",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The board.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The draft.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionEmail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such board, or not a board owner",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/boards/{id}/permission/answer": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Record a board's answer.",
+        "description": "A permission only after it was asked (a choice needs no email). \"yes\" approves the board through the approve\npath (the note \"They said yes on <date>\" is kept): the terms and\npermission blockers are cleared, but robots rules that forbid the feed and\na missing key still refuse it (409, nothing recorded). \"no\" declines it\nthrough the decline path with the reason \"They said no on <date>\". Board\nowners only.",
+        "operationId": "sources.board_permission_answer",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The board.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BoardAnswer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Recorded: the board, approved or declined.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_request`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such board, or not a board owner",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`not_asked`: nothing was asked yet; `not_waiting`; or the first blocker that remains when the answer is yes",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/boards/{id}/permission/asked": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Record that the permission email was sent.",
+        "description": "Stores the date; asking twice keeps the first date. The app sends\nnothing. Board owners only.",
+        "operationId": "sources.board_permission_asked",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The board.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recorded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionEmail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such board, or not a board owner",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`not_waiting`: the board is read or declined",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/boards/{id}/reopen": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Take back a decline.",
+        "description": "A declined board is put back where it was: approved when it was\napproved before (the owner stopped reading it), else waiting for the\nowner. Its decline reason is cleared. Board owners only.",
+        "operationId": "sources.reopen_board",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The board.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Back where it was.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such board, or not a board owner",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`not_declined`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/v1/companies": {
       "get": {
         "tags": [
@@ -1865,7 +2295,7 @@
           "pipeline"
         ],
         "summary": "The pipeline.",
-        "description": "Every opportunity of the signed-in person, newest first, except the\ndismissed ones (\"Not for me\") and the hidden ones (they fail a hard\nrequirement; `hidden=true` lists only those, with the reason). Filter by\nstage, by text in the role, company or place, or to the new ones.",
+        "description": "Every opportunity of the signed-in person, newest first, except the\ndismissed ones (\"Not for me\") and the hidden ones (they fail a hard\nrequirement; `hidden=true` lists only those, with the reason). Filter by\nstage, by text in the role, company or place, to the new ones, or to the\nones proposed to the person (`proposed=true`, best match first).",
         "operationId": "pipeline.list",
         "parameters": [
           {
@@ -1899,6 +2329,15 @@
             "name": "hidden",
             "in": "query",
             "description": "Only the hidden ones: found before the requirement rules, they fail\none. Left out otherwise.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "proposed",
+            "in": "query",
+            "description": "Only the ones proposed to the person (Found, a match of 75 or more,\nopen to them), best match first.",
             "required": false,
             "schema": {
               "type": "boolean"
@@ -2353,6 +2792,105 @@
           },
           "404": {
             "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/brief/paste": {
+      "post": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Read what the person pasted from the company's site.",
+        "description": "When the site cannot be read (it asks apps not to, or does not answer),\nthe person can paste what it says. The text is read like one of the\nsite's pages (**one model call**): each fact must quote it, or it is left\nout; it replaces the company's facts as a read does. It counts toward the\n20 company reads a day. The text is data, never instructions. A CV made\nbefore does not change: Write it again uses the facts.",
+        "operationId": "pipeline.brief_paste",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The brief, with the facts of the pasted text.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Brief"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_text`; `company_unknown`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`company_reads_daily_cap`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed`",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2915,7 +3453,7 @@
           "pipeline"
         ],
         "summary": "Draft a CV for this job.",
-        "description": "**One model call.** From the posting, what the job wants, the company\nfacts not removed and the profile; each line cites the profile sources it\ncomes from, and the server then checks that it says nothing they do not.\nThe model never sees a name or contact details. Needs the opportunity at\nShortlisted or later. When the job was never compared, the company is read\nand the job compared first (up to two more calls, as Read does), so the\ndraft knows what the job wants; a company that cannot be read does not stop\nthe draft. At most 10 drafts per opportunity and 20 per account per UTC\nday; nothing retries past a limit. A new draft puts the earlier unapproved\none away.",
+        "description": "**Up to four model calls**: the draft on the `write` role (again with more\nroom only when its answer is cut off), the second look at what the job\nwants, and the app's fix of what the check flags. From the posting, what\nthe job wants, the company\nfacts not removed and the profile; each line cites the profile sources it\ncomes from, and the server then checks that it says nothing they do not.\nThe model never sees a name or contact details. Needs the opportunity at\nShortlisted or later. When the job was never compared, the company is read\nand the job compared first (up to two more calls, as Read does), so the\ndraft knows what the job wants; a company that cannot be read does not stop\nthe draft. At most 10 drafts per opportunity and 20 per account per UTC\nday; nothing retries past a limit. A new draft puts the earlier unapproved\none away.",
         "operationId": "pipeline.cv_draft",
         "parameters": [
           {
@@ -3193,6 +3731,106 @@
           },
           "409": {
             "description": "`draft_frozen`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/opportunities/{id}/cv/drafts/{n}/hide-position": {
+      "post": {
+        "tags": [
+          "pipeline"
+        ],
+        "summary": "Take a position off \"Earlier\".",
+        "description": "The position is no longer named under \"Earlier\", in the PDF or on the\npage. It stays among what the CV left out, and putting it back shows it\nagain. The preview is made again. No model call. Only a draft can change.",
+        "operationId": "pipeline.cv_hide_position",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The opportunity.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "n",
+            "in": "path",
+            "description": "The draft.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HidePositionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The CV, without that position.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cv"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_request`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such draft or position",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`draft_frozen`; `already_on_cv`",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6051,6 +6689,395 @@
         ]
       }
     },
+    "/api/v1/profile/facts/proposals": {
+      "get": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "The facts proposed for the profile.",
+        "description": "What the app already knows that the profile does not hold: what the person\ntold and confirmed in Tell me about you, what their own website says, what\na CV read again says. Open ones, and those kept or dropped in the last day\n(still undoable), grouped by position, newest first, then skills and\nbackground. Never calls a model.",
+        "operationId": "profile.fact_proposals",
+        "responses": {
+          "200": {
+            "description": "The proposals.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactProposalsView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/facts/proposals/batches/{id}/undo": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Undo a Keep all, within a day.",
+        "description": "Every fact it kept is taken back, in one profile write, and waits again.",
+        "operationId": "profile.fact_undo_batch",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The Keep all (`batch.id`).",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The proposals, after the undo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactProposalsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_profile`: the profile would break a limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such Keep all",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`undo_expired`: kept more than a day ago",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/facts/proposals/keep-all": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Keep every open fact.",
+        "description": "One profile write, one new version, and one Undo for all of them for a day\n(`…/batches/{id}/undo`). Facts whose job is no longer on the profile are\nleft as they are.",
+        "operationId": "profile.fact_keep_all",
+        "responses": {
+          "200": {
+            "description": "The proposals, after they were kept.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactProposalsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_profile`: the profile would break a limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/facts/proposals/{id}/drop": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Drop a fact: it is not written, not proposed again, and never written by\nTell me about you's Save. Can be undone for a day.",
+        "operationId": "profile.fact_drop",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The proposal.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The proposals, after it was dropped.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactProposalsView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`proposal_not_open`: already kept",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/facts/proposals/{id}/keep": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Keep a fact.",
+        "description": "Writes it on its position (with its quote; a confirmed assumption keeps\nwhat it was based on), adds the skill or adds to the background: one new\nprofile version. Can be undone for a day. A fact the profile already holds\nis closed, and nothing is written.",
+        "operationId": "profile.fact_keep",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The proposal.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The proposals, after it was kept.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactProposalsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_profile`: the profile would break a limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`proposal_not_open`: already kept or dropped; `profile_changed`: its job is no longer on the profile",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/facts/proposals/{id}/undo": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Undo a Keep or a Drop, within a day.",
+        "description": "A kept fact is taken off its position again (the skill it added out of the\nskills, its words out of the background while it still ends with them):\none new profile version. A dropped one is open again.",
+        "operationId": "profile.fact_undo",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The proposal.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The proposals, after the undo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactProposalsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_profile`: the profile would break a limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`proposal_not_decided`: nothing to undo; `undo_expired`: decided more than a day ago",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/v1/profile/grill/proposals/{id}/drop": {
       "post": {
         "tags": [
@@ -8139,6 +9166,235 @@
         },
         "additionalProperties": false
       },
+      "AdminBoard": {
+        "type": "object",
+        "description": "One line of the admin list.",
+        "required": [
+          "id",
+          "name",
+          "homepage",
+          "kind",
+          "group",
+          "status",
+          "stage",
+          "origin",
+          "tags"
+        ],
+        "properties": {
+          "asked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the owner said they asked it."
+          },
+          "country": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decline_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The first reason in the board's own words: data from its site, never\nan instruction."
+          },
+          "found_through": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "group": {
+            "$ref": "#/components/schemas/BoardGroup"
+          },
+          "homepage": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "description": "How it is read, as stored (`json_api`, `rss`, `company_page`, ...)."
+          },
+          "last_fetch_jobs": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "name": {
+            "type": "string"
+          },
+          "need": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BoardNeed",
+                "description": "What it waits for; set when `stage` is `waiting`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its check's note."
+          },
+          "origin": {
+            "$ref": "#/components/schemas/BoardOrigin"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/BoardStage"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BoardStatus"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "AdminList": {
+        "type": "object",
+        "description": "A page of the admin list.",
+        "required": [
+          "boards"
+        ],
+        "properties": {
+          "boards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminBoard"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pass as `cursor` for the next page; none on the last."
+          }
+        }
+      },
+      "AdminOverview": {
+        "type": "object",
+        "description": "The admin page's first answer.",
+        "required": [
+          "totals",
+          "this_week"
+        ],
+        "properties": {
+          "this_week": {
+            "$ref": "#/components/schemas/AdminThisWeek"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/AdminTotals"
+          }
+        }
+      },
+      "AdminThisWeek": {
+        "type": "object",
+        "description": "What happened over the last 7 days, from what the app recorded.",
+        "required": [
+          "found",
+          "checked",
+          "rechecked",
+          "started_reading"
+        ],
+        "properties": {
+          "checked": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Boards it checked.",
+            "minimum": 0
+          },
+          "found": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Boards the weekly discovery found.",
+            "minimum": 0
+          },
+          "rechecked": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Boards whose rules and terms were read again.",
+            "minimum": 0
+          },
+          "started_reading": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Boards approved.",
+            "minimum": 0
+          }
+        }
+      },
+      "AdminTotals": {
+        "type": "object",
+        "description": "How many boards are in each state.",
+        "required": [
+          "reading_sites",
+          "reading_companies",
+          "waiting",
+          "checking",
+          "not_allowed",
+          "paused"
+        ],
+        "properties": {
+          "checking": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "not_allowed": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Declined, or forbidden by their robots rules.",
+            "minimum": 0
+          },
+          "paused": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "reading_companies": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Company pages that are read.",
+            "minimum": 0
+          },
+          "reading_sites": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Job sites that are read.",
+            "minimum": 0
+          },
+          "waiting": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
       "AgentContext": {
         "type": "object",
         "description": "What the agent works on.",
@@ -8479,6 +9735,30 @@
           "ai_unavailable"
         ]
       },
+      "BoardAnswer": {
+        "type": "object",
+        "description": "The answer to record.",
+        "required": [
+          "answer"
+        ],
+        "properties": {
+          "answer": {
+            "$ref": "#/components/schemas/RequestAnswer"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RequestKind",
+            "description": "Which request; permission when left out."
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What they said, in up to 500 characters; kept with the answer."
+          }
+        },
+        "additionalProperties": false
+      },
       "BoardBlocker": {
         "type": "object",
         "description": "Why a board cannot be approved yet.",
@@ -8612,6 +9892,14 @@
           }
         }
       },
+      "BoardGroup": {
+        "type": "string",
+        "description": "Which part of the registry a board belongs to.",
+        "enum": [
+          "site",
+          "company"
+        ]
+      },
       "BoardKey": {
         "type": "object",
         "description": "A board's API key, as a client sees it: never the key itself.",
@@ -8711,6 +9999,16 @@
             "description": "The web search."
           }
         }
+      },
+      "BoardNeed": {
+        "type": "string",
+        "description": "What a board waits on the owner for.",
+        "enum": [
+          "permission",
+          "key",
+          "choice",
+          "approve"
+        ]
       },
       "BoardOrigin": {
         "type": "string",
@@ -8931,6 +10229,17 @@
             "description": "Share of the sample open worldwide (0–1)."
           }
         }
+      },
+      "BoardStage": {
+        "type": "string",
+        "description": "Where a board stands, as the admin page words it.",
+        "enum": [
+          "reading",
+          "paused",
+          "waiting",
+          "checking",
+          "not_allowed"
+        ]
       },
       "BoardStatus": {
         "type": "string",
@@ -10394,7 +11703,11 @@
           "versions",
           "can_draft",
           "caps",
-          "draft_eur"
+          "draft_eur",
+          "done",
+          "read_eur",
+          "writing",
+          "work_languages"
         ],
         "properties": {
           "can_draft": {
@@ -10402,6 +11715,20 @@
           },
           "caps": {
             "$ref": "#/components/schemas/CvCaps"
+          },
+          "company_read_failure": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the company's site could not be read, when it could not:\n`robots_disallows`, `no_pages_readable` or `site_unreachable`. The\nperson can paste what it says (`…/brief/paste`)."
+          },
+          "done": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CvDoneStep"
+            },
+            "description": "What the app did by itself for this CV, in order: the job's\npreparation (when it prepared it) and the draft."
           },
           "draft": {
             "oneOf": [
@@ -10434,12 +11761,35 @@
             "type": "string",
             "format": "uuid"
           },
+          "read_eur": {
+            "type": "number",
+            "format": "double",
+            "description": "About what reading pasted text costs, in euros."
+          },
+          "suggested_language": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The posting's language, when the CV is in another: offered, never\nchosen for the person."
+          },
           "versions": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CvVersion"
             },
             "description": "The PDF versions, newest first."
+          },
+          "work_languages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The languages the person works in (their goals), in their order: what\nthe CV's language choice offers first."
+          },
+          "writing": {
+            "type": "boolean",
+            "description": "The app is getting this CV ready by itself right now (reading the\ncompany or writing the draft): the page waits for it."
           }
         }
       },
@@ -10509,6 +11859,30 @@
           "letter"
         ]
       },
+      "CvDoneStep": {
+        "type": "object",
+        "description": "A step the app did by itself for this job, with what it cost.",
+        "required": [
+          "step",
+          "eur",
+          "at"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "eur": {
+            "type": "number",
+            "format": "double",
+            "description": "About what it cost, in euros."
+          },
+          "step": {
+            "type": "string",
+            "description": "`shortlist`, `site`, `read`, `compare` or `draft`."
+          }
+        }
+      },
       "CvDraftRequest": {
         "type": "object",
         "description": "What to make a draft of.",
@@ -10518,7 +11892,7 @@
               "string",
               "null"
             ],
-            "description": "A language tag such as `pt-PT`; the posting's when it says, else\nEnglish."
+            "description": "A language tag such as `pt-PT`; when left out, the first language the\nperson works in (their goals), else one their profile says they speak\nwell enough, else English. The posting's is only offered."
           }
         },
         "additionalProperties": false
@@ -10537,13 +11911,16 @@
           "education",
           "languages",
           "left_out",
+          "earlier",
           "flagged",
           "can_approve",
           "keywords",
           "changes",
           "fixed_by_app",
           "waiting",
-          "needs_version"
+          "needs_version",
+          "wants",
+          "company_facts"
         ],
         "properties": {
           "approved_at": {
@@ -10560,12 +11937,33 @@
           "changes": {
             "$ref": "#/components/schemas/Changes"
           },
+          "company_facts": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The company facts the draft could use: none means it was written\nfrom the posting and the profile only.",
+            "minimum": 0
+          },
           "contact": {
             "$ref": "#/components/schemas/ContactView"
+          },
+          "cost_eur": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "What the app's calls for this draft cost, in euros (the draft, the\nsecond look at what the job wants, the fix of what was flagged)."
           },
           "created_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "earlier": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EarlierLine"
+            },
+            "description": "The positions named under \"Earlier\", newest first, as in the PDF:\nevery one left out that has a title or a company and that the person\ndid not take off."
           },
           "education": {
             "type": "array",
@@ -10695,6 +12093,13 @@
               "$ref": "#/components/schemas/Waiting"
             },
             "description": "What waits on the person, in the order the page shows it."
+          },
+          "wants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WantView"
+            },
+            "description": "What the job wants, each covered by the CV or why not."
           }
         }
       },
@@ -10919,6 +12324,61 @@
           }
         }
       },
+      "CvRead": {
+        "type": "object",
+        "description": "What an import applied in the last day found, part by part.",
+        "required": [
+          "applied_at",
+          "jobs",
+          "achievements",
+          "skills",
+          "degrees",
+          "languages",
+          "certificates",
+          "projects"
+        ],
+        "properties": {
+          "achievements": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "applied_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "certificates": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "degrees": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "jobs": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "languages": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "projects": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "skills": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
       "CvVersion": {
         "type": "object",
         "description": "An approved version: the approved text as a PDF.",
@@ -11020,6 +12480,26 @@
           "approved",
           "discarded"
         ]
+      },
+      "EarlierLine": {
+        "type": "object",
+        "description": "A position the CV names only, under \"Earlier\", as the PDF prints it.",
+        "required": [
+          "position",
+          "text"
+        ],
+        "properties": {
+          "position": {
+            "type": "integer",
+            "format": "int32",
+            "description": "For `…/hide-position` and `…/put-back`.",
+            "minimum": 0
+          },
+          "text": {
+            "type": "string",
+            "description": "\"Title, Company (2015–2017)\"."
+          }
+        }
       },
       "Education": {
         "type": "object",
@@ -11204,6 +12684,60 @@
           "unclear"
         ]
       },
+      "FactGroup": {
+        "type": "object",
+        "description": "The proposals for one place of the profile.",
+        "required": [
+          "target",
+          "proposals"
+        ],
+        "properties": {
+          "company": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "end_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "For a position: its place in `work` now.",
+            "minimum": 0
+          },
+          "proposals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FactProposalView"
+            }
+          },
+          "start_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`YYYY`, `YYYY-MM` or `YYYY-MM-DD`; no end while it is current."
+          },
+          "target": {
+            "$ref": "#/components/schemas/FactTarget"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For a position: its title and company."
+          }
+        }
+      },
       "FactProposal": {
         "type": "object",
         "description": "A fact taken from an answer.",
@@ -11250,6 +12784,15 @@
           }
         }
       },
+      "FactProposalState": {
+        "type": "string",
+        "description": "Where a proposal is.",
+        "enum": [
+          "open",
+          "kept",
+          "dropped"
+        ]
+      },
       "FactProposalStatus": {
         "type": "string",
         "description": "Where a fact taken from an answer is.",
@@ -11259,12 +12802,154 @@
           "dropped"
         ]
       },
+      "FactProposalView": {
+        "type": "object",
+        "description": "A fact proposed for the profile.",
+        "required": [
+          "id",
+          "text",
+          "quote",
+          "source",
+          "area",
+          "state",
+          "said_right"
+        ],
+        "properties": {
+          "area": {
+            "$ref": "#/components/schemas/Area",
+            "description": "What it is about."
+          },
+          "basis": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For a confirmed assumption: what it was based on (its reason, or the\npage it was read on)."
+          },
+          "decided_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it was kept or dropped."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quote": {
+            "type": "string",
+            "description": "The words it comes from: the person's, the confirmed assumption, the\nwebsite's or the CV's."
+          },
+          "said_right": {
+            "type": "boolean",
+            "description": "An assumption the person marked *That's right* in Tell me about you\n(not one left unanswered, nor a sentence taken from the profile)."
+          },
+          "source": {
+            "$ref": "#/components/schemas/FactSource"
+          },
+          "state": {
+            "$ref": "#/components/schemas/FactProposalState"
+          },
+          "text": {
+            "type": "string",
+            "description": "The fact (for a skill, its name)."
+          },
+          "undo_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Until when that can be undone."
+          }
+        }
+      },
+      "FactProposalsView": {
+        "type": "object",
+        "description": "The facts proposed for the profile: open ones, and those decided in the\nlast day (they can still be undone).",
+        "required": [
+          "groups",
+          "open",
+          "kept",
+          "dropped"
+        ],
+        "properties": {
+          "batch": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/KeptBatch",
+                "description": "The last Keep all, while it can be undone in one go."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cv_read": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CvRead",
+                "description": "An import applied in the last day, and what it found."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dropped": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Dropped in the last day.",
+            "minimum": 0
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FactGroup"
+            },
+            "description": "By position, newest position first; then the skills and the background."
+          },
+          "kept": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Kept in the last day.",
+            "minimum": 0
+          },
+          "open": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Waiting for Keep or Drop.",
+            "minimum": 0
+          }
+        }
+      },
+      "FactSource": {
+        "type": "string",
+        "description": "Where a proposed fact comes from.",
+        "enum": [
+          "you_said",
+          "you_confirmed",
+          "your_website",
+          "your_cv"
+        ]
+      },
       "FactStatus": {
         "type": "string",
         "description": "How a fact became the person's.",
         "enum": [
           "told",
           "confirmed_assumption"
+        ]
+      },
+      "FactTarget": {
+        "type": "string",
+        "description": "Where a proposed fact goes.",
+        "enum": [
+          "position",
+          "skills",
+          "background"
         ]
       },
       "Field": {
@@ -11761,6 +13446,22 @@
           "below_floor"
         ]
       },
+      "HidePositionRequest": {
+        "type": "object",
+        "description": "A position to take off the CV.",
+        "required": [
+          "position"
+        ],
+        "properties": {
+          "position": {
+            "type": "integer",
+            "format": "int32",
+            "description": "A position the CV names under \"Earlier\" (its place in the profile's\n`work`).",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
       "Import": {
         "type": "object",
         "description": "A draft profile waiting for review.",
@@ -11806,6 +13507,13 @@
           "status": {
             "$ref": "#/components/schemas/ImportStatus",
             "description": "Where it is."
+          },
+          "stopped": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What stopped reading the sections that came back empty a second time\n(`ai_budget_reached`, `ai_daily_limit_reached`), if anything: the draft\nhas what the first reads found."
           }
         }
       },
@@ -11907,6 +13615,32 @@
               "null"
             ],
             "description": "The fact, fixed. Left out, the fact is kept as it is. Whatever is\nwritten must still be said by the quote or the profile; the quote\nitself never changes."
+          }
+        }
+      },
+      "KeptBatch": {
+        "type": "object",
+        "description": "A Keep all: the facts it kept, undone together.",
+        "required": [
+          "id",
+          "kept",
+          "undo_until"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kept": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Facts it added to the profile, still there.",
+            "minimum": 0
+          },
+          "undo_until": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Until when it can be undone."
           }
         }
       },
@@ -12392,7 +14126,7 @@
               "string",
               "null"
             ],
-            "description": "A language tag such as `pt-PT`; the posting's when it says, else\nEnglish."
+            "description": "A language tag such as `pt-PT`; when left out, the approved CV's."
           },
           "size": {
             "oneOf": [
@@ -13416,7 +15150,8 @@
           "gaps",
           "reasons_updated",
           "dismissed",
-          "editable"
+          "editable",
+          "proposed"
         ],
         "properties": {
           "apply_url": {
@@ -13530,6 +15265,10 @@
             "format": "date-time",
             "description": "When the posting was published."
           },
+          "proposed": {
+            "type": "boolean",
+            "description": "Proposed to the person: Found, a match of 75 or more, open to them."
+          },
           "reasons_updated": {
             "type": "boolean",
             "description": "Some of its reasons were stripped: they claimed things the profile never says."
@@ -13540,6 +15279,17 @@
               "null"
             ],
             "description": "Pay, as the posting says."
+          },
+          "shortlisted_by": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ShortlistedBy",
+                "description": "Who shortlisted it, once someone did."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "source": {
             "type": "string",
@@ -13730,7 +15480,8 @@
           "stage",
           "new",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "proposed"
         ],
         "properties": {
           "company": {
@@ -13781,6 +15532,10 @@
               "null"
             ]
           },
+          "proposed": {
+            "type": "boolean",
+            "description": "Proposed to the person: Found, a match of 75 or more, open to them."
+          },
           "region_note": {
             "type": [
               "string",
@@ -13794,6 +15549,17 @@
               "null"
             ],
             "description": "Pay, as the posting says."
+          },
+          "shortlisted_by": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ShortlistedBy",
+                "description": "Who shortlisted it, once someone did."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "source": {
             "type": "string",
@@ -13848,6 +15614,20 @@
           "cancelled"
         ]
       },
+      "PasteRequest": {
+        "type": "object",
+        "description": "What the company's site says, pasted by the person.",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The site's words, 1 to 20,000 characters."
+          }
+        },
+        "additionalProperties": false
+      },
       "PdfChecks": {
         "type": "object",
         "description": "What was checked on a PDF, kept with its version.",
@@ -13893,6 +15673,55 @@
           "year",
           "month"
         ]
+      },
+      "PermissionEmail": {
+        "type": "object",
+        "description": "The email asking a board for permission, as a draft.",
+        "required": [
+          "subject",
+          "body"
+        ],
+        "properties": {
+          "answer": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RequestAnswer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "answered_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it was answered, and how."
+          },
+          "asked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the owner said they sent it."
+          },
+          "body": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "to": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The board's contact when its check found one."
+          }
+        }
       },
       "Preparation": {
         "type": "object",
@@ -14338,6 +16167,14 @@
           "dont_have"
         ]
       },
+      "QuoteFrom": {
+        "type": "string",
+        "description": "Where the quote of a waiting line comes from.",
+        "enum": [
+          "you",
+          "profile"
+        ]
+      },
       "RankingBasis": {
         "type": "string",
         "description": "What a board's place in the order rests on.",
@@ -14482,6 +16319,22 @@
           "within_country",
           "within_eu",
           "anywhere"
+        ]
+      },
+      "RequestAnswer": {
+        "type": "string",
+        "description": "What a board said.",
+        "enum": [
+          "yes",
+          "no"
+        ]
+      },
+      "RequestKind": {
+        "type": "string",
+        "description": "What a request asks.",
+        "enum": [
+          "permission",
+          "choice"
         ]
       },
       "Resolution": {
@@ -15539,6 +17392,14 @@
           }
         }
       },
+      "ShortlistedBy": {
+        "type": "string",
+        "description": "Who shortlisted an opportunity.",
+        "enum": [
+          "person",
+          "app"
+        ]
+      },
       "SiteOrigin": {
         "type": "string",
         "description": "Where the company's site came from.",
@@ -15685,7 +17546,10 @@
           "company",
           "skills",
           "education",
-          "languages"
+          "languages",
+          "background",
+          "project",
+          "certificate"
         ]
       },
       "SourceView": {
@@ -16290,6 +18154,17 @@
             ],
             "description": "The person's own words the line was made from, as the profile has\nthem on that position: what \"Change it\" starts from. None when it\ncites none."
           },
+          "quote_from": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/QuoteFrom",
+                "description": "Whether the quote is something the person told the app or their\nprofile's words. None when there is no quote."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "role": {
             "type": [
               "string",
@@ -16320,6 +18195,42 @@
           "cv_approval",
           "letter_approval"
         ]
+      },
+      "WantReason": {
+        "type": "string",
+        "description": "Why a want is or is not on the CV.",
+        "enum": [
+          "on_cv",
+          "in_profile",
+          "not_in_profile"
+        ]
+      },
+      "WantView": {
+        "type": "object",
+        "description": "What the job wants, against the CV.",
+        "required": [
+          "text",
+          "level",
+          "covered",
+          "reason"
+        ],
+        "properties": {
+          "covered": {
+            "type": "boolean",
+            "description": "The CV says it."
+          },
+          "level": {
+            "type": "string",
+            "description": "`must` or `nice`."
+          },
+          "reason": {
+            "$ref": "#/components/schemas/WantReason"
+          },
+          "text": {
+            "type": "string",
+            "description": "What it wants, in short."
+          }
+        }
       },
       "WatchBoardKind": {
         "type": "string",

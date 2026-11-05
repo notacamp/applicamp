@@ -1,11 +1,11 @@
 {
   "nav": {
     "today": "Hoje",
-    "pipeline": "Oportunidades",
+    "pipeline": "Empregos",
     "companies": "Empresas",
-    "boards": "Portais",
+    "boards": "Sites de emprego",
     "agents": "Agentes",
-    "profile": "Perfil e objetivos",
+    "profile": "Você",
     "cvs": "CVs"
   },
   "command": {

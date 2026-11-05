@@ -34,6 +34,11 @@
 //!   new or changed jobs kept, jobs a full read no longer lists closed and
 //!   deleted after a while, expired ones dropped. No model is called. A
 //!   search does not read it yet.
+//! - **The Workable list** ([`features::workable_list`], #88): once a day
+//!   Workable's documented list of every company's jobs is streamed (never
+//!   held), and each company with a job posted in the last 60 days becomes a
+//!   Workable company page of the registry, approved by the app with its
+//!   system. No model; the jobs themselves are not kept.
 //! - **The search** ([`features::search`]): the same job seen on several
 //!   boards merged into one ([`dedupe`]), crediting each; the goals' hard
 //!   limits on the boards' structured fields (a board's regions too:
@@ -198,12 +203,19 @@ impl SourcesDeps {
 /// The sources module, composed with `deps`.
 pub fn module(deps: SourcesDeps) -> Module {
     use features::{
-        boards as board, company_pages, discovery, recheck, reground, search, store, watch,
+        board_requests as requests, boards as board, company_pages, discovery, recheck, reground,
+        search, store, watch, workable_list,
     };
     let router = OpenApiRouter::new()
         .routes(routes!(search::start))
         .routes(routes!(search::latest))
         .routes(routes!(search::estimate))
+        .routes(routes!(requests::overview))
+        .routes(routes!(requests::list))
+        .routes(routes!(requests::draft))
+        .routes(routes!(requests::asked))
+        .routes(routes!(requests::answer))
+        .routes(routes!(requests::reopen))
         .routes(routes!(board::list))
         .routes(routes!(board::scanned))
         .routes(routes!(store::totals))
@@ -236,6 +248,8 @@ pub fn module(deps: SourcesDeps) -> Module {
             .job_with::<company_pages::CheckPagesSoon, _>(deps.clone())
             .job_with::<company_pages::web_search::WebSearch, _>(deps.clone())
             .job_with::<store::ReadStore, _>(deps.clone())
+            .job_with::<workable_list::ReadList, _>(deps.clone())
+            .job_with::<workable_list::ReadListSoon, _>(deps.clone())
             .job_with::<watch::FindBoard, _>(deps)
             .publishes::<events::SearchFinished>(),
         kinds: Vec::new(),
@@ -264,6 +278,9 @@ pub async fn start(db: &PgPool, deps: &SourcesDeps) -> Result<(), String> {
             .await
             .map_err(|e| e.to_string())?;
     let web_search = features::company_pages::web_search::schedule(db, deps)
+        .await
+        .map_err(|e| e.to_string())?;
+    let workable_list = features::workable_list::schedule(db, deps)
         .await
         .map_err(|e| e.to_string())?;
     let discovery = features::discovery::schedule(db, deps)
@@ -296,6 +313,7 @@ pub async fn start(db: &PgPool, deps: &SourcesDeps) -> Result<(), String> {
         page_checks,
         web_search,
         store,
+        workable_list,
         company_boards = deps.config.company_boards(),
         discovery,
         seeded_checks,
@@ -336,7 +354,9 @@ mod tests {
                 "sources.recheck_requirements",
                 "sources.reground_reasons",
                 "sources.search",
-                "sources.web_search_pages"
+                "sources.web_search_pages",
+                "sources.workable_list",
+                "sources.workable_list_soon"
             ]
         );
     }

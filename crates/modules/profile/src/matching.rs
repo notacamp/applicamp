@@ -185,6 +185,15 @@ async fn goals_of(db: &PgPool, account: Uuid) -> Result<Option<(Goals, i32)>> {
     Ok(row.map(|(goals, version)| (goals.0, version)))
 }
 
+/// The languages `account` works in, from their goals (BCP 47 tags, the
+/// first the one they prefer); none while not answered.
+pub async fn languages_for_work(db: &PgPool, account: Uuid) -> Result<Vec<String>> {
+    Ok(goals_of(db, account)
+        .await?
+        .map(|(goals, _)| goals.languages_for_work)
+        .unwrap_or_default())
+}
+
 /// `account`'s Autonomy goal: how much agents may do alone. None while it
 /// is not answered.
 pub async fn autonomy(db: &PgPool, account: Uuid) -> Result<Option<crate::goals::Autonomy>> {

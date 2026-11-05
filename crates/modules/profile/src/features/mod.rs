@@ -2,6 +2,7 @@
 
 pub mod about;
 pub mod completion;
+pub mod facts;
 pub mod goals;
 pub mod grill;
 pub mod imports;

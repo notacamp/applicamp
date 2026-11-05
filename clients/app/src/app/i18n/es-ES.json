@@ -1,7 +1,7 @@
 {
   "appName": "Applicamp",
   "frame": {
-    "jump": "Buscar o ir a",
+    "jump": "Buscar",
     "places": "Secciones"
   },
   "commands": {
@@ -12,7 +12,7 @@
   },
   "today": {
     "title": "Hoy",
-    "lead": "Lo que te espera, cada día. Los agentes trabajan en segundo plano; nada sale en tu nombre sin tu permiso.",
+    "lead": "No se envía nada sin tu aprobación.",
     "loading": "Cargando…",
     "loadFailed": "No se pudo cargar Hoy.",
     "retry": "Reintentar",
@@ -49,24 +49,22 @@
     "action": "Ir a las habilidades"
   },
   "pipeline": {
-    "title": "Oportunidades",
-    "lead": "Todas las oportunidades que encuentran los agentes o que añades tú, desde la primera coincidencia hasta la oferta."
+    "title": "Empleos"
   },
   "boards": {
-    "title": "Portales",
-    "lead": "Los portales de empleo que leen las búsquedas, ordenados por los salarios que publican, los nuevos que te esperan y lo que analizó cada búsqueda."
+    "title": "Sitios de empleo",
+    "adminTitle": "Sitios de empleo",
+    "back": "Tú",
+    "eyebrow": "Tú · Sitios de empleo"
   },
   "companies": {
-    "title": "Empresas",
-    "lead": "Empresas cuyas ofertas siguen encajando contigo. Vigila una y Applicamp revisa cada día su propio portal de empleo y te avisa cuando aparece algo que encaja. No se vigila nada hasta que lo digas."
+    "title": "Empresas"
   },
   "agents": {
-    "title": "Agentes",
-    "lead": "Cada ejecución trabaja en su propio sandbox, creado para una tarea y eliminado al terminar."
+    "title": "Agentes"
   },
   "profile": {
-    "title": "Perfil y objetivos",
-    "lead": "Lo que los agentes saben de ti. Solo usan lo que está escrito aquí, y cada afirmación de un CV tiene que salir de aquí.",
+    "title": "Tú",
     "signedInAs": "Sesión iniciada como",
     "waysIn": "Formas de iniciar sesión"
   },
@@ -76,7 +74,6 @@
     "home": "Ir a Hoy"
   },
   "cvs": {
-    "title": "CV",
-    "lead": "Todos los CV que has hecho: los PDF que puedes abrir y enviar, y los borradores que aún se revisan."
+    "title": "CV"
   }
 }

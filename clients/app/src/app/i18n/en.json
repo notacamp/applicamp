@@ -1,7 +1,7 @@
 {
   "appName": "Applicamp",
   "frame": {
-    "jump": "Search or jump to",
+    "jump": "Search",
     "places": "Places"
   },
   "commands": {
@@ -12,7 +12,7 @@
   },
   "today": {
     "title": "Today",
-    "lead": "What waits on you, every day. Agents work in the background; nothing leaves your name without your say.",
+    "lead": "Nothing is sent without your approval.",
     "loading": "Loading…",
     "loadFailed": "Today couldn’t be loaded.",
     "retry": "Try again",
@@ -49,24 +49,22 @@
     "action": "Go to Skills"
   },
   "pipeline": {
-    "title": "Pipeline",
-    "lead": "Every opportunity agents find or you add, from first match to offer."
+    "title": "Jobs"
   },
   "boards": {
-    "title": "Boards",
-    "lead": "The job boards searches read, ranked by the salaries they list, the new ones waiting for you, and what each search scanned."
+    "title": "Job sites",
+    "adminTitle": "Job sites",
+    "back": "You",
+    "eyebrow": "You · Job sites"
   },
   "companies": {
-    "title": "Companies",
-    "lead": "Companies whose jobs keep fitting you. Watch one, and Applicamp checks its own job board every day and tells you when something that fits comes up. Nothing is watched until you say so."
+    "title": "Companies"
   },
   "agents": {
-    "title": "Agents",
-    "lead": "Each run works in its own sandbox, made for one job and deleted after."
+    "title": "Agents"
   },
   "profile": {
-    "title": "Profile & goals",
-    "lead": "What agents know about you. They use only what is written here, and every claim in a CV must trace back to it.",
+    "title": "You",
     "signedInAs": "Signed in as",
     "waysIn": "Ways to sign in"
   },
@@ -76,7 +74,6 @@
     "home": "Go to Today"
   },
   "cvs": {
-    "title": "CVs",
-    "lead": "Every CV you’ve made: the PDFs you can open and send, and the drafts still being reviewed."
+    "title": "CVs"
   }
 }

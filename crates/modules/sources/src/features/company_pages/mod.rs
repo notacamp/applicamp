@@ -232,6 +232,9 @@ pub async fn run_all(deps: &SourcesDeps, db: &PgPool) -> Result<Summary> {
     ))
     .fetch_all(db)
     .await?;
+    // Pages the Workable list proves are approved with their system, with no
+    // sample read (#88).
+    crate::features::workable_list::approve_listed(db, now).await?;
     // A day checks at most the limit, however many runs it has.
     let today = now
         .date_naive()
@@ -260,6 +263,7 @@ pub async fn run_all(deps: &SourcesDeps, db: &PgPool) -> Result<Summary> {
             board_columns!(),
             " FROM sources.job_boards
               WHERE kind = 'company_page' AND status = 'candidate' AND system_id = $1
+                AND list_seen_at IS NULL
                 AND (recheck_after IS NULL OR recheck_after <= $2)
               ORDER BY created_at, slug LIMIT $3"
         ))

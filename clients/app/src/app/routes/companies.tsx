@@ -16,7 +16,7 @@ export interface CompaniesProps {
 export function Companies({ tab, onTab }: CompaniesProps) {
   const { t } = useTranslation();
   return (
-    <Page testId="companies" title={t("companies.title")} lead={t("companies.lead")}>
+    <Page testId="companies" title={t("companies.title")}>
       <CompaniesPage tab={tab} onTab={onTab} />
     </Page>
   );

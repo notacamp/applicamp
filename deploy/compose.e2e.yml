@@ -121,6 +121,8 @@ services:
       APPLICAMP_SOURCES__LEVER_EU_URL: http://lever.hiring.test:9020
       APPLICAMP_SOURCES__ASHBY_URL: http://ashby.hiring.test:9020
       APPLICAMP_SOURCES__WORKABLE_URL: http://workable.hiring.test:9020
+      # The Workable list (#88): the fake serves invented companies there.
+      APPLICAMP_SOURCES__WORKABLE_LIST_URL: http://workable.hiring.test:9020/boards/workable.xml
       APPLICAMP_SOURCES__RECRUITEE_URL: http://recruitee.hiring.test:9020
       APPLICAMP_SOURCES__TEAMTAILOR_URL: http://teamtailor.hiring.test:9020
       APPLICAMP_SOURCES__PERSONIO_URL: http://personio.hiring.test:9020
@@ -134,6 +136,14 @@ services:
       APPLICAMP_SOURCES__WATCH_EVERY_SECS: "0"
       APPLICAMP_AI__COMPLETE__BASE_URL: http://fake-jobs:9020/v1
       APPLICAMP_AI__COMPLETE__MODEL: fake/model
+      # Priced like the default model, so estimates read as they would.
+      APPLICAMP_AI__COMPLETE__PRICE_IN_USD_PER_MTOK: "0.15"
+      APPLICAMP_AI__COMPLETE__PRICE_OUT_USD_PER_MTOK: "0.5"
+      # The longer writing (the CV) on its own role, as in prod.
+      APPLICAMP_AI__WRITE__BASE_URL: http://fake-jobs:9020/v1
+      APPLICAMP_AI__WRITE__MODEL: fake/writer
+      APPLICAMP_AI__WRITE__PRICE_IN_USD_PER_MTOK: "0.15"
+      APPLICAMP_AI__WRITE__PRICE_OUT_USD_PER_MTOK: "0.5"
       # Agent runs (the Agents page's Run a check): the runner as a child
       # process of the server behind a policy proxy, not a sandbox; tests
       # only. The image carries the runner at /app/applicamp-agent.

@@ -1,8 +1,10 @@
-// Applicamp's design system: @notacamp/ui (the Not A Camp components and
-// tokens) with Applicamp's token set over it, its preferences, its strings
-// and the few compositions the package has no component for yet. Modules
-// and the app shell import UI only from here (dependency-cruiser:
-// "ui-public-surface"), and only here may class names and styles appear.
+// Applicamp's design system: @notacamp/ui (the Not A Camp components, fonts
+// and tokens, as published) with the few tokens the package has none for, its
+// preferences, its strings and the few compositions the package has no
+// component for yet. Modules and the app shell import UI only from here
+// (dependency-cruiser: "ui-public-surface"), and only here may class names and
+// styles appear.
+import "@notacamp/ui/fonts.css";
 import "@notacamp/ui/tokens.css";
 import "@notacamp/ui/base.css";
 import "@notacamp/ui/ui.css";
@@ -20,7 +22,6 @@ export {
   type AppBrandProps,
   type AppMarkProps,
 } from "./components/AppMark/AppMark";
-export { AppFrame } from "./components/AppFrame/AppFrame";
 export { FileField, type FileFieldProps } from "./components/FileField/FileField";
 export { InlineEdit, type InlineEditProps } from "./components/InlineEdit/InlineEdit";
 export { InlineText, type InlineTextProps } from "./components/InlineText/InlineText";
@@ -56,6 +57,12 @@ export {
 export { StatusMark, type StatusMarkProps } from "./components/StatusMark/StatusMark";
 export { Workbench, type WorkbenchProps } from "./components/Workbench/Workbench";
 export { CardList, type CardListProps } from "./components/CardList/CardList";
+export {
+  DecisionCard,
+  DecisionList,
+  type DecisionCardProps,
+  type DecisionState,
+} from "./components/DecisionCard/DecisionCard";
 export { DataTable, type DataColumn, type DataTableProps } from "./components/DataTable/DataTable";
 export { Label, LABEL_HUES, type LabelHue, type LabelProps } from "./components/Label/Label";
 export { MatchBar, type MatchBarProps } from "./components/MatchBar/MatchBar";

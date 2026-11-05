@@ -5,11 +5,11 @@ import { useTranslation } from "react-i18next";
 import { useShortcut, useShortcuts } from "~/lib/shortcuts";
 import {
   AppBrand,
-  AppFrame,
   CommandMenu,
   IconButton,
   NavItem,
   PhoneHeader,
+  Shell,
   ShortcutSheet,
   Sidebar,
   SidebarFooter,
@@ -30,10 +30,16 @@ export function SignedInFrame() {
   );
 }
 
+/** Where a key can take you: the three places and the pages reached from them. */
+type Address = PlacePath | "/boards" | "/companies" | "/cvs" | "/agents";
+
 /**
- * The app frame: the sidebar (Today, Pipeline, Boards, Companies, Agents, Profile & goals, the
- * shortcuts and the account), or the phone header and tab bar below 48rem;
- * ⌘K's command menu and the `?` sheet.
+ * The app frame: the sidebar (Search, then Today, Jobs and You, and the
+ * account), or the phone header and tab bar below 48rem; ⌘K's command menu
+ * and the `?` sheet. No key is hinted on a nav item or a button: the app is
+ * for people who are not tech-savvy. The keys keep working silently, and the
+ * pages that are not places (Job sites, Companies, Agents, CVs) stay a
+ * command in Search.
  */
 function Frame() {
   const { t } = useTranslation();
@@ -48,7 +54,7 @@ function Frame() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const current = placeOf(pathname);
 
-  const go = (to: PlacePath) => () => {
+  const go = (to: Address) => () => {
     void navigate({ to });
   };
   useShortcut("nav.today", go("/"));
@@ -59,7 +65,7 @@ function Frame() {
   useShortcut("nav.agents", go("/agents"));
   useShortcut("nav.profile", go("/profile"));
   // ⌘K's "Search now" and "New opportunity" (and their keys) from any page:
-  // the Pipeline starts the search, or opens New, once it is shown.
+  // Jobs starts the search, or opens New, once it is shown.
   useShortcut("sources.start", () => {
     void navigate({ to: "/pipeline", search: { run: "search" } });
   });
@@ -83,7 +89,7 @@ function Frame() {
 
   return (
     <>
-      <AppFrame>
+      <Shell>
         <PhoneHeader>
           <AppBrand name={t("appName")} />
           <Spacer />
@@ -91,7 +97,6 @@ function Frame() {
             size="lg"
             icon="search"
             label={t("frame.jump")}
-            shortcut="command.open"
             data-testid="jump-phone"
             onClick={() => {
               registry.run("command.open");
@@ -105,7 +110,6 @@ function Frame() {
             <NavItem
               label={t("frame.jump")}
               icon="search"
-              shortcut="command.open"
               onClick={() => {
                 registry.run("command.open");
               }}
@@ -116,41 +120,28 @@ function Frame() {
               <NavItem
                 label={place.label}
                 icon={place.icon}
-                shortcut={place.shortcut}
                 current={place.current}
                 {...link(place.path)}
               />
             </Tagged>
           ))}
           <SidebarFooter>
-            <Tagged testId="shortcut-sheet-button">
-              <NavItem
-                label={tNav("sheet.open")}
-                icon="keyboard"
-                shortcut="sheet.open"
-                onClick={() => {
-                  registry.run("sheet.open");
-                }}
-              />
-            </Tagged>
             <AccountMenu testId="account-menu" />
           </SidebarFooter>
         </Sidebar>
         <Outlet />
-      </AppFrame>
+      </Shell>
       <Tagged testId="tab-bar">
         <TabBar
           phoneOnly
           label={t("frame.places")}
-          items={places
-            .filter((place) => place.phone)
-            .map((place) => ({
-              id: place.id,
-              label: place.label,
-              icon: place.icon,
-              current: place.current,
-              ...link(place.path),
-            }))}
+          items={places.map((place) => ({
+            id: place.id,
+            label: place.label,
+            icon: place.icon,
+            current: place.current,
+            ...link(place.path),
+          }))}
         />
       </Tagged>
       <ShortcutSheet

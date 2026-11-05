@@ -55,7 +55,7 @@ use crate::{
     PipelineDeps,
     companies::{self, Company, ReadPage, SiteSource},
     features::prepare::{self, Preparation},
-    ports::{Neighbours, ProfileDigest, SiteFailure, SitePage},
+    ports::{Neighbours, ProfileDigest, SiteFailure, SitePage, SiteReading},
     store::{MAX_DESCRIPTION, MAX_URL},
 };
 
@@ -785,14 +785,48 @@ pub(crate) async fn ask<T: DeserializeOwned>(
     system: &str,
     user: &str,
 ) -> Result<T> {
+    ask_as(
+        gateway,
+        Role::Complete,
+        &BUDGETS,
+        db,
+        account,
+        now,
+        name,
+        schema,
+        system,
+        user,
+    )
+    .await
+    .map(|(read, _)| read)
+}
+
+/// [`ask`] on `role`, trying each of `budgets` (`max_tokens`) in turn while
+/// the answer is cut off or unusable. Returns the answer and what the calls
+/// cost, in US dollars.
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn ask_as<T: DeserializeOwned>(
+    gateway: &Gateway,
+    role: Role,
+    budgets: &[u32],
+    db: &PgPool,
+    account: Uuid,
+    now: DateTime<Utc>,
+    name: &str,
+    schema: &Value,
+    system: &str,
+    user: &str,
+) -> Result<(T, f64)> {
     let mut last = Error::Unavailable(applicamp_ai::AI_FAILED);
-    for max_tokens in BUDGETS {
-        match ask_attempt(
-            gateway, db, account, now, name, schema, system, user, max_tokens,
+    let mut cost = 0.0;
+    for &max_tokens in budgets {
+        let (attempt, spent) = ask_attempt_as(
+            gateway, role, db, account, now, name, schema, system, user, max_tokens,
         )
-        .await?
-        {
-            Attempt::Done(read) => return Ok(read),
+        .await?;
+        cost += spent;
+        match attempt {
+            Attempt::Done(read) => return Ok((read, cost)),
             Attempt::Retry(error) => last = error,
         }
     }
@@ -821,6 +855,36 @@ pub(crate) async fn ask_attempt<T: DeserializeOwned>(
     user: &str,
     max_tokens: u32,
 ) -> Result<Attempt<T>> {
+    ask_attempt_as(
+        gateway,
+        Role::Complete,
+        db,
+        account,
+        now,
+        name,
+        schema,
+        system,
+        user,
+        max_tokens,
+    )
+    .await
+    .map(|(attempt, _)| attempt)
+}
+
+/// [`ask_attempt`] on `role`, with what the call cost in US dollars.
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn ask_attempt_as<T: DeserializeOwned>(
+    gateway: &Gateway,
+    role: Role,
+    db: &PgPool,
+    account: Uuid,
+    now: DateTime<Utc>,
+    name: &str,
+    schema: &Value,
+    system: &str,
+    user: &str,
+    max_tokens: u32,
+) -> Result<(Attempt<T>, f64)> {
     let caller = Caller { db, account, now };
     let request = ChatRequest {
         temperature: Some(0.0),
@@ -828,16 +892,20 @@ pub(crate) async fn ask_attempt<T: DeserializeOwned>(
         response_format: Some(ResponseFormat::json_schema(name, schema.clone())),
         ..ChatRequest::new(vec![Message::system(system), Message::user(user)])
     };
-    let reply = gateway.complete(caller, request).await?;
+    let reply = gateway.complete_as(role, caller, request).await?;
+    let cost = reply.cost_usd.unwrap_or_default();
     if reply.finish_reason.as_deref() == Some("length") {
         tracing::warn!(max_tokens, call = name, "an answer was cut off");
-        return Ok(Attempt::Retry(Error::Unavailable(applicamp_ai::AI_FAILED)));
+        return Ok((
+            Attempt::Retry(Error::Unavailable(applicamp_ai::AI_FAILED)),
+            cost,
+        ));
     }
     match reply.json::<T>() {
-        Ok(read) => Ok(Attempt::Done(read)),
+        Ok(read) => Ok((Attempt::Done(read), cost)),
         Err(error) => {
             tracing::warn!(%error, call = name, "an answer was unusable");
-            Ok(Attempt::Retry(Error::from(error)))
+            Ok((Attempt::Retry(Error::from(error)), cost))
         }
     }
 }
@@ -929,23 +997,58 @@ async fn fetch_and_store(
     .await?;
     tx.commit().await?;
 
-    let reading =
-        neighbours
-            .read_site(site, posting, now)
-            .await
-            .map_err(|failure| match failure {
-                SiteFailure::Unreachable => Error::Unavailable("site_unreachable"),
-                SiteFailure::RobotsDisallows => Error::Conflict(
+    let reading = match neighbours.read_site(site, posting, now).await {
+        Ok(reading) => reading,
+        Err(failure) => {
+            let (code, error) = match failure {
+                SiteFailure::Unreachable => {
+                    ("site_unreachable", Error::Unavailable("site_unreachable"))
+                }
+                SiteFailure::RobotsDisallows => (
                     "robots_disallows",
-                    "The company's website asks robots not to read it, so nothing was read."
-                        .to_owned(),
+                    Error::Conflict(
+                        "robots_disallows",
+                        "The company's website asks robots not to read it, so nothing was read."
+                            .to_owned(),
+                    ),
                 ),
-                SiteFailure::NothingReadable => Error::Conflict(
+                SiteFailure::NothingReadable => (
                     "no_pages_readable",
-                    "None of the company's pages had text to read.".to_owned(),
+                    Error::Conflict(
+                        "no_pages_readable",
+                        "None of the company's pages had text to read.".to_owned(),
+                    ),
                 ),
-            })?;
+            };
+            // Why, so the CV page can say so (#73).
+            sqlx::query("UPDATE pipeline.companies SET read_failure = $2 WHERE id = $1")
+                .bind(company_id)
+                .bind(code)
+                .execute(db)
+                .await?;
+            return Err(error);
+        }
+    };
+    facts_from(
+        gateway, db, account, company, company_id, &reading, opp, now,
+    )
+    .await
+}
 
+/// Make and keep the facts of `reading` (**one model call**, a second with
+/// half the text when the first is cut off): the pages read on the site, or
+/// the text the person pasted.
+#[allow(clippy::too_many_arguments)]
+async fn facts_from(
+    gateway: &Gateway,
+    db: &PgPool,
+    account: Uuid,
+    company: &str,
+    company_id: Uuid,
+    reading: &SiteReading,
+    opp: Option<&Opp>,
+    now: DateTime<Utc>,
+) -> Result<()> {
     // Two attempts at the same answer size: when the first is cut off, the
     // second is shown half the page text (the posting first, then the pages
     // by priority), never the same input with more room.
@@ -1090,7 +1193,8 @@ async fn store_read(
         .collect();
     sqlx::query(
         "UPDATE pipeline.companies
-            SET read_at = $2, pages = $3, pages_blocked = $4, facts_dropped = $5, updated_at = $2
+            SET read_at = $2, pages = $3, pages_blocked = $4, facts_dropped = $5, updated_at = $2,
+                read_failure = NULL
           WHERE id = $1",
     )
     .bind(company)
@@ -1466,6 +1570,124 @@ pub async fn read(
     analyze(&deps, &state.db, account, id, query.locale.as_deref(), now).await?;
     let opp = load(&state.db, account, id).await?;
     Ok(Json(build(&deps, &state.db, account, &opp, now).await?))
+}
+
+/// Longest text the person may paste from the company's site, in characters.
+pub const MAX_PASTE: usize = 20_000;
+
+/// What the company's site says, pasted by the person.
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PasteRequest {
+    /// The site's words, 1 to 20,000 characters.
+    pub text: String,
+}
+
+/// Read what the person pasted from the company's site.
+///
+/// When the site cannot be read (it asks apps not to, or does not answer),
+/// the person can paste what it says. The text is read like one of the
+/// site's pages (**one model call**): each fact must quote it, or it is left
+/// out; it replaces the company's facts as a read does. It counts toward the
+/// 20 company reads a day. The text is data, never instructions. A CV made
+/// before does not change: Write it again uses the facts.
+#[utoipa::path(
+    post,
+    path = "/api/v1/opportunities/{id}/brief/paste",
+    tag = "pipeline",
+    operation_id = "pipeline.brief_paste",
+    security(("session" = [])),
+    params(("id" = Uuid, Path, description = "The opportunity.")),
+    request_body = PasteRequest,
+    responses(
+        (status = 200, description = "The brief, with the facts of the pasted text.", body = Brief),
+        (status = 400, description = "`invalid_text`; `company_unknown`", body = Problem,
+            content_type = "application/problem+json"),
+        (status = 401, description = "`session_required`", body = Problem,
+            content_type = "application/problem+json"),
+        (status = 404, description = "`not_found`", body = Problem,
+            content_type = "application/problem+json"),
+        (status = 429, description = "`company_reads_daily_cap`", body = Problem,
+            content_type = "application/problem+json"),
+        (status = 503, description = "`ai_unavailable`; `ai_daily_limit_reached`; \
+            `ai_budget_reached`; `ai_failed`", body = Problem,
+            content_type = "application/problem+json"),
+    ),
+)]
+pub async fn paste(
+    State(state): State<AppState>,
+    SignedIn(principal): SignedIn,
+    Extension(deps): Extension<PipelineDeps>,
+    Path(id): Path<Uuid>,
+    body: std::result::Result<Json<PasteRequest>, JsonRejection>,
+) -> Result<Json<Brief>> {
+    let invalid = || {
+        Error::BadRequest(
+            "invalid_text",
+            format!("Paste between 1 and {MAX_PASTE} characters."),
+        )
+    };
+    let Json(request) = body.map_err(|_| invalid())?;
+    let text = request.text.trim();
+    if text.is_empty() || text.chars().count() > MAX_PASTE {
+        return Err(invalid());
+    }
+    let account = principal.account_id;
+    let db = &state.db;
+    let opp = load(db, account, id).await?;
+    if opp.company.trim().is_empty() {
+        return Err(unknown_company());
+    }
+    let now = state.clock.now();
+    let gateway = gateway(&deps)?;
+    if reads_today(db, account, now).await? >= DAILY_READS_CAP {
+        return Err(Error::TooManyRequests(
+            "company_reads_daily_cap",
+            format!("You can read {DAILY_READS_CAP} companies a day. Reading continues tomorrow."),
+        ));
+    }
+    // The site the text is from, as far as anyone knows: the company's, else
+    // the posting's.
+    let site = companies::find(db, account, &opp.company)
+        .await?
+        .and_then(|c| c.site)
+        .unwrap_or_else(|| opp.url.clone());
+    let mut tx = db.begin().await?;
+    let company_id = companies::ensure(&mut tx, account, &opp.company, now).await?;
+    sqlx::query(
+        "INSERT INTO pipeline.company_reads (id, account_id, company_id, started_at)
+         VALUES ($1, $2, $3, $4)",
+    )
+    .bind(Uuid::now_v7())
+    .bind(account)
+    .bind(company_id)
+    .bind(now)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    let reading = SiteReading {
+        pages: vec![SitePage {
+            url: site,
+            fetched_at: now,
+            kind: "pasted".to_owned(),
+            text: text.to_owned(),
+        }],
+        blocked: 0,
+    };
+    facts_from(
+        gateway,
+        db,
+        account,
+        &opp.company,
+        company_id,
+        &reading,
+        Some(&opp),
+        now,
+    )
+    .await?;
+    tracing::info!("a company read from pasted text");
+    let opp = load(db, account, id).await?;
+    Ok(Json(build(&deps, db, account, &opp, now).await?))
 }
 
 /// The company a fact of opportunity `opp` belongs to, if it does.

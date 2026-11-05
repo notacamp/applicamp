@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<source>
+  <publisher>Workable</publisher>
+  <publisherurl>https://www.workable.com</publisherurl>
+  <job>
+    <title>
+      <![CDATA[Head Baker]]>
+    </title>
+    <date>
+      <![CDATA[Fri, 30 Oct 2026 09:15:00 UTC]]>
+    </date>
+    <referencenumber>
+      <![CDATA[AAAA111111]]>
+    </referencenumber>
+    <url>
+      <![CDATA[https://apply.workable.com/j/AAAA111111]]>
+    </url>
+    <company>
+      <![CDATA[Meridian Bakery & Co]]>
+    </company>
+    <city><![CDATA[Porto]]></city>
+    <country><![CDATA[PT]]></country>
+    <remote><![CDATA[false]]></remote>
+    <description>
+      <![CDATA[<p>Invented. See <a href="https://example.com/company">us</a>.</p>]]>
+    </description>
+    <website>
+      <![CDATA[https://meridian-bakery.example.com]]>
+    </website>
+  </job>
+  <job>
+    <title><![CDATA[Delivery Driver]]></title>
+    <date><![CDATA[Mon, 02 Nov 2026 08:00:00 UTC]]></date>
+    <referencenumber><![CDATA[BBBB222222]]></referencenumber>
+    <url><![CDATA[https://apply.workable.com/j/BBBB222222]]></url>
+    <company><![CDATA[Meridian Bakery & Co]]></company>
+    <description><![CDATA[<p>Mentions <website>https://wrong.example.com</website> in text.</p>]]></description>
+  </job>
+  <job>
+    <title><![CDATA[No company here]]></title>
+    <date><![CDATA[Mon, 02 Nov 2026 08:00:00 UTC]]></date>
+    <referencenumber><![CDATA[CCCC333333]]></referencenumber>
+    <url><![CDATA[https://apply.workable.com/j/CCCC333333]]></url>
+    <company><![CDATA[]]></company>
+  </job>
+  <job>
+    <title><![CDATA[Typesetter]]></title>
+    <date><![CDATA[Wed, 28 Jul 2021 10:24:17 UTC]]></date>
+    <referencenumber><![CDATA[DDDD444444]]></referencenumber>
+    <url><![CDATA[https://apply.workable.com/lantern-press/j/DDDD444444/]]></url>
+    <company><![CDATA[Old Lantern Press]]></company>
+  </job>
+  <job>
+    <title>Dock Hand</title>
+    <date>Tue, 03 Nov 2026 12:00:00 UTC</date>
+    <referencenumber>EEEE555555</referencenumber>
+    <url>https://apply.workable.com/j/EEEE555555</url>
+    <company>Harbour &lt;Works&gt;</company>
+  </job>
+</source>

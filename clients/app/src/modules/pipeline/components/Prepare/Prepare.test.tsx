@@ -198,14 +198,18 @@ describe("Prepare: what the app did by itself", () => {
 describe("Prepare: company and job", () => {
   it("offers Read with its cost, asks nothing of the model on opening, and leaves a spot for the draft", async () => {
     const { requests } = renderPage({ [BRIEF]: { body: brief() } });
-    expect(await screen.findByTestId("prepare-read")).toHaveTextContent(
-      "Read about Example Co · about €0.004",
+    expect(await screen.findByTestId("prepare-read")).toHaveTextContent("Read about Example Co");
+    // The cost on the line under the button, never in it.
+    expect(screen.getByTestId("prepare-read")).not.toHaveTextContent("€");
+    expect(screen.getByTestId("prepare-read-cost")).toHaveTextContent(
+      "Reading costs about €0.004.",
     );
     expect(screen.getByTestId("prepare-site")).toHaveTextContent("example.com");
     expect(screen.getByTestId("prepare-wants-pending")).toBeVisible();
     expect(screen.getByTestId("prepare-draft-slot")).toBeVisible();
-    expect(await screen.findByTestId("prepare-draft")).toHaveTextContent(
-      "Draft the CV · about €0.004",
+    expect(await screen.findByTestId("prepare-draft")).toHaveTextContent("Draft the CV");
+    expect(screen.getByTestId("prepare-draft-cost")).toHaveTextContent(
+      "Drafting the CV costs about €0.01.",
     );
     expect(screen.getByTestId("prepare-spend")).toHaveTextContent("Company reads today: 1 of 20.");
     expect(requests.map((r) => r.route)).not.toContain(
@@ -291,7 +295,8 @@ describe("Prepare: company and job", () => {
     expect(screen.getByTestId("prepare-dropped")).toHaveTextContent("2 facts were left out");
     expect(screen.getByTestId("prepare-want-0")).toHaveTextContent("Rails");
     expect(screen.getByTestId("prepare-want-1")).toHaveTextContent("Kafka · nice to have");
-    expect(screen.getByTestId("prepare-read-again")).toHaveTextContent("about €0.002");
+    expect(screen.getByTestId("prepare-read-again")).toHaveTextContent("Read again");
+    expect(screen.getByTestId("prepare-read-again-cost")).toHaveTextContent("about €0.002");
 
     await user.click(screen.getByTestId("prepare-fact-remove-b"));
     const undo = await screen.findByTestId("prepare-fact-undo-b");

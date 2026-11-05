@@ -28,6 +28,11 @@
 //! - **Matching** ([`matching`]): how far a person is, and what a job search
 //!   matches against, for the ports the server wires to other modules.
 //!
+//! - **Complete your profile** ([`features::facts`]): the facts the app
+//!   already knows (what the person told and confirmed, their own website, a
+//!   CV read again) proposed for the profile, each to keep or drop, undoable
+//!   for a day. Made in plain code, no model.
+//!
 //! - **Completion** ([`features::completion`]): how strong the profile is
 //!   ([`strength`]) and the order of the skills. Its AI questions, drafts and
 //!   found skills were removed (#49): Tell me about you asks about the gaps.
@@ -69,7 +74,7 @@ pub struct ProfileDeps {
 
 /// The profile module, composed with `deps`.
 pub fn module(deps: ProfileDeps) -> Module {
-    use features::{about, completion, goals, grill, imports, linkedin, profile};
+    use features::{about, completion, facts, goals, grill, imports, linkedin, profile};
     // Uploads take up to a 20 MB export; every other route keeps axum's
     // default body limit.
     let uploads = OpenApiRouter::new()
@@ -103,6 +108,12 @@ pub fn module(deps: ProfileDeps) -> Module {
         .routes(routes!(imports::apply))
         .routes(routes!(imports::discard))
         .routes(routes!(linkedin::decide))
+        .routes(routes!(facts::list))
+        .routes(routes!(facts::keep_one))
+        .routes(routes!(facts::keep_all))
+        .routes(routes!(facts::drop_one))
+        .routes(routes!(facts::undo))
+        .routes(routes!(facts::undo_batch))
         .merge(uploads)
         .layer(Extension(Ai(deps.ai.clone())))
         .layer(Extension(deps.research.clone()));
@@ -111,10 +122,21 @@ pub fn module(deps: ProfileDeps) -> Module {
         router,
         background: Background::new()
             .job::<imports::ExpireImports>()
+            .job::<facts::ProposeFacts>()
+            .job::<facts::BackfillFacts>()
             .publishes::<events::ProfileUpdated>()
             .publishes::<events::GoalsUpdated>(),
         kinds: Vec::new(),
     }
+}
+
+/// On server start: queue the one-off proposals of the facts the app already
+/// knows for the accounts that existed before Complete your profile (#72). A
+/// marker keeps it from running twice. Whether it was queued.
+pub async fn start(db: &sqlx::PgPool) -> Result<bool, String> {
+    features::facts::schedule_backfill(db)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
@@ -136,6 +158,13 @@ mod tests {
             module(ProfileDeps::default()).background,
         )])
         .unwrap();
-        assert_eq!(registry.kinds(), ["profile.expire_imports"]);
+        assert_eq!(
+            registry.kinds(),
+            [
+                "profile.backfill_facts",
+                "profile.expire_imports",
+                "profile.propose_facts"
+            ]
+        );
     }
 }

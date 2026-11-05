@@ -428,6 +428,7 @@ mod tests {
             pages: sqlx::types::Json(Vec::new()),
             pages_blocked: 0,
             facts_dropped: 0,
+            read_failure: None,
         }
     }
 

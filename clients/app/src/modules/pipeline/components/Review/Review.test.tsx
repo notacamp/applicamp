@@ -89,7 +89,7 @@ describe("Review the CV", () => {
       "Did invoice runs drop to 20 minutes?",
     );
     expect(screen.getByTestId("cv-question-where-l5")).toHaveTextContent(
-      "You told us about Example Org: “Cut invoice runs from 6 hours to 40 minutes”.",
+      "Your profile says about Example Org: “Cut invoice runs from 6 hours to 40 minutes”.",
     );
     expect(screen.getByTestId("cv-question-keeps-l5")).toHaveTextContent(
       "If you keep it, this goes on your profile: “I cut invoice runs to 20 minutes.”",
@@ -283,6 +283,152 @@ describe("Review the CV", () => {
     expect(await screen.findByTestId("cv-approve")).toBeEnabled();
   });
 
+  it("says what the job wants, what the app did and what it cost, and what it rewrote", async () => {
+    const draft = cvDraft();
+    const role = draft.experience[0];
+    const fixedLine = cvLine("l8", "Led a team of 4 engineers", {
+      fixed_by_app: true,
+      original: "Led a team of 4 engineers building ledgers for small shops",
+    });
+    renderReview({
+      [CV]: {
+        body: cv({
+          draft: {
+            ...draft,
+            experience:
+              role === undefined ? [] : [{ ...role, bullets: [...role.bullets, fixedLine] }],
+          },
+          suggested_language: "fr",
+          work_languages: ["en", "es-ES"],
+        }),
+      },
+    });
+    expect(await screen.findByTestId("cv-wants")).toHaveTextContent("What the job wants");
+    expect(screen.getByTestId("cv-want-1")).toHaveTextContent(
+      "Kafka · nice to have · not on your profile",
+    );
+    expect(screen.getByTestId("cv-done")).toHaveTextContent("Done by the app · €0.006");
+    expect(screen.getByTestId("cv-done-draft-1")).toHaveTextContent("Wrote the CV · €0.004");
+    expect(screen.getByTestId("cv-done-pdf")).toHaveTextContent("Made the PDF");
+    expect(screen.getByTestId("cv-fixed-l8")).toHaveTextContent(
+      "It said: “Led a team of 4 engineers building ledgers for small shops”",
+    );
+    // Style, Length, Language: the CV's, the person's next language for work, the posting's.
+    expect(screen.getByTestId("cv-layout-language")).toHaveTextContent("Style");
+    expect(screen.getByTestId("cv-language-en")).toBeVisible();
+    expect(screen.getByTestId("cv-language-es-ES")).toBeVisible();
+    await userEvent.setup().click(screen.getByTestId("cv-language-fr"));
+    expect(screen.getByTestId("cv-language-next")).toHaveTextContent("Press Write it again");
+    expect(screen.getByTestId("cv-make-again")).toHaveTextContent("Write it again");
+    expect(screen.getByTestId("cv-make-again")).not.toHaveTextContent("€");
+    expect(screen.getByTestId("cv-write-again-cost")).toHaveTextContent(
+      "Writing it again costs about €0.01.",
+    );
+  });
+
+  it("says when the PDF could not be made, keeps the text and tries again", async () => {
+    let asked: unknown;
+    renderReview({
+      [CV]: {
+        body: cv({
+          draft: cvDraft({
+            preview: {
+              ready: false,
+              stale: false,
+              error: "cv_pdf_unavailable",
+              at: "2026-10-31T10:00:01Z",
+            },
+          }),
+        }),
+      },
+      [`POST /api/v1/opportunities/${ID}/cv/drafts/1/preview`]: async (request) => {
+        asked = await request.json();
+        return { body: cv({ draft: cvDraft() }) };
+      },
+    });
+    expect(await screen.findByTestId("cv-preview-error")).toHaveTextContent(
+      "Could not make the PDF for Example Co. The text of the CV is saved.",
+    );
+    // Nothing says the PDF was made.
+    expect(screen.queryByTestId("cv-done-pdf")).toBeNull();
+    const text = screen.getByTestId("cv-preview-text");
+    expect(text).toHaveAttribute("download", "CV - Example Co.txt");
+    expect(decodeURIComponent(text.getAttribute("href") ?? "")).toContain(
+      "- Led a team of 4 engineers",
+    );
+    await userEvent.setup().click(screen.getByTestId("cv-preview-retry"));
+    await waitFor(() => {
+      expect(asked).toEqual({ template: "clean", length: 1 });
+    });
+  });
+
+  it("says when the company's site asks apps not to read it, and reads what the person pastes", async () => {
+    let pasted: unknown;
+    renderReview({
+      [CV]: {
+        body: cv({
+          draft: cvDraft({ company_facts: 0 }),
+          company_read_failure: "robots_disallows",
+        }),
+      },
+      [`POST /api/v1/opportunities/${ID}/brief/paste`]: async (request) => {
+        pasted = await request.json();
+        return { status: 200, body: {} };
+      },
+    });
+    expect(await screen.findByTestId("cv-site")).toHaveTextContent(
+      "The site asks apps not to read it. The CV was written from the job posting and your profile only.",
+    );
+    expect(screen.getByTestId("cv-site-paste")).not.toHaveTextContent("€");
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("cv-site-paste"));
+    await user.type(screen.getByTestId("cv-site-text"), "Example Co builds ledgers.");
+    await user.click(screen.getByTestId("cv-site-read"));
+    await waitFor(() => {
+      expect(pasted).toEqual({ text: "Example Co builds ledgers." });
+    });
+    expect(await screen.findByTestId("cv-site-done")).toHaveTextContent(
+      "Write it again to use what the site says.",
+    );
+  });
+
+  it("waits while the app writes the CV, with no button to press", async () => {
+    renderReview({ [CV]: { body: cv({ writing: true }) } });
+    expect(await screen.findByTestId("cv-writing")).toHaveTextContent(
+      "Writing your CV for Example Co. Usually under a minute.",
+    );
+    expect(screen.queryByTestId("cv-draft")).toBeNull();
+  });
+
+  it("says a quote is what the person told the app, or what their profile says", async () => {
+    const draft = cvDraft();
+    const [first, ...rest] = draft.waiting;
+    if (first === undefined) {
+      throw new Error("the fixture waits on something");
+    }
+    renderReview({
+      [CV]: {
+        body: cv({
+          draft: {
+            ...draft,
+            waiting: [
+              { ...first, quote: "I owned invoicing end to end", quote_from: "you" },
+              ...rest,
+            ],
+          },
+        }),
+      },
+    });
+    expect(await screen.findByTestId(`cv-question-where-${first.line_id}`)).toHaveTextContent(
+      "You told us about Example Org: “I owned invoicing end to end”.",
+    );
+    // Change it starts from those words, either way.
+    await userEvent.setup().click(screen.getByTestId(`cv-question-change-${first.line_id}`));
+    expect(screen.getByTestId(`cv-question-input-${first.line_id}`)).toHaveValue(
+      "I owned invoicing end to end",
+    );
+  });
+
   it("says why a line can't be kept: another job's, or too long", async () => {
     renderReview({
       [CV]: {
@@ -352,6 +498,51 @@ describe("Review the CV", () => {
       "This draft has no PDF yet.",
     );
     expect(screen.getByTestId("cv-preview-make")).toHaveTextContent("Make the PDF");
+  });
+
+  it("takes a position off Earlier", async () => {
+    let hidden: unknown;
+    renderReview({
+      [CV]: { body: cv({ draft: cvDraft() }) },
+      [`POST /api/v1/opportunities/${ID}/cv/drafts/1/hide-position`]: async (request) => {
+        hidden = await request.json();
+        return { body: cv({ draft: cvDraft({ earlier: [] }) }) };
+      },
+    });
+    const user = userEvent.setup();
+    await openLines(user);
+    expect(await screen.findByTestId("cv-earlier-2")).toHaveTextContent(
+      "Junior Developer, Tiny Co (2015–2017)",
+    );
+    await user.click(screen.getByTestId("cv-earlier-remove-2"));
+    await waitFor(() => {
+      expect(hidden).toEqual({ position: 2 });
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId("cv-earlier")).toBeNull();
+    });
+  });
+
+  it("says the cover letter is being written once Undo is over", async () => {
+    const earlier = new Date(Date.now() - 60_000).toISOString();
+    renderReview({
+      [CV]: {
+        body: cv({
+          draft: {
+            ...fixedDraft(),
+            status: "approved",
+            version: 1,
+            can_approve: false,
+            undo_until: earlier,
+          },
+          next: { step: "letter", eur: 0.002, at: earlier },
+        }),
+      },
+    });
+    expect(await screen.findByTestId("cv-letter-started")).toHaveTextContent(
+      "Approved. Your cover letter is being written now.",
+    );
+    expect(screen.queryByTestId("cv-undo")).toBeNull();
   });
 
   it("marks a line the app rewrote", async () => {
@@ -488,7 +679,8 @@ describe("Review the CV", () => {
       },
     });
     const write = await screen.findByTestId("cv-letter-write");
-    expect(write).toHaveTextContent("Write the cover letter · about €0.002");
+    expect(write).toHaveTextContent("Write the cover letter");
+    expect(screen.getByTestId("cv-letter-write-cost")).toHaveTextContent("about €0.002");
     await userEvent.setup().click(write);
     await waitFor(() => {
       expect(onLetter).toHaveBeenCalledWith(ID);
@@ -542,7 +734,10 @@ describe("Review the CV", () => {
   it("offers the draft when there is none, and a company fact used as an achievement can't be confirmed", async () => {
     renderReview({ [CV]: { body: cv() } });
     expect(await screen.findByTestId("cv-empty")).toBeVisible();
-    expect(screen.getByTestId("cv-draft")).toHaveTextContent("Draft the CV · about €0.004");
+    expect(screen.getByTestId("cv-draft")).toHaveTextContent("Draft the CV");
+    expect(screen.getByTestId("cv-draft-cost")).toHaveTextContent(
+      "Drafting the CV costs about €0.01.",
+    );
   });
 
   it("offers only Change it and Remove it for a company fact outside the summary", async () => {

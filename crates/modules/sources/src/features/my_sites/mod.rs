@@ -78,6 +78,7 @@ pub struct MySitesQuery {
     /// Only sites whose name has this in it, ignoring case.
     pub q: Option<String>,
     /// What to show; all sites when left out.
+    #[param(inline)]
     pub show: Option<Show>,
 }
 

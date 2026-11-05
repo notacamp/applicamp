@@ -30,7 +30,7 @@ export function SiteRow({ site, canManage, saving, onToggle, onKey }: SiteRowPro
         onClick={() => {
           onKey(site);
         }}
-        data-testid={`site-key-${site.id}`}
+        data-testid="site-key"
       >
         {t("sites.addKey")}
       </Button>
@@ -49,7 +49,7 @@ export function SiteRow({ site, canManage, saving, onToggle, onKey }: SiteRowPro
         onClick={() => {
           onToggle(site);
         }}
-        data-testid={`site-toggle-${site.id}`}
+        data-testid="site-toggle"
       >
         {state}
       </Button>
@@ -67,7 +67,7 @@ export function SiteRow({ site, canManage, saving, onToggle, onKey }: SiteRowPro
         )
       }
       actions={action}
-      testId={`site-row-${site.id}`}
+      testId="site-row"
     />
   );
 }

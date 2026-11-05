@@ -151,12 +151,11 @@ pub fn offer_of(tags: &[String], country: Option<&str>, remote_first: bool) -> O
         Place::Country(code.to_owned())
     } else if spots.contains(&Place::Worldwide) {
         Place::Worldwide
-    } else if spots.contains(&Place::Europe) {
-        Place::Europe
-    } else if spots.len() > 1
-        && spots
-            .iter()
-            .all(|p| matches!(p, Place::Country(c) if regions::EUROPEAN.contains(&c.as_str())))
+    } else if spots.contains(&Place::Europe)
+        || (spots.len() > 1
+            && spots
+                .iter()
+                .all(|p| matches!(p, Place::Country(c) if regions::EUROPEAN.contains(&c.as_str()))))
     {
         Place::Europe
     } else if let Some(first) = spots.into_iter().next() {

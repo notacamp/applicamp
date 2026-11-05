@@ -246,9 +246,9 @@ test("the Job sites page: the owner opens on All sites, Your sites lists the sit
   // One list, one search box, one select; the fake site is in a group, with its toggle.
   await expect(page.getByTestId("sites-find")).toBeVisible();
   await expect(page.getByTestId("sites-show")).toBeVisible();
-  const row = page.locator('[data-testid^="site-row-"]').filter({ hasText: "Fake Remote Board" });
+  const row = page.getByTestId("site-row").filter({ hasText: "Fake Remote Board" });
   await expect(row).toBeVisible();
-  const toggle = row.locator('[data-testid^="site-toggle-"]');
+  const toggle = row.getByTestId("site-toggle");
   const before = await toggle.getAttribute("aria-pressed");
   expect(["true", "false"]).toContain(before);
   const after = before === "true" ? "false" : "true";
@@ -259,23 +259,10 @@ test("the Job sites page: the owner opens on All sites, Your sites lists the sit
   await toggle.click();
   await expect(toggle).toHaveAttribute("aria-pressed", after);
   await page.reload();
-  await expect(
-    page
-      .locator('[data-testid^="site-row-"]')
-      .filter({ hasText: "Fake Remote Board" })
-      .locator('[data-testid^="site-toggle-"]'),
-  ).toHaveAttribute("aria-pressed", after);
+  const again = page.getByTestId("site-row").filter({ hasText: "Fake Remote Board" });
+  await expect(again.getByTestId("site-toggle")).toHaveAttribute("aria-pressed", after);
 
   // Turned back, so the next project starts from the same list.
-  await page
-    .locator('[data-testid^="site-row-"]')
-    .filter({ hasText: "Fake Remote Board" })
-    .locator('[data-testid^="site-toggle-"]')
-    .click();
-  await expect(
-    page
-      .locator('[data-testid^="site-row-"]')
-      .filter({ hasText: "Fake Remote Board" })
-      .locator('[data-testid^="site-toggle-"]'),
-  ).toHaveAttribute("aria-pressed", before ?? "true");
+  await again.getByTestId("site-toggle").click();
+  await expect(again.getByTestId("site-toggle")).toHaveAttribute("aria-pressed", before ?? "true");
 });

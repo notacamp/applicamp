@@ -10,14 +10,7 @@ import {
   watching,
 } from "../../../../../test/companies";
 import { renderWithProviders, stubApi, type Stub } from "../../../../../test/render";
-import {
-  EUROPE_SITE,
-  HIMALAYAS_SITE,
-  KEYED_SITE,
-  RUBY_SITE,
-  site,
-  sites,
-} from "../../../../../test/sites";
+import { EUROPE_SITE, HIMALAYAS_SITE, RUBY_SITE, site, sites } from "../../../../../test/sites";
 import type { CompanyList } from "../../api/companies";
 import type { MySites } from "../../api/sites";
 import { withSite } from "../../api/sites";
@@ -50,6 +43,16 @@ function fakeSites(extra: Record<string, Stub> = {}, initial: MySites = sites())
   return { queries, put, requests };
 }
 
+/** The row of the site called `name`. */
+async function rowOf(name: string): Promise<HTMLElement> {
+  const rows = await screen.findAllByTestId("site-row");
+  const row = rows.find((candidate) => (candidate.textContent ?? "").includes(name));
+  if (row === undefined) {
+    throw new Error(`no row for ${name}`);
+  }
+  return row;
+}
+
 describe("the job sites page", () => {
   it("says how many sites there are and how many are on, in groups, each row with its line and salary", async () => {
     fakeSites();
@@ -57,19 +60,15 @@ describe("the job sites page", () => {
     expect(await screen.findByTestId("sites-count")).toHaveTextContent("4 available, 2 on");
     const remote = screen.getByTestId("sites-group-remote_worldwide");
     expect(remote).toHaveTextContent("Remote, worldwide");
-    const row = within(remote).getByTestId(`site-row-${HIMALAYAS_SITE}`);
+    const row = within(remote).getByTestId("site-row");
     expect(row).toHaveTextContent("Himalayas");
     expect(row).toHaveTextContent("Remote jobs, mostly tech.");
     expect(row).toHaveTextContent("Typical salary");
     expect(row).toHaveTextContent("96");
     // The group of their own country carries its name.
     expect(screen.getByTestId("sites-group-country")).toHaveTextContent("Portugal");
-    expect(screen.getByTestId(`site-row-${KEYED_SITE}`)).toHaveTextContent(
-      "Portugal. Mostly tech.",
-    );
-    expect(screen.getByTestId(`site-row-${RUBY_SITE}`)).toHaveTextContent(
-      "Only ruby and rails jobs.",
-    );
+    expect(await rowOf("Jobs Portugal")).toHaveTextContent("Portugal. Mostly tech.");
+    expect(await rowOf("Ruby on Remote")).toHaveTextContent("Only ruby and rails jobs.");
     // No filter chips: one search box and one select.
     expect(screen.getByTestId("sites-find")).toBeInTheDocument();
     expect(screen.getByTestId("sites-show")).toBeInTheDocument();
@@ -79,22 +78,20 @@ describe("the job sites page", () => {
     const { put } = fakeSites();
     const user = userEvent.setup();
     renderWithProviders(<MySitesPage canManage={false} />);
-    const toggle = await screen.findByTestId(`site-toggle-${RUBY_SITE}`);
-    expect(toggle).toHaveAttribute("aria-pressed", "false");
-    expect(toggle).toHaveTextContent("Off");
-    await user.click(toggle);
-    await waitFor(() => {
-      expect(screen.getByTestId(`site-toggle-${RUBY_SITE}`)).toHaveAttribute(
-        "aria-pressed",
-        "true",
-      );
+    const toggle = async (name: string) => within(await rowOf(name)).getByTestId("site-toggle");
+    const ruby = await toggle("Ruby on Remote");
+    expect(ruby).toHaveAttribute("aria-pressed", "false");
+    expect(ruby).toHaveTextContent("Off");
+    await user.click(ruby);
+    await waitFor(async () => {
+      expect(await toggle("Ruby on Remote")).toHaveAttribute("aria-pressed", "true");
     });
-    expect(screen.getByTestId(`site-toggle-${RUBY_SITE}`)).toHaveTextContent("On");
+    expect(await toggle("Ruby on Remote")).toHaveTextContent("On");
     await waitFor(() => {
       expect(screen.getByTestId("sites-count")).toHaveTextContent("4 available, 3 on");
     });
     expect(put).toEqual([{ id: RUBY_SITE, on: true }]);
-    await user.click(screen.getByTestId(`site-toggle-${HIMALAYAS_SITE}`));
+    await user.click(await toggle("Himalayas"));
     await waitFor(() => {
       expect(screen.getByTestId("sites-count")).toHaveTextContent("4 available, 2 on");
     });
@@ -104,14 +101,14 @@ describe("the job sites page", () => {
   it("asks for the key for the owner and tells anyone else that the admin adds it", async () => {
     fakeSites();
     const { unmount } = renderWithProviders(<MySitesPage canManage />);
-    const key = await screen.findByTestId(`site-key-${KEYED_SITE}`);
-    expect(key).toHaveTextContent("Add the key");
-    expect(screen.queryByTestId(`site-toggle-${KEYED_SITE}`)).toBeNull();
+    const owner = await rowOf("Jobs Portugal");
+    expect(within(owner).getByTestId("site-key")).toHaveTextContent("Add the key");
+    expect(within(owner).queryByTestId("site-toggle")).toBeNull();
     unmount();
     renderWithProviders(<MySitesPage canManage={false} />);
-    const row = await screen.findByTestId(`site-row-${KEYED_SITE}`);
+    const row = await rowOf("Jobs Portugal");
     expect(row).toHaveTextContent("The admin adds this key");
-    expect(screen.queryByTestId(`site-key-${KEYED_SITE}`)).toBeNull();
+    expect(within(row).queryByTestId("site-key")).toBeNull();
   });
 
   it("names the sites that do not allow apps in one sentence, and counts the company pages", async () => {

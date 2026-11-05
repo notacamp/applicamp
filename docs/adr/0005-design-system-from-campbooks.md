@@ -1,6 +1,6 @@
 # 0005 — The UI is built on @notacamp/ui
 
-**Status:** Accepted · 2026-10-25
+**Status:** Accepted · 2026-10-25 · the token set amended by ADR 0011
 
 ## Context
 The owner asked to reuse the Campbooks design system instead of building one.

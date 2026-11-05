@@ -1,7 +1,7 @@
 {
   "appName": "Applicamp",
   "frame": {
-    "jump": "Chercher ou aller à",
+    "jump": "Chercher",
     "places": "Rubriques"
   },
   "commands": {
@@ -12,7 +12,7 @@
   },
   "today": {
     "title": "Aujourd’hui",
-    "lead": "Ce qui vous attend, chaque jour. Les agents travaillent en arrière-plan ; rien ne part en votre nom sans votre accord.",
+    "lead": "Rien n’est envoyé sans votre accord.",
     "loading": "Chargement…",
     "loadFailed": "Aujourd’hui n’a pas pu être chargé.",
     "retry": "Réessayer",
@@ -49,24 +49,20 @@
     "action": "Aller aux compétences"
   },
   "pipeline": {
-    "title": "Opportunités",
-    "lead": "Chaque opportunité trouvée par les agents ou ajoutée par vous, de la première correspondance à l’offre."
+    "title": "Emplois"
   },
   "boards": {
     "title": "Sites d’emploi",
     "lead": "Les sites d’emploi que lisent les recherches, classés par les salaires qu’ils affichent, les nouveaux qui vous attendent et ce que chaque recherche a analysé."
   },
   "companies": {
-    "title": "Entreprises",
-    "lead": "Les entreprises dont les offres continuent de vous correspondre. Suivez-en une et Applicamp consulte chaque jour son propre site d’emploi, puis vous prévient dès qu’une offre vous correspond. Rien n’est suivi sans votre accord."
+    "title": "Entreprises"
   },
   "agents": {
-    "title": "Agents",
-    "lead": "Chaque exécution travaille dans son propre bac à sable, créé pour une tâche et supprimé ensuite."
+    "title": "Agents"
   },
   "profile": {
-    "title": "Profil et objectifs",
-    "lead": "Ce que les agents savent de vous. Ils n’utilisent que ce qui est écrit ici, et chaque affirmation d’un CV doit en découler.",
+    "title": "Vous",
     "signedInAs": "Connecté en tant que",
     "waysIn": "Moyens de connexion"
   },
@@ -76,7 +72,6 @@
     "home": "Aller à Aujourd’hui"
   },
   "cvs": {
-    "title": "CV",
-    "lead": "Tous les CV que vous avez faits : les PDF que vous pouvez ouvrir et envoyer, et les brouillons encore en relecture."
+    "title": "CV"
   }
 }

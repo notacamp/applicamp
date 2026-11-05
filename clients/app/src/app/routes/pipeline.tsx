@@ -34,7 +34,7 @@ export interface PipelineProps {
 }
 
 /**
- * `/pipeline`: every opportunity, from first match to offer, with Search now
+ * `/pipeline`, Jobs: every opportunity, from first match to offer, with Search now
  * and its progress (the sources module) beside them.
  */
 export function Pipeline({
@@ -56,7 +56,7 @@ export function Pipeline({
     }
   }, [open, newOnly, onSearch]);
   return (
-    <Page testId="pipeline" title={t("pipeline.title")} lead={t("pipeline.lead")} wide>
+    <Page testId="pipeline" title={t("pipeline.title")} wide>
       <PipelinePage
         newOnly={newOnly}
         initialOpen={open}

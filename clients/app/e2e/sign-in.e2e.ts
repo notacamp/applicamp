@@ -114,7 +114,7 @@ test("an invited person signs in with Campbooks, lands on Today, imports their L
   // phone. Type a place, Enter goes there.
   await (phone ? page.getByTestId("jump-phone").click() : page.keyboard.press("ControlOrMeta+k"));
   await expect.poll(() => focusedRole(page)).toBe("combobox");
-  await page.keyboard.type("Pipeline");
+  await page.keyboard.type("Jobs");
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/pipeline$/);
   await expectPageFillsTheScreen(page, "pipeline");

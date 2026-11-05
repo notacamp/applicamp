@@ -66,7 +66,8 @@ flowchart LR
 `clients/app` (Vite, React 19, TypeScript strict, TanStack Router + Query,
 generated API types, zod, i18next with en / pt-PT / es-ES / fr, Vitest,
 Playwright happy-path e2e). Components and tokens come from `@notacamp/ui`;
-Applicamp's Notion-like look is its own token set.
+The look is the package's own (ADR 0011); Applicamp adds only the tokens the
+package has none for.
 
 ## Running it
 

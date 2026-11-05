@@ -55,8 +55,25 @@
     }
   },
   "review": {
-    "title": "Reveja o que foi encontrado",
-    "lead": "Nada é guardado até escolher. Substituir faz disto o seu perfil; Juntar mantém o seu como está e acrescenta só o que é novo.",
+    "title": "Veja o que encontrámos",
+    "lead": "Nada é guardado até escolher. Substituir faz disto o seu perfil. Juntar mantém o que editou, preenche o que falta e tira um local do resumo de um emprego.",
+    "found": "Encontrámos {{list}}.",
+    "counts": {
+      "jobs_one": "{{count}} emprego",
+      "jobs_other": "{{count}} empregos",
+      "achievements_one": "{{count}} conquista",
+      "achievements_other": "{{count}} conquistas",
+      "skills_one": "{{count}} competência",
+      "skills_other": "{{count}} competências",
+      "degrees_one": "{{count}} curso",
+      "degrees_other": "{{count}} cursos",
+      "languages_one": "{{count}} língua",
+      "languages_other": "{{count}} línguas",
+      "certificates_one": "{{count}} certificação",
+      "certificates_other": "{{count}} certificações",
+      "projects_one": "{{count}} projeto",
+      "projects_other": "{{count}} projetos"
+    },
     "loading": "A carregar o rascunho…",
     "loadFailed": "Não foi possível carregar o rascunho.",
     "gone": "Este rascunho já não existe: os rascunhos duram 24 horas.",
@@ -76,6 +93,7 @@
       "label": "Nenhum título profissional encontrado neste ficheiro",
       "summary": "Nenhum resumo encontrado neste ficheiro",
       "work": "Nenhuma posição encontrada neste ficheiro",
+      "achievements": "Nenhuma conquista encontrada neste ficheiro",
       "education": "Nenhuma formação encontrada neste ficheiro",
       "skills": "Nenhuma competência encontrada neste ficheiro",
       "languages": "Nenhum idioma encontrado neste ficheiro",
@@ -83,6 +101,10 @@
       "projects": "Nenhum projeto encontrado neste ficheiro",
       "hint": "Adicione-os à mão depois de aplicar, ou importe a exportação de dados do LinkedIn, que inclui competências, formação e idiomas.",
       "hintZip": "Adicione-os à mão depois de aplicar."
+    },
+    "stopped": {
+      "title": "O seu limite de IA não nos deixou ler outra vez as partes em falta.",
+      "body": "Abaixo está o que encontrámos. Acrescente as partes em falta à mão, ou tente de novo amanhã."
     }
   },
   "source": {
@@ -640,7 +662,9 @@
       "title": "Guardado",
       "banner": "Guardado no seu perfil.",
       "lead": "O seu perfil está agora {{score}}% forte. Os agentes e os CV passam a usá-lo. Pode voltar quando quiser para acrescentar mais.",
-      "done": "Voltar a Perfil e objetivos"
+      "done": "Voltar a Perfil e objetivos",
+      "facts_one": "{{count}} facto espera por si em Complete o seu perfil.",
+      "facts_other": "{{count}} factos esperam por si em Complete o seu perfil."
     },
     "errors": {
       "generic": "Não funcionou. Tente outra vez.",
@@ -823,5 +847,53 @@
       "invalid_text": "Escreva algo, dentro do tamanho do LinkedIn para esta parte.",
       "not_found": "Isso já não está aqui. Volte atrás e veja de novo."
     }
+  },
+  "complete": {
+    "eyebrow": "O seu perfil",
+    "title": "Complete o seu perfil",
+    "lead_one": "Encontrámos {{count}} facto sobre o seu trabalho. Guarde-o se estiver certo.",
+    "lead_other": "Encontrámos {{count}} factos sobre o seu trabalho. Guarde os que estão certos.",
+    "leadNone": "Os factos que encontramos sobre o seu trabalho aparecem aqui, para os guardar ou descartar.",
+    "loading": "A carregar os factos…",
+    "loadFailed": "Não foi possível carregar os factos.",
+    "cvRead": "Lemos o seu CV outra vez.",
+    "progress": "{{decided}} de {{total}} decididos",
+    "keepAll": "Guardar todos",
+    "keep": "Guardar",
+    "drop": "Descartar",
+    "undo": "Anular",
+    "kept": "Guardado",
+    "dropped": "Descartado",
+    "keepLabel": "Guardar: {{text}}",
+    "dropLabel": "Descartar: {{text}}",
+    "undoLabel": "Anular: {{text}}",
+    "sources": {
+      "you_said": "disse-nos",
+      "you_confirmed": "confirmou",
+      "your_website": "do seu site",
+      "your_cv": "do seu CV"
+    },
+    "quoted": "«{{quote}}»",
+    "website": "De uma página do seu site.",
+    "confirmed": "Disse que isto estava certo.",
+    "groups": {
+      "skills": "As suas competências",
+      "background": "O seu percurso"
+    },
+    "now": "hoje",
+    "years": "{{start}} – {{end}}",
+    "done_one": "{{count}} facto acrescentado ao seu perfil.",
+    "done_other": "{{count}} factos acrescentados ao seu perfil.",
+    "doneUndo": "Pode anular isto durante um dia.",
+    "doneNone": "Nada foi acrescentado ao seu perfil.",
+    "failed": "Não resultou. Tente de novo.",
+    "profileChanged": "Esse emprego mudou no seu perfil. Veja o emprego e tente de novo.",
+    "emptyTitle": "Nada de novo para acrescentar",
+    "emptyLead": "Os factos novos aparecem aqui depois de responder às perguntas em Fale-me de si, ou de importar o seu CV.",
+    "back": "Voltar ao seu perfil",
+    "nudgeTitle_one": "{{count}} facto novo para o seu perfil",
+    "nudgeTitle_other": "{{count}} factos novos para o seu perfil",
+    "nudgeBody": "Das suas respostas, do seu site e do seu CV. Guarde os que estão certos.",
+    "nudgeOpen": "Ver os factos"
   }
 }

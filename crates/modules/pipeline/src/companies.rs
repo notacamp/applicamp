@@ -89,6 +89,9 @@ pub struct Company {
     pub pages: sqlx::types::Json<Vec<ReadPage>>,
     pub pages_blocked: i32,
     pub facts_dropped: i32,
+    /// Why the last read of its site failed, when it did:
+    /// `robots_disallows`, `no_pages_readable` or `site_unreachable`.
+    pub read_failure: Option<String>,
 }
 
 impl Company {
@@ -130,7 +133,8 @@ pub fn origin_of(raw: &str) -> Option<Url> {
 /// `account`'s company named `name`, if it is on record.
 pub async fn find(db: &PgPool, account: Uuid, name: &str) -> Result<Option<Company>> {
     Ok(sqlx::query_as(
-        "SELECT id, name, site, site_source, read_at, pages, pages_blocked, facts_dropped
+        "SELECT id, name, site, site_source, read_at, pages, pages_blocked, facts_dropped,
+                read_failure
            FROM pipeline.companies WHERE account_id = $1 AND key = $2",
     )
     .bind(account)

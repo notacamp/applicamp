@@ -55,8 +55,25 @@
     }
   },
   "review": {
-    "title": "Review what was found",
-    "lead": "Nothing is saved until you choose. Replace makes this your profile; Merge keeps yours as it is and adds only what’s new.",
+    "title": "Check what we found",
+    "lead": "Nothing is saved until you choose. Replace makes this your profile. Merge keeps what you edited, fills in what is missing and moves a place out of a job’s summary.",
+    "found": "Found {{list}}.",
+    "counts": {
+      "jobs_one": "{{count}} job",
+      "jobs_other": "{{count}} jobs",
+      "achievements_one": "{{count}} achievement",
+      "achievements_other": "{{count}} achievements",
+      "skills_one": "{{count}} skill",
+      "skills_other": "{{count}} skills",
+      "degrees_one": "{{count}} degree",
+      "degrees_other": "{{count}} degrees",
+      "languages_one": "{{count}} language",
+      "languages_other": "{{count}} languages",
+      "certificates_one": "{{count}} certification",
+      "certificates_other": "{{count}} certifications",
+      "projects_one": "{{count}} project",
+      "projects_other": "{{count}} projects"
+    },
     "loading": "Loading the draft…",
     "loadFailed": "The draft couldn’t be loaded.",
     "gone": "This draft is no longer here: drafts last 24 hours.",
@@ -76,6 +93,7 @@
       "label": "No headline found in this file",
       "summary": "No summary found in this file",
       "work": "No positions found in this file",
+      "achievements": "No achievements found in this file",
       "education": "No education found in this file",
       "skills": "No skills found in this file",
       "languages": "No languages found in this file",
@@ -83,6 +101,10 @@
       "projects": "No projects found in this file",
       "hint": "Add them by hand after you apply this, or import your LinkedIn data export, which carries skills, education and languages.",
       "hintZip": "Add them by hand after you apply this."
+    },
+    "stopped": {
+      "title": "Your AI limit stopped us reading the missing parts again.",
+      "body": "Below is what we found. Add the missing parts by hand, or try again tomorrow."
     }
   },
   "source": {
@@ -640,7 +662,9 @@
       "title": "Saved",
       "banner": "Saved to your profile.",
       "lead": "Your profile is now {{score}}% strong. Agents and CVs use it from now on. You can come back any time to add more.",
-      "done": "Back to Profile & goals"
+      "done": "Back to Profile & goals",
+      "facts_one": "{{count}} fact is waiting on Complete your profile.",
+      "facts_other": "{{count}} facts are waiting on Complete your profile."
     },
     "errors": {
       "generic": "That didn’t work. Try again.",
@@ -823,5 +847,53 @@
       "invalid_text": "Write something, within LinkedIn’s length for this part.",
       "not_found": "That isn’t here any more. Go back and look again."
     }
+  },
+  "complete": {
+    "eyebrow": "Your profile",
+    "title": "Complete your profile",
+    "lead_one": "We found {{count}} fact about your work. Keep it if it is right.",
+    "lead_other": "We found {{count}} facts about your work. Keep the right ones.",
+    "leadNone": "Facts we find about your work show up here, for you to keep or drop.",
+    "loading": "Loading the facts…",
+    "loadFailed": "The facts could not be loaded.",
+    "cvRead": "We read your CV again.",
+    "progress": "{{decided}} of {{total}} decided",
+    "keepAll": "Keep all",
+    "keep": "Keep",
+    "drop": "Drop",
+    "undo": "Undo",
+    "kept": "Kept",
+    "dropped": "Dropped",
+    "keepLabel": "Keep: {{text}}",
+    "dropLabel": "Drop: {{text}}",
+    "undoLabel": "Undo: {{text}}",
+    "sources": {
+      "you_said": "you said",
+      "you_confirmed": "you confirmed",
+      "your_website": "from your website",
+      "your_cv": "from your CV"
+    },
+    "quoted": "“{{quote}}”",
+    "website": "From a page of your website.",
+    "confirmed": "You said this was right.",
+    "groups": {
+      "skills": "Your skills",
+      "background": "Your background"
+    },
+    "now": "now",
+    "years": "{{start}} – {{end}}",
+    "done_one": "{{count}} fact added to your profile.",
+    "done_other": "{{count}} facts added to your profile.",
+    "doneUndo": "You can undo this for a day.",
+    "doneNone": "Nothing was added to your profile.",
+    "failed": "That did not work. Try again.",
+    "profileChanged": "That job changed on your profile. Check the job, then try again.",
+    "emptyTitle": "Nothing new to add",
+    "emptyLead": "New facts show up here after you answer questions in Tell me about you, or import your CV.",
+    "back": "Back to your profile",
+    "nudgeTitle_one": "{{count}} new fact for your profile",
+    "nudgeTitle_other": "{{count}} new facts for your profile",
+    "nudgeBody": "From your answers, your website and your CV. Keep the right ones.",
+    "nudgeOpen": "Check the facts"
   }
 }

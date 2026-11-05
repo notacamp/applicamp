@@ -138,10 +138,13 @@ async fn a_shortlisted_job_is_read_compared_and_drafted_then_waits_for_the_appro
     assert_eq!(brief["preparation"]["waiting_on"], "cv_approval");
     assert_eq!(steps(&brief), ["read", "compare", "draft"]);
     let spent = brief["preparation"]["spent_eur"].as_f64().unwrap();
-    // The read, the comparison, and the draft with its fix round at worst.
-    let expected = crate::features::brief::COMPANY_READ_EUR
-        + crate::features::brief::ANALYSIS_EUR
-        + crate::features::cv::DRAFT_EUR;
+    // The read, the comparison, and what the draft's calls really cost.
+    let drafted: f64 = sqlx::query_scalar("SELECT cost_eur FROM pipeline.cv_drafts")
+        .fetch_one(&s.h.db)
+        .await
+        .unwrap();
+    let expected =
+        crate::features::brief::COMPANY_READ_EUR + crate::features::brief::ANALYSIS_EUR + drafted;
     assert!((spent - expected).abs() < 1e-9, "{spent}");
     assert_eq!(brief["facts"].as_array().unwrap().len(), 1);
     assert_eq!(s.model.calls(CV).await, 1);

@@ -1,9 +1,10 @@
 //! `applicamp-ai`: the model gateway.
 //!
-//! Every model call goes through [`Gateway`] by **role**, never by vendor.
-//! Applicamp has one role so far, [`Role::Complete`] (structuring, writing),
-//! served by any provider speaking the OpenAI-compatible chat completions
-//! API: OpenRouter, or a self-hosted vLLM / llama.cpp / Ollama.
+//! Every model call goes through [`Gateway`] by **role**, never by vendor:
+//! [`Role::Complete`] (structuring, short answers) and [`Role::Write`]
+//! (longer writing: the tailored CV; `complete` serves it when it is not set),
+//! each served by any provider speaking the OpenAI-compatible chat
+//! completions API: OpenRouter, or a self-hosted vLLM / llama.cpp / Ollama.
 //!
 //! A trimmed copy of Campbooks Next's `campbooks-ai`: no `decide`, `embed` or
 //! `vision` roles, no streaming, no tools. What it keeps:

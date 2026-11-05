@@ -44,6 +44,8 @@ export interface CvSheetProps {
   actions: LineActions;
   /** Put back a position, or a line, as the profile has it. */
   onPutBack: (what: { position: number } | { source: string }) => void;
+  /** Take a position off "Earlier": named nowhere until it is put back. */
+  onHidePosition: (position: number) => void;
 }
 
 /**
@@ -51,7 +53,7 @@ export interface CvSheetProps {
  * and summary, the positions with their lines, the skills, education and
  * languages, and what was left out. Every line can show where it came from.
  */
-export function CvSheet({ draft, actions, onPutBack }: CvSheetProps) {
+export function CvSheet({ draft, actions, onPutBack, onHidePosition }: CvSheetProps) {
   const { t } = useTranslation("pipeline");
   const { contact } = draft;
   const contactLine = [
@@ -119,6 +121,33 @@ export function CvSheet({ draft, actions, onPutBack }: CvSheetProps) {
           </PaperRole>
         ))}
       </PaperSection>
+      {draft.earlier.length === 0 ? null : (
+        <PaperSection title={t("cv.sheet.earlier")} testId="cv-earlier">
+          <Stack gap="sm">
+            {draft.earlier.map((line) => (
+              <Cluster key={line.position}>
+                <Tagged testId={`cv-earlier-${String(line.position)}`}>
+                  <Text size="sm">{line.text}</Text>
+                </Tagged>
+                {actions.editable ? (
+                  <Button
+                    variant="ghost"
+                    icon="close"
+                    disabled={actions.busy}
+                    data-testid={`cv-earlier-remove-${String(line.position)}`}
+                    aria-label={`${t("cv.sheet.earlierRemove")}: ${line.text}`}
+                    onClick={() => {
+                      onHidePosition(line.position);
+                    }}
+                  >
+                    {t("cv.sheet.earlierRemove")}
+                  </Button>
+                ) : null}
+              </Cluster>
+            ))}
+          </Stack>
+        </PaperSection>
+      )}
       {draft.skills.length === 0 ? null : (
         <PaperSection title={t("cv.sheet.skills")} testId="cv-skills">
           <ChipList>

@@ -711,6 +711,70 @@ function linkedinReview(userContent: string) {
 }
 
 /**
+ * A profile import (#72, system prompt "You turn the document between
+ * <document>…"), for the invented LinkedIn profile the e2e uploads as a PDF.
+ * It answers wrong in the known ways the server must survive: the first
+ * position's place on the first line of its summary and its dates as words,
+ * then everything else but education and languages; asked again on the text
+ * under those headings (`profile_again`), it gives both. Every value is in
+ * that PDF.
+ */
+function profileImport(part: string) {
+  if (part === "profile_work") {
+    return {
+      work: [
+        {
+          name: "Example Org",
+          position: "Staff Engineer",
+          startDate: "Jul 2023",
+          summary: "Lisbon, Portugal\nRuns the billing platform for 40 shops.",
+          highlights: ["Moved billing to Rust", "Cut refunds by half"],
+        },
+        {
+          name: "Sample Labs",
+          position: "Engineer",
+          location: "Porto, Portugal",
+          startDate: "Jun 2017",
+          endDate: "Apr 2023",
+          summary: "Built the data pipeline for 40 shops.",
+          highlights: ["Ran the on-call rota"],
+        },
+      ],
+    };
+  }
+  if (part === "profile_again") {
+    return {
+      education: [
+        {
+          institution: "Sample University",
+          studyType: "Master's degree",
+          area: "Computer science",
+          startDate: "2012",
+          endDate: "2017",
+        },
+      ],
+      languages: [
+        { language: "Portuguese", fluency: "Native or Bilingual" },
+        { language: "English", fluency: "Full Professional" },
+      ],
+    };
+  }
+  return {
+    basics: {
+      name: "Alex Demo",
+      label: "Staff engineer building calm backends",
+      summary: "I build boring, reliable backends for small teams.",
+      profiles: [],
+    },
+    education: [],
+    skills: [{ name: "Rust" }, { name: "PostgreSQL" }, { name: "Team leadership" }],
+    languages: [],
+    certificates: [],
+    projects: [],
+  };
+}
+
+/**
  * Answers a chat completion as the model would, by what it is asked, or (any
  * other) the scoring of every posting of the last user message, with its
  * facts.
@@ -720,10 +784,19 @@ async function complete(request: IncomingMessage, response: ServerResponse) {
   try {
     const parsed = JSON.parse(await body(request)) as {
       messages?: { role?: string; content?: string }[];
+      response_format?: { json_schema?: { name?: string } };
     };
     const messages = parsed.messages ?? [];
     const system = messages.find((message) => message.role === "system")?.content ?? "";
     const user = messages.findLast((message) => message.role === "user");
+    if (system.startsWith("You turn the document between <document>")) {
+      json(
+        response,
+        200,
+        completion(profileImport(parsed.response_format?.json_schema?.name ?? "")),
+      );
+      return;
+    }
     if (system.startsWith("You write what a job-hunting app knows about one person")) {
       json(response, 200, completion(aboutPortrait(user?.content ?? "")));
       return;
@@ -762,6 +835,11 @@ async function complete(request: IncomingMessage, response: ServerResponse) {
     }
     if (system.startsWith("You fix the lines of a CV")) {
       json(response, 200, completion(cvFixes(user?.content ?? "")));
+      return;
+    }
+    if (system.startsWith("You add bullets to a CV")) {
+      // What the job wants that the profile shows: nothing more to add here.
+      json(response, 200, completion({ bullets: [] }));
       return;
     }
     if (system.startsWith("You write a cover letter")) {

@@ -86,12 +86,16 @@ const cvKey = (id: string) => [...PIPELINE_QUERY_KEY, "cv", id] as const;
 /** Every CV of the account (`GET /api/v1/cvs`). */
 export const CVS_QUERY_KEY = [...PIPELINE_QUERY_KEY, "cvs"] as const;
 
-/** Reading the CV never calls the model. */
+/** How often the CV is read again while the app writes it. */
+const WRITING_MS = 4000;
+
+/** Reading the CV never calls the model; while the app writes it, it is read again. */
 export function useCv(id: string) {
   return useQuery({
     queryKey: cvKey(id),
     queryFn: async ({ signal }): Promise<Cv> =>
       unwrap(await api.GET("/api/v1/opportunities/{id}/cv", { params: { path: { id } }, signal })),
+    refetchInterval: (query) => (query.state.data?.writing === true ? WRITING_MS : false),
   });
 }
 
@@ -207,6 +211,22 @@ export function usePutBack(id: string, n: number) {
   });
 }
 
+/** Takes a position off "Earlier": the CV names it nowhere until it is put back. */
+export function useHidePosition(id: string, n: number) {
+  const store = useStore(id);
+  return useMutation({
+    mutationFn: async (position: number): Promise<Cv> =>
+      unwrap(
+        await api.POST("/api/v1/opportunities/{id}/cv/drafts/{n}/hide-position", {
+          params: { path: { id, n } },
+          headers: CSRF_HEADERS,
+          body: { position },
+        }),
+      ),
+    onSuccess: store,
+  });
+}
+
 /**
  * Approves a draft: its text becomes a PDF (Clean on 1 page unless the
  * `layout` says otherwise), read back and kept as the next version.
@@ -292,6 +312,7 @@ const ERROR_CODES = [
   "cannot_keep",
   "not_flagged",
   "too_late",
+  "company_reads_daily_cap",
   "profile_changed",
   "draft_frozen",
   "lines_flagged",
@@ -316,16 +337,59 @@ export function cvErrorCode(error: unknown): CvErrorCode {
   return ERROR_CODES.find((known) => known === code) ?? "generic";
 }
 
-/**
- * What "Draft the CV" costs, about, in euros: the draft and, at worst, the app's fix round (the
- * server's own figure is `Cv.draft_eur`).
- */
-export const DRAFT_ESTIMATE_EUR = 0.004;
-
 /** Where a flag can be fixed with "It's true": not for a company fact used as an achievement. */
 export function canConfirm(flags: readonly CvReason[]): boolean {
   return (
     flags.length > 0 &&
     flags.every((flag) => flag.kind !== "company_fact_outside_summary" && flag.kind !== "no_source")
   );
+}
+
+/**
+ * The CV's text, as plain text: what "Download the text" saves when the PDF
+ * could not be made. The person's own CV, nothing added.
+ */
+export function cvText(draft: CvDraft): string {
+  const present = (part: string | null | undefined): part is string =>
+    part !== undefined && part !== null && part.trim() !== "";
+  const contact = draft.contact;
+  const lines: string[] = [];
+  if (present(contact.name)) {
+    lines.push(contact.name);
+  }
+  if (draft.headline !== undefined && draft.headline !== null) {
+    lines.push(draft.headline.text);
+  }
+  const reach = [contact.email, contact.location, contact.url, ...contact.links.map((l) => l.url)]
+    .filter(present)
+    .join(" · ");
+  if (reach !== "") {
+    lines.push(reach);
+  }
+  if (draft.summary !== undefined && draft.summary !== null) {
+    lines.push("", draft.summary.text);
+  }
+  for (const role of draft.experience) {
+    const head = [role.title, role.company].filter(present).join(" · ");
+    const when = [role.start_date, role.end_date].filter(present).join(" – ");
+    lines.push("", when === "" ? head : `${head} (${when})`);
+    for (const bullet of role.bullets) {
+      lines.push(`- ${bullet.text}`);
+    }
+  }
+  if (draft.skills.length > 0) {
+    lines.push("", draft.skills.map((skill) => skill.name).join(", "));
+  }
+  for (const school of draft.education) {
+    lines.push("", [school.study_type, school.area, school.institution].filter(present).join(", "));
+  }
+  if (draft.languages.length > 0) {
+    lines.push(
+      "",
+      draft.languages
+        .map((l) => (present(l.fluency) ? `${l.language}: ${l.fluency}` : l.language))
+        .join(", "),
+    );
+  }
+  return `${lines.join("\n")}\n`;
 }

@@ -8,11 +8,14 @@ import { AddedStep } from "./AddedStep";
 import { errorCode } from "./labels";
 import { PortraitStep } from "./PortraitStep";
 import { QuestionsStep } from "./QuestionsStep";
+import { FactsWaiting } from "../Complete/FactsNudge";
 import { ReviewStep } from "./ReviewStep";
 
 export interface AboutYouPageProps {
   /** Back to Profile & goals. */
   onBack: () => void;
+  /** Open "Complete your profile": the facts waiting to be kept or dropped. */
+  onComplete: () => void;
   /** The month's AI spend line. */
   spend?: ReactNode;
 }
@@ -26,7 +29,7 @@ type Step = "portrait" | "added" | "questions" | "review";
  * before it all is saved in one go. Opening it makes the portrait (one model
  * call per profile version); nothing is saved until Save.
  */
-export function AboutYouPage({ onBack, spend }: AboutYouPageProps) {
+export function AboutYouPage({ onBack, onComplete, spend }: AboutYouPageProps) {
   const { t, i18n } = useTranslation("profile");
   const about = useAbout();
   const portrait = useMakePortrait(i18n.language);
@@ -61,6 +64,7 @@ export function AboutYouPage({ onBack, spend }: AboutYouPageProps) {
           <Banner tone="neutral" icon="check" role="status" title={t("about.saved.banner")}>
             {t("about.saved.lead", { score: saved })}
           </Banner>
+          <FactsWaiting onOpen={onComplete} />
           <Cluster>
             <Button variant="primary" data-testid="about-saved-done" onClick={onBack}>
               {t("about.saved.done")}

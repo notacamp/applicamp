@@ -10,7 +10,9 @@ use uuid::Uuid;
 
 use super::{CAP_PER_DAY, CAP_PER_OPPORTUNITY};
 use crate::{
-    ports::{CvContact, CvEducation, CvFact, CvLanguage, CvPosition, CvProfile},
+    ports::{
+        CvCertificate, CvContact, CvEducation, CvFact, CvLanguage, CvPosition, CvProfile, CvProject,
+    },
     testkit::{Fake, Fixer, Harness, Model},
 };
 
@@ -18,6 +20,7 @@ pub(crate) const FACT_ID: &str = "aaaa1111-0000-4000-8000-000000000001";
 pub(crate) const COMPANY_FACT: &str = "Builds ledgers for small shops";
 pub(crate) const CV: &str = "You write a one-page CV";
 pub(crate) const FIX: &str = "You fix the lines of a CV";
+pub(crate) const WANTS: &str = "You add bullets to a CV";
 
 pub(crate) fn profile() -> CvProfile {
     CvProfile {
@@ -78,6 +81,18 @@ pub(crate) fn profile() -> CvProfile {
             language: "English".into(),
             fluency: Some("Fluent".into()),
         }],
+        background: Some("Ran a small hotel for six years before engineering".into()),
+        projects: vec![CvProject {
+            name: "Ledgerly".into(),
+            description: Some("An open-source billing toolkit".into()),
+            ..CvProject::default()
+        }],
+        certificates: vec![CvCertificate {
+            name: "Cloud Practitioner".into(),
+            issuer: Some("Example Academy".into()),
+            date: Some("2022".into()),
+        }],
+        work_languages: vec!["en".into()],
         latest: Some(0),
     }
 }
@@ -180,16 +195,41 @@ async fn stack(db: PgPool) -> Stack {
 
 /// A stack whose model drafts `cv` and answers the fix prompt with `fixer`.
 async fn stack_with(db: PgPool, cv: Value, fixer: Option<Fixer>) -> Stack {
+    stack_full(
+        db,
+        cv,
+        json!({"wants": [], "questions": []}),
+        fixer,
+        Value::Null,
+    )
+    .await
+}
+
+/// A stack whose model compares the job with `analysis`, drafts `cv`,
+/// answers the fix prompt with `fixer` and the second look at what the job
+/// wants with `adds`.
+async fn stack_full(
+    db: PgPool,
+    cv: Value,
+    analysis: Value,
+    fixer: Option<Fixer>,
+    adds: Value,
+) -> Stack {
+    stack_reading(db, json!({"facts": []}), cv, analysis, fixer, adds).await
+}
+
+/// [`stack_full`] whose model reads a company's pages as `facts`.
+async fn stack_reading(
+    db: PgPool,
+    facts: Value,
+    cv: Value,
+    analysis: Value,
+    fixer: Option<Fixer>,
+    adds: Value,
+) -> Stack {
     let fake = Arc::new(Fake::default());
     *fake.cv_profile.lock().unwrap() = Some(profile());
-    let model = Model::with_fixer(
-        json!({"facts": []}),
-        json!({"wants": [], "questions": []}),
-        cv,
-        Value::Null,
-        fixer,
-    )
-    .await;
+    let model = Model::with_adds(facts, analysis, cv, Value::Null, fixer, adds).await;
     let h = Harness::with_ai(db, Uuid::now_v7(), Arc::clone(&fake), Some(model.gateway()));
     company_fact(&h).await;
     let opp = add(&h, "shortlisted").await;
@@ -266,6 +306,8 @@ async fn a_draft_cites_its_sources_and_the_check_flags_what_they_do_not_say(db: 
     assert_eq!(status, StatusCode::OK, "{cv}");
     assert!(cv["draft"].is_null());
     assert_eq!(cv["can_draft"]["allowed"], true);
+    // Shortlisting started its preparation: the page waits for the CV.
+    assert_eq!(cv["writing"], true);
     assert_eq!(cv["caps"]["drafts_today_cap"], CAP_PER_DAY);
     assert_eq!(cv["caps"]["drafts_here_cap"], CAP_PER_OPPORTUNITY);
     assert_eq!(s.model.calls(CV).await, 0, "a look never calls the model");
@@ -671,6 +713,7 @@ async fn another_accounts_opportunity_is_not_found(db: PgPool) {
         ("POST", "/drafts/1/approve", json!({})),
         ("POST", "/drafts/1/discard", json!({})),
         ("POST", "/drafts/1/unapprove", json!({})),
+        ("POST", "/drafts/1/hide-position", json!({ "position": 2 })),
         (
             "POST",
             "/drafts/1/preview",
@@ -806,7 +849,14 @@ async fn approving_keeps_a_pdf_that_was_read_back_and_serves_it_inline_then_as_a
     assert_eq!(checks["sections"]["missing"], json!([]));
     assert_eq!(
         checks["sections"]["expected"],
-        json!(["Summary", "Experience", "Skills", "Education", "Languages"])
+        json!([
+            "Summary",
+            "Experience",
+            "Earlier",
+            "Skills",
+            "Education",
+            "Languages"
+        ])
     );
     assert_eq!(checks["lines"]["missing"], json!([]));
     assert_eq!(checks["keywords"]["missing"], json!([]));
@@ -1447,6 +1497,7 @@ async fn the_app_fixes_what_it_can_asks_the_rest_and_yes_keeps_the_fact_it_propo
     // model's, are what Change it starts from.
     assert_eq!(team["company"], "Example Org");
     assert_eq!(team["quote"], "Led a team of 4 engineers");
+    assert_eq!(team["quote_from"], "profile", "a highlight of the profile");
     let company = waiting_for(&cv, COMPANY_FACT);
     assert!(company["proposal"].is_null());
     assert_eq!(company["cannot_keep"], "company");
@@ -1708,4 +1759,305 @@ async fn an_approval_can_be_undone_for_a_moment_and_not_after(db: PgPool) {
     assert_eq!(status, StatusCode::CONFLICT, "{body}");
     assert_eq!(body["code"], "too_late");
     assert_eq!(s.model.calls(CV).await, 1);
+}
+
+// ---- written from everything the profile knows (#73) ----------------------------
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_model_is_shown_everything_and_the_cv_reads_newest_first_with_the_rest_earlier(
+    db: PgPool,
+) {
+    // The model gives the older position first.
+    let mut cv = answer();
+    cv["experience"].as_array_mut().unwrap().reverse();
+    let s = stack_with(db, cv, None).await;
+    let cv = draft(&s).await;
+    let message = &s.model.user_messages(CV).await[0];
+    for needle in [
+        "[bg] Ran a small hotel for six years before engineering",
+        "[pr0] Ledgerly: An open-source billing toolkit",
+        "[ce0] Cloud Practitioner, Example Academy, 2022",
+        "<language>en</language>",
+    ] {
+        assert!(message.contains(needle), "{needle}\n{message}");
+    }
+    let d = &cv["draft"];
+    let positions: Vec<i64> = d["experience"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["position"].as_i64().unwrap())
+        .collect();
+    assert_eq!(
+        positions,
+        [0, 1],
+        "newest first, whatever the model's order"
+    );
+    // What the calls cost, and what the app did.
+    let cost = d["cost_eur"].as_f64().unwrap();
+    assert!(cost > 0.0, "{cost}");
+    let done = cv["done"].as_array().unwrap();
+    assert_eq!(done.last().unwrap()["step"], "draft");
+    assert!((done.last().unwrap()["eur"].as_f64().unwrap() - cost).abs() < 1e-12);
+    assert!(cv["suggested_language"].is_null());
+    // The position left out is named under Earlier, by the app.
+    let (_, _, bytes) = s.h.get_raw(&url(&s.opp, "/drafts/1/preview.pdf")).await;
+    let read = super::pdf::readback::extract(&bytes).unwrap();
+    assert!(read.text.contains("Earlier"), "{}", read.text);
+    assert!(
+        read.text.contains("Junior Developer, Tiny Co (2015–2017)"),
+        "{}",
+        read.text
+    );
+    // The page shows the same line.
+    assert_eq!(
+        d["earlier"],
+        json!([{ "position": 2, "text": "Junior Developer, Tiny Co (2015–2017)" }])
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_position_taken_off_is_named_nowhere_until_it_is_put_back(db: PgPool) {
+    let s = stack(db).await;
+    draft(&s).await;
+    let hide = url(&s.opp, "/drafts/1/hide-position");
+    // A position with lines on the CV is not taken off this way.
+    let (status, body) = s.h.json("POST", &hide, &json!({ "position": 0 })).await;
+    assert_eq!(status, StatusCode::CONFLICT, "{body}");
+    assert_eq!(body["code"], "already_on_cv");
+    let (status, _) = s.h.json("POST", &hide, &json!({ "position": 9 })).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+
+    // Off "Earlier", in the PDF and on the page; still among what was left out.
+    let (status, cv) = s.h.json("POST", &hide, &json!({ "position": 2 })).await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    assert_eq!(cv["draft"]["earlier"], json!([]));
+    assert!(
+        cv["draft"]["left_out"]["roles"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["position"] == 2)
+    );
+    let (_, _, bytes) = s.h.get_raw(&url(&s.opp, "/drafts/1/preview.pdf")).await;
+    let read = super::pdf::readback::extract(&bytes).unwrap();
+    assert!(!read.text.contains("Tiny Co"), "{}", read.text);
+
+    // Its last line removed, a position is taken off too.
+    let second: Vec<String> = cv["draft"]["experience"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["position"] == 1)
+        .unwrap()["bullets"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|b| b["id"].as_str().unwrap().to_owned())
+        .collect();
+    let mut cv = cv;
+    for id in second {
+        let (status, next) =
+            s.h.json(
+                "PATCH",
+                &url(&s.opp, &format!("/drafts/1/lines/{id}")),
+                &json!({ "remove": true }),
+            )
+            .await;
+        assert_eq!(status, StatusCode::OK, "{next}");
+        cv = next;
+    }
+    assert_eq!(cv["draft"]["earlier"], json!([]), "{}", cv["draft"]);
+
+    // Put back, it is on the CV again.
+    let (status, cv) =
+        s.h.json(
+            "POST",
+            &url(&s.opp, "/drafts/1/put-back"),
+            &json!({ "position": 2 }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    assert!(
+        cv["draft"]["experience"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["position"] == 2)
+    );
+    let hidden: Vec<i64> = sqlx::query_scalar(
+        "SELECT (jsonb_array_elements(content -> 'hidden_positions'))::bigint
+           FROM pipeline.cv_drafts WHERE status = 'draft'",
+    )
+    .fetch_all(&s.h.db)
+    .await
+    .unwrap();
+    assert_eq!(hidden, [1], "only the one still off the CV");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_cv_is_in_the_persons_language_and_the_postings_is_only_offered(db: PgPool) {
+    let s = stack(db).await;
+    if let Some(profile) = s.fake.cv_profile.lock().unwrap().as_mut() {
+        profile.work_languages = vec!["pt-PT".into()];
+    }
+    sqlx::query("UPDATE pipeline.opportunities SET working_languages = '{en}'")
+        .execute(&s.h.db)
+        .await
+        .unwrap();
+    let cv = draft(&s).await;
+    assert_eq!(cv["draft"]["language"], "pt-PT");
+    assert_eq!(cv["suggested_language"], "en");
+    assert!(s.model.user_messages(CV).await[0].contains("<language>pt-PT</language>"));
+    // Asked for, the posting's.
+    let (status, cv) =
+        s.h.json(
+            "POST",
+            &url(&s.opp, "/drafts"),
+            &json!({ "language": "en" }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{cv}");
+    assert_eq!(cv["draft"]["language"], "en");
+    assert!(cv["suggested_language"].is_null());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn what_the_job_wants_and_the_profile_shows_is_added_in_one_more_call(db: PgPool) {
+    // A draft that leaves the second position out.
+    let mut cv = answer();
+    cv["experience"].as_array_mut().unwrap().truncate(1);
+    let analysis = json!({
+        "wants": [
+            { "label": "Partner feeds", "quote": "partner feeds", "level": "must" },
+            { "label": "Elixir", "quote": "Elixir is a plus", "level": "nice" },
+        ],
+        "questions": [],
+    });
+    let adds = json!({ "bullets": [
+        { "position": 1, "text": "Built ingestion for 3 partner feeds", "sources": ["w1.h1"] },
+    ]});
+    let s = stack_full(db, cv, analysis, None, adds).await;
+    sqlx::query(
+        "UPDATE pipeline.opportunities
+            SET description = 'You will own billing and partner feeds. Elixir is a plus. \
+                               Rust and PostgreSQL required.'",
+    )
+    .execute(&s.h.db)
+    .await
+    .unwrap();
+    let cv = draft(&s).await;
+    assert_eq!(s.model.calls(WANTS).await, 1);
+    let message = &s.model.user_messages(WANTS).await[0];
+    assert!(message.contains("- Partner feeds (must)"), "{message}");
+    assert!(
+        !message.contains("Elixir"),
+        "a want the profile lacks is never asked for"
+    );
+    let d = &cv["draft"];
+    let second = d["experience"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["position"] == 1)
+        .expect("the position comes back with the bullet");
+    assert_eq!(
+        second["bullets"][0]["text"],
+        "Built ingestion for 3 partner feeds"
+    );
+    assert_eq!(second["bullets"][0]["flags"], json!([]));
+    let wants = d["wants"].as_array().unwrap();
+    let want = |text: &str| wants.iter().find(|w| w["text"] == text).unwrap();
+    assert_eq!(want("Partner feeds")["covered"], true);
+    assert_eq!(want("Elixir")["covered"], false);
+    assert_eq!(want("Elixir")["reason"], "not_in_profile");
+    assert_eq!(want("Elixir")["level"], "nice");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_site_that_asks_apps_not_to_read_it_is_said_and_what_it_says_can_be_pasted(db: PgPool) {
+    let facts = json!({ "facts": [{
+        "text": "Runs payroll for bakeries",
+        "quote": "payroll for bakeries",
+        // The site as the read kept it, an origin: what the pasted text is shown under.
+        "url": "https://example-co.test/",
+    }]});
+    let s = stack_reading(
+        db.clone(),
+        facts,
+        answer(),
+        json!({"wants": [], "questions": []}),
+        None,
+        Value::Null,
+    )
+    .await;
+    sqlx::query(
+        "UPDATE pipeline.companies SET site = 'https://example-co.test', site_source = 'person'",
+    )
+    .execute(&s.h.db)
+    .await
+    .unwrap();
+    *s.fake.site.lock().unwrap() = Some(Err(crate::ports::SiteFailure::RobotsDisallows));
+    let cv = draft(&s).await;
+    assert_eq!(cv["company_read_failure"], "robots_disallows", "{cv}");
+    assert!(cv["read_eur"].as_f64().unwrap() > 0.0);
+
+    // What the site says, pasted: read like one of its pages.
+    let paste = format!("/api/v1/opportunities/{}/brief/paste", s.opp);
+    let (status, body) = s.h.json("POST", &paste, &json!({ "text": "  " })).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+    assert_eq!(body["code"], "invalid_text");
+    let (status, brief) =
+        s.h.json(
+            "POST",
+            &paste,
+            &json!({ "text": "Example Co runs payroll for bakeries in Porto." }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{brief}");
+    let texts: Vec<&str> = brief["facts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|f| f["removed"] != true)
+        .map(|f| f["text"].as_str().unwrap())
+        .collect();
+    assert_eq!(texts, ["Runs payroll for bakeries"]);
+    let (_, cv) = s.h.get(&url(&s.opp, "")).await;
+    assert!(cv["company_read_failure"].is_null(), "{cv}");
+
+    // Someone else's job: not found.
+    let other = Harness::as_account(db, Uuid::now_v7(), Arc::clone(&s.fake));
+    let (status, _) = other
+        .json("POST", &paste, &json!({ "text": "Anything" }))
+        .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[test]
+fn with_no_language_for_work_a_first_language_comes_before_a_working_one() {
+    let mut p = profile();
+    p.work_languages = vec![];
+    // As LinkedIn writes them.
+    p.languages = vec![
+        CvLanguage {
+            language: "English".into(),
+            fluency: Some("Full professional proficiency".into()),
+        },
+        CvLanguage {
+            language: "Portuguese".into(),
+            fluency: Some("Native or bilingual proficiency".into()),
+        },
+    ];
+    assert_eq!(super::language_of(None, &p), "pt-PT");
+    p.languages.truncate(1);
+    assert_eq!(super::language_of(None, &p), "en");
+    // Not enough to write a CV in: English, the default.
+    p.languages = vec![CvLanguage {
+        language: "French".into(),
+        fluency: Some("Elementary proficiency".into()),
+    }];
+    assert_eq!(super::language_of(None, &p), "en");
+    // What the person asked for wins.
+    assert_eq!(super::language_of(Some("fr"), &p), "fr");
 }

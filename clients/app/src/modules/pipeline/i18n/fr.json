@@ -181,10 +181,10 @@
       }
     },
     "readLead": "Lit l’annonce et le site de l’entreprise elle-même (ce site seulement, là où robots.txt le permet) et en tire les faits : un appel à l’IA, réutilisé pendant 30 jours. Ensuite, un autre compare le poste à votre profil.",
-    "read": "Lire sur {{company}} · environ {{cost}}",
+    "read": "Lire sur {{company}}",
     "reading": "Lecture…",
     "readingLead": "Lecture des pages de {{company}}, puis comparaison du poste avec votre profil. Cela prend quelques secondes.",
-    "readAgain": "Relire · environ {{cost}}",
+    "readAgain": "Relire",
     "noFacts": "Rien sur {{company}} n’a pu être cité à partir de ses pages.",
     "facts": {
       "title": "Ce que disent les pages de {{company}}",
@@ -286,6 +286,7 @@
         "letter_approval": "Votre lettre de motivation et vos réponses sont rédigées et attendent votre relecture."
       },
       "steps": {
+        "shortlist": "retenu l’offre le {{date}}",
         "site": "trouvé le site ({{date}})",
         "read": "lu l’entreprise ({{date}})",
         "compare": "comparé l’offre ({{date}})",
@@ -309,7 +310,8 @@
         "profile_needed": "Arrêté : ajoutez d’abord un poste à votre profil.",
         "generic": "Un problème est survenu pendant la préparation de cette offre."
       }
-    }
+    },
+    "readCost": "Lire coûte environ {{cost}}."
   },
   "cv": {
     "eyebrow": "CV sur mesure",
@@ -327,23 +329,25 @@
       "draftPill": "Brouillon",
       "approvedPill": "Approuvé · v{{version}}",
       "language": "Rédigé en {{language}}",
-      "makeAgain": "Refaire · environ {{cost}}",
+      "makeAgain": "Réécrire",
       "making": "Rédaction…",
       "approve": "Approuver v{{version}}",
       "approving": "Approbation…",
-      "approveWhy": "Approuver s’active quand toutes les lignes bloquées sont corrigées ou supprimées."
+      "approveWhy": "Approuver s’active quand toutes les lignes bloquées sont corrigées ou supprimées.",
+      "cost": "Le réécrire coûte environ {{cost}}."
     },
     "draft": {
-      "draft": "Rédiger le CV · environ {{cost}}",
+      "draft": "Rédiger le CV",
       "drafting": "Rédaction…",
       "review": "Relire le CV",
-      "hint": "Un appel d’IA. Ensuite, chaque ligne est vérifiée par rapport à votre profil, sans IA.",
+      "hint": "Jusqu’à quatre appels d’IA : le brouillon et les corrections de l’app elle-même. Ensuite, chaque ligne est vérifiée par rapport à votre profil, sans IA.",
       "blocked": {
         "stage_too_early": "Présélectionnez d’abord ce poste : on fait un CV pour les postes que vous visez.",
         "per_opportunity_cap": "Vous avez déjà fait 10 brouillons pour ce poste. Relisez-en un.",
         "daily_cap": "Vous avez déjà fait 20 brouillons aujourd’hui. Vous pourrez continuer demain.",
         "ai_unavailable": "L’IA n’est pas configurée sur ce serveur : rien ne peut être rédigé."
-      }
+      },
+      "cost": "Rédiger le CV coûte environ {{cost}}."
     },
     "sheet": {
       "label": "Votre CV sur mesure",
@@ -352,7 +356,9 @@
       "skills": "Compétences",
       "education": "Formation",
       "languages": "Langues",
-      "now": "en cours"
+      "now": "en cours",
+      "earlier": "Expérience antérieure",
+      "earlierRemove": "Retirer du CV"
     },
     "marks": {
       "as_in_profile": "Comme dans le profil",
@@ -467,10 +473,11 @@
       "cannot_keep": "Cette ligne concerne l’entreprise, pas vous. Modifiez-la ou retirez-la.",
       "not_flagged": "Cette ligne correspond déjà à votre profil.",
       "too_late": "Il est trop tard pour annuler. Refaites le CV pour le modifier.",
+      "company_reads_daily_cap": "Vous pouvez lire 20 entreprises par jour. La lecture reprend demain.",
       "cv_previews_daily_cap": "Vous avez créé 30 PDF de brouillons aujourd’hui. Cela reprend demain ; modifier une ligne refait quand même le PDF."
     },
     "layout": {
-      "template": "Modèle",
+      "template": "Style",
       "templates": {
         "clean": "Épuré",
         "compact": "Compact"
@@ -479,12 +486,14 @@
       "pages_one": "{{count}} page",
       "pages_other": "{{count}} pages",
       "language": "Langue",
-      "note": "Le modèle et la longueur font un PDF à partir du même texte approuvé, sans IA. Une autre langue est un nouveau brouillon : un appel à l’IA et une relecture. Utilisez « Refaire ».",
+      "note": "Le style et la longueur refont le PDF, sans IA. Pour une autre langue, choisissez-la et appuyez sur Réécrire.",
       "confirmTitle": "Faire une nouvelle version ?",
       "confirmBody": "Cela garde la v{{version}} telle quelle et fait la v{{next}} à partir du même texte approuvé, avec le modèle {{template}} sur {{pages}}. Aucune IA n’est utilisée.",
       "confirm": "Faire la v{{next}}",
       "cancel": "Annuler",
-      "making": "Création du PDF…"
+      "making": "Création du PDF…",
+      "languageNext": "Appuyez sur Réécrire pour l’avoir en {{language}}.",
+      "title": "Mise en page · langue"
     },
     "pdf": {
       "open": "Ouvrir le PDF",
@@ -527,8 +536,11 @@
       "making": "Création du PDF…",
       "note": "Certains mots risquent de mal ressortir quand un site d’emploi lit ce PDF.",
       "doesntFit": "Le CV ne tient pas sur 2 pages. Retirez quelques lignes.",
-      "unavailable": "Le PDF n’a pas pu être créé pour l’instant. Modifiez une ligne ou choisissez une mise en page pour réessayer.",
+      "unavailable": "Impossible de faire le PDF pour {{company}}. Le texte du CV est enregistré.",
       "lines": "Chaque ligne et d’où elle vient",
+      "retry": "Réessayer",
+      "downloadText": "Télécharger le texte",
+      "textFile": "CV - {{company}}.txt",
       "stale": "Le PDF est antérieur à votre dernière modification.",
       "make": "Créer le PDF",
       "none": "Ce brouillon n’a pas encore de PDF."
@@ -552,6 +564,7 @@
       "answer_one": "Répondez à la question pour approuver.",
       "answer_other": "Répondez aux {{count}} questions pour approuver.",
       "toldUs": "Vous nous avez parlé de {{company}} : « {{quote}} ».",
+      "profileSays": "Votre profil dit à propos de {{company}} : « {{quote}} ».",
       "keeps": "Si vous la gardez, ceci va dans votre profil : « {{proposal}} »",
       "cannotKeepOther": "Cette ligne parle d’un autre emploi de votre profil. Modifiez-la ou retirez-la.",
       "cannotKeepLong": "Cette ligne est trop longue pour aller telle quelle dans votre profil. Raccourcissez-la ou retirez-la."
@@ -565,7 +578,52 @@
       "approved": "Approuvé",
       "undo": "Annuler",
       "undoing": "Annulation…",
-      "next": "Nous écrivons ensuite votre lettre de motivation, environ {{cost}}. Annuler l’arrête."
+      "next": "Nous écrivons ensuite votre lettre de motivation, environ {{cost}}. Annuler l’arrête.",
+      "started": "Approuvé. Votre lettre de motivation est en cours de rédaction."
+    },
+    "wants": {
+      "title": "Ce que l’offre demande",
+      "nice": "un plus",
+      "notInProfile": "absent de votre profil",
+      "notOnCv": "absent de ce CV",
+      "covered": "Sur votre CV",
+      "notCovered": "Pas sur votre CV"
+    },
+    "done": {
+      "title": "Fait par l’app · {{cost}}",
+      "row": "{{step}} · {{cost}}",
+      "doneLabel": "Fait",
+      "steps": {
+        "shortlist": "A retenu cette offre",
+        "site": "A trouvé le site de l’entreprise",
+        "read": "A lu le site de l’entreprise",
+        "compare": "A comparé l’offre avec votre profil",
+        "draft": "A écrit le CV",
+        "checked": "A vérifié chaque ligne avec votre profil",
+        "pdf": "A fait le PDF"
+      }
+    },
+    "fixed": {
+      "title_one": "Corrigé par l’app · {{count}} ligne",
+      "title_other": "Corrigé par l’app · {{count}} lignes",
+      "now": "« {{text}} »",
+      "was": "Elle disait : « {{text}} »"
+    },
+    "site": {
+      "robots": "Le site demande aux apps de ne pas le lire. Le CV a été écrit à partir de l’offre et de votre profil seulement.",
+      "unread": "Le site de l’entreprise n’a pas pu être lu. Le CV a été écrit à partir de l’offre et de votre profil seulement.",
+      "paste": "Coller ce que dit le site",
+      "cost": "Le lire coûte environ {{cost}}.",
+      "dialogTitle": "Collez ce que dit le site de l’entreprise",
+      "hint": "Copiez le texte des pages de l’entreprise. Les faits sont tirés de ces mots seulement.",
+      "label": "Les mots du site",
+      "read": "Lire ce texte",
+      "reading": "Lecture…",
+      "cancel": "Annuler",
+      "done": "Lu. Réécrivez le CV pour utiliser ce que dit le site."
+    },
+    "writing": {
+      "title": "Rédaction de votre CV pour {{company}}. En général moins d’une minute. Il apparaît dans Aujourd’hui quand il est prêt."
     }
   },
   "cvs": {
@@ -634,7 +692,7 @@
       "body": "Votre CV est approuvé. Rédigez la lettre qui l’accompagne, à partir du même profil et des mêmes faits."
     },
     "slot": {
-      "write": "Rédiger la lettre de motivation · environ {{cost}}",
+      "write": "Rédiger la lettre de motivation",
       "writing": "Rédaction…",
       "review": "Relire la lettre de motivation",
       "hint": "Un appel d’IA. Ensuite, chaque phrase est vérifiée par rapport à votre profil, sans IA.",
@@ -644,7 +702,8 @@
         "per_opportunity_cap": "Vous avez déjà rédigé 10 brouillons de lettre pour ce poste. Relisez-en un.",
         "daily_cap": "Vous avez déjà rédigé 20 brouillons de lettre aujourd’hui. Vous pourrez continuer demain.",
         "ai_unavailable": "L’IA n’est pas configurée sur ce serveur : rien ne peut être rédigé."
-      }
+      },
+      "cost": "La rédiger coûte environ {{cost}}."
     },
     "toolbar": {
       "draft": "Brouillon {{n}}",
@@ -658,11 +717,12 @@
         "standard": "Standard · environ 300"
       },
       "note": "Une autre longueur ou une autre langue est un nouveau brouillon : Refaire.",
-      "makeAgain": "Refaire · environ {{cost}}",
+      "makeAgain": "Réécrire",
       "making": "Rédaction…",
       "approve": "Approuver",
       "approving": "Approbation…",
-      "approveWhy": "Approuver s’active quand toutes les phrases et questions bloquées sont corrigées, supprimées ou répondues."
+      "approveWhy": "Approuver s’active quand toutes les phrases et questions bloquées sont corrigées, supprimées ou répondues.",
+      "cost": "La réécrire coûte environ {{cost}}."
     },
     "sheet": {
       "label": "Votre lettre de motivation"

@@ -288,7 +288,10 @@ describe("Write the cover letter", () => {
       [`POST ${DRAFTS}`]: { body: letter({ draft: letterDraft() }) },
     });
     const write = await screen.findByTestId("letter-write");
-    expect(write).toHaveTextContent("Write the cover letter · about €0.002");
+    expect(write).toHaveTextContent("Write the cover letter");
+    expect(screen.getByTestId("letter-write-cost")).toHaveTextContent(
+      "Writing it costs about €0.002.",
+    );
     await userEvent.setup().click(write);
     expect(await screen.findByTestId("letter-paper")).toBeVisible();
     expect(

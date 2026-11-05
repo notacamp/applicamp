@@ -137,9 +137,8 @@ test("someone writes the cover letter after approving the CV, fixes what can't b
   // Approved CV → "Write the cover letter" on its review page.
   await approvedCv(page, id);
   await page.goto(`/pipeline/${id}/cv`);
-  await expect(page.getByTestId("cv-letter-write")).toContainText(
-    "Write the cover letter · about €0.002",
-  );
+  await expect(page.getByTestId("cv-letter-write")).toContainText("Write the cover letter");
+  await expect(page.getByTestId("cv-letter-write-cost")).toContainText("about €0.002");
   await page.getByTestId("cv-letter-write").click();
   await expect(page).toHaveURL(new RegExp(`/pipeline/${id}/letter$`));
   await expectPageFillsTheScreen(page, "letter-review");

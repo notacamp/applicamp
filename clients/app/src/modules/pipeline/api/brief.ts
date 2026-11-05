@@ -145,6 +145,30 @@ export function useReadCompany(id: string, language: string) {
   });
 }
 
+/**
+ * "Paste what the site says": the person's paste of the company's own pages,
+ * read like one of them (one AI call; each fact must quote it). The CV made
+ * before does not change: Write it again uses the facts.
+ */
+export function usePasteSite(id: string) {
+  const store = useStore(id);
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (text: string): Promise<Brief> =>
+      unwrap(
+        await api.POST("/api/v1/opportunities/{id}/brief/paste", {
+          params: { path: { id } },
+          headers: CSRF_HEADERS,
+          body: { text },
+        }),
+      ),
+    onSuccess: (brief) => {
+      store(brief);
+      void queryClient.invalidateQueries({ queryKey: [...PIPELINE_QUERY_KEY, "cv", id] });
+    },
+  });
+}
+
 /** "Wrong, remove": the fact stays removed on later reads. */
 export function useRemoveFact(id: string) {
   const store = useStore(id);

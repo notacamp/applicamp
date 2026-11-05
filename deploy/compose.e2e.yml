@@ -136,6 +136,14 @@ services:
       APPLICAMP_SOURCES__WATCH_EVERY_SECS: "0"
       APPLICAMP_AI__COMPLETE__BASE_URL: http://fake-jobs:9020/v1
       APPLICAMP_AI__COMPLETE__MODEL: fake/model
+      # Priced like the default model, so estimates read as they would.
+      APPLICAMP_AI__COMPLETE__PRICE_IN_USD_PER_MTOK: "0.15"
+      APPLICAMP_AI__COMPLETE__PRICE_OUT_USD_PER_MTOK: "0.5"
+      # The longer writing (the CV) on its own role, as in prod.
+      APPLICAMP_AI__WRITE__BASE_URL: http://fake-jobs:9020/v1
+      APPLICAMP_AI__WRITE__MODEL: fake/writer
+      APPLICAMP_AI__WRITE__PRICE_IN_USD_PER_MTOK: "0.15"
+      APPLICAMP_AI__WRITE__PRICE_OUT_USD_PER_MTOK: "0.5"
       # Agent runs (the Agents page's Run a check): the runner as a child
       # process of the server behind a policy proxy, not a sandbox; tests
       # only. The image carries the runner at /app/applicamp-agent.

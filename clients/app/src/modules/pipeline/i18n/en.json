@@ -181,10 +181,10 @@
       }
     },
     "readLead": "Reads the posting and the company’s own website (that site only, where robots.txt allows) and makes the facts: one AI call, reused for 30 days. Then one more compares the job with your profile.",
-    "read": "Read about {{company}} · about {{cost}}",
+    "read": "Read about {{company}}",
     "reading": "Reading…",
     "readingLead": "Reading {{company}}’s pages, then comparing the job with your profile. This takes a few seconds.",
-    "readAgain": "Read again · about {{cost}}",
+    "readAgain": "Read again",
     "noFacts": "Nothing about {{company}} could be quoted from its pages.",
     "facts": {
       "title": "What {{company}}’s own pages say",
@@ -286,6 +286,7 @@
         "letter_approval": "Your cover letter and answers are written and wait for your review."
       },
       "steps": {
+        "shortlist": "shortlisted the job on {{date}}",
         "site": "found the website ({{date}})",
         "read": "read the company ({{date}})",
         "compare": "compared the job ({{date}})",
@@ -309,7 +310,8 @@
         "profile_needed": "Stopped: add a position to your profile first.",
         "generic": "Something went wrong while preparing this job."
       }
-    }
+    },
+    "readCost": "Reading costs about {{cost}}."
   },
   "cv": {
     "eyebrow": "Tailored CV",
@@ -327,23 +329,25 @@
       "draftPill": "Draft",
       "approvedPill": "Approved · v{{version}}",
       "language": "Written in {{language}}",
-      "makeAgain": "Make again · about {{cost}}",
+      "makeAgain": "Write it again",
       "making": "Drafting…",
       "approve": "Approve v{{version}}",
       "approving": "Approving…",
-      "approveWhy": "Approve turns on when every blocked line is fixed or removed."
+      "approveWhy": "Approve turns on when every blocked line is fixed or removed.",
+      "cost": "Writing it again costs about {{cost}}."
     },
     "draft": {
-      "draft": "Draft the CV · about {{cost}}",
+      "draft": "Draft the CV",
       "drafting": "Drafting…",
       "review": "Review the CV",
-      "hint": "One AI call. Then every line is checked against your profile, without AI.",
+      "hint": "Up to four AI calls: the draft and the app’s own fixes. Then every line is checked against your profile, without AI.",
       "blocked": {
         "stage_too_early": "Shortlist this job first: a CV is made for the jobs you’re going after.",
         "per_opportunity_cap": "You’ve made 10 drafts for this job. Review one of them.",
         "daily_cap": "You’ve made 20 drafts today. Drafting continues tomorrow.",
         "ai_unavailable": "The AI isn’t set up on this server, so nothing can be drafted."
-      }
+      },
+      "cost": "Drafting the CV costs about {{cost}}."
     },
     "sheet": {
       "label": "Your tailored CV",
@@ -352,7 +356,9 @@
       "skills": "Skills",
       "education": "Education",
       "languages": "Languages",
-      "now": "now"
+      "now": "now",
+      "earlier": "Earlier",
+      "earlierRemove": "Remove from the CV"
     },
     "marks": {
       "as_in_profile": "As in profile",
@@ -467,10 +473,11 @@
       "cannot_keep": "This line is about the company, not about you. Change it or remove it.",
       "not_flagged": "This line already matches your profile.",
       "too_late": "It’s too late to undo. Make the CV again to change it.",
+      "company_reads_daily_cap": "You can read 20 companies a day. Reading continues tomorrow.",
       "cv_previews_daily_cap": "You’ve made 30 PDFs of drafts today. It continues tomorrow; changing a line still makes the PDF again."
     },
     "layout": {
-      "template": "Template",
+      "template": "Style",
       "templates": {
         "clean": "Clean",
         "compact": "Compact"
@@ -479,12 +486,14 @@
       "pages_one": "{{count}} page",
       "pages_other": "{{count}} pages",
       "language": "Language",
-      "note": "Template and length make a PDF from the same approved text, with no AI. A different language is a new draft: one AI call and a review. Use Make again.",
+      "note": "Style and length make the PDF again, with no AI. For another language, choose it and press Write it again.",
       "confirmTitle": "Make a new version?",
       "confirmBody": "This keeps v{{version}} as it is and makes v{{next}} from the same approved text, as {{template}} on {{pages}}. No AI is used.",
       "confirm": "Make v{{next}}",
       "cancel": "Cancel",
-      "making": "Making the PDF…"
+      "making": "Making the PDF…",
+      "languageNext": "Press Write it again to have it in {{language}}.",
+      "title": "Layout · language"
     },
     "pdf": {
       "open": "Open the PDF",
@@ -527,8 +536,11 @@
       "making": "Making the PDF…",
       "note": "Some words may not come out right when a job site reads this PDF.",
       "doesntFit": "The CV doesn’t fit on 2 pages. Remove a few lines.",
-      "unavailable": "The PDF couldn’t be made just now. Change a line or pick a layout to try again.",
+      "unavailable": "Could not make the PDF for {{company}}. The text of the CV is saved.",
       "lines": "Every line and where it comes from",
+      "retry": "Try again",
+      "downloadText": "Download the text",
+      "textFile": "CV - {{company}}.txt",
       "stale": "The PDF is older than your last change.",
       "make": "Make the PDF",
       "none": "This draft has no PDF yet."
@@ -552,6 +564,7 @@
       "answer_one": "Answer the question to approve.",
       "answer_other": "Answer the {{count}} questions to approve.",
       "toldUs": "You told us about {{company}}: “{{quote}}”.",
+      "profileSays": "Your profile says about {{company}}: “{{quote}}”.",
       "keeps": "If you keep it, this goes on your profile: “{{proposal}}”",
       "cannotKeepOther": "This line is about another job on your profile. Change it or remove it.",
       "cannotKeepLong": "This line is too long to keep on your profile as it is. Make it shorter or remove it."
@@ -565,7 +578,52 @@
       "approved": "Approved",
       "undo": "Undo",
       "undoing": "Undoing…",
-      "next": "Writing your cover letter next, about {{cost}}. Undo stops it."
+      "next": "Writing your cover letter next, about {{cost}}. Undo stops it.",
+      "started": "Approved. Your cover letter is being written now."
+    },
+    "wants": {
+      "title": "What the job wants",
+      "nice": "nice to have",
+      "notInProfile": "not on your profile",
+      "notOnCv": "not on this CV",
+      "covered": "On your CV",
+      "notCovered": "Not on your CV"
+    },
+    "done": {
+      "title": "Done by the app · {{cost}}",
+      "row": "{{step}} · {{cost}}",
+      "doneLabel": "Done",
+      "steps": {
+        "shortlist": "Shortlisted this job",
+        "site": "Found the company website",
+        "read": "Read the company website",
+        "compare": "Compared the job with your profile",
+        "draft": "Wrote the CV",
+        "checked": "Checked every line against your profile",
+        "pdf": "Made the PDF"
+      }
+    },
+    "fixed": {
+      "title_one": "Fixed by the app · {{count}} line",
+      "title_other": "Fixed by the app · {{count}} lines",
+      "now": "“{{text}}”",
+      "was": "It said: “{{text}}”"
+    },
+    "site": {
+      "robots": "The site asks apps not to read it. The CV was written from the job posting and your profile only.",
+      "unread": "The company's site could not be read. The CV was written from the job posting and your profile only.",
+      "paste": "Paste what the site says",
+      "cost": "Reading it costs about {{cost}}.",
+      "dialogTitle": "Paste what the company's site says",
+      "hint": "Copy the text from the company's own pages. Facts are taken only from these words.",
+      "label": "The site's words",
+      "read": "Read this text",
+      "reading": "Reading…",
+      "cancel": "Cancel",
+      "done": "Read. Write it again to use what the site says."
+    },
+    "writing": {
+      "title": "Writing your CV for {{company}}. Usually under a minute. It appears on Today when it is ready."
     }
   },
   "cvs": {
@@ -634,7 +692,7 @@
       "body": "Your CV is approved. Write the letter that goes with it, from the same profile and the same facts."
     },
     "slot": {
-      "write": "Write the cover letter · about {{cost}}",
+      "write": "Write the cover letter",
       "writing": "Writing…",
       "review": "Review the cover letter",
       "hint": "One AI call. Then every sentence is checked against your profile, without AI.",
@@ -644,7 +702,8 @@
         "per_opportunity_cap": "You’ve written 10 letter drafts for this job. Review one of them.",
         "daily_cap": "You’ve written 20 letter drafts today. Writing continues tomorrow.",
         "ai_unavailable": "The AI isn’t set up on this server, so nothing can be written."
-      }
+      },
+      "cost": "Writing it costs about {{cost}}."
     },
     "toolbar": {
       "draft": "Draft {{n}}",
@@ -658,11 +717,12 @@
         "standard": "Standard · about 300"
       },
       "note": "A different length or language is a new draft: Make again.",
-      "makeAgain": "Make again · about {{cost}}",
+      "makeAgain": "Write it again",
       "making": "Writing…",
       "approve": "Approve",
       "approving": "Approving…",
-      "approveWhy": "Approve turns on when every blocked sentence and question is fixed, removed or answered."
+      "approveWhy": "Approve turns on when every blocked sentence and question is fixed, removed or answered.",
+      "cost": "Writing it again costs about {{cost}}."
     },
     "sheet": {
       "label": "Your cover letter"

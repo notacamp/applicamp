@@ -11,8 +11,8 @@ pub const MAX_HEADLINE: usize = 200;
 pub const MAX_SUMMARY: usize = 700;
 pub const MAX_BULLET: usize = 400;
 /// Bullets for one position, and for the whole CV.
-pub const MAX_ROLE_BULLETS: usize = 8;
-pub const MAX_BULLETS: usize = 16;
+pub const MAX_ROLE_BULLETS: usize = 6;
+pub const MAX_BULLETS: usize = 30;
 /// Skills shown, and the longest skill name.
 pub const MAX_SKILLS: usize = 16;
 pub const MAX_SKILL: usize = 80;
@@ -86,7 +86,16 @@ pub fn judge(raw: RawCv, frame: &Frame, profile: &CvProfile) -> Option<Content> 
     content.headline = tidy(raw.headline, MAX_HEADLINE, &mut content);
     content.summary = tidy(raw.summary, MAX_SUMMARY, &mut content);
     let mut total = 0;
-    for role in raw.experience {
+    // Newest first before the cap on bullets, so the cap cuts the oldest.
+    let mut experience = raw.experience;
+    experience.sort_by_key(|role| {
+        std::cmp::Reverse(super::model::started(
+            usize::try_from(role.position)
+                .ok()
+                .and_then(|p| frame.position(p)),
+        ))
+    });
+    for role in experience {
         let Some(position) = usize::try_from(role.position)
             .ok()
             .filter(|p| frame.position(*p).is_some())
@@ -108,6 +117,8 @@ pub fn judge(raw: RawCv, frame: &Frame, profile: &CvProfile) -> Option<Content> 
         }
         content.experience.push(Role { position, bullets });
     }
+    // Newest first, whatever order the model gave.
+    content.sort_experience(frame);
     let mut skills: Vec<String> = Vec::new();
     for skill in raw.skills {
         let skill = skill.trim();

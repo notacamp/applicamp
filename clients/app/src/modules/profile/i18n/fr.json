@@ -55,8 +55,25 @@
     }
   },
   "review": {
-    "title": "Relisez ce qui a été trouvé",
-    "lead": "Rien n’est enregistré tant que vous n’avez pas choisi. Remplacer en fait votre profil ; Fusionner garde le vôtre tel quel et n’ajoute que les nouveautés.",
+    "title": "Vérifiez ce que nous avons trouvé",
+    "lead": "Rien n’est enregistré tant que vous n’avez pas choisi. Remplacer en fait votre profil. Fusionner garde vos modifications, complète ce qui manque et retire un lieu du résumé d’un poste.",
+    "found": "Nous avons trouvé {{list}}.",
+    "counts": {
+      "jobs_one": "{{count}} poste",
+      "jobs_other": "{{count}} postes",
+      "achievements_one": "{{count}} réalisation",
+      "achievements_other": "{{count}} réalisations",
+      "skills_one": "{{count}} compétence",
+      "skills_other": "{{count}} compétences",
+      "degrees_one": "{{count}} diplôme",
+      "degrees_other": "{{count}} diplômes",
+      "languages_one": "{{count}} langue",
+      "languages_other": "{{count}} langues",
+      "certificates_one": "{{count}} certification",
+      "certificates_other": "{{count}} certifications",
+      "projects_one": "{{count}} projet",
+      "projects_other": "{{count}} projets"
+    },
     "loading": "Chargement du brouillon…",
     "loadFailed": "Impossible de charger le brouillon.",
     "gone": "Ce brouillon n’existe plus : les brouillons durent 24 heures.",
@@ -76,6 +93,7 @@
       "label": "Aucun titre trouvé dans ce fichier",
       "summary": "Aucun résumé trouvé dans ce fichier",
       "work": "Aucun poste trouvé dans ce fichier",
+      "achievements": "Aucune réalisation trouvée dans ce fichier",
       "education": "Aucune formation trouvée dans ce fichier",
       "skills": "Aucune compétence trouvée dans ce fichier",
       "languages": "Aucune langue trouvée dans ce fichier",
@@ -83,6 +101,10 @@
       "projects": "Aucun projet trouvé dans ce fichier",
       "hint": "Ajoutez-les à la main après avoir appliqué, ou importez votre export de données LinkedIn, qui contient compétences, formation et langues.",
       "hintZip": "Ajoutez-les à la main après avoir appliqué."
+    },
+    "stopped": {
+      "title": "Votre limite d’IA nous a empêchés de relire les parties manquantes.",
+      "body": "Voici ce que nous avons trouvé. Ajoutez les parties manquantes à la main, ou réessayez demain."
     }
   },
   "source": {
@@ -640,7 +662,9 @@
       "title": "Enregistré",
       "banner": "Enregistré dans votre profil.",
       "lead": "Votre profil est maintenant solide à {{score}} %. Les agents et les CV l’utilisent désormais. Vous pouvez revenir quand vous voulez pour en ajouter.",
-      "done": "Retour à Profil et objectifs"
+      "done": "Retour à Profil et objectifs",
+      "facts_one": "{{count}} fait vous attend dans Complétez votre profil.",
+      "facts_other": "{{count}} faits vous attendent dans Complétez votre profil."
     },
     "errors": {
       "generic": "Cela n’a pas marché. Réessayez.",
@@ -823,5 +847,53 @@
       "invalid_text": "Écrivez quelque chose, dans la longueur LinkedIn de cette partie.",
       "not_found": "Ce n’est plus ici. Revenez en arrière et regardez à nouveau."
     }
+  },
+  "complete": {
+    "eyebrow": "Votre profil",
+    "title": "Complétez votre profil",
+    "lead_one": "Nous avons trouvé {{count}} fait sur votre travail. Gardez-le s’il est juste.",
+    "lead_other": "Nous avons trouvé {{count}} faits sur votre travail. Gardez ceux qui sont justes.",
+    "leadNone": "Les faits que nous trouvons sur votre travail apparaissent ici, pour que vous les gardiez ou les écartiez.",
+    "loading": "Chargement des faits…",
+    "loadFailed": "Impossible de charger les faits.",
+    "cvRead": "Nous avons relu votre CV.",
+    "progress": "{{decided}} sur {{total}} décidés",
+    "keepAll": "Tout garder",
+    "keep": "Garder",
+    "drop": "Écarter",
+    "undo": "Annuler",
+    "kept": "Gardé",
+    "dropped": "Écarté",
+    "keepLabel": "Garder : {{text}}",
+    "dropLabel": "Écarter : {{text}}",
+    "undoLabel": "Annuler : {{text}}",
+    "sources": {
+      "you_said": "vous l’avez dit",
+      "you_confirmed": "vous l’avez confirmé",
+      "your_website": "de votre site",
+      "your_cv": "de votre CV"
+    },
+    "quoted": "« {{quote}} »",
+    "website": "D’une page de votre site.",
+    "confirmed": "Vous avez dit que c’était juste.",
+    "groups": {
+      "skills": "Vos compétences",
+      "background": "Votre parcours"
+    },
+    "now": "aujourd’hui",
+    "years": "{{start}} – {{end}}",
+    "done_one": "{{count}} fait ajouté à votre profil.",
+    "done_other": "{{count}} faits ajoutés à votre profil.",
+    "doneUndo": "Vous pouvez l’annuler pendant une journée.",
+    "doneNone": "Rien n’a été ajouté à votre profil.",
+    "failed": "Cela n’a pas fonctionné. Réessayez.",
+    "profileChanged": "Ce poste a changé dans votre profil. Vérifiez-le, puis réessayez.",
+    "emptyTitle": "Rien de nouveau à ajouter",
+    "emptyLead": "Les nouveaux faits apparaissent ici après vos réponses dans Parlez-moi de vous, ou après l’import de votre CV.",
+    "back": "Retour à votre profil",
+    "nudgeTitle_one": "{{count}} nouveau fait pour votre profil",
+    "nudgeTitle_other": "{{count}} nouveaux faits pour votre profil",
+    "nudgeBody": "Tirés de vos réponses, de votre site et de votre CV. Gardez ceux qui sont justes.",
+    "nudgeOpen": "Voir les faits"
   }
 }

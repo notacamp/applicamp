@@ -111,7 +111,7 @@ export function PreparationPanel({ id, brief, onReview }: PreparationPanelProps)
 }
 
 /** The steps the page words (`prepare.byItself.steps.<step>`). */
-const STEPS = ["site", "read", "compare", "draft", "letter"] as const;
+const STEPS = ["shortlist", "site", "read", "compare", "draft", "letter"] as const;
 
 function stepKey(step: string): (typeof STEPS)[number] | "other" {
   return STEPS.find((known) => known === step) ?? "other";

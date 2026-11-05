@@ -159,9 +159,14 @@ export function CompanyFacts({ id, brief }: CompanyFactsProps) {
                 read.mutate(false);
               }}
             >
-              {read.isPending ? t("prepare.reading") : t("prepare.read", { company, cost })}
+              {read.isPending ? t("prepare.reading") : t("prepare.read", { company })}
             </Button>
           </Cluster>
+          <Tagged testId="prepare-read-cost">
+            <Text tone="secondary" size="sm">
+              {t("prepare.readCost", { cost })}
+            </Text>
+          </Tagged>
           {read.isPending ? (
             <Tagged testId="prepare-reading">
               <Banner role="status" title={t("prepare.readingLead", { company })} />
@@ -289,9 +294,14 @@ export function CompanyFacts({ id, brief }: CompanyFactsProps) {
                 read.mutate(true);
               }}
             >
-              {read.isPending ? t("prepare.reading") : t("prepare.readAgain", { cost: againCost })}
+              {read.isPending ? t("prepare.reading") : t("prepare.readAgain")}
             </Button>
           </Cluster>
+          <Tagged testId="prepare-read-again-cost">
+            <Text tone="secondary" size="sm">
+              {t("prepare.readCost", { cost: againCost })}
+            </Text>
+          </Tagged>
         </Stack>
       )}
 

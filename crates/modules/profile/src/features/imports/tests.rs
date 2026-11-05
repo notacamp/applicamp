@@ -7,7 +7,9 @@ use serde_json::{Value, json};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use super::testkit::{CV_LINES, LINKEDIN_LINES, export_zip, export_zip_with, pdf_saying};
+use super::testkit::{
+    CV_LINES, LINKEDIN_LINES, LINKEDIN_PROFILE_LINES, export_zip, export_zip_with, pdf_saying,
+};
 use crate::testkit::{Harness, Part, fake_model, gateway, scripted_model};
 
 async fn import_zip(h: &Harness, zip: &[u8]) -> Value {
@@ -692,4 +694,211 @@ async fn an_answer_that_stays_cut_off_saves_nothing(db: PgPool) {
         (503, Some("ai_failed"))
     );
     assert_eq!(h.count("SELECT count(*) FROM profile.imports").await, 0);
+}
+
+/// What a model answers for the invented LinkedIn profile when it gets it
+/// wrong in the known ways (#72): the first position's place as its summary,
+/// the dates as words; then everything else but education and languages;
+/// then, asked again on the text under those headings, both.
+fn wrong_linkedin_answers() -> [Value; 3] {
+    [
+        json!({ "work": [
+            { "name": "Example Org", "position": "Staff Engineer", "startDate": "Jul 2023",
+              "summary": "Lisbon, Portugal", "highlights": ["Moved billing to Rust"] },
+            { "name": "Sample Labs", "position": "Engineer", "startDate": "Jun 2017",
+              "endDate": "Apr 2023", "location": "Porto, Portugal",
+              "summary": "Built the data pipeline for 40 shops.",
+              "highlights": [] },
+        ] }),
+        json!({
+            "basics": {
+                "name": "Alex Demo",
+                "label": "Staff engineer building calm backends",
+                "summary": "I build boring, reliable backends for small teams.",
+                "profiles": [],
+            },
+            "education": [],
+            "skills": [{ "name": "Rust" }, { "name": "PostgreSQL" }, { "name": "Team leadership" }],
+            "languages": [],
+            "certificates": [],
+            "projects": [],
+        }),
+        json!({
+            "education": [{ "institution": "Sample University", "studyType": "Master's degree",
+                "area": "Computer science", "startDate": "2012", "endDate": "2017" }],
+            "languages": [{ "language": "Portuguese", "fluency": "Native or Bilingual" },
+                { "language": "English", "fluency": "Full Professional" }],
+        }),
+    ]
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_linkedin_pdf_never_puts_a_place_in_a_summary_and_reads_every_section(db: PgPool) {
+    let [work, rest, again] = wrong_linkedin_answers();
+    let model = scripted_model(vec![
+        ("stop", work.to_string()),
+        ("stop", rest.to_string()),
+        ("stop", again.to_string()),
+    ])
+    .await;
+    let h = Harness::new(db, Some(gateway(&model, None)));
+    let pdf = pdf_saying(&LINKEDIN_PROFILE_LINES);
+    let (status, import) = h
+        .upload(&[
+            Part::Text("kind", "pdf"),
+            Part::File("file", "Profile.pdf", &pdf),
+        ])
+        .await;
+    assert_eq!(status, 201, "{import}");
+    let draft = &import["draft"];
+    assert_eq!(import["dropped"], 0, "{import}");
+
+    // The place is the location, never the summary; the dates are months.
+    let first = &draft["work"][0];
+    assert_eq!(first["summary"], Value::Null, "{first}");
+    assert_eq!(first["location"], "Lisbon, Portugal");
+    assert_eq!(first["startDate"], "2023-07");
+    assert_eq!(first["endDate"], Value::Null, "current");
+    assert_eq!(first["highlights"], json!(["Moved billing to Rust"]));
+    let second = &draft["work"][1];
+    assert_eq!(second["summary"], "Built the data pipeline for 40 shops.");
+    assert_eq!(second["endDate"], "2023-04");
+
+    // Education and languages came back empty, so they were asked again on
+    // the text under their headings, and are here.
+    assert_eq!(draft["education"][0]["institution"], "Sample University");
+    assert_eq!(draft["languages"].as_array().unwrap().len(), 2);
+    assert_eq!(
+        draft["basics"]["summary"],
+        "I build boring, reliable backends for small teams."
+    );
+    let requests = model.received_requests().await.unwrap();
+    assert_eq!(
+        requests.len(),
+        3,
+        "positions, the rest, the two sections again"
+    );
+    let third: Value = serde_json::from_slice(&requests[2].body).unwrap();
+    assert_eq!(
+        third["response_format"]["json_schema"]["name"],
+        "profile_again"
+    );
+    assert_eq!(
+        third["response_format"]["json_schema"]["schema"]["required"],
+        json!(["education", "languages"])
+    );
+    let document = third["messages"][1]["content"].as_str().unwrap();
+    assert!(document.contains("Sample University"), "{document}");
+    assert!(
+        document.contains("English (Full Professional)"),
+        "{document}"
+    );
+    assert!(!document.contains("Example Org"), "only the sections' text");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn merging_a_new_read_repairs_a_place_summary_and_keeps_the_rest(db: PgPool) {
+    let h = Harness::new(db, None);
+    // The profile an earlier import left: a place as the summary, no end
+    // date, and a fact the person kept.
+    let (status, _) = h
+        .json(
+            "PUT",
+            "/api/v1/profile",
+            &json!({
+                "basics": { "name": "Alex Demo", "profiles": [] },
+                "work": [{
+                    "name": "Example Org", "position": "Senior Engineer", "startDate": "2021-03",
+                    "summary": "Lisbon, Portugal", "highlights": [],
+                    "facts": [{ "id": "f1", "text": "Led 4 engineers", "quote": "I led 4 engineers",
+                        "area": "people", "kept_at": "2026-10-30T09:00:00Z" }],
+                }],
+            }),
+        )
+        .await;
+    assert_eq!(status, 200);
+    let newer = export_zip_with(&[(
+        "Positions.csv",
+        b"Company Name,Title,Description,Location,Started On,Finished On\n\
+          Example Org,Senior Engineer,Runs the billing platform.,\"Lisbon, Portugal\",Mar 2021,Feb 2024\n",
+    )]);
+    let import = import_zip(&h, &newer).await;
+    let (status, merged) = h
+        .json(
+            "POST",
+            &format!("/api/v1/profile/imports/{}/apply", id_of(&import)),
+            &json!({ "mode": "merge" }),
+        )
+        .await;
+    assert_eq!(status, 200, "{merged}");
+    let work = &merged["profile"]["work"][0];
+    assert_eq!(work["summary"], "Runs the billing platform.");
+    assert_eq!(work["location"], "Lisbon, Portugal");
+    assert_eq!(work["endDate"], "2024-02");
+    assert_eq!(
+        work["facts"][0]["text"], "Led 4 engineers",
+        "kept facts stay"
+    );
+    assert_eq!(merged["profile"]["work"].as_array().unwrap().len(), 1);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn asking_again_that_fails_keeps_the_draft_and_its_empty_sections(db: PgPool) {
+    let [work, rest, _] = wrong_linkedin_answers();
+    // The third call is cut off, and so is its one retry.
+    let model = scripted_model(vec![
+        ("stop", work.to_string()),
+        ("stop", rest.to_string()),
+        ("length", "{\"education\":[".to_owned()),
+    ])
+    .await;
+    let h = Harness::new(db, Some(gateway(&model, None)));
+    let pdf = pdf_saying(&LINKEDIN_PROFILE_LINES);
+    let (status, import) = h
+        .upload(&[
+            Part::Text("kind", "pdf"),
+            Part::File("file", "Profile.pdf", &pdf),
+        ])
+        .await;
+    assert_eq!(status, 201, "the two answers make a draft: {import}");
+    assert_eq!(import["draft"]["work"].as_array().unwrap().len(), 2);
+    assert_eq!(
+        import["draft"]["education"],
+        json!([]),
+        "not found, as the review says"
+    );
+    assert_eq!(import["draft"]["languages"], json!([]));
+    assert_eq!(import["stopped"], Value::Null, "no limit stopped it");
+    assert_eq!(model.received_requests().await.unwrap().len(), 4);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_limit_on_asking_again_keeps_what_was_paid_for_and_says_so(db: PgPool) {
+    let [work, rest, again] = wrong_linkedin_answers();
+    let model = scripted_model(vec![
+        ("stop", work.to_string()),
+        ("stop", rest.to_string()),
+        ("stop", again.to_string()),
+    ])
+    .await;
+    // Each call uses 1,200 tokens: the day's 2,400 end before the third.
+    let h = Harness::new(db, Some(gateway(&model, Some(2_400))));
+    let pdf = pdf_saying(&LINKEDIN_PROFILE_LINES);
+    let (status, import) = h
+        .upload(&[
+            Part::Text("kind", "pdf"),
+            Part::File("file", "Profile.pdf", &pdf),
+        ])
+        .await;
+    assert_eq!(status, 201, "{import}");
+    assert_eq!(import["stopped"], "ai_daily_limit_reached");
+    assert_eq!(import["draft"]["work"].as_array().unwrap().len(), 2);
+    assert_eq!(import["draft"]["education"], json!([]));
+    assert_eq!(model.received_requests().await.unwrap().len(), 2);
+    // The draft says so when it is read again.
+    let (status, again) = h
+        .get(&format!("/api/v1/profile/imports/{}", id_of(&import)))
+        .await;
+    assert_eq!(status, 200);
+    assert_eq!(again["stopped"], "ai_daily_limit_reached");
 }

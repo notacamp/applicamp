@@ -22,6 +22,8 @@ pub const SKILLS: &str = "sk";
 pub const EDUCATION: &str = "ed";
 /// Languages.
 pub const LANGUAGES: &str = "lang";
+/// Where the person comes from (`basics.background`).
+pub const BACKGROUND: &str = "bg";
 
 /// What a source is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -45,6 +47,12 @@ pub enum SourceKind {
     Education,
     /// Languages (`lang`).
     Languages,
+    /// Where the person comes from, in their words (`bg`).
+    Background,
+    /// A project of theirs (`pr2`).
+    Project,
+    /// A certificate they hold (`ce0`).
+    Certificate,
 }
 
 /// A piece of the person's profile (or a company fact), with its words.
@@ -163,6 +171,16 @@ impl Frame {
                 None,
             );
         }
+        if let Some(text) = nonblank(&profile.background) {
+            add(
+                BACKGROUND.into(),
+                SourceKind::Background,
+                text.to_owned(),
+                None,
+                None,
+                None,
+            );
+        }
         for position in &profile.positions {
             let at = position.index;
             if let Some(text) = nonblank(&position.summary) {
@@ -216,6 +234,49 @@ impl Frame {
                 None,
                 Some(fact.url.clone()),
             );
+        }
+        for (i, project) in profile.projects.iter().enumerate() {
+            let text = [
+                Some(project.name.trim()),
+                project.description.as_deref().map(str::trim),
+            ]
+            .into_iter()
+            .flatten()
+            .filter(|t| !t.is_empty())
+            .collect::<Vec<_>>()
+            .join(": ");
+            if !text.is_empty() {
+                add(
+                    format!("pr{i}"),
+                    SourceKind::Project,
+                    text,
+                    None,
+                    None,
+                    None,
+                );
+            }
+        }
+        for (i, certificate) in profile.certificates.iter().enumerate() {
+            let text = [
+                Some(certificate.name.trim()),
+                certificate.issuer.as_deref().map(str::trim),
+                certificate.date.as_deref().map(str::trim),
+            ]
+            .into_iter()
+            .flatten()
+            .filter(|t| !t.is_empty())
+            .collect::<Vec<_>>()
+            .join(", ");
+            if !text.is_empty() {
+                add(
+                    format!("ce{i}"),
+                    SourceKind::Certificate,
+                    text,
+                    None,
+                    None,
+                    None,
+                );
+            }
         }
         if !profile.skills.is_empty() {
             add(
@@ -438,9 +499,36 @@ pub struct Content {
     pub languages: Vec<LanguageItem>,
     /// The next number of a line id (`l<n>`).
     pub next_line: u32,
+    /// Positions the person took off the CV (its last line removed, or
+    /// removed from "Earlier"): named nowhere, not even under "Earlier",
+    /// until put back.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hidden_positions: Vec<usize>,
 }
 
 impl Content {
+    /// Take position `index` off the CV.
+    pub fn hide_position(&mut self, index: usize) {
+        if !self.hidden_positions.contains(&index) {
+            self.hidden_positions.push(index);
+        }
+    }
+
+    /// The positions the CV names under "Earlier": the profile's positions
+    /// it shows no line of and the person did not take off, newest first.
+    pub fn earlier<'a>(&self, frame: &'a Frame) -> Vec<&'a PositionInfo> {
+        let mut earlier: Vec<&PositionInfo> = frame
+            .positions
+            .iter()
+            .filter(|p| {
+                !self.experience.iter().any(|r| r.position == p.index)
+                    && !self.hidden_positions.contains(&p.index)
+            })
+            .collect();
+        earlier.sort_by_key(|p| std::cmp::Reverse(started(Some(p))));
+        earlier
+    }
+
     /// A new line id.
     pub fn new_line_id(&mut self) -> String {
         self.next_line += 1;
@@ -459,6 +547,13 @@ impl Content {
                     .iter()
                     .flat_map(|r| r.bullets.iter().map(|l| (l, false))),
             )
+    }
+
+    /// The positions newest first, by when they started (a position with no
+    /// start date last), whatever order they were chosen in.
+    pub fn sort_experience(&mut self, frame: &Frame) {
+        self.experience
+            .sort_by_key(|role| std::cmp::Reverse(started(frame.position(role.position))));
     }
 
     /// Every line with where it is: the headline, the summary, or a bullet
@@ -502,6 +597,24 @@ impl Content {
             .map(|r| r.position)
             .or(latest)
     }
+}
+
+/// When `position` started, comparable (`2021-03` after `2021`): empty when
+/// it does not say.
+pub fn started(position: Option<&PositionInfo>) -> String {
+    let raw = position
+        .and_then(|p| p.start_date.as_deref())
+        .map(str::trim)
+        .unwrap_or_default();
+    // `2021` is the start of 2021: before any month of it.
+    let mut padded = raw.to_owned();
+    if padded.len() == 4 {
+        padded.push_str("-00");
+    }
+    if padded.len() == 7 {
+        padded.push_str("-00");
+    }
+    padded
 }
 
 /// The profile's education and languages, as the CV prints them.

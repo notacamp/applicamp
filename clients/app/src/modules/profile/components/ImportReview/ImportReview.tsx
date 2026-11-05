@@ -14,6 +14,7 @@ import {
   Tag,
   Tagged,
   Text,
+  TouchTargets,
 } from "~/lib/ui";
 
 import { useApplyImport, useDiscardImport, useImport, type ApplyMode } from "../../api/imports";
@@ -23,10 +24,12 @@ import {
   compareBasics,
   compareList,
   emptySections,
+  foundIn,
   LISTS,
   type Change,
 } from "../../api/sections";
 import { useDescribe } from "../EntryList/EntryList";
+import { useFoundList } from "./found";
 
 export interface ImportReviewProps {
   /** The draft. */
@@ -45,12 +48,14 @@ function ChangeTag({ change }: { change: Change }) {
 }
 
 /**
- * The draft beside the profile: every value marked new, changed or the
- * same, what the source check left out, then Replace, Merge or Discard.
- * Nothing is saved before a choice.
+ * The draft beside the profile: what was found in each part ("Found 6
+ * jobs, 18 achievements…") and what came back empty, every value marked new,
+ * changed or the same, what the source check left out, then Replace, Merge
+ * or Discard. Nothing is saved before a choice.
  */
 export function ImportReview({ id, current, onDone, onRestart }: ImportReviewProps) {
   const { t } = useTranslation("profile");
+  const foundList = useFoundList();
   const draft = useImport(id);
   const apply = useApplyImport();
   const discard = useDiscardImport();
@@ -81,8 +86,9 @@ export function ImportReview({ id, current, onDone, onRestart }: ImportReviewPro
     );
   }
 
-  const { draft: next, dropped, kind } = draft.data;
+  const { draft: next, dropped, kind, stopped } = draft.data;
   const empty = emptySections(next);
+  const found = foundList(foundIn(next));
   const choose = (mode: ApplyMode) => () => {
     apply.mutate(
       { id, mode },
@@ -103,112 +109,126 @@ export function ImportReview({ id, current, onDone, onRestart }: ImportReviewPro
 
   return (
     <Section title={t("review.title")} description={t("review.lead")} testId="import-review">
-      <Stack gap="lg">
-        {dropped > 0 ? (
-          <Tagged testId="review-dropped">
-            <Banner icon="warning" title={t("review.dropped", { dropped })}>
-              {t("review.droppedBody")}
-            </Banner>
-          </Tagged>
-        ) : null}
-        {empty.length > 0 ? (
-          <Tagged testId="review-empty">
-            <Banner icon="warning" title={t("review.empty.title", { count: empty.length })}>
-              <Stack gap="sm">
-                {empty.map((section) => (
-                  <Tagged key={section} testId={`review-empty-${section}`}>
-                    <Text>{t(`review.empty.${section}`)}</Text>
-                  </Tagged>
-                ))}
-                <Text tone="secondary">
-                  {t(kind === "linkedin_zip" ? "review.empty.hintZip" : "review.empty.hint")}
-                </Text>
-              </Stack>
-            </Banner>
-          </Tagged>
-        ) : null}
-        {basics.length > 0 ? (
-          <PropertyList testId="review-basics">
-            {basics.map(({ key, change, value, now }) => (
-              <Property key={key} label={t(`basics.${key}`)}>
-                <Text>{value}</Text>
-                <ChangeTag change={change} />
-                {change === "changed" && now !== undefined && now !== null ? (
-                  <Text tone="tertiary" size="sm">
-                    {t("review.now", { value: now })}
-                  </Text>
-                ) : null}
-              </Property>
-            ))}
-          </PropertyList>
-        ) : null}
-        {LISTS.map((list) => {
-          const rows = compareList(list, current, next);
-          if (rows.length === 0) {
-            return null;
-          }
-          return (
-            <Tagged key={list} testId={`review-${list}`}>
-              <List label={t(`sections.${list}`)}>
-                {rows.map(({ entry, change }, index) => {
-                  const { title, meta } = describe(list, entry);
-                  return (
-                    <ListRow
-                      key={index}
-                      title={title}
-                      meta={
-                        meta === "" ? t(`sections.${list}`) : `${t(`sections.${list}`)} · ${meta}`
-                      }
-                      badge={<ChangeTag change={change} />}
-                    />
-                  );
-                })}
-              </List>
+      <TouchTargets>
+        <Stack gap="lg">
+          {found === "" ? null : (
+            <Tagged testId="review-found">
+              <Banner icon="check" title={t("review.found", { list: found })} />
             </Tagged>
-          );
-        })}
-        {apply.isError || discard.isError ? (
-          <Tagged testId="review-error">
-            <Banner tone="danger" icon="warning" role="alert" title={t("review.failed")} />
-          </Tagged>
-        ) : null}
-        <Cluster>
-          <Button
-            variant="primary"
-            icon="check"
-            disabled={busy}
-            data-testid="review-replace"
-            onClick={choose("replace")}
-          >
-            {t("review.replace")}
-          </Button>
-          {isEmptyProfile(current) ? null : (
-            <Button
-              variant="secondary"
-              icon="plus"
-              disabled={busy}
-              data-testid="review-merge"
-              onClick={choose("merge")}
-            >
-              {t("review.merge")}
-            </Button>
           )}
-          <Button
-            variant="ghost"
-            disabled={busy}
-            data-testid="review-discard"
-            onClick={() => {
-              discard.mutate(id, {
-                onSuccess: () => {
-                  onDone("discarded");
-                },
-              });
-            }}
-          >
-            {t("review.discard")}
-          </Button>
-        </Cluster>
-      </Stack>
+          {stopped === null || stopped === undefined ? null : (
+            <Tagged testId="review-stopped">
+              <Banner icon="warning" title={t("review.stopped.title")}>
+                {t("review.stopped.body")}
+              </Banner>
+            </Tagged>
+          )}
+          {dropped > 0 ? (
+            <Tagged testId="review-dropped">
+              <Banner icon="warning" title={t("review.dropped", { dropped })}>
+                {t("review.droppedBody")}
+              </Banner>
+            </Tagged>
+          ) : null}
+          {empty.length > 0 ? (
+            <Tagged testId="review-empty">
+              <Banner icon="warning" title={t("review.empty.title", { count: empty.length })}>
+                <Stack gap="sm">
+                  {empty.map((section) => (
+                    <Tagged key={section} testId={`review-empty-${section}`}>
+                      <Text>{t(`review.empty.${section}`)}</Text>
+                    </Tagged>
+                  ))}
+                  <Text tone="secondary">
+                    {t(kind === "linkedin_zip" ? "review.empty.hintZip" : "review.empty.hint")}
+                  </Text>
+                </Stack>
+              </Banner>
+            </Tagged>
+          ) : null}
+          {basics.length > 0 ? (
+            <PropertyList testId="review-basics">
+              {basics.map(({ key, change, value, now }) => (
+                <Property key={key} label={t(`basics.${key}`)}>
+                  <Text>{value}</Text>
+                  <ChangeTag change={change} />
+                  {change === "changed" && now !== undefined && now !== null ? (
+                    <Text tone="tertiary" size="sm">
+                      {t("review.now", { value: now })}
+                    </Text>
+                  ) : null}
+                </Property>
+              ))}
+            </PropertyList>
+          ) : null}
+          {LISTS.map((list) => {
+            const rows = compareList(list, current, next);
+            if (rows.length === 0) {
+              return null;
+            }
+            return (
+              <Tagged key={list} testId={`review-${list}`}>
+                <List label={t(`sections.${list}`)}>
+                  {rows.map(({ entry, change }, index) => {
+                    const { title, meta } = describe(list, entry);
+                    return (
+                      <ListRow
+                        key={index}
+                        title={title}
+                        meta={
+                          meta === "" ? t(`sections.${list}`) : `${t(`sections.${list}`)} · ${meta}`
+                        }
+                        badge={<ChangeTag change={change} />}
+                      />
+                    );
+                  })}
+                </List>
+              </Tagged>
+            );
+          })}
+          {apply.isError || discard.isError ? (
+            <Tagged testId="review-error">
+              <Banner tone="danger" icon="warning" role="alert" title={t("review.failed")} />
+            </Tagged>
+          ) : null}
+          <Cluster>
+            <Button
+              variant="primary"
+              icon="check"
+              disabled={busy}
+              data-testid="review-replace"
+              onClick={choose("replace")}
+            >
+              {t("review.replace")}
+            </Button>
+            {isEmptyProfile(current) ? null : (
+              <Button
+                variant="secondary"
+                icon="plus"
+                disabled={busy}
+                data-testid="review-merge"
+                onClick={choose("merge")}
+              >
+                {t("review.merge")}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              disabled={busy}
+              data-testid="review-discard"
+              onClick={() => {
+                discard.mutate(id, {
+                  onSuccess: () => {
+                    onDone("discarded");
+                  },
+                });
+              }}
+            >
+              {t("review.discard")}
+            </Button>
+          </Cluster>
+        </Stack>
+      </TouchTargets>
     </Section>
   );
 }

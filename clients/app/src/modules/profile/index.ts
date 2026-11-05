@@ -24,3 +24,4 @@ export {
 export { JobAnswerFacts, type JobAnswerFactsProps } from "./components/Grill/JobAnswerFacts";
 export { AboutYouPage, type AboutYouPageProps } from "./components/AboutYou/AboutYouPage";
 export { LinkedInPage, type LinkedInPageProps } from "./components/LinkedIn/LinkedInPage";
+export { CompletePage, type CompletePageProps } from "./components/Complete/CompletePage";

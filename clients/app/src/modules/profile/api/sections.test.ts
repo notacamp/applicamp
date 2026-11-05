@@ -5,7 +5,9 @@ import {
   compareBasics,
   compareList,
   entryOf,
+  foundIn,
   isSameEntry,
+  matchPositions,
   problemsOf,
   valuesOf,
   withList,
@@ -99,5 +101,57 @@ describe("the profile's lists", () => {
     const next = withList(CURRENT, "skills", [{ name: "Go" }]);
     expect(next.skills).toEqual([{ name: "Go" }]);
     expect(CURRENT.skills).toEqual([{ name: "Rust" }]);
+  });
+});
+
+describe("what a draft holds", () => {
+  it("counts each part that has something, in the review's order", () => {
+    const draft: Profile = {
+      ...EMPTY_PROFILE,
+      work: [
+        {
+          name: "Example Org",
+          position: "Staff Engineer",
+          highlights: ["Moved billing to Rust", "Cut refunds by half"],
+        },
+        { name: "Sample Labs", position: "Engineer", highlights: ["Built the pipeline"] },
+      ],
+      skills: [{ name: "Rust" }, { name: "PostgreSQL" }],
+      education: [{ institution: "Sample University" }],
+      languages: [{ language: "Portuguese" }, { language: "English" }],
+    };
+    expect(foundIn(draft)).toEqual([
+      { key: "jobs", count: 2 },
+      { key: "achievements", count: 3 },
+      { key: "skills", count: 2 },
+      { key: "degrees", count: 1 },
+      { key: "languages", count: 2 },
+    ]);
+    expect(foundIn(EMPTY_PROFILE)).toEqual([]);
+  });
+});
+
+describe("matching positions as the server merges", () => {
+  it("keeps two stints with one title at one company apart", () => {
+    const stint = (startDate: string) => ({
+      name: "Example Org",
+      position: "Consultant",
+      startDate,
+      highlights: [],
+    });
+    const mine = [stint("2022-01")];
+    expect(matchPositions(mine, [stint("2022-01"), stint("2018-03")])).toEqual([0, undefined]);
+    // A start edited by hand: found by its title, once.
+    expect(matchPositions([stint("2022-02")], [stint("2022-01"), stint("2018-03")])).toEqual([
+      0,
+      undefined,
+    ]);
+    expect(
+      compareList(
+        "work",
+        { ...EMPTY_PROFILE, work: mine },
+        { ...EMPTY_PROFILE, work: [stint("2022-01"), stint("2018-03")] },
+      ).map(({ change }) => change),
+    ).toEqual(["same", "new"]);
   });
 });

@@ -701,7 +701,26 @@
     "undo": "Undo",
     "declined": "Declined",
     "open": "Open",
-    "more": "Show more"
+    "more": "Show more",
+    "why": {
+      "needs_key": "Its list of jobs needs a key from the site. Add one, then check again.",
+      "list_not_allowed": "The site's rules do not let apps read its list of jobs.",
+      "no_job_list": "The app found no list of jobs on this site.",
+      "request_limit": "The check used its {{detail}} requests before it found where the jobs are.",
+      "empty_list": "A list of jobs was found, but no job could be read from it.",
+      "jobs_on_hiring_system": "Every job on it applies on one company's page on {{detail}}, so it is one company and not a job site. That page is added as a company page.",
+      "not_a_job_board": "Too few of its items look like jobs, so it may not be a job site.",
+      "nothing_recent": "Its newest job is from {{detail}}, more than 30 days ago.",
+      "undated": "None of its jobs says when it was posted, and the site shows no change in the last 30 days.",
+      "terms_forbid": "Its terms do not allow apps to read it.",
+      "terms_ask_first": "Its terms ask for permission first.",
+      "terms_personal_only": "Its terms allow personal use only, not an app.",
+      "terms_unread": "The app has not read its terms yet.",
+      "owner_edited": "You changed its settings, so it waits for you.",
+      "config_to_use": "The app found how to read it. Use that setup to approve it.",
+      "needs_approval": "Every check passed. Only your approval is left.",
+      "unknown": "It waits for you, for a reason the app cannot put into words yet."
+    }
   },
   "sites": {
     "loadFailed": "The job sites couldn’t be loaded.",

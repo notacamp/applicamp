@@ -82,6 +82,7 @@ use uuid::Uuid;
 use crate::{
     SourcesDeps, board_keys,
     features::boards::{blockers, unique_slug},
+    hiring_systems,
     job::html_to_text,
     job_boards::{
         self, BoardConfig, BoardRow, Fields, Kind, Proposal, Report, SampleJob, Status,
@@ -1700,7 +1701,7 @@ pub async fn check(
         notes: old.notes,
         proposal,
         config_fingerprint: robots::fingerprint(&new_config.to_string()),
-        waiting_because: String::new(),
+        waiting_because: None,
         rules: RULES,
     };
     let high = remote_share.unwrap_or(0.0) >= 0.5 && worldwide_share.unwrap_or(0.0) >= 0.5;
@@ -1749,9 +1750,9 @@ pub async fn check(
     )
     .await?;
     if !approved {
-        let name = one_company
+        let system = one_company
             .as_ref()
-            .map(|link| crate::company_pages::name_of_token(&link.token));
+            .map(|link| hiring_systems::of(link.source).map_or(link.source.as_str(), |s| s.name));
         let because = waiting::because(&waiting::Facts {
             needs_key: secret.is_err(),
             rules_forbid_list: report.robots.endpoint_allowed == Some(false),
@@ -1761,8 +1762,9 @@ pub async fn check(
             newest: sample.iter().filter_map(|job| job.posted_at).max(),
             out_of_requests: visits.exhausted,
             requests: visits.spent(),
-            one_company: name.as_deref(),
+            one_system: system,
             verdict: reading.verdict.as_deref(),
+            quote: reading.quote.as_deref(),
             terms_fresh: reading.fresh(&key),
             budget_reached: reading.budget_reached,
             edited: row.config_edited,
@@ -1771,11 +1773,11 @@ pub async fn check(
         });
         sqlx::query(
             "UPDATE sources.job_boards
-                SET report = jsonb_set(report, '{waiting_because}', to_jsonb($2::text))
+                SET report = jsonb_set(report, '{waiting_because}', $2)
               WHERE id = $1 AND status = 'candidate'",
         )
         .bind(row.id)
-        .bind(&because)
+        .bind(sqlx::types::Json(&because))
         .execute(db)
         .await?;
     }

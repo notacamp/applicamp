@@ -701,7 +701,26 @@
     "undo": "Anular",
     "declined": "Recusado",
     "open": "Abrir",
-    "more": "Mostrar mais"
+    "more": "Mostrar mais",
+    "why": {
+      "needs_key": "A lista de empregos precisa de uma chave do site. Adicione uma e volte a verificar.",
+      "list_not_allowed": "As regras do site não deixam as aplicações ler a lista de empregos.",
+      "no_job_list": "A aplicação não encontrou nenhuma lista de empregos neste site.",
+      "request_limit": "A verificação usou os seus {{detail}} pedidos antes de encontrar onde estão os empregos.",
+      "empty_list": "Foi encontrada uma lista de empregos, mas não foi possível ler nenhum emprego.",
+      "jobs_on_hiring_system": "Todos os empregos pedem candidatura na página de uma só empresa em {{detail}}, por isso é uma empresa e não um site de empregos. Essa página é adicionada como página de empresa.",
+      "not_a_job_board": "Poucos itens parecem empregos, por isso talvez não seja um site de empregos.",
+      "nothing_recent": "O emprego mais recente é de {{detail}}, há mais de 30 dias.",
+      "undated": "Nenhum emprego diz quando foi publicado e o site não mostra alterações nos últimos 30 dias.",
+      "terms_forbid": "Os termos não permitem que aplicações o leiam.",
+      "terms_ask_first": "Os termos pedem autorização primeiro.",
+      "terms_personal_only": "Os termos só permitem uso pessoal, não por uma aplicação.",
+      "terms_unread": "A aplicação ainda não leu os termos.",
+      "owner_edited": "Alterou as definições, por isso fica à sua espera.",
+      "config_to_use": "A aplicação descobriu como o ler. Use essa configuração para o aprovar.",
+      "needs_approval": "Todas as verificações passaram. Só falta a sua aprovação.",
+      "unknown": "Fica à sua espera, por um motivo que a aplicação ainda não sabe explicar."
+    }
   },
   "sites": {
     "loadFailed": "Não foi possível carregar os sites de emprego.",

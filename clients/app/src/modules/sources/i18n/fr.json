@@ -701,7 +701,26 @@
     "undo": "Annuler",
     "declined": "Refusé",
     "open": "Ouvrir",
-    "more": "Afficher plus"
+    "more": "Afficher plus",
+    "why": {
+      "needs_key": "Sa liste d'offres demande une clé du site. Ajoutez-en une, puis vérifiez à nouveau.",
+      "list_not_allowed": "Les règles du site ne laissent pas les applications lire sa liste d'offres.",
+      "no_job_list": "L'application n'a trouvé aucune liste d'offres sur ce site.",
+      "request_limit": "La vérification a utilisé ses {{detail}} requêtes avant de trouver où sont les offres.",
+      "empty_list": "Une liste d'offres a été trouvée, mais aucune offre n'a pu être lue.",
+      "jobs_on_hiring_system": "Toutes les offres demandent de postuler sur la page d'une seule entreprise chez {{detail}}, c'est donc une entreprise et non un site d'offres. Cette page est ajoutée comme page d'entreprise.",
+      "not_a_job_board": "Trop peu d'éléments ressemblent à des offres, ce n'est peut-être pas un site d'offres.",
+      "nothing_recent": "Son offre la plus récente date du {{detail}}, il y a plus de 30 jours.",
+      "undated": "Aucune offre ne dit quand elle a été publiée et le site n'a pas changé depuis 30 jours.",
+      "terms_forbid": "Ses conditions n'autorisent pas les applications à le lire.",
+      "terms_ask_first": "Ses conditions demandent d'abord une autorisation.",
+      "terms_personal_only": "Ses conditions n'autorisent qu'un usage personnel, pas celui d'une application.",
+      "terms_unread": "L'application n'a pas encore lu ses conditions.",
+      "owner_edited": "Vous avez changé ses réglages, il attend donc votre décision.",
+      "config_to_use": "L'application a trouvé comment le lire. Utilisez ce réglage pour l'approuver.",
+      "needs_approval": "Toutes les vérifications ont réussi. Il ne manque que votre accord.",
+      "unknown": "Il attend votre décision, pour une raison que l'application ne sait pas encore expliquer."
+    }
   },
   "sites": {
     "loadFailed": "Les sites d’emploi n’ont pas pu être chargés.",

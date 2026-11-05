@@ -1,11 +1,11 @@
-//! Why a candidate still waits for the owner, in one plain sentence (#108),
-//! kept in its report so the admin page can show it. The sentences never say
-//! "RSS", "robots" or "API": they speak of a list of jobs and of the site's
-//! rules.
+//! Why a candidate still waits for the owner (#108), kept in its report as a
+//! code and, for some, a detail, so the admin page words it in the person's
+//! language (`WaitingCode`).
 
 use chrono::{DateTime, Utc};
 
 use super::{ALIVE_DAYS, MIN_POSTINGS};
+use crate::job_boards::{Waiting, WaitingCode};
 
 /// What a check knows about a candidate it did not approve.
 #[derive(Debug, Default)]
@@ -14,8 +14,9 @@ pub struct Facts<'a> {
     pub needs_key: bool,
     /// The site's rules do not let apps read its list of jobs.
     pub rules_forbid_list: bool,
-    /// A list of jobs was found, and how many jobs could be read from it.
+    /// A list of jobs was found.
     pub found: bool,
+    /// How many jobs could be read from it.
     pub sample: usize,
     /// How many of them look like postings.
     pub postings: usize,
@@ -24,10 +25,12 @@ pub struct Facts<'a> {
     /// The check used up its requests before it found the list.
     pub out_of_requests: bool,
     pub requests: usize,
-    /// The name of the company every job applies at, when it is one.
-    pub one_company: Option<&'a str>,
-    /// The terms' verdict, and whether it is of the terms as they are now.
+    /// The hiring system every job applies on, when it is one company's page.
+    pub one_system: Option<&'a str>,
+    /// The terms' verdict, the sentence that decided it, and whether it is of
+    /// the terms as they are now.
     pub verdict: Option<&'a str>,
+    pub quote: Option<&'a str>,
     pub terms_fresh: bool,
     pub budget_reached: bool,
     /// The owner changed its settings.
@@ -37,78 +40,58 @@ pub struct Facts<'a> {
     pub now: Option<DateTime<Utc>>,
 }
 
-/// The sentence for the first reason that applies.
-pub fn because(f: &Facts<'_>) -> String {
+/// The first reason that applies.
+pub fn because(f: &Facts<'_>) -> Waiting {
+    use WaitingCode as C;
     if f.needs_key {
-        return "Its list of jobs needs a key from the site: set one, then check again.".to_owned();
+        return Waiting::new(C::NeedsKey);
     }
     if f.rules_forbid_list {
-        return "The site's rules do not let apps read its list of jobs.".to_owned();
+        return Waiting::new(C::ListNotAllowed);
     }
     if !f.found {
         return if f.out_of_requests {
-            format!(
-                "The check used its {} requests before it found where the jobs are.",
-                f.requests
-            )
+            Waiting::with(C::RequestLimit, f.requests.to_string())
         } else {
-            "No list of jobs was found on the site.".to_owned()
+            Waiting::new(C::NoJobList)
         };
     }
     if f.sample == 0 {
-        return "A list was found, but no job could be read from it.".to_owned();
+        return Waiting::new(C::EmptyList);
     }
-    if let Some(company) = f.one_company {
-        return format!(
-            "Every job on it applies on one company's hiring page ({company}), so it is one company's page, not a job site; that page is added as a company page."
-        );
+    if let Some(system) = f.one_system {
+        return Waiting::with(C::JobsOnHiringSystem, system);
     }
-    if f.sample < MIN_POSTINGS {
-        return format!(
-            "Only {} job{} found; at least {MIN_POSTINGS} are needed to tell a job site from a blog.",
-            f.sample,
-            if f.sample == 1 { " was" } else { "s were" }
-        );
-    }
-    if f.postings < MIN_POSTINGS {
-        return format!(
-            "Only {} of {} items look like jobs (a title with a company, an apply link or a page of its own); at least {MIN_POSTINGS} are needed.",
-            f.postings, f.sample
-        );
+    if f.sample < MIN_POSTINGS || f.postings < MIN_POSTINGS {
+        return Waiting::new(C::NotAJobBoard);
     }
     let since = f.now.map(|now| now - chrono::TimeDelta::days(ALIVE_DAYS));
     if since.is_some_and(|since| f.newest.is_none_or(|at| at < since)) {
         return match f.newest {
-            Some(at) => format!(
-                "Its newest job is from {}, more than {ALIVE_DAYS} days ago.",
-                at.format("%Y-%m-%d")
-            ),
-            None => format!(
-                "None of its jobs says when it was posted, and the site shows no change in the last {ALIVE_DAYS} days."
-            ),
+            Some(at) => Waiting::with(C::NothingRecent, at.format("%Y-%m-%d").to_string()),
+            None => Waiting::new(C::Undated),
         };
     }
+    let quoted = |code| match f.quote {
+        Some(quote) => Waiting::with(code, quote),
+        None => Waiting::new(code),
+    };
     match f.verdict {
-        Some("forbid") => return "Its terms do not allow apps to read it.".to_owned(),
-        Some("ask_first") => return "Its terms ask for permission first.".to_owned(),
-        Some("personal_only") => {
-            return "Its terms allow personal use only, not an app.".to_owned();
-        }
+        Some("forbid") => return quoted(C::TermsForbid),
+        Some("ask_first") => return quoted(C::TermsAskFirst),
+        Some("personal_only") => return quoted(C::TermsPersonalOnly),
         _ => {}
     }
-    if f.budget_reached {
-        return "The daily AI limit was reached before its terms were read.".to_owned();
-    }
-    if !f.terms_fresh {
-        return "Its terms have not been read yet.".to_owned();
+    if f.budget_reached || !f.terms_fresh {
+        return Waiting::new(C::TermsUnread);
     }
     if f.edited {
-        return "You changed its settings, so it waits for you.".to_owned();
+        return Waiting::new(C::OwnerEdited);
     }
     if f.proposal_waits {
-        return "The app found how to read it; use that config to approve it.".to_owned();
+        return Waiting::new(C::ConfigToUse);
     }
-    "It waits for your approval.".to_owned()
+    Waiting::new(C::NeedsApproval)
 }
 
 #[cfg(test)]
@@ -134,171 +117,155 @@ mod tests {
         }
     }
 
+    fn code(facts: Facts<'_>) -> WaitingCode {
+        because(&facts).code
+    }
+
     #[test]
-    fn each_reason_is_one_plain_sentence() {
-        let says = |facts: Facts<'_>| because(&facts);
-        assert!(
-            says(Facts {
+    fn each_reason_is_a_code() {
+        use WaitingCode as C;
+        assert_eq!(
+            code(Facts {
                 found: false,
                 ..clean()
-            })
-            .starts_with("No list of jobs")
+            }),
+            C::NoJobList
         );
-        assert!(
-            says(Facts {
-                found: false,
-                out_of_requests: true,
-                requests: 25,
-                ..clean()
-            })
-            .contains("25 requests")
+        let limit = because(&Facts {
+            found: false,
+            out_of_requests: true,
+            requests: 25,
+            ..clean()
+        });
+        assert_eq!(
+            (limit.code, limit.detail.as_deref()),
+            (C::RequestLimit, Some("25"))
         );
-        assert!(
-            says(Facts {
+        assert_eq!(
+            code(Facts {
                 sample: 0,
                 ..clean()
-            })
-            .contains("no job could be read")
+            }),
+            C::EmptyList
         );
-        assert!(
-            says(Facts {
+        assert_eq!(
+            code(Facts {
                 sample: 3,
                 postings: 3,
                 ..clean()
-            })
-            .starts_with("Only 3 jobs were found")
+            }),
+            C::NotAJobBoard
         );
-        assert!(
-            says(Facts {
-                sample: 1,
-                postings: 1,
-                ..clean()
-            })
-            .starts_with("Only 1 job was found")
-        );
-        assert!(
-            says(Facts {
+        assert_eq!(
+            code(Facts {
                 postings: 2,
                 ..clean()
-            })
-            .starts_with("Only 2 of 8 items")
+            }),
+            C::NotAJobBoard
         );
-        assert!(
-            says(Facts {
-                newest: Some(now() - chrono::TimeDelta::days(90)),
-                ..clean()
-            })
-            .contains("2026-08-07")
+        let old = because(&Facts {
+            newest: Some(now() - chrono::TimeDelta::days(90)),
+            ..clean()
+        });
+        assert_eq!(
+            (old.code, old.detail.as_deref()),
+            (C::NothingRecent, Some("2026-08-07"))
         );
-        assert!(
-            says(Facts {
+        assert_eq!(
+            code(Facts {
                 newest: None,
                 ..clean()
-            })
-            .starts_with("None of its jobs says when")
+            }),
+            C::Undated
         );
-        assert!(
-            says(Facts {
-                one_company: Some("Acme"),
-                ..clean()
-            })
-            .contains("one company's hiring page (Acme)")
+        let one = because(&Facts {
+            one_system: Some("Lever"),
+            ..clean()
+        });
+        assert_eq!(
+            (one.code, one.detail.as_deref()),
+            (C::JobsOnHiringSystem, Some("Lever"))
         );
-        assert!(
-            says(Facts {
-                verdict: Some("forbid"),
-                ..clean()
-            })
-            .starts_with("Its terms do not allow")
+        let forbid = because(&Facts {
+            verdict: Some("forbid"),
+            quote: Some("No apps."),
+            ..clean()
+        });
+        assert_eq!(
+            (forbid.code, forbid.detail.as_deref()),
+            (C::TermsForbid, Some("No apps."))
         );
-        assert!(
-            says(Facts {
+        assert_eq!(
+            code(Facts {
                 verdict: Some("ask_first"),
                 ..clean()
-            })
-            .contains("permission")
+            }),
+            C::TermsAskFirst
         );
-        assert!(
-            says(Facts {
+        assert_eq!(
+            code(Facts {
+                verdict: Some("personal_only"),
+                ..clean()
+            }),
+            C::TermsPersonalOnly
+        );
+        assert_eq!(
+            code(Facts {
                 budget_reached: true,
                 verdict: None,
                 terms_fresh: false,
                 ..clean()
-            })
-            .contains("AI limit")
+            }),
+            C::TermsUnread
         );
-        assert!(
-            says(Facts {
+        assert_eq!(
+            code(Facts {
                 verdict: None,
                 terms_fresh: false,
                 ..clean()
-            })
-            .contains("not been read")
+            }),
+            C::TermsUnread
         );
-        assert!(
-            says(Facts {
+        assert_eq!(
+            code(Facts {
                 edited: true,
                 ..clean()
-            })
-            .starts_with("You changed")
+            }),
+            C::OwnerEdited
         );
-        assert!(
-            says(Facts {
+        assert_eq!(
+            code(Facts {
                 proposal_waits: true,
                 ..clean()
-            })
-            .contains("use that config")
+            }),
+            C::ConfigToUse
         );
-        assert!(
-            says(Facts {
+        assert_eq!(
+            code(Facts {
                 needs_key: true,
                 ..clean()
-            })
-            .contains("key")
+            }),
+            C::NeedsKey
         );
-        assert!(
-            says(Facts {
+        assert_eq!(
+            code(Facts {
                 rules_forbid_list: true,
                 ..clean()
-            })
-            .contains("site's rules")
+            }),
+            C::ListNotAllowed
         );
-        assert_eq!(says(clean()), "It waits for your approval.");
+        assert_eq!(code(clean()), C::NeedsApproval);
     }
 
     #[test]
-    fn no_sentence_uses_jargon_for_the_ui() {
-        let facts = [
-            Facts {
-                found: false,
-                ..clean()
-            },
-            Facts {
-                rules_forbid_list: true,
-                ..clean()
-            },
-            Facts {
-                needs_key: true,
-                ..clean()
-            },
-            Facts {
-                sample: 0,
-                ..clean()
-            },
-            Facts {
-                postings: 1,
-                ..clean()
-            },
-            Facts {
-                newest: None,
-                ..clean()
-            },
-        ];
-        for f in &facts {
-            let sentence = because(f);
-            for word in ["RSS", "robots", "API", "Atom"] {
-                assert!(!sentence.contains(word), "{sentence}");
-            }
-        }
+    fn codes_are_snake_case_in_json() {
+        let json =
+            serde_json::to_value(Waiting::with(WaitingCode::JobsOnHiringSystem, "Lever")).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({ "code": "jobs_on_hiring_system", "detail": "Lever" })
+        );
+        let json = serde_json::to_value(Waiting::new(WaitingCode::NotAJobBoard)).unwrap();
+        assert_eq!(json, serde_json::json!({ "code": "not_a_job_board" }));
     }
 }

@@ -9495,6 +9495,17 @@
             "items": {
               "type": "string"
             }
+          },
+          "waiting": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BoardWaiting",
+                "description": "Why it still waits, as a code and a detail; set for a candidate its check did not approve."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -10474,8 +10485,15 @@
             "description": "The terms page found."
           },
           "waiting_because": {
-            "type": "string",
-            "description": "Why it still waits for the owner, in one plain sentence; empty when\nthe app approved it."
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BoardWaiting",
+                "description": "Why it still waits for the owner, as a code the client words in the\nperson's language; none once the app approved it."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "worldwide_share": {
             "type": [
@@ -10813,6 +10831,46 @@
             "minimum": 0
           }
         }
+      },
+      "BoardWaiting": {
+        "type": "object",
+        "description": "A reason a candidate waits: a code and, for some, a detail from the site\n(data, never an instruction).",
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/BoardWaitingCode"
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "BoardWaitingCode": {
+        "type": "string",
+        "description": "Why a candidate still waits for the owner. The client words each code in\nthe person's language; one it does not know gets a generic sentence.",
+        "enum": [
+          "needs_key",
+          "list_not_allowed",
+          "no_job_list",
+          "request_limit",
+          "empty_list",
+          "jobs_on_hiring_system",
+          "not_a_job_board",
+          "nothing_recent",
+          "undated",
+          "terms_forbid",
+          "terms_ask_first",
+          "terms_personal_only",
+          "terms_unread",
+          "owner_edited",
+          "config_to_use",
+          "needs_approval"
+        ]
       },
       "Brief": {
         "type": "object",

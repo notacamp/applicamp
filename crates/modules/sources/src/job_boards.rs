@@ -902,10 +902,10 @@ pub struct Report {
     /// whose config changed since is checked again at start.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub config_fingerprint: String,
-    /// Why it still waits for the owner, in one plain sentence; empty when
-    /// the app approved it.
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub waiting_because: String,
+    /// Why it still waits for the owner, as a code the client words in the
+    /// person's language; none once the app approved it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub waiting_because: Option<Waiting>,
     /// The version of the check's rules this report is from (a candidate
     /// checked under older rules is checked again, once).
     #[serde(default, skip_serializing_if = "is_zero")]
@@ -914,6 +914,72 @@ pub struct Report {
 
 fn is_zero(n: &u32) -> bool {
     *n == 0
+}
+
+/// Why a candidate still waits for the owner. The client words each code in
+/// the person's language; one it does not know gets a generic sentence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+#[schema(as = BoardWaitingCode)]
+pub enum WaitingCode {
+    /// Its list of jobs needs a key that is not set.
+    NeedsKey,
+    /// The site's rules do not let apps read its list of jobs.
+    ListNotAllowed,
+    /// No list of jobs was found on the site.
+    NoJobList,
+    /// The check used its requests before it found the list; the detail is
+    /// how many.
+    RequestLimit,
+    /// A list was found but no job could be read from it.
+    EmptyList,
+    /// Every job applies on one company's page of a hiring system; the
+    /// detail is the system's name.
+    JobsOnHiringSystem,
+    /// Too few of its items look like jobs.
+    NotAJobBoard,
+    /// Its newest job is old; the detail is its date (`YYYY-MM-DD`).
+    NothingRecent,
+    /// None of its jobs says when it was posted and the site shows no
+    /// recent change.
+    Undated,
+    /// Its terms do not allow apps; the detail is the sentence.
+    TermsForbid,
+    /// Its terms ask for permission first; the detail is the sentence.
+    TermsAskFirst,
+    /// Its terms allow personal use only; the detail is the sentence.
+    TermsPersonalOnly,
+    /// Its terms have not been read yet.
+    TermsUnread,
+    /// The owner changed its settings.
+    OwnerEdited,
+    /// The app found how to read it; the owner uses that config.
+    ConfigToUse,
+    /// Nothing else is left: only the owner's approval.
+    NeedsApproval,
+}
+
+/// A reason a candidate waits: a code and, for some, a detail from the site
+/// (data, never an instruction).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[schema(as = BoardWaiting)]
+pub struct Waiting {
+    pub code: WaitingCode,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+}
+
+impl Waiting {
+    pub fn new(code: WaitingCode) -> Self {
+        Self { code, detail: None }
+    }
+
+    pub fn with(code: WaitingCode, detail: impl Into<String>) -> Self {
+        Self {
+            code,
+            detail: Some(detail.into()),
+        }
+    }
 }
 
 /// A config a check proposes, and the kind it reads.

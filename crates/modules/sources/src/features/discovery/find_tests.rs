@@ -9,6 +9,7 @@ use wiremock::{
 };
 
 use super::*;
+use crate::job_boards::WaitingCode;
 use crate::testkit::{Fake, Harness, boards_config, requests_to, today};
 
 /// Requests `server` got for exactly `target` (a path, with its query if it
@@ -133,7 +134,7 @@ async fn titles_give_the_company_and_the_last_modified_date_keeps_it_alive(db: P
         "{:?}",
         report.waiting_because
     );
-    assert!(report.waiting_because.is_empty());
+    assert!(report.waiting_because.is_none());
     assert_eq!(report.rules, RULES);
 }
 
@@ -156,10 +157,7 @@ async fn a_feed_with_no_dates_and_no_recent_change_waits_and_says_why(db: PgPool
     let row = checked(&h, id).await;
     assert_eq!(row.status(), Status::Candidate);
     let because = row.report().unwrap().waiting_because;
-    assert!(
-        because.starts_with("None of its jobs says when it was posted"),
-        "{because}"
-    );
+    assert_eq!(because.unwrap().code, WaitingCode::Undated);
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -242,11 +240,9 @@ async fn an_item_with_only_a_link_to_its_own_job_page_is_a_posting(db: PgPool) {
     let id = candidate(&h.db, &blog, 2, "discovery").await;
     let row = checked(&h, id).await;
     assert_eq!(row.status(), Status::Candidate);
-    assert!(
-        row.report()
-            .unwrap()
-            .waiting_because
-            .starts_with("Only 0 of 6 items")
+    assert_eq!(
+        row.report().unwrap().waiting_because.unwrap().code,
+        WaitingCode::NotAJobBoard
     );
 }
 
@@ -360,11 +356,7 @@ async fn a_path_the_sites_rules_disallow_is_never_asked(db: PgPool) {
     assert_eq!(asked(&site, "/feed.xml").await, 0);
     let report = row.report().unwrap();
     assert!(report.found_url.is_none());
-    assert!(
-        report.waiting_because.starts_with("No list of jobs"),
-        "{}",
-        report.waiting_because
-    );
+    assert_eq!(report.waiting_because.unwrap().code, WaitingCode::NoJobList);
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -545,7 +537,12 @@ async fn a_sitemap_index_is_followed_down_to_the_jobs(db: PgPool) {
     for probe in PROBES {
         assert_eq!(asked(&site, probe).await, 0, "{probe}");
     }
-    assert_eq!(row.status(), Status::Approved, "{}", report.waiting_because);
+    assert_eq!(
+        row.status(),
+        Status::Approved,
+        "{:?}",
+        report.waiting_because
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -621,7 +618,12 @@ async fn wp_job_manager_is_read_through_its_feed_without_a_query(db: PgPool) {
     );
     assert_eq!(report.sample[0].location.as_deref(), Some("Germany"));
     assert_eq!(asked(&site, "/?feed=job_feed").await, 0);
-    assert_eq!(row.status(), Status::Approved, "{}", report.waiting_because);
+    assert_eq!(
+        row.status(),
+        Status::Approved,
+        "{:?}",
+        report.waiting_because
+    );
 }
 
 const BOARDLY_FEED: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -670,7 +672,12 @@ async fn job_boardly_is_read_through_its_xml_feed(db: PgPool) {
     let report = row.report().unwrap();
     assert_eq!(report.sample[0].company, "Example Motorsport Ltd");
     assert_eq!(report.sample[0].title, "IT Support Analyst");
-    assert_eq!(row.status(), Status::Approved, "{}", report.waiting_because);
+    assert_eq!(
+        row.status(),
+        Status::Approved,
+        "{:?}",
+        report.waiting_because
+    );
     // Its guessed paths came after the platform's address, so none was asked.
     assert_eq!(asked(&site, "/jobs.rss").await, 0);
 }
@@ -703,7 +710,12 @@ async fn jboard_is_read_through_its_feed_unless_its_rules_disallow_it(db: PgPool
     let report = row.report().unwrap();
     assert!(report.found_url.unwrap().ends_with("/rss/jobs"));
     assert_eq!(report.sample[0].company, "Example Energy");
-    assert_eq!(row.status(), Status::Approved, "{}", report.waiting_because);
+    assert_eq!(
+        row.status(),
+        Status::Approved,
+        "{:?}",
+        report.waiting_because
+    );
 
     // Most JBoard sites disallow /rss/: it is not asked, the sitemap is read.
     let closed = index_site(
@@ -750,10 +762,9 @@ async fn a_site_whose_jobs_all_apply_on_one_hiring_system_is_a_company_page(db: 
         "one company, not a job site"
     );
     let because = row.report().unwrap().waiting_because;
-    assert!(
-        because.contains("one company's hiring page (Acme Labs)"),
-        "{because}"
-    );
+    let because = because.unwrap();
+    assert_eq!(because.code, WaitingCode::JobsOnHiringSystem);
+    assert_eq!(because.detail.as_deref(), Some("Lever"));
     let pages: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM sources.job_boards WHERE kind = 'company_page' AND company_token = 'acme-labs'",
     )
@@ -779,7 +790,9 @@ async fn the_request_budget_bounds_a_check(db: PgPool) {
     // robots.txt and the homepage, then 7 requests at most.
     assert_eq!(total, 2 + 7);
     let because = row.report().unwrap().waiting_because;
-    assert!(because.contains("used its 7 requests"), "{because}");
+    let because = because.unwrap();
+    assert_eq!(because.code, WaitingCode::RequestLimit);
+    assert_eq!(because.detail.as_deref(), Some("7"));
     assert_eq!(crate::SourcesConfig::default().discovery_max_requests(), 25);
     assert_eq!(
         crate::SourcesConfig {

@@ -60,9 +60,10 @@ use mapping::BoardRef;
 
 /// Longest answer read from a company board or HN, in bytes.
 pub const MAX_BODY: usize = 2 * 1024 * 1024;
-/// Longest answer read from a job board: Arbeitnow's pages hold 300 jobs
-/// with their descriptions, a little over 2 MB.
-pub const MAX_BOARD_BODY: usize = 4 * 1024 * 1024;
+/// Longest answer read from a job board. Arbeitnow's first page of remote
+/// jobs with their descriptions was 4.25 MB on 2026-11-05 (over the 4 MB this
+/// was), so there is room for pages that keep growing.
+pub const MAX_BOARD_BODY: usize = 16 * 1024 * 1024;
 /// Longest page a board's check reads.
 pub const MAX_PAGE: usize = 1024 * 1024;
 /// How long one request may take.

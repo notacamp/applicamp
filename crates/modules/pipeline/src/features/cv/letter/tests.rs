@@ -184,6 +184,29 @@ fn sentences_url(s: &Stack, id: &Value, tail: &str) -> String {
 const NOTICE: &str = "What's your notice period?";
 
 #[sqlx::test(migrations = "../../../migrations")]
+async fn with_no_language_asked_the_letter_is_in_the_approved_cvs(db: PgPool) {
+    let s = stack(db).await;
+    approve_cv(&s).await;
+    sqlx::query("UPDATE pipeline.cv_drafts SET language = 'pt-PT' WHERE status = 'approved'")
+        .execute(&s.h.db)
+        .await
+        .unwrap();
+    let letter = draft(&s).await;
+    assert_eq!(letter["draft"]["language"], "pt-PT", "{letter}");
+    assert!(s.model.user_messages(LETTER).await[0].contains("<language>pt-PT</language>"));
+    // Asked for, another.
+    let (status, letter) =
+        s.h.json(
+            "POST",
+            &url(&s.opp, "/drafts"),
+            &json!({ "language": "en" }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{letter}");
+    assert_eq!(letter["draft"]["language"], "en");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
 async fn a_letter_needs_an_approved_cv_and_says_why(db: PgPool) {
     let s = stack(db).await;
     let (status, letter) = s.h.get(&url(&s.opp, "")).await;

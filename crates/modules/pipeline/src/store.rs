@@ -297,14 +297,17 @@ pub(crate) async fn insert(
     now: DateTime<Utc>,
 ) -> Result<Option<Uuid>> {
     let eligibility = row.eligibility.as_ref();
+    // A job that fits well, and is open to the person, is proposed to them.
+    let proposed = row.match_score.is_some_and(|score| score >= PROPOSE_AT)
+        && eligibility.is_none_or(|e| e.open_to_candidate != "no");
     let id: Option<Uuid> = sqlx::query_scalar(
         "INSERT INTO pipeline.opportunities
             (id, account_id, title, company, location, work_mode, url, source, source_ref,
              posted_at, salary_text, description, match_score, match_why, match_gaps,
              created_at, updated_at, remote, open_to_candidate, region_note, working_languages,
-             apply_url, expires_at, canonical_url, dedupe_key)
+             apply_url, expires_at, canonical_url, dedupe_key, proposed_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $16,
-                 $17, $18, $19, $20, $21, $22, $23, $24)
+                 $17, $18, $19, $20, $21, $22, $23, $24, $25)
          ON CONFLICT (account_id, source, source_ref) DO NOTHING
          RETURNING id",
     )
@@ -332,6 +335,7 @@ pub(crate) async fn insert(
     .bind(row.expires_at)
     .bind(&row.canonical_url)
     .bind(&row.dedupe_key)
+    .bind(proposed.then_some(now))
     .fetch_optional(&mut *conn)
     .await?;
     if let Some(opportunity) = id {
@@ -436,6 +440,9 @@ pub async fn attach_sources(
     Ok(matched)
 }
 
+/// The match a found job needs to be proposed to the person.
+pub const PROPOSE_AT: i32 = 75;
+
 /// Add `found` to `account`'s pipeline as Found, in one transaction, each
 /// announced with `pipeline.opportunity_added`. Postings already there, and
 /// ones that are not valid, are skipped. How many were added.
@@ -511,7 +518,9 @@ pub async fn set_eligibility(
     let done = sqlx::query(
         "UPDATE pipeline.opportunities
             SET remote = $3, open_to_candidate = $4, region_note = $5, working_languages = $6,
-                hidden_reason = $7
+                hidden_reason = $7,
+                -- Not open to the person, or failing a requirement: not proposed.
+                proposed_at = CASE WHEN $7::text IS NULL AND $4 <> 'no' THEN proposed_at END
           WHERE id = $1 AND account_id = $2 AND stage IN ('found', 'shortlisted')
             AND remote IS NULL",
     )

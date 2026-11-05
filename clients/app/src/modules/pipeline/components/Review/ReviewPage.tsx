@@ -36,6 +36,7 @@ import {
   useMakeDraft,
   useMakeVersion,
   usePreview,
+  useHidePosition,
   usePutBack,
   useUnapprove,
   type Cv,
@@ -53,6 +54,8 @@ import type { LineActions } from "./LineRow";
 import { VersionsSection } from "./PdfPanel";
 import { PreviewPane } from "./PreviewPane";
 import { ReviewAside } from "./ReviewAside";
+import { SiteNote } from "./SiteNote";
+import { WritingState } from "./WritingState";
 
 export interface ReviewPageProps {
   /** The opportunity. */
@@ -124,7 +127,9 @@ export function ReviewPage({ id, onBack, onPipeline, spend, onLetter }: ReviewPa
       </Tagged>
     );
   } else if (cv.data.draft === undefined || cv.data.draft === null) {
-    body = (
+    body = cv.data.writing ? (
+      <WritingState company={company} />
+    ) : (
       <Tagged testId="cv-empty">
         <Stack>
           <Text tone="secondary">{t("cv.empty.body")}</Text>
@@ -139,6 +144,7 @@ export function ReviewPage({ id, onBack, onPipeline, spend, onLetter }: ReviewPa
         id={id}
         cv={cv.data}
         draft={cv.data.draft}
+        company={company}
         spend={spend}
         onPipeline={onPipeline}
         onLetter={onLetter}
@@ -168,6 +174,7 @@ function Review({
   id,
   cv,
   draft,
+  company,
   spend,
   onPipeline,
   onLetter,
@@ -175,6 +182,7 @@ function Review({
   id: string;
   cv: Cv;
   draft: CvDraft;
+  company: string;
   spend: ReactNode;
   onPipeline: () => void;
   onLetter: ((id: string) => void) | undefined;
@@ -183,6 +191,7 @@ function Review({
   const change = useChangeLine(id, draft.n);
   const confirm = useConfirmLine(id, draft.n);
   const putBack = usePutBack(id, draft.n);
+  const hidePosition = useHidePosition(id, draft.n);
   const approve = useApprove(id, draft.n);
   const makeVersion = useMakeVersion(id);
   const preview = usePreview(id, draft.n);
@@ -205,14 +214,23 @@ function Review({
     change.isPending ||
     confirm.isPending ||
     putBack.isPending ||
+    hidePosition.isPending ||
     approve.isPending ||
     makeVersion.isPending ||
     preview.isPending ||
     unapprove.isPending ||
     again.isPending;
-  const failure = [change, confirm, putBack, approve, makeVersion, preview, unapprove, again].find(
-    (action) => action.isError,
-  )?.error;
+  const failure = [
+    change,
+    confirm,
+    putBack,
+    hidePosition,
+    approve,
+    makeVersion,
+    preview,
+    unapprove,
+    again,
+  ].find((action) => action.isError)?.error;
   const failedLength = preview.isError
     ? preview.variables.length
     : approve.isError
@@ -224,6 +242,7 @@ function Review({
       change,
       confirm,
       putBack,
+      hidePosition,
       approve,
       makeVersion,
       preview,
@@ -256,6 +275,41 @@ function Review({
   };
   const version = draft.version ?? (newest?.version ?? 0) + 1;
   const waiting = draft.waiting.length;
+  // The CV's language first, then the others the person works in (their
+  // goals, in their order), then the posting's, else English (or Portuguese
+  // for a CV in English): three at most.
+  const current = cvLanguage(draft.language);
+  const languages = [
+    current,
+    ...cv.work_languages.map(cvLanguage),
+    ...(cv.suggested_language === undefined || cv.suggested_language === null
+      ? []
+      : [cvLanguage(cv.suggested_language)]),
+    current === "en" ? "pt-PT" : "en",
+  ]
+    .filter((tag, index, all) => all.indexOf(tag) === index)
+    .slice(0, 3);
+  const writeAgain = (
+    <Button
+      variant="secondary"
+      ai
+      disabled={busy || !cv.can_draft.allowed}
+      data-testid="cv-make-again"
+      onClick={() => {
+        resetErrors();
+        again.mutate();
+      }}
+    >
+      {again.isPending ? t("cv.toolbar.making") : t("cv.toolbar.makeAgain")}
+    </Button>
+  );
+  const writeAgainCost = (
+    <Tagged testId="cv-write-again-cost">
+      <Text tone="secondary" size="sm">
+        {t("cv.toolbar.cost", { cost: formatCost(cv.draft_eur, i18n.language) })}
+      </Text>
+    </Tagged>
+  );
   const sheet = (
     <CvSheet
       draft={draft}
@@ -263,6 +317,10 @@ function Review({
       onPutBack={(what) => {
         resetErrors();
         putBack.mutate(what);
+      }}
+      onHidePosition={(position) => {
+        resetErrors();
+        hidePosition.mutate(position);
       }}
     />
   );
@@ -289,22 +347,10 @@ function Review({
                 })}
               </Text>
             </Tagged>
-            <Button
-              variant="secondary"
-              ai
-              disabled={busy || !cv.can_draft.allowed}
-              data-testid="cv-make-again"
-              onClick={() => {
-                resetErrors();
-                again.mutate();
-              }}
-            >
-              {again.isPending
-                ? t("cv.toolbar.making")
-                : t("cv.toolbar.makeAgain", { cost: formatCost(cv.draft_eur, i18n.language) })}
-            </Button>
+            {editable ? null : writeAgain}
           </Cluster>
         </Tagged>
+        {editable ? null : writeAgainCost}
         {draft.needs_version ? (
           <Tagged testId="cv-needs-version">
             <Banner
@@ -353,6 +399,7 @@ function Review({
             </Banner>
           </Tagged>
         )}
+        <SiteNote id={id} cv={cv} draft={draft} />
         {onLetter === undefined || newest === undefined ? null : (
           <Tagged testId="cv-letter">
             <Section title={t("letter.fromCv.title")} description={t("letter.fromCv.body")}>
@@ -366,22 +413,6 @@ function Review({
             </Section>
           </Tagged>
         )}
-        <LayoutControls
-          layout={layout}
-          onLayout={(next) => {
-            resetErrors();
-            if (editable) {
-              preview.mutate(next);
-            } else {
-              setAsked(next);
-            }
-          }}
-          language={language}
-          onLanguage={(next) => {
-            setLanguage(cvLanguage(next));
-          }}
-          disabled={busy}
-        />
         <ReviewLayout
           testId="cv-layout"
           aside={
@@ -392,17 +423,48 @@ function Review({
               actions={actions}
               onBack={onPipeline}
               onOpenPdf={setViewing}
+              controls={
+                <Stack gap="sm">
+                  <LayoutControls
+                    layout={layout}
+                    onLayout={(next) => {
+                      resetErrors();
+                      if (editable) {
+                        preview.mutate(next);
+                      } else {
+                        setAsked(next);
+                      }
+                    }}
+                    language={language}
+                    languages={languages}
+                    onLanguage={(next) => {
+                      setLanguage(cvLanguage(next));
+                    }}
+                    disabled={busy}
+                  />
+                  {language === cvLanguage(draft.language) ? null : (
+                    <Tagged testId="cv-language-next">
+                      <Text size="sm">
+                        {t("cv.layout.languageNext", {
+                          language: languageName(language, i18n.language),
+                        })}
+                      </Text>
+                    </Tagged>
+                  )}
+                </Stack>
+              }
             />
           }
         >
           <Stack>
-            {editable ? (
+            {again.isPending ? (
+              <WritingState company={company} />
+            ) : editable ? (
               <>
                 <PreviewPane
                   opportunity={id}
-                  n={draft.n}
-                  language={draft.language}
-                  preview={draft.preview}
+                  company={company}
+                  draft={draft}
                   making={preview.isPending}
                   disabled={busy}
                   onMake={() => {
@@ -432,29 +494,35 @@ function Review({
           <ActionDock
             testId="cv-dock"
             actions={
-              <Button
-                variant="primary"
-                icon="check"
-                disabled={busy || !draft.can_approve}
-                data-testid="cv-approve"
-                onClick={() => {
-                  resetErrors();
-                  approve.mutate(layout);
-                }}
-              >
-                {approve.isPending
-                  ? t("cv.toolbar.approving")
-                  : t("cv.toolbar.approve", { version })}
-              </Button>
+              <>
+                <Button
+                  variant="primary"
+                  icon="check"
+                  disabled={busy || !draft.can_approve}
+                  data-testid="cv-approve"
+                  onClick={() => {
+                    resetErrors();
+                    approve.mutate(layout);
+                  }}
+                >
+                  {approve.isPending
+                    ? t("cv.toolbar.approving")
+                    : t("cv.toolbar.approve", { version })}
+                </Button>
+                {writeAgain}
+              </>
             }
             note={
-              <Tagged testId={draft.can_approve ? "cv-approve-ready" : "cv-approve-reason"}>
-                <Text tone="secondary" size="sm">
-                  {draft.can_approve
-                    ? t("cv.waiting.ready")
-                    : t("cv.waiting.answer", { count: Math.max(waiting, 1) })}
-                </Text>
-              </Tagged>
+              <>
+                <Tagged testId={draft.can_approve ? "cv-approve-ready" : "cv-approve-reason"}>
+                  <Text tone="secondary" size="sm">
+                    {draft.can_approve
+                      ? t("cv.waiting.ready")
+                      : t("cv.waiting.answer", { count: Math.max(waiting, 1) })}
+                  </Text>
+                </Tagged>
+                {writeAgainCost}
+              </>
             }
           />
         ) : undoing ? (
@@ -486,6 +554,16 @@ function Review({
                   </Text>
                 </Tagged>
               )
+            }
+          />
+        ) : draft.status === "approved" && cv.next !== undefined && cv.next !== null ? (
+          // Undo is over and the letter starts: say so until it shows.
+          <ActionDock
+            testId="cv-dock"
+            actions={
+              <Tagged testId="cv-letter-started">
+                <Text weight="semibold">{t("cv.dock.started")}</Text>
+              </Tagged>
             }
           />
         ) : null}

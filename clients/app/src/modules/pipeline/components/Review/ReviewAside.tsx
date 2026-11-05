@@ -17,6 +17,7 @@ import {
 import type { Cv, CvDraft, CvKeyword } from "../../api/cv";
 import { formatCost, formatLimit } from "../../api/labels";
 import type { LineActions } from "./LineRow";
+import { DonePanel, FixedPanel, WantsPanel } from "./AsidePanels";
 import { PdfPanel } from "./PdfPanel";
 import { WaitingCards } from "./WaitingCards";
 
@@ -69,6 +70,7 @@ export function ReviewAside({
   actions,
   onBack,
   onOpenPdf,
+  controls,
 }: {
   cv: Cv;
   draft: CvDraft;
@@ -80,6 +82,8 @@ export function ReviewAside({
   onBack: () => void;
   /** Open a version's PDF. */
   onOpenPdf: (version: number) => void;
+  /** The layout and language: Style, Length, Language. */
+  controls: ReactNode;
 }) {
   const { t, i18n } = useTranslation("pipeline");
   const { changes, keywords } = draft;
@@ -120,6 +124,15 @@ export function ReviewAside({
       {draft.status === "approved" ? null : (
         <WaitingCards waiting={draft.waiting} fixed={draft.fixed_by_app} actions={actions} />
       )}
+      {draft.status === "approved" ? null : <FixedPanel draft={draft} />}
+      <WantsPanel draft={draft} />
+      <DonePanel cv={cv} />
+      <Tagged testId="cv-layout-language">
+        <Stack gap="sm">
+          <Text weight="semibold">{t("cv.layout.title")}</Text>
+          {controls}
+        </Stack>
+      </Tagged>
       <Tagged testId="cv-keywords">
         <Stack gap="sm">
           <Text weight="semibold">

@@ -712,7 +712,8 @@ export interface paths {
          * @description Every opportunity of the signed-in person, newest first, except the
          *     dismissed ones ("Not for me") and the hidden ones (they fail a hard
          *     requirement; `hidden=true` lists only those, with the reason). Filter by
-         *     stage, by text in the role, company or place, or to the new ones.
+         *     stage, by text in the role, company or place, to the new ones, or to the
+         *     ones proposed to the person (`proposed=true`, best match first).
          */
         get: operations["pipeline.list"];
         put?: never;
@@ -819,6 +820,31 @@ export interface paths {
         put?: never;
         /** Undo a removal: the fact is back. */
         post: operations["pipeline.brief_restore_fact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/brief/paste": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Read what the person pasted from the company's site.
+         * @description When the site cannot be read (it asks apps not to, or does not answer),
+         *     the person can paste what it says. The text is read like one of the
+         *     site's pages (**one model call**): each fact must quote it, or it is left
+         *     out; it replaces the company's facts as a read does. It counts toward the
+         *     20 company reads a day. The text is data, never instructions. A CV made
+         *     before does not change: Write it again uses the facts.
+         */
+        post: operations["pipeline.brief_paste"];
         delete?: never;
         options?: never;
         head?: never;
@@ -972,7 +998,10 @@ export interface paths {
         put?: never;
         /**
          * Draft a CV for this job.
-         * @description **One model call.** From the posting, what the job wants, the company
+         * @description **Up to four model calls**: the draft on the `write` role (again with more
+         *     room only when its answer is cut off), the second look at what the job
+         *     wants, and the app's fix of what the check flags. From the posting, what
+         *     the job wants, the company
          *     facts not removed and the profile; each line cites the profile sources it
          *     comes from, and the server then checks that it says nothing they do not.
          *     The model never sees a name or contact details. Needs the opportunity at
@@ -1033,6 +1062,28 @@ export interface paths {
          * @description An approved version cannot be discarded. No model call.
          */
         post: operations["pipeline.cv_discard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{id}/cv/drafts/{n}/hide-position": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Take a position off "Earlier".
+         * @description The position is no longer named under "Earlier", in the PDF or on the
+         *     page. It stays among what the CV left out, and putting it back shows it
+         *     again. The preview is made again. No model call. Only a draft can change.
+         */
+        post: operations["pipeline.cv_hide_position"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1787,6 +1838,137 @@ export interface paths {
          */
         put: operations["profile.about_choose"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/facts/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The facts proposed for the profile.
+         * @description What the app already knows that the profile does not hold: what the person
+         *     told and confirmed in Tell me about you, what their own website says, what
+         *     a CV read again says. Open ones, and those kept or dropped in the last day
+         *     (still undoable), grouped by position, newest first, then skills and
+         *     background. Never calls a model.
+         */
+        get: operations["profile.fact_proposals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/facts/proposals/batches/{id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo a Keep all, within a day.
+         * @description Every fact it kept is taken back, in one profile write, and waits again.
+         */
+        post: operations["profile.fact_undo_batch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/facts/proposals/keep-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Keep every open fact.
+         * @description One profile write, one new version, and one Undo for all of them for a day
+         *     (`…/batches/{id}/undo`). Facts whose job is no longer on the profile are
+         *     left as they are.
+         */
+        post: operations["profile.fact_keep_all"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/facts/proposals/{id}/drop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Drop a fact: it is not written, not proposed again, and never written by
+         *     Tell me about you's Save. Can be undone for a day.
+         */
+        post: operations["profile.fact_drop"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/facts/proposals/{id}/keep": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Keep a fact.
+         * @description Writes it on its position (with its quote; a confirmed assumption keeps
+         *     what it was based on), adds the skill or adds to the background: one new
+         *     profile version. Can be undone for a day. A fact the profile already holds
+         *     is closed, and nothing is written.
+         */
+        post: operations["profile.fact_keep"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/facts/proposals/{id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo a Keep or a Drop, within a day.
+         * @description A kept fact is taken off its position again (the skill it added out of the
+         *     skills, its words out of the background while it still ends with them):
+         *     one new profile version. A dropped one is open again.
+         */
+        post: operations["profile.fact_undo"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3519,6 +3701,17 @@ export interface components {
         Cv: {
             can_draft: components["schemas"]["CanDraft"];
             caps: components["schemas"]["CvCaps"];
+            /**
+             * @description Why the company's site could not be read, when it could not:
+             *     `robots_disallows`, `no_pages_readable` or `site_unreachable`. The
+             *     person can paste what it says (`…/brief/paste`).
+             */
+            company_read_failure?: string | null;
+            /**
+             * @description What the app did by itself for this CV, in order: the job's
+             *     preparation (when it prepared it) and the draft.
+             */
+            done: components["schemas"]["CvDoneStep"][];
             draft?: components["schemas"]["CvDraftView"] | null;
             /**
              * Format: double
@@ -3528,8 +3721,28 @@ export interface components {
             next?: components["schemas"]["CvNext"] | null;
             /** Format: uuid */
             opportunity_id: string;
+            /**
+             * Format: double
+             * @description About what reading pasted text costs, in euros.
+             */
+            read_eur: number;
+            /**
+             * @description The posting's language, when the CV is in another: offered, never
+             *     chosen for the person.
+             */
+            suggested_language?: string | null;
             /** @description The PDF versions, newest first. */
             versions: components["schemas"]["CvVersion"][];
+            /**
+             * @description The languages the person works in (their goals), in their order: what
+             *     the CV's language choice offers first.
+             */
+            work_languages: string[];
+            /**
+             * @description The app is getting this CV ready by itself right now (reading the
+             *     company or writing the draft): the page waits for it.
+             */
+            writing: boolean;
         };
         /** @description The caps and the spend. */
         CvCaps: {
@@ -3561,11 +3774,24 @@ export interface components {
          * @enum {string}
          */
         CvDocument: "cv" | "letter";
+        /** @description A step the app did by itself for this job, with what it cost. */
+        CvDoneStep: {
+            /** Format: date-time */
+            at: string;
+            /**
+             * Format: double
+             * @description About what it cost, in euros.
+             */
+            eur: number;
+            /** @description `shortlist`, `site`, `read`, `compare` or `draft`. */
+            step: string;
+        };
         /** @description What to make a draft of. */
         CvDraftRequest: {
             /**
-             * @description A language tag such as `pt-PT`; the posting's when it says, else
-             *     English.
+             * @description A language tag such as `pt-PT`; when left out, the first language the
+             *     person works in (their goals), else one their profile says they speak
+             *     well enough, else English. The posting's is only offered.
              */
             language?: string | null;
         };
@@ -3576,9 +3802,27 @@ export interface components {
             /** @description Approve is on: nothing is flagged and it is still a draft. */
             can_approve: boolean;
             changes: components["schemas"]["Changes"];
+            /**
+             * Format: int32
+             * @description The company facts the draft could use: none means it was written
+             *     from the posting and the profile only.
+             */
+            company_facts: number;
             contact: components["schemas"]["ContactView"];
+            /**
+             * Format: double
+             * @description What the app's calls for this draft cost, in euros (the draft, the
+             *     second look at what the job wants, the fix of what was flagged).
+             */
+            cost_eur?: number | null;
             /** Format: date-time */
             created_at: string;
+            /**
+             * @description The positions named under "Earlier", newest first, as in the PDF:
+             *     every one left out that has a title or a company and that the person
+             *     did not take off.
+             */
+            earlier: components["schemas"]["EarlierLine"][];
             education: components["schemas"]["EducationView"][];
             experience: components["schemas"]["RoleView"][];
             /**
@@ -3630,6 +3874,8 @@ export interface components {
             version?: number | null;
             /** @description What waits on the person, in the order the page shows it. */
             waiting: components["schemas"]["Waiting"][];
+            /** @description What the job wants, each covered by the CV or why not. */
+            wants: components["schemas"]["WantView"][];
         };
         /**
          * @description What a row of the CVs page is.
@@ -3723,6 +3969,25 @@ export interface components {
             stale: boolean;
             template?: components["schemas"]["Template"] | null;
         };
+        /** @description What an import applied in the last day found, part by part. */
+        CvRead: {
+            /** Format: int32 */
+            achievements: number;
+            /** Format: date-time */
+            applied_at: string;
+            /** Format: int32 */
+            certificates: number;
+            /** Format: int32 */
+            degrees: number;
+            /** Format: int32 */
+            jobs: number;
+            /** Format: int32 */
+            languages: number;
+            /** Format: int32 */
+            projects: number;
+            /** Format: int32 */
+            skills: number;
+        };
         /** @description An approved version: the approved text as a PDF. */
         CvVersion: {
             /**
@@ -3776,6 +4041,16 @@ export interface components {
          * @enum {string}
          */
         DraftStatus: "draft" | "approved" | "discarded";
+        /** @description A position the CV names only, under "Earlier", as the PDF prints it. */
+        EarlierLine: {
+            /**
+             * Format: int32
+             * @description For `…/hide-position` and `…/put-back`.
+             */
+            position: number;
+            /** @description "Title, Company (2015–2017)". */
+            text: string;
+        };
         /** @description A school or degree. */
         Education: {
             /** @description The field ("Computer science"). */
@@ -3851,6 +4126,22 @@ export interface components {
          * @enum {string}
          */
         Fact: "yes" | "no" | "unclear";
+        /** @description The proposals for one place of the profile. */
+        FactGroup: {
+            company?: string | null;
+            end_date?: string | null;
+            /**
+             * Format: int32
+             * @description For a position: its place in `work` now.
+             */
+            position?: number | null;
+            proposals: components["schemas"]["FactProposalView"][];
+            /** @description `YYYY`, `YYYY-MM` or `YYYY-MM-DD`; no end while it is current. */
+            start_date?: string | null;
+            target: components["schemas"]["FactTarget"];
+            /** @description For a position: its title and company. */
+            title?: string | null;
+        };
         /** @description A fact taken from an answer. */
         FactProposal: {
             /** @description What it is about. */
@@ -3878,15 +4169,91 @@ export interface components {
             turn_seq: number;
         };
         /**
+         * @description Where a proposal is.
+         * @enum {string}
+         */
+        FactProposalState: "open" | "kept" | "dropped";
+        /**
          * @description Where a fact taken from an answer is.
          * @enum {string}
          */
         FactProposalStatus: "ready" | "kept" | "dropped";
+        /** @description A fact proposed for the profile. */
+        FactProposalView: {
+            /** @description What it is about. */
+            area: components["schemas"]["Area"];
+            /**
+             * @description For a confirmed assumption: what it was based on (its reason, or the
+             *     page it was read on).
+             */
+            basis?: string | null;
+            /**
+             * Format: date-time
+             * @description When it was kept or dropped.
+             */
+            decided_at?: string | null;
+            /** Format: uuid */
+            id: string;
+            /**
+             * @description The words it comes from: the person's, the confirmed assumption, the
+             *     website's or the CV's.
+             */
+            quote: string;
+            /**
+             * @description An assumption the person marked *That's right* in Tell me about you
+             *     (not one left unanswered, nor a sentence taken from the profile).
+             */
+            said_right: boolean;
+            source: components["schemas"]["FactSource"];
+            state: components["schemas"]["FactProposalState"];
+            /** @description The fact (for a skill, its name). */
+            text: string;
+            /**
+             * Format: date-time
+             * @description Until when that can be undone.
+             */
+            undo_until?: string | null;
+        };
+        /**
+         * @description The facts proposed for the profile: open ones, and those decided in the
+         *     last day (they can still be undone).
+         */
+        FactProposalsView: {
+            batch?: components["schemas"]["KeptBatch"] | null;
+            cv_read?: components["schemas"]["CvRead"] | null;
+            /**
+             * Format: int32
+             * @description Dropped in the last day.
+             */
+            dropped: number;
+            /** @description By position, newest position first; then the skills and the background. */
+            groups: components["schemas"]["FactGroup"][];
+            /**
+             * Format: int32
+             * @description Kept in the last day.
+             */
+            kept: number;
+            /**
+             * Format: int32
+             * @description Waiting for Keep or Drop.
+             */
+            open: number;
+        };
+        /**
+         * @description Where a proposed fact comes from.
+         * @enum {string}
+         */
+        FactSource: "you_said" | "you_confirmed" | "your_website" | "your_cv";
         /**
          * @description How a fact became the person's.
          * @enum {string}
          */
         FactStatus: "told" | "confirmed_assumption";
+        /**
+         * @description Where a proposed fact goes.
+         * @enum {string}
+         */
+        FactTarget: "position" | "skills" | "background";
         /**
          * @description What a change is about.
          * @enum {string}
@@ -4077,6 +4444,15 @@ export interface components {
          * @enum {string}
          */
         HiddenReason: "not_remote" | "not_open_to_location" | "language" | "below_floor";
+        /** @description A position to take off the CV. */
+        HidePositionRequest: {
+            /**
+             * Format: int32
+             * @description A position the CV names under "Earlier" (its place in the profile's
+             *     `work`).
+             */
+            position: number;
+        };
         /** @description A draft profile waiting for review. */
         Import: {
             /**
@@ -4106,6 +4482,12 @@ export interface components {
             kind: components["schemas"]["ImportKind"];
             /** @description Where it is. */
             status: components["schemas"]["ImportStatus"];
+            /**
+             * @description What stopped reading the sections that came back empty a second time
+             *     (`ai_budget_reached`, `ai_daily_limit_reached`), if anything: the draft
+             *     has what the first reads found.
+             */
+            stopped?: string | null;
         };
         /**
          * @description What an import is made from.
@@ -4159,6 +4541,21 @@ export interface components {
              *     itself never changes.
              */
             text?: string | null;
+        };
+        /** @description A Keep all: the facts it kept, undone together. */
+        KeptBatch: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * Format: int32
+             * @description Facts it added to the profile, still there.
+             */
+            kept: number;
+            /**
+             * Format: date-time
+             * @description Until when it can be undone.
+             */
+            undo_until: string;
         };
         /** @description A keyword of the job. */
         Keyword: {
@@ -4328,10 +4725,7 @@ export interface components {
         };
         /** @description What to make a draft of. */
         LetterDraftRequest: {
-            /**
-             * @description A language tag such as `pt-PT`; the posting's when it says, else
-             *     English.
-             */
+            /** @description A language tag such as `pt-PT`; when left out, the approved CV's. */
             language?: string | null;
             size?: components["schemas"]["LetterSize"] | null;
         };
@@ -4744,10 +5138,13 @@ export interface components {
              * @description When the posting was published.
              */
             posted_at?: string | null;
+            /** @description Proposed to the person: Found, a match of 75 or more, open to them. */
+            proposed: boolean;
             /** @description Some of its reasons were stripped: they claimed things the profile never says. */
             reasons_updated: boolean;
             /** @description Pay, as the posting says. */
             salary_text?: string | null;
+            shortlisted_by?: components["schemas"]["ShortlistedBy"] | null;
             /** @description Where it was found (see the summary's `source`). */
             source: string;
             /**
@@ -4836,10 +5233,13 @@ export interface components {
             /** @description Found and never opened. */
             new: boolean;
             next_step?: string | null;
+            /** @description Proposed to the person: Found, a match of 75 or more, open to them. */
+            proposed: boolean;
             /** @description Where it is open, as the posting says, to go with the reason. */
             region_note?: string | null;
             /** @description Pay, as the posting says. */
             salary_text?: string | null;
+            shortlisted_by?: components["schemas"]["ShortlistedBy"] | null;
             /**
              * @description Where it was found: a job board's slug (`himalayas`), a company
              *     board (`greenhouse`, `lever`, `ashby`), `hn`, or `link` (added by
@@ -4865,6 +5265,11 @@ export interface components {
          * @enum {string}
          */
         Outcome: "succeeded" | "nothing_new" | "needs_you" | "ended_max_steps" | "ended_budget" | "ended_timeout" | "ended_loop" | "failed" | "cancelled";
+        /** @description What the company's site says, pasted by the person. */
+        PasteRequest: {
+            /** @description The site's words, 1 to 20,000 characters. */
+            text: string;
+        };
         /** @description What was checked on a PDF, kept with its version. */
         PdfChecks: {
             contact: components["schemas"]["ContactCheck"];
@@ -5106,6 +5511,11 @@ export interface components {
          * @enum {string}
          */
         QuestionState: "open" | "answered" | "skipped" | "dont_have";
+        /**
+         * @description Where the quote of a waiting line comes from.
+         * @enum {string}
+         */
+        QuoteFrom: "you" | "profile";
         /**
          * @description What a board's place in the order rests on.
          * @enum {string}
@@ -5587,6 +5997,11 @@ export interface components {
             why?: string | null;
         };
         /**
+         * @description Who shortlisted an opportunity.
+         * @enum {string}
+         */
+        ShortlistedBy: "person" | "app";
+        /**
          * @description Where the company's site came from.
          * @enum {string}
          */
@@ -5643,7 +6058,7 @@ export interface components {
          * @description What a source is.
          * @enum {string}
          */
-        SourceKind: "headline" | "summary" | "position_summary" | "highlight" | "fact" | "company" | "skills" | "education" | "languages";
+        SourceKind: "headline" | "summary" | "position_summary" | "highlight" | "fact" | "company" | "skills" | "education" | "languages" | "background" | "project" | "certificate";
         /** @description A source a line cites. */
         SourceView: {
             id: string;
@@ -5885,6 +6300,7 @@ export interface components {
              *     cites none.
              */
             quote?: string | null;
+            quote_from?: components["schemas"]["QuoteFrom"] | null;
             /** @description "Title · Company" of the position a kept fact lands on. */
             role?: string | null;
             /** @description The line's text, or the skill. */
@@ -5900,6 +6316,21 @@ export interface components {
          * @enum {string}
          */
         WaitingOn: "site" | "answers" | "cv_approval" | "letter_approval";
+        /**
+         * @description Why a want is or is not on the CV.
+         * @enum {string}
+         */
+        WantReason: "on_cv" | "in_profile" | "not_in_profile";
+        /** @description What the job wants, against the CV. */
+        WantView: {
+            /** @description The CV says it. */
+            covered: boolean;
+            /** @description `must` or `nice`. */
+            level: string;
+            reason: components["schemas"]["WantReason"];
+            /** @description What it wants, in short. */
+            text: string;
+        };
         /**
          * @description What a company's jobs are read from.
          * @enum {string}
@@ -7638,6 +8069,11 @@ export interface operations {
                  *     one. Left out otherwise.
                  */
                 hidden?: boolean;
+                /**
+                 * @description Only the ones proposed to the person (Found, a match of 75 or more,
+                 *     open to them), best match first.
+                 */
+                proposed?: boolean;
             };
             header?: never;
             path?: never;
@@ -7953,6 +8389,78 @@ export interface operations {
             };
             /** @description `not_found` */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.brief_paste": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasteRequest"];
+            };
+        };
+        responses: {
+            /** @description The brief, with the facts of the pasted text. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Brief"];
+                };
+            };
+            /** @description `invalid_text`; `company_unknown` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `company_reads_daily_cap` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `ai_unavailable`; `ai_daily_limit_reached`; `ai_budget_reached`; `ai_failed` */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -8527,6 +9035,71 @@ export interface operations {
                 };
             };
             /** @description `draft_frozen` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "pipeline.cv_hide_position": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The opportunity. */
+                id: string;
+                /** @description The draft. */
+                n: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HidePositionRequest"];
+            };
+        };
+        responses: {
+            /** @description The CV, without that position. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cv"];
+                };
+            };
+            /** @description `invalid_request` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: no such draft or position */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `draft_frozen`; `already_on_cv` */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -10490,6 +11063,300 @@ export interface operations {
             };
             /** @description `not_found`: no such assumption */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.fact_proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The proposals. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactProposalsView"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.fact_undo_batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The Keep all (`batch.id`). */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The proposals, after the undo. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactProposalsView"];
+                };
+            };
+            /** @description `invalid_profile`: the profile would break a limit */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: no such Keep all */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `undo_expired`: kept more than a day ago */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.fact_keep_all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The proposals, after they were kept. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactProposalsView"];
+                };
+            };
+            /** @description `invalid_profile`: the profile would break a limit */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.fact_drop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The proposal. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The proposals, after it was dropped. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactProposalsView"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `proposal_not_open`: already kept */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.fact_keep": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The proposal. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The proposals, after it was kept. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactProposalsView"];
+                };
+            };
+            /** @description `invalid_profile`: the profile would break a limit */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `proposal_not_open`: already kept or dropped; `profile_changed`: its job is no longer on the profile */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.fact_undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The proposal. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The proposals, after the undo. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactProposalsView"];
+                };
+            };
+            /** @description `invalid_profile`: the profile would break a limit */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `proposal_not_decided`: nothing to undo; `undo_expired`: decided more than a day ago */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -17,11 +17,13 @@ function WaitingCard({ item, actions }: { item: CvWaiting; actions: LineActions 
   const proposal = item.proposal ?? undefined;
   const company = item.company ?? undefined;
   const question = item.question ?? undefined;
-  // Where the line comes from, in the person's own words.
+  // Where the line comes from: what they told the app, or their profile's words.
   const where =
     skill || company === undefined || quote === undefined
       ? undefined
-      : t("cv.waiting.toldUs", { company, quote });
+      : item.quote_from === "you"
+        ? t("cv.waiting.toldUs", { company, quote })
+        : t("cv.waiting.profileSays", { company, quote });
   // What a yes keeps, word for word, or why there is no yes.
   let keeps: string;
   if (skill) {

@@ -141,8 +141,7 @@ pub struct Letter {
 #[derive(Debug, Clone, Default, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct LetterDraftRequest {
-    /// A language tag such as `pt-PT`; the posting's when it says, else
-    /// English.
+    /// A language tag such as `pt-PT`; when left out, the approved CV's.
     #[serde(default)]
     pub language: Option<String>,
     /// `short` (about 180 words, the default) or `standard` (about 300).
@@ -250,15 +249,17 @@ async fn drafts_today(db: &PgPool, account: Uuid, now: DateTime<Utc>) -> Result<
     .await?)
 }
 
-/// The approved CV a letter sits next to: its version and its words.
+/// The approved CV a letter sits next to: its version, its words and the
+/// language it is in.
 struct ApprovedCv {
     version: i32,
     content: sqlx::types::Json<super::model::Content>,
+    language: String,
 }
 
 async fn approved_cv(db: &PgPool, account: Uuid, opp: Uuid) -> Result<Option<ApprovedCv>> {
-    let row: Option<(i32, sqlx::types::Json<super::model::Content>)> = sqlx::query_as(
-        "SELECT version, content FROM pipeline.cv_drafts
+    let row: Option<(i32, sqlx::types::Json<super::model::Content>, String)> = sqlx::query_as(
+        "SELECT version, content, language FROM pipeline.cv_drafts
           WHERE opportunity_id = $1 AND account_id = $2 AND status = 'approved'
             AND version IS NOT NULL
           ORDER BY n DESC LIMIT 1",
@@ -267,7 +268,11 @@ async fn approved_cv(db: &PgPool, account: Uuid, opp: Uuid) -> Result<Option<App
     .bind(account)
     .fetch_optional(db)
     .await?;
-    Ok(row.map(|(version, content)| ApprovedCv { version, content }))
+    Ok(row.map(|(version, content, language)| ApprovedCv {
+        version,
+        content,
+        language,
+    }))
 }
 
 /// Whether a letter can be drafted now, and why not.
@@ -638,7 +643,8 @@ pub(crate) async fn write(
         None => Vec::new(),
     };
     let frame = Frame::build(&profile, &opp.company, &facts);
-    let language = language_of(language, &opp);
+    // The language asked for, else the approved CV's: a letter goes with it.
+    let language = language_of(language.or(Some(cv.language.as_str())), &profile);
     let posting = opp.description.clone().unwrap_or_default();
     let questions = questions::parse(&posting);
     let cv_words = cv_words(&cv.content.0);

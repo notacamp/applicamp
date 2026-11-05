@@ -237,7 +237,7 @@ pub(super) async fn state(
     // The strength as if everything told so far were saved.
     let mut profile = seen.profile.clone();
     let mut goals = seen.goals.clone();
-    super::apply(row, &mut profile, &mut goals, now);
+    super::apply(row, &mut profile, &mut goals, &[], now);
     let strength_now = strength::compute(&profile, &goals).score;
 
     let progress = &row.questions.0;
@@ -661,6 +661,8 @@ pub async fn answer(
     row.questions.0.current = None;
     row.questions.0.updated = added;
     super::put(&mut tx, account, &row, now).await?;
+    // What the answer says, proposed for the profile (Complete your profile).
+    crate::features::facts::queue(&mut tx, account).await?;
     tx.commit().await?;
     super::respond(&state, &research, account).await
 }

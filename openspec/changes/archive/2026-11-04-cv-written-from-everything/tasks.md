@@ -1,0 +1,13 @@
+# Tasks
+- [x] 1 `Role::Write`, `AiConfig.write`, `Gateway::complete_as` and `writer()`; ledger migration; config tests; `.env.example`
+- [x] 2 The port and the server: background, projects, certificates, the languages for work
+- [x] 3 The frame's new sources; prompt version 2; budgets; the judge sorts positions; Put back keeps the order
+- [x] 4 "Earlier" in the PDF data and both templates, four languages; read-back; test
+- [x] 5 The person's language; `suggested_language`
+- [x] 6 The wants pass; `draft.wants`; cost on the draft and `done`; tests
+- [x] 7 Proposals: migration, insert, eligibility, PATCH, list filter; the after-search handler and job; tests
+- [x] 8 Client: the review page of the prototype, four languages; the fake model's richer draft and Earlier; the e2e spec filmed
+- [x] 9 The states: the site could not be read (and paste what it says), the PDF could not be made, the CV being written; no price in button labels
+- [x] 10 OpenAPI regenerated, client types regenerated, changelog entry file (changelog/unreleased/added/73-cv-written-from-everything.md), gates green in CI, recording (UI at 375px and desktop)
+- [x] 11 A question card says whose words its quote is (`quote_from`: "You told us about …" or "Your profile says about …"), in all four languages; #93's review fixes merged in
+- [x] 12 Review fixes (#95): a closed posting is never shortlisted, and the 3 a day hold under a per-account lock with room for one more preparation; the letter follows the approved CV's language; the draft's estimate priced from the gateway (up to four calls); a position taken off is named nowhere (`hidden_positions`, `…/hide-position`, the page's Earlier line from the server); the wants pass only for wants a position or the skills show, within the caps; roles sorted before the cap; first language before a working one; the person's languages for work offered; "Made the PDF" only when made; the copy and docs

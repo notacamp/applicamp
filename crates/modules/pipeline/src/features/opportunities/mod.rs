@@ -212,6 +212,30 @@ pub struct OpportunitySummary {
     pub hidden_reason: Option<HiddenReason>,
     /// Where it is open, as the posting says, to go with the reason.
     pub region_note: Option<String>,
+    /// Proposed to the person: Found, a match of 75 or more, open to them.
+    pub proposed: bool,
+    /// Who shortlisted it, once someone did.
+    pub shortlisted_by: Option<ShortlistedBy>,
+}
+
+/// Who shortlisted an opportunity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ShortlistedBy {
+    /// The person.
+    Person,
+    /// The app, from its proposals (Autonomy "Prepare").
+    App,
+}
+
+impl ShortlistedBy {
+    fn parse(raw: &str) -> Option<Self> {
+        match raw {
+            "person" => Some(Self::Person),
+            "app" => Some(Self::App),
+            _ => None,
+        }
+    }
 }
 
 /// An opportunity, whole: what the side peek shows.
@@ -275,6 +299,10 @@ pub struct Opportunity {
     /// Title, company and location can be typed (an opportunity added by a
     /// link to a site that is not a job board).
     pub editable: bool,
+    /// Proposed to the person: Found, a match of 75 or more, open to them.
+    pub proposed: bool,
+    /// Who shortlisted it, once someone did.
+    pub shortlisted_by: Option<ShortlistedBy>,
 }
 
 /// The pipeline.
@@ -316,6 +344,8 @@ pub(crate) struct Row {
     apply_url: Option<String>,
     expires_at: Option<DateTime<Utc>>,
     source_name: Option<String>,
+    proposed_at: Option<DateTime<Utc>>,
+    shortlisted_by: Option<String>,
 }
 
 /// The columns a [`Row`] reads, as a literal (queries are static strings).
@@ -324,7 +354,7 @@ macro_rules! columns {
         "id, title, company, location, work_mode, url, source, posted_at, salary_text, \
          description, match_score, match_why, match_gaps, reasons_updated, stage, next_step, notes, \
          dismissed, opened_at, created_at, updated_at, remote, open_to_candidate, region_note, \
-         working_languages, hidden_reason, apply_url, expires_at, \
+         working_languages, hidden_reason, apply_url, expires_at, proposed_at, shortlisted_by, \
          (SELECT s.name FROM pipeline.opportunity_sources s \
            WHERE s.opportunity_id = opportunities.id ORDER BY s.seen_at, s.board LIMIT 1) \
          AS source_name"
@@ -337,6 +367,20 @@ impl Row {
             && self.opened_at.is_none()
             && !self.dismissed
             && self.hidden_reason.is_none()
+    }
+
+    fn proposed(&self) -> bool {
+        self.proposed_at.is_some()
+            && self.stage == "found"
+            && !self.dismissed
+            && self.hidden_reason.is_none()
+            && self.open_to_candidate.as_deref() != Some("no")
+    }
+
+    fn shortlisted_by(&self) -> Option<ShortlistedBy> {
+        self.shortlisted_by
+            .as_deref()
+            .and_then(ShortlistedBy::parse)
     }
 
     fn hidden_reason(&self) -> Option<HiddenReason> {
@@ -360,6 +404,8 @@ impl Row {
     fn summary(self) -> OpportunitySummary {
         OpportunitySummary {
             new: self.is_new(),
+            proposed: self.proposed(),
+            shortlisted_by: self.shortlisted_by(),
             match_score: self.match_score(),
             hidden_reason: self.hidden_reason(),
             id: self.id,
@@ -383,6 +429,8 @@ impl Row {
         let editable = self.source == store::LINK;
         Opportunity {
             new: self.is_new(),
+            proposed: self.proposed(),
+            shortlisted_by: self.shortlisted_by(),
             match_score: self.match_score(),
             facts: self.facts(),
             hidden_reason: self.hidden_reason(),
@@ -428,6 +476,9 @@ pub struct ListQuery {
     /// Only the hidden ones: found before the requirement rules, they fail
     /// one. Left out otherwise.
     pub hidden: Option<bool>,
+    /// Only the ones proposed to the person (Found, a match of 75 or more,
+    /// open to them), best match first.
+    pub proposed: Option<bool>,
 }
 
 /// `text` as a `LIKE` pattern matching it anywhere.
@@ -444,7 +495,8 @@ fn contains_pattern(text: &str) -> String {
 /// Every opportunity of the signed-in person, newest first, except the
 /// dismissed ones ("Not for me") and the hidden ones (they fail a hard
 /// requirement; `hidden=true` lists only those, with the reason). Filter by
-/// stage, by text in the role, company or place, or to the new ones.
+/// stage, by text in the role, company or place, to the new ones, or to the
+/// ones proposed to the person (`proposed=true`, best match first).
 #[utoipa::path(
     get,
     path = "/api/v1/opportunities",
@@ -484,7 +536,9 @@ pub async fn list(
             AND (hidden_reason IS NOT NULL) = $5
             AND NOT (stage IN ('found', 'shortlisted') AND expires_at IS NOT NULL
                      AND expires_at < $6)
-          ORDER BY created_at DESC, id DESC
+            AND (NOT $7 OR (proposed_at IS NOT NULL AND stage = 'found'
+                            AND open_to_candidate IS DISTINCT FROM 'no'))
+          ORDER BY CASE WHEN $7 THEN match_score END DESC NULLS LAST, created_at DESC, id DESC
           LIMIT 1000"
     ))
     .bind(principal.account_id)
@@ -493,6 +547,7 @@ pub async fn list(
     .bind(query.new.unwrap_or(false))
     .bind(query.hidden.unwrap_or(false))
     .bind(state.clock.now())
+    .bind(query.proposed.unwrap_or(false))
     .fetch_all(&state.db)
     .await?;
     Ok(Json(OpportunityList {
@@ -851,10 +906,17 @@ pub async fn update(
         || title != row.title
         || company != row.company;
     let updated_at = if changed { now } else { row.updated_at };
+    // A stage moved by the person, or a job set aside, is no longer a
+    // proposal; one they shortlisted is theirs.
+    let moved = stage != previous_stage;
+    let shortlisted_now = previous_stage == "found" && stage != "found";
     let row: Row = sqlx::query_as(concat!(
         "UPDATE pipeline.opportunities
             SET stage = $3, dismissed = $4, next_step = $5, notes = $6, location = $7,
-                title = $8, company = $9, opened_at = $10, updated_at = $11
+                title = $8, company = $9, opened_at = $10, updated_at = $11,
+                proposed_at = CASE WHEN $12 OR $4 THEN NULL ELSE proposed_at END,
+                shortlisted_by = CASE WHEN $13 THEN 'person' ELSE shortlisted_by END,
+                shortlisted_at = CASE WHEN $13 THEN $11 ELSE shortlisted_at END
           WHERE id = $1 AND account_id = $2
       RETURNING ",
         columns!()
@@ -870,6 +932,8 @@ pub async fn update(
     .bind(&company)
     .bind(opened_at)
     .bind(updated_at)
+    .bind(moved)
+    .bind(shortlisted_now)
     .fetch_one(&mut *tx)
     .await?;
     let was_on = previous_stage != "found" && !previous_dismissed;

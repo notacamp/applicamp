@@ -100,6 +100,7 @@ fn content(bullets: &[&str]) -> Content {
             fluency: Some("Fluent".into()),
         }],
         next_line: 10,
+        hidden_positions: vec![],
     }
 }
 
@@ -383,5 +384,28 @@ async fn the_keywords_the_review_showed_as_on_the_cv_must_survive() {
             assert!(checks.reasons().iter().any(|r| r.contains("Kubernetes")));
         }
         other => panic!("expected the keyword to be missing, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn a_position_the_cv_leaves_out_is_named_under_earlier_with_its_years() {
+    let mut cv = content(&BULLETS);
+    cv.experience.retain(|role| role.position == 0);
+    for (tag, heading) in [("en", "Earlier"), ("pt-PT", "Experiência anterior")] {
+        let made = made(&cv, tag, Template::Clean, Length::One)
+            .await
+            .unwrap_or_else(|r| panic!("{tag}: {r:?}"));
+        assert!(
+            made.checks.sections.expected.iter().any(|h| h == heading),
+            "{tag}: {:?}",
+            made.checks.sections.expected
+        );
+        assert!(made.checks.passed(), "{tag}: {:?}", made.checks);
+        let read = readback::extract(&made.bytes).expect("readable");
+        assert!(
+            read.text.contains("Engineer, Sample Labs (2017–2021)"),
+            "{}",
+            read.text
+        );
     }
 }

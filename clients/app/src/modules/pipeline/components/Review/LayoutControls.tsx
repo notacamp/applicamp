@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 
-import { Cluster, Select, Stack, Tagged, Text, ViewSwitch } from "~/lib/ui";
+import { Cluster, Stack, Tagged, Text, ViewSwitch } from "~/lib/ui";
 
 import { LENGTHS, TEMPLATES, type CvLayout } from "../../api/cv";
 import { languageName } from "../../api/labels";
@@ -15,25 +15,30 @@ export function cvLanguage(tag: string): (typeof CV_LANGUAGES)[number] {
 }
 
 /**
- * The look of the PDF (template, pages) and the CV's language. The first two
- * make a PDF from the same text, with no AI; a different language is a new
- * draft, which the note says.
+ * The look of the PDF and the CV's language, as three labelled pairs: Style
+ * (Clean, Compact), Length (1 page, 2 pages) and Language (the CV's and one
+ * other). Style and length make the PDF again from the same text, with no AI;
+ * another language is a new draft, written again with Write it again.
  */
 export function LayoutControls({
   layout,
   onLayout,
   language,
   onLanguage,
+  languages,
   disabled,
 }: {
   layout: CvLayout;
   onLayout: (layout: CvLayout) => void;
   language: string;
   onLanguage: (language: string) => void;
+  /** The languages to choose between: the CV's first. */
+  languages: readonly string[];
   /** Something is running. */
   disabled: boolean;
 }) {
   const { t, i18n } = useTranslation("pipeline");
+  const chosen = cvLanguage(language);
   return (
     <Tagged testId="cv-layout-controls">
       <Stack gap="sm">
@@ -55,6 +60,8 @@ export function LayoutControls({
               }
             }}
           />
+        </Cluster>
+        <Cluster>
           <Text tone="secondary" size="sm">
             {t("cv.layout.length")}
           </Text>
@@ -73,15 +80,24 @@ export function LayoutControls({
               }
             }}
           />
-          <Select
+        </Cluster>
+        <Cluster>
+          <Text tone="secondary" size="sm">
+            {t("cv.layout.language")}
+          </Text>
+          <ViewSwitch
             label={t("cv.layout.language")}
-            options={CV_LANGUAGES.map((tag) => ({
-              value: tag,
+            options={languages.map((tag) => ({
+              value: cvLanguage(tag),
               label: languageName(tag, i18n.language),
+              testId: `cv-language-${cvLanguage(tag)}`,
             }))}
-            value={cvLanguage(language)}
-            onChange={onLanguage}
-            data-testid="cv-language-select"
+            value={chosen}
+            onChange={(tag) => {
+              if (!disabled) {
+                onLanguage(tag);
+              }
+            }}
           />
         </Cluster>
         <Text tone="secondary" size="sm">

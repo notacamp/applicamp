@@ -183,3 +183,42 @@ pub(crate) const LINKEDIN_LINES: [&str; 27] = [
     "Sample University",
     "Master's degree, Computer science, 2012 - 2017",
 ];
+
+/// An invented LinkedIn profile saved as PDF (#72), shaped like the real
+/// thing: the sidebar first (contact, top skills, languages), then the name,
+/// the headline, the About text, and each position as a company, a title, a
+/// dates line and a place line, with bullet lines; then education. A model
+/// that answers a place as a position's summary, or skips education and
+/// languages, is what the import must survive.
+pub(crate) const LINKEDIN_PROFILE_LINES: [&str; 30] = [
+    "Contact",
+    "www.example.com/in/alex-demo",
+    "Top Skills",
+    "Rust",
+    "PostgreSQL",
+    "Team leadership",
+    "Languages",
+    "Portuguese (Native or Bilingual)",
+    "English (Full Professional)",
+    "Alex Demo",
+    "Staff engineer building calm backends",
+    "Lisbon, Portugal",
+    "About",
+    "I build boring, reliable backends for small teams.",
+    "Experience",
+    "Example Org",
+    "Staff Engineer",
+    "Jul 2023 - Present (1 year 4 months)",
+    "Lisbon, Portugal",
+    "- Moved billing to Rust",
+    "- Cut refunds by half",
+    "Sample Labs",
+    "Engineer",
+    "Jun 2017 - Apr 2023 (5 years 11 months)",
+    "Porto, Portugal",
+    "Built the data pipeline for 40 shops.",
+    "Education",
+    "Sample University",
+    "Master's degree, Computer science",
+    "2012 - 2017",
+];

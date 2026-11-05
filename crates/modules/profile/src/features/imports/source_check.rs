@@ -12,7 +12,7 @@ use crate::schema::{Kind, Profile, Values};
 
 /// Month names (full, then abbreviations) per month, in every language the
 /// app speaks. Lower case.
-const MONTHS: [&[&str]; 12] = [
+pub(crate) const MONTHS: [&[&str]; 12] = [
     &[
         "january", "janeiro", "enero", "janvier", "jan", "ene", "janv",
     ],

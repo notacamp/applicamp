@@ -102,10 +102,12 @@ test("someone prepares a job: reads the company's own pages, removes a wrong fac
   await expect(page).toHaveURL(new RegExp(`/pipeline/${id}/prepare$`));
   await expectPageFillsTheScreen(page, "prepare");
 
-  // Nothing has been read: the site is the posting's own host, Read says what it costs.
+  // Nothing has been read: the site is the posting's own host; the line under Read says what
+  // it costs, never the button.
   await expect(page.getByTestId("prepare-site")).toContainText("example-co.test");
   await expect(page.getByTestId("prepare-read")).toContainText(`Read about ${company}`);
-  await expect(page.getByTestId("prepare-read")).toContainText("€0.004");
+  await expect(page.getByTestId("prepare-read")).not.toContainText("€");
+  await expect(page.getByTestId("prepare-read-cost")).toContainText("€0.004");
   await expect(page.getByTestId("prepare-draft-slot")).toBeVisible();
   await expectNoSidewaysScroll(page);
   await expectAccessible(page);

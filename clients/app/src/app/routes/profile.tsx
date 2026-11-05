@@ -17,6 +17,8 @@ export interface ProfileProps {
   onAbout: () => void;
   /** Open "Your LinkedIn". */
   onLinkedIn: () => void;
+  /** Open "Complete your profile". */
+  onComplete: () => void;
 }
 
 /** `/profile`: what agents know about you, how you sign in, and what the AI cost this month. */
@@ -27,6 +29,7 @@ export function Profile({
   onAction,
   onAbout,
   onLinkedIn,
+  onComplete,
 }: ProfileProps) {
   const { t } = useTranslation();
   const me = useMe();
@@ -39,6 +42,7 @@ export function Profile({
         onAction={onAction}
         onAbout={onAbout}
         onLinkedIn={onLinkedIn}
+        onComplete={onComplete}
       />
       {me.data === undefined ? null : (
         <Tagged testId="profile-account">

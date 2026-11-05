@@ -57,6 +57,8 @@
   })
 }
 
+#if data.earlier.len() > 0 { section(data.labels.earlier)[#data.earlier.join(" · ")] }
+
 #if data.skills.len() > 0 { section(data.labels.skills)[#data.skills.join(" · ")] }
 
 #if data.education.len() > 0 {

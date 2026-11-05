@@ -702,7 +702,13 @@ pub(crate) async fn run(deps: &PipelineDeps, db: &PgPool, opp: Uuid) -> Result<(
 }
 
 /// Note a step done by itself.
-async fn record(db: &PgPool, opp: Uuid, step: &str, eur: f64, now: DateTime<Utc>) -> Result<()> {
+pub(crate) async fn record(
+    db: &PgPool,
+    opp: Uuid,
+    step: &str,
+    eur: f64,
+    now: DateTime<Utc>,
+) -> Result<()> {
     sqlx::query(
         "UPDATE pipeline.preparations
             SET done = done || jsonb_build_array(jsonb_build_object('step', $2::text, 'at', $3::timestamptz, 'eur', $4::float8))
@@ -751,8 +757,9 @@ async fn run_step(
                 Next::Run(PreparationStep::Draft) => {}
                 other => return Ok(other),
             }
-            cv::draft(deps, db, account, opp, None, now).await?;
-            record(db, opp, "draft", cv::DRAFT_EUR, now).await?;
+            // What the draft's calls really cost.
+            let cost = cv::draft(deps, db, account, opp, None, now).await?;
+            record(db, opp, "draft", cost, now).await?;
             Ok(Next::Wait(WaitingOn::CvApproval))
         }
         PreparationStep::Letter => {

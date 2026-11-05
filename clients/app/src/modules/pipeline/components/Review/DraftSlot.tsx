@@ -11,7 +11,8 @@ export function blockedReason(cv: Cv): NonNullable<Cv["can_draft"]["reason"]> | 
 }
 
 /**
- * "Draft the CV · about €0.004": the draft's AI call and, at worst, the app's fix round, then the check without AI.
+ * "Draft the CV", its cost on the line under it: the draft's AI calls and, at worst, the app's
+ * fix round, then the check without AI.
  * Off, with its reason, when the job is not yet shortlisted or a cap or a
  * limit is hit. With a draft already made it says "Review the CV".
  */
@@ -61,7 +62,7 @@ export function DraftSlot({
               make.mutate(undefined, onReview === undefined ? {} : { onSuccess: onReview });
             }}
           >
-            {make.isPending ? t("cv.draft.drafting") : t("cv.draft.draft", { cost })}
+            {make.isPending ? t("cv.draft.drafting") : t("cv.draft.draft")}
           </Button>
         ) : (
           <Button
@@ -82,9 +83,11 @@ export function DraftSlot({
         </Tagged>
       ) : null}
       {draft === undefined && reason === undefined ? (
-        <Text tone="secondary" size="sm">
-          {t("cv.draft.hint")}
-        </Text>
+        <Tagged testId={`${testIdPrefix}-draft-cost`}>
+          <Text tone="secondary" size="sm">
+            {t("cv.draft.cost", { cost })} {t("cv.draft.hint")}
+          </Text>
+        </Tagged>
       ) : null}
       {failure === undefined ? null : (
         <Tagged testId={`${testIdPrefix}-draft-failed`}>

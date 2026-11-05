@@ -108,7 +108,9 @@ function bodyOf(request: Request): Promise<unknown> {
 
 function renderPage(routes: Record<string, Stub> = {}, onBack = vi.fn()) {
   const calls = stubApi({ "GET /api/v1/profile/about": { body: view() }, ...routes });
-  renderWithProviders(<AboutYouPage onBack={onBack} spend={<p data-testid="spend">spend</p>} />);
+  renderWithProviders(
+    <AboutYouPage onBack={onBack} onComplete={vi.fn()} spend={<p data-testid="spend">spend</p>} />,
+  );
   return calls;
 }
 

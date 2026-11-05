@@ -76,6 +76,18 @@ pub enum WaitingKind {
     Skill,
 }
 
+/// Where the quote of a waiting line comes from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum QuoteFrom {
+    /// Something the person told the app: a fact of theirs ("You told us
+    /// about …").
+    You,
+    /// Their profile as it came in: a highlight, a summary or a headline of
+    /// their CV ("Your profile says about …").
+    Profile,
+}
+
 /// A line (or skill) the check flagged and the app could not fix: a
 /// question only the person can answer.
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -104,6 +116,9 @@ pub struct Waiting {
     /// them on that position: what "Change it" starts from. None when it
     /// cites none.
     pub quote: Option<String>,
+    /// Whether the quote is something the person told the app or their
+    /// profile's words. None when there is no quote.
+    pub quote_from: Option<QuoteFrom>,
     /// Why it is flagged.
     pub flags: Vec<Reason>,
 }
@@ -160,6 +175,15 @@ pub struct EducationView {
 pub struct LanguageView {
     pub language: String,
     pub fluency: Option<String>,
+}
+
+/// A position the CV names only, under "Earlier", as the PDF prints it.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct EarlierLine {
+    /// For `…/hide-position` and `…/put-back`.
+    pub position: u32,
+    /// "Title, Company (2015–2017)".
+    pub text: String,
 }
 
 /// A position that is not on the CV.
@@ -293,6 +317,10 @@ pub struct CvDraftView {
     pub education: Vec<EducationView>,
     pub languages: Vec<LanguageView>,
     pub left_out: LeftOut,
+    /// The positions named under "Earlier", newest first, as in the PDF:
+    /// every one left out that has a title or a company and that the person
+    /// did not take off.
+    pub earlier: Vec<EarlierLine>,
     /// How many lines (and skills) cannot be traced to the profile.
     pub flagged: u32,
     /// The first of them, as the page shows them.
@@ -313,6 +341,14 @@ pub struct CvDraftView {
     pub needs_version: bool,
     /// Just approved: until then `…/unapprove` puts it back as a draft.
     pub undo_until: Option<DateTime<Utc>>,
+    /// What the job wants, each covered by the CV or why not.
+    pub wants: Vec<super::wants::WantView>,
+    /// What the app's calls for this draft cost, in euros (the draft, the
+    /// second look at what the job wants, the fix of what was flagged).
+    pub cost_eur: Option<f64>,
+    /// The company facts the draft could use: none means it was written
+    /// from the posting and the profile only.
+    pub company_facts: u32,
 }
 
 /// An approved version: the approved text as a PDF.
@@ -415,6 +451,7 @@ fn waiting(content: &Content, frame: &Frame, checks: &Checks) -> Vec<Waiting> {
                     role: None,
                     company: None,
                     quote: None,
+                    quote_from: None,
                     flags,
                 });
             }
@@ -441,8 +478,9 @@ fn waiting(content: &Content, frame: &Frame, checks: &Checks) -> Vec<Waiting> {
                 .filter(|c| !c.trim().is_empty());
             // The person's own words, never the model's or a company's page,
             // from the position the card names (or, with none, the profile's
-            // own summary or headline).
-            let quote = usable_sources(line, place, frame)
+            // own summary or headline): a fact they told the app, or their
+            // profile's.
+            let source = usable_sources(line, place, frame)
                 .iter()
                 .filter_map(|source| frame.get(source))
                 .find(|source| {
@@ -458,8 +496,15 @@ fn waiting(content: &Content, frame: &Frame, checks: &Checks) -> Vec<Waiting> {
                             | SourceKind::Summary
                             | SourceKind::Headline
                     )
-                })
-                .map(|source| source.text.clone());
+                });
+            let quote = source.map(|source| source.text.clone());
+            let quote_from = source.map(|source| {
+                if source.kind == SourceKind::Fact {
+                    QuoteFrom::You
+                } else {
+                    QuoteFrom::Profile
+                }
+            });
             Some(Waiting {
                 line_id: id,
                 kind: WaitingKind::Line,
@@ -470,6 +515,7 @@ fn waiting(content: &Content, frame: &Frame, checks: &Checks) -> Vec<Waiting> {
                 role,
                 company,
                 quote,
+                quote_from,
                 flags,
             })
         })
@@ -813,6 +859,13 @@ pub fn draft_view(
             })
             .collect(),
         left_out,
+        earlier: super::pdf::data::earlier_lines(content, frame)
+            .into_iter()
+            .map(|(position, text)| EarlierLine {
+                position: to_u32(position),
+                text,
+            })
+            .collect(),
         flagged: to_u32(flagged_ids.len()),
         first_flagged: flagged_ids.first().cloned(),
         can_approve: draft && flagged_ids.is_empty(),
@@ -827,6 +880,15 @@ pub fn draft_view(
         preview: None,
         needs_version: false,
         undo_until: None,
+        wants: super::wants::wants_view(wants, title, posting, content, frame),
+        cost_eur: None,
+        company_facts: to_u32(
+            frame
+                .sources
+                .iter()
+                .filter(|s| s.kind == SourceKind::Company)
+                .count(),
+        ),
     }
 }
 
@@ -875,6 +937,10 @@ mod tests {
                         title: Some("Senior Engineer".into()),
                         company: Some("Example Org".into()),
                         highlights: vec!["Rebuilt billing in Rust".into()],
+                        facts: vec![crate::ports::CvFact {
+                            id: "11111111-aaaa".into(),
+                            text: "Moved invoicing onto PostgreSQL".into(),
+                        }],
                         ..CvPosition::default()
                     },
                     CvPosition {
@@ -908,6 +974,11 @@ mod tests {
                     line("l1", "Rebuilt billing in Rust for 12 teams", &["w0.h1"]),
                     line("l2", "Built ingestion for 3 partner feeds", &["w1.h1"]),
                     line("l3", long.trim(), &["w0.h1"]),
+                    line(
+                        "l4",
+                        "Moved invoicing onto PostgreSQL in 3 weeks",
+                        &["w0.f11111111"],
+                    ),
                 ],
             }],
             ..Content::default()
@@ -921,6 +992,15 @@ mod tests {
         assert_eq!(item("s1").company.as_deref(), Some("Example Org"));
         assert_eq!(item("s1").quote.as_deref(), Some("Rebuilt billing in Rust"));
         assert_eq!(item("l1").quote.as_deref(), Some("Rebuilt billing in Rust"));
+        // A highlight is the profile's words, not something told to the app.
+        assert_eq!(item("l1").quote_from, Some(QuoteFrom::Profile));
+        // A fact the person kept: what they told the app.
+        assert_eq!(
+            item("l4").quote.as_deref(),
+            Some("Moved invoicing onto PostgreSQL")
+        );
+        assert_eq!(item("l4").quote_from, Some(QuoteFrom::You));
+        assert_eq!(item("l2").quote_from, None);
         assert_eq!(item("l1").cannot_keep, None);
         assert_eq!(
             item("l1").proposal.as_deref(),

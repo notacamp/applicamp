@@ -31,6 +31,9 @@ export type BoardKey = Schema<"BoardKey">;
 export type ScanRun = Schema<"ScanRun">;
 export type ScanLine = Schema<"ScanLine">;
 export type ScanPage = Schema<"ScanPage">;
+/** What a search did with the jobs it read: the four numbers and why the others were left out. */
+export type SearchFunnel = Schema<"SearchFunnel">;
+export type JobsLeftOut = Schema<"JobsLeftOut">;
 
 export const BOARDS_QUERY_KEY = ["boards"] as const;
 const LIST_KEY = [...BOARDS_QUERY_KEY, "list"] as const;

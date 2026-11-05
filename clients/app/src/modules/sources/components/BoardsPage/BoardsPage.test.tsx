@@ -491,34 +491,6 @@ describe("the boards page", () => {
     expect(await screen.findByTestId("boards-load-error")).toBeVisible();
   });
 
-  it("shows what each search and discovery run scanned, older runs on demand", async () => {
-    fakeBoards(false);
-    renderPage("scanned");
-    const runs = await screen.findAllByTestId("scanned-run");
-    expect(runs[0]).toHaveTextContent("nightly search");
-    const lines = within(runs[0] ?? document.body).getAllByTestId("scanned-line");
-    expect(lines[0]).toHaveTextContent(
-      "Himalayas: 412 read → 30 passed your requirements → 30 scored by AI → 9 matched",
-    );
-    expect(lines[1]).toHaveTextContent("Remotive: skipped (polling limit)");
-    expect(lines[2]).toHaveTextContent("Jobicy: couldn’t be read (rate_limited)");
-    const user = userEvent.setup();
-    await user.click(screen.getByTestId("scanned-more"));
-    await waitFor(() => {
-      expect(screen.getAllByTestId("scanned-run")).toHaveLength(2);
-    });
-    expect(screen.getAllByTestId("scanned-run")[1]).toHaveTextContent(
-      "Example Remote: checked · Feed at /feed.xml",
-    );
-    expect(screen.queryByTestId("scanned-more")).toBeNull();
-    await user.selectOptions(screen.getByTestId("scanned-board-filter"), HIMALAYAS);
-    await waitFor(() => {
-      expect(screen.getByTestId("scanned-board-filter")).toHaveValue(HIMALAYAS);
-    });
-    await user.click(screen.getByTestId("boards-tab-boards"));
-    expect(await screen.findByTestId("boards-section-approved")).toBeVisible();
-  });
-
   it("shows a hiring system and a company page by their kind, in plain words", async () => {
     stubApi({
       "GET /api/v1/boards": {

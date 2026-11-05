@@ -35,8 +35,8 @@
 //!   whenever the built-in table does not know the model: an unknown model is
 //!   priced high, so a CV's estimate and its reservations are high too.
 //! - Spending limits in euros ([`BudgetConfig`]):
-//!   `APPLICAMP_AI__BUDGET__ACCOUNT_DAILY_EUR` (default 0.30),
-//!   `…__ACCOUNT_MONTHLY_EUR` (3), `…__INSTANCE_MONTHLY_EUR` (15), each `0`
+//!   `APPLICAMP_AI__BUDGET__ACCOUNT_DAILY_EUR` (default 1),
+//!   `…__ACCOUNT_MONTHLY_EUR` (10), `…__INSTANCE_MONTHLY_EUR` (15), each `0`
 //!   for no limit, and `…__USD_TO_EUR` (0.92), the fixed rate dollars are
 //!   converted at.
 //!
@@ -62,10 +62,12 @@ pub const DEFAULT_DAILY_TOKENS: u64 = 200_000;
 /// The reasoning effort sent to OpenRouter unless configured: enough to
 /// answer well, short enough to leave room for the answer.
 pub const DEFAULT_REASONING_EFFORT: &str = "low";
-/// What one account may spend per UTC day, in euros, by default.
-pub const DEFAULT_ACCOUNT_DAILY_EUR: f64 = 0.30;
+/// What one account may spend per UTC day, in euros, by default: a night's
+/// search (a quick look at every job within the limits, the best 100 read
+/// in full) costs a few cents, a tailored CV a few more (#74).
+pub const DEFAULT_ACCOUNT_DAILY_EUR: f64 = 1.0;
 /// What one account may spend per calendar month (UTC), in euros, by default.
-pub const DEFAULT_ACCOUNT_MONTHLY_EUR: f64 = 3.0;
+pub const DEFAULT_ACCOUNT_MONTHLY_EUR: f64 = 10.0;
 /// What the whole instance may spend per calendar month (UTC), in euros, by
 /// default: every account and every role together.
 pub const DEFAULT_INSTANCE_MONTHLY_EUR: f64 = 15.0;
@@ -580,14 +582,9 @@ mod tests {
     #[test]
     fn the_budget_has_defaults_and_zero_is_no_limit() {
         let config = load(serde_json::json!({})).unwrap();
-        assert_eq!(
-            config.budget.account_daily_eur(),
-            Some(DEFAULT_ACCOUNT_DAILY_EUR)
-        );
-        assert_eq!(
-            config.budget.account_monthly_eur(),
-            Some(DEFAULT_ACCOUNT_MONTHLY_EUR)
-        );
+        // €1 a day and €10 a month per account (#74), €15 a month for all.
+        assert_eq!(config.budget.account_daily_eur(), Some(1.0));
+        assert_eq!(config.budget.account_monthly_eur(), Some(10.0));
         assert_eq!(
             config.budget.instance_monthly_eur(),
             Some(DEFAULT_INSTANCE_MONTHLY_EUR)

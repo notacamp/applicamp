@@ -3,7 +3,7 @@
   "starting": "A começar…",
   "confirm": {
     "title": "Pesquisar agora nos sites de emprego?",
-    "body": "Esta pesquisa vai custar cerca de {{cost}} de IA para avaliar cerca de {{jobs}} ofertas. Continuar?",
+    "body": "Esta pesquisa vai custar cerca de {{cost}} de IA para ver cerca de {{jobs}} ofertas. Continuar?",
     "go": "Pesquisar",
     "cancel": "Agora não"
   },
@@ -47,7 +47,7 @@
     "tabs": {
       "label": "Vista dos portais",
       "boards": "Portais",
-      "scanned": "Analisado"
+      "scanned": "Pesquisas"
     },
     "loading": "A carregar os portais de emprego…",
     "loadFailed": "Não foi possível carregar os portais de emprego.",
@@ -290,25 +290,64 @@
     }
   },
   "scanned": {
-    "lead": "O que cada pesquisa e a descoberta semanal analisaram, portal a portal.",
-    "filter": "Portal",
-    "allBoards": "Todos os portais",
-    "loading": "A carregar o que foi analisado…",
-    "loadFailed": "Não foi possível carregar o que foi analisado.",
-    "emptyTitle": "Ainda nada analisado",
-    "emptyBody": "Depois de uma pesquisa, cada portal lido aparece aqui: ofertas lidas, que cumprem os seus requisitos, avaliadas pela IA, correspondências e o custo da IA.",
-    "more": "Mostrar anteriores",
+    "lead": "O que cada pesquisa encontrou.",
+    "loading": "A carregar as pesquisas…",
+    "loadFailed": "Não foi possível carregar as pesquisas.",
+    "emptyTitle": "Ainda não há pesquisas",
+    "emptyBody": "Cada pesquisa aparece aqui: as ofertas que leu, as que leu por inteiro, as boas correspondências e quanto custou.",
+    "lastNight": "Ontem à noite · {{date}}",
     "today": "Hoje {{time}}",
-    "discovery": "{{at}} · descoberta",
-    "search": "{{at}} · {{kind}} · {{cost}}",
-    "nightlySearch": "pesquisa noturna",
-    "manualSearch": "pesquisa",
-    "line": {
-      "read": "{{name}}: {{read}} lidas → {{passed}} cumprem os seus requisitos → {{scored}} avaliadas pela IA → {{matched}} correspondências · IA {{cost}}",
-      "skipped": "{{name}}: saltado (limite de leituras), usada a última resposta: {{read}} lidas → {{passed}} cumprem → {{scored}} avaliadas → {{matched}} correspondências",
-      "error": "{{name}}: não foi possível ler ({{error}})",
-      "checked": "{{name}}: verificado · {{note}}"
-    }
+    "manual": "Pesquisaste · {{at}}",
+    "discovery": "Procurou novos sites de emprego · {{date}}",
+    "sitesChecked_one": "{{count}} site verificado",
+    "sitesChecked_other": "{{count}} sites verificados",
+    "figures": {
+      "read_one": "oferta lida",
+      "read_other": "ofertas lidas",
+      "readInFull": "lidas por inteiro",
+      "goodMatches_one": "boa correspondência",
+      "goodMatches_other": "boas correspondências",
+      "cost": "custo"
+    },
+    "from": "De onde vieram as correspondências",
+    "noMatches": "Desta vez não houve boas correspondências.",
+    "companySites": "Sites das empresas",
+    "leftOut": "Porque ficaram de fora",
+    "reasons": {
+      "seen_before": "Já vistas antes",
+      "too_old": "Antigas, ou já fechadas",
+      "not_remote": "Não são remotas, ou não são onde podes trabalhar",
+      "quick_look": "Não servem, pelo título e pelo resumo",
+      "language": "Numa língua em que não trabalhas",
+      "not_open_to_location": "Só contratam noutros países",
+      "below_floor": "Pagam menos do que pediste",
+      "not_good_enough": "Lidas por inteiro, não são boas correspondências",
+      "waiting": "Ficaram para a próxima pesquisa"
+    },
+    "count": "{{label}} · {{n}}",
+    "keptWithNote_one": "{{count}} das {{total}} lidas por inteiro não diz onde contrata. Fica, com uma nota.",
+    "keptWithNote_other": "{{count}} das {{total}} lidas por inteiro não dizem onde contratam. Ficam, com uma nota.",
+    "bySite": "Ver por site",
+    "hideBySite": "Esconder por site",
+    "site": {
+      "read": "Lidas: {{read}} · De relance: {{quick}} · Lidas por inteiro: {{full}} · Boas correspondências: {{matched}} · Custo: {{cost}}",
+      "skipped": "Não foi lido outra vez tão cedo: usaram-se as últimas ofertas.",
+      "partial": "Lidas {{pages}} páginas. A página {{page}} não respondeu.",
+      "error": "Não foi possível ler: {{error}}",
+      "checked": "Verificado · {{note}}"
+    },
+    "errors": {
+      "noAnswer": "o site não respondeu.",
+      "slowDown": "o site pediu à app para ir mais devagar.",
+      "needsKey": "precisa de uma chave.",
+      "badConfig": "as definições não funcionam."
+    },
+    "earlier": "Pesquisas anteriores",
+    "details": "Detalhes",
+    "more": "Ver mais antigas",
+    "nightlyLine": "A app pesquisa todas as noites às 21:00.",
+    "about": "Cerca de {{cost}}.",
+    "running": "A pesquisar agora. Podes sair desta página."
   },
   "companies": {
     "loading": "A carregar as empresas…",

@@ -207,6 +207,38 @@ pub struct BoardRead {
     /// What went wrong ([`FetchError::kind`]).
     pub error: Option<String>,
     pub duration_ms: u32,
+    /// A page after the first that could not be read: the pages before it
+    /// were kept.
+    pub partial: Option<PartialRead>,
+}
+
+/// A board read in part: a page after the first failed, and the pages
+/// before it were kept.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PartialRead {
+    /// The page that failed (2 or more).
+    pub failed_page: u32,
+}
+
+impl PartialRead {
+    /// What the board's scan line says, in a few words: "Read 2 pages. Page
+    /// 3 did not answer."
+    pub fn note(self) -> String {
+        let read = self.failed_page - 1;
+        let pages = if read == 1 { "page" } else { "pages" };
+        format!(
+            "Read {read} {pages}. Page {} did not answer.",
+            self.failed_page
+        )
+    }
+}
+
+/// A JSON API's jobs: what was read, whether every page came from the
+/// cache, and the page that failed after the first, if one did.
+struct ApiRead {
+    jobs: Vec<Job>,
+    cached: bool,
+    partial: Option<PartialRead>,
 }
 
 /// What a search read.
@@ -876,22 +908,30 @@ impl Reader {
         self.job_board_for(db, row, now, fresh_since, &[]).await
     }
 
-    /// [`Self::job_board`] for someone with `skills`: a board that can
-    /// search by skill is also asked for their top skills, one query each.
+    /// [`Self::job_board`] for someone with `queries` (their roles' key
+    /// words and top skills, [`crate::matching::board_queries`]): a board
+    /// that can search by keyword is also asked for each, one page each, at
+    /// most [`crate::matching::MAX_QUERIES`].
     pub async fn job_board_for(
         &self,
         db: &PgPool,
         row: &BoardRow,
         now: DateTime<Utc>,
         fresh_since: DateTime<Utc>,
-        skills: &[String],
+        queries: &[String],
     ) -> BoardRead {
         let started = Instant::now();
         let board = BoardRef::of(row);
-        let result = self.read_board(db, row, &board, now, skills).await;
+        let result = self.read_board(db, row, &board, now, queries).await;
         let duration_ms = u32::try_from(started.elapsed().as_millis()).unwrap_or(u32::MAX);
+        let mut partial = None;
         let (jobs, outcome, error) = match result {
-            Ok((jobs, cached)) => {
+            Ok(ApiRead {
+                jobs,
+                cached,
+                partial: part,
+            }) => {
+                partial = part;
                 if cached {
                     let read_lately = row.last_fetch_at.is_some_and(|at| at >= fresh_since);
                     let outcome = if read_lately {
@@ -939,37 +979,40 @@ impl Reader {
             outcome,
             error,
             duration_ms,
+            partial,
         }
     }
 
-    /// The jobs of the approved boards `rows`, one board after the other.
+    /// The jobs of the approved boards `rows`, one board after the other,
+    /// each asked for `queries` when it can search by keyword.
     pub async fn job_boards(
         &self,
         db: &PgPool,
         rows: &[BoardRow],
         now: DateTime<Utc>,
         fresh_since: DateTime<Utc>,
-        skills: &[String],
+        queries: &[String],
     ) -> Vec<BoardRead> {
         let mut reads = Vec::with_capacity(rows.len());
         for row in rows
             .iter()
             .filter(|r| self.inner.config.is_enabled(&r.slug))
         {
-            reads.push(self.job_board_for(db, row, now, fresh_since, skills).await);
+            reads.push(self.job_board_for(db, row, now, fresh_since, queries).await);
         }
         reads
     }
 
-    /// `row`'s jobs, and whether every answer came from the cache.
+    /// `row`'s jobs, whether every answer came from the cache, and a page
+    /// that failed after the first.
     async fn read_board(
         &self,
         db: &PgPool,
         row: &BoardRow,
         board: &BoardRef,
         now: DateTime<Utc>,
-        skills: &[String],
-    ) -> Result<(Vec<Job>, bool), FetchError> {
+        queries: &[String],
+    ) -> Result<ApiRead, FetchError> {
         if row.backoff_until.is_some_and(|until| until > now) {
             return Err(FetchError::BackingOff);
         }
@@ -979,38 +1022,50 @@ impl Reader {
         let secret =
             board_keys::query(self.keys(), row, &config).map_err(|_| FetchError::NeedsKey)?;
         let mut ttl = config.poll().to_std().unwrap_or(Duration::from_secs(3_600));
+        let whole = |(jobs, cached): (Vec<Job>, bool)| ApiRead {
+            jobs,
+            cached,
+            partial: None,
+        };
         match kind {
             Kind::JsonApi => {
-                let stack = config.stack_queries(skills);
+                let asked = query_values(&config, queries);
                 if let Some(per_day) = row.terms().max_fetches_per_day.filter(|n| *n > 0)
-                    && !stack.is_empty()
+                    && !asked.is_empty()
                 {
-                    ttl = stack_ttl(ttl, per_day, stack.len());
+                    ttl = stack_ttl(ttl, per_day, asked.len());
                 }
-                let (mut jobs, mut cached) =
-                    self.json_api(db, &config, board, ttl, &secret).await?;
-                for value in &stack {
+                let mut read = self
+                    .json_api(db, &config, board, ttl, &secret, &row.slug)
+                    .await?;
+                for value in &asked {
                     let Some(extra) = config.for_skill(value) else {
                         break;
                     };
-                    match self.json_api(db, &extra, board, ttl, &secret).await {
-                        Ok((more, was_cached)) => {
-                            cached &= was_cached;
-                            jobs.extend(more);
+                    match self
+                        .json_api(db, &extra, board, ttl, &secret, &row.slug)
+                        .await
+                    {
+                        Ok(more) => {
+                            read.cached &= more.cached;
+                            read.jobs.extend(more.jobs);
                         }
                         Err(e) => {
                             // The plain read stands; ask no more.
-                            tracing::info!(board = %row.slug, error = %e.kind(), "a stack query failed");
+                            tracing::info!(board = %row.slug, error = %e.kind(), "a board query failed");
                             break;
                         }
                     }
                 }
                 let mut seen = std::collections::HashSet::new();
-                jobs.retain(|job| seen.insert(job.source_ref.clone()));
-                Ok((jobs, cached))
+                read.jobs.retain(|job| seen.insert(job.source_ref.clone()));
+                Ok(read)
             }
-            Kind::Rss => self.feed(db, &config, board, ttl, &secret).await,
-            Kind::JsonldSitemap => self.sitemap(db, &config, row, board, ttl, &secret).await,
+            Kind::Rss => self.feed(db, &config, board, ttl, &secret).await.map(whole),
+            Kind::JsonldSitemap => self
+                .sitemap(db, &config, row, board, ttl, &secret)
+                .await
+                .map(whole),
             Kind::HiringSystem | Kind::CompanyPage => Err(FetchError::BadConfig),
             Kind::Hn => {
                 let (mut jobs, cached) = self.hn_with(db, ttl).await?;
@@ -1025,12 +1080,15 @@ impl Reader {
                         ..BoardJob::default()
                     });
                 }
-                Ok((jobs, cached))
+                Ok(whole((jobs, cached)))
             }
         }
     }
 
-    /// A JSON API's jobs, page after page (by cursor or page number).
+    /// A JSON API's jobs, page after page (by cursor or page number). A page
+    /// after the first that fails (an error, or an answer that is not the
+    /// JSON expected) ends the reading and keeps the pages before it; a
+    /// first page that fails fails the board.
     async fn json_api(
         &self,
         db: &PgPool,
@@ -1038,11 +1096,13 @@ impl Reader {
         board: &BoardRef,
         ttl: Duration,
         secret: &[(String, String)],
-    ) -> Result<(Vec<Job>, bool), FetchError> {
+        slug: &str,
+    ) -> Result<ApiRead, FetchError> {
         let endpoint = config.endpoint.as_ref().ok_or(FetchError::BadConfig)?;
         let mut jobs = Vec::new();
         let mut cached = true;
         let mut cursor: Option<String> = None;
+        let mut partial = None;
         for page in 1..=config.pages() {
             let mut url = endpoint.clone();
             {
@@ -1060,18 +1120,38 @@ impl Reader {
             if url.query() == Some("") {
                 url.set_query(None);
             }
-            let got = self
-                .get_board(db, &url, ttl, config.spacing(), secret)
-                .await?;
-            cached &= got.cached;
-            let answer: serde_json::Value =
-                serde_json::from_slice(&got.body).map_err(|_| FetchError::Unexpected)?;
-            let items = match config.items.as_deref() {
+            let read = async {
+                let got = self
+                    .get_board(db, &url, ttl, config.spacing(), secret)
+                    .await?;
+                let answer: serde_json::Value =
+                    serde_json::from_slice(&got.body).map_err(|_| FetchError::Unexpected)?;
+                Ok::<_, FetchError>((got.cached, answer))
+            }
+            .await;
+            let (was_cached, answer) = match read {
+                Ok(read) => read,
+                Err(e) if page > 1 => {
+                    // The pages before it stand.
+                    tracing::info!(board = %slug, page, error = %e.kind(), "a job board's page could not be read; the pages before it are kept");
+                    partial = Some(PartialRead { failed_page: page });
+                    break;
+                }
+                Err(e) => return Err(e),
+            };
+            cached &= was_cached;
+            let Some(items) = match config.items.as_deref() {
                 Some(pointer) if !pointer.is_empty() => answer.pointer(pointer),
                 _ => Some(&answer),
             }
-            .and_then(serde_json::Value::as_array)
-            .ok_or(FetchError::Unexpected)?;
+            .and_then(serde_json::Value::as_array) else {
+                if page > 1 {
+                    tracing::info!(board = %slug, page, "a job board's page is not as expected; the pages before it are kept");
+                    partial = Some(PartialRead { failed_page: page });
+                    break;
+                }
+                return Err(FetchError::Unexpected);
+            };
             let skip = usize::from(config.skip_first && page == 1);
             let before = jobs.len();
             jobs.extend(
@@ -1101,7 +1181,11 @@ impl Reader {
                 break;
             }
         }
-        Ok((jobs, cached))
+        Ok(ApiRead {
+            jobs,
+            cached,
+            partial,
+        })
     }
 
     /// A feed's jobs.
@@ -1255,6 +1339,28 @@ impl Reader {
         };
         Ok(job.map(|job| (job, board)))
     }
+}
+
+/// The values to ask `config`'s board for, one query each: `queries` as the
+/// board spells them, without repeats, at most
+/// [`crate::matching::MAX_QUERIES`]. None for a board that cannot search by
+/// keyword.
+fn query_values(config: &BoardConfig, queries: &[String]) -> Vec<String> {
+    let Some(search) = &config.skill_search else {
+        return Vec::new();
+    };
+    let mut values: Vec<String> = Vec::new();
+    for query in queries {
+        if values.len() == crate::matching::MAX_QUERIES {
+            break;
+        }
+        if let Some(value) = search.value_of(query)
+            && !values.contains(&value)
+        {
+            values.push(value);
+        }
+    }
+    values
 }
 
 /// How long each address of a board is reused when `extra` stack queries

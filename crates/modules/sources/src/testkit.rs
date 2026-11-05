@@ -39,7 +39,8 @@ use crate::{
     matching::MatchInput,
     module,
     ports::{
-        Attach, CompanyFact, KnownLinks, MatchedPosting, Neighbours, Scored, Unchecked, Unreasoned,
+        Attach, CompanyFact, HiddenUnclear, KnownLinks, MatchedPosting, Neighbours, Scored,
+        Unchecked, Unreasoned,
     },
     readers::Board,
     requirements::{Excluded, Facts, Reach},
@@ -93,6 +94,11 @@ pub(crate) struct Fake {
     pub(crate) matched: Mutex<Vec<MatchedPosting>>,
     /// Facts read on companies' sites.
     pub(crate) facts: Mutex<Vec<CompanyFact>>,
+    /// Opportunities hidden because their posting did not say where it
+    /// hires.
+    pub(crate) hidden_unclear: Mutex<Vec<HiddenUnclear>>,
+    /// The ones shown again: the opportunity and the gaps added.
+    pub(crate) shown: Mutex<Vec<(Uuid, Vec<String>)>>,
 }
 
 impl Fake {
@@ -351,6 +357,41 @@ impl Neighbours for Fake {
         items.sort_by_key(|item| item.opportunity);
         items.truncate(most);
         Box::pin(async move { Ok(items) })
+    }
+
+    fn hidden_unclear<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        after: Uuid,
+        most: usize,
+    ) -> BoxFuture<'a, Result<Vec<HiddenUnclear>>> {
+        let mut items: Vec<HiddenUnclear> = lock(&self.hidden_unclear)
+            .iter()
+            .filter(|item| item.opportunity > after)
+            .cloned()
+            .collect();
+        items.sort_by_key(|item| item.opportunity);
+        items.truncate(most);
+        Box::pin(async move { Ok(items) })
+    }
+
+    fn show_with_gaps<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        _account: Uuid,
+        opportunity: Uuid,
+        gaps: Vec<String>,
+    ) -> BoxFuture<'a, Result<bool>> {
+        let shown = {
+            let mut hidden = lock(&self.hidden_unclear);
+            let before = hidden.len();
+            hidden.retain(|item| item.opportunity != opportunity);
+            hidden.len() < before
+        };
+        if shown {
+            lock(&self.shown).push((opportunity, gaps));
+        }
+        Box::pin(async move { Ok(shown) })
     }
 
     fn set_reasons<'a>(

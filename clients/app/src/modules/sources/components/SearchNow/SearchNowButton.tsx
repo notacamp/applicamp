@@ -19,6 +19,8 @@ export interface SearchNowButtonProps {
   variant?: "primary" | "secondary" | undefined;
   /** Start at once, as if pressed (⌘K's "Search now" landed here); then `onAutoStarted`. */
   autoStart?: boolean | undefined;
+  /** Show its keyboard shortcut on the button (not on the Searches tab: plain words only). */
+  showShortcut?: boolean | undefined;
   onAutoStarted?: (() => void) | undefined;
 }
 
@@ -32,6 +34,7 @@ export function SearchNowButton({
   variant = "primary",
   autoStart = false,
   onAutoStarted,
+  showShortcut = true,
 }: SearchNowButtonProps) {
   const { t, i18n } = useTranslation("sources");
   const queryClient = useQueryClient();
@@ -101,7 +104,7 @@ export function SearchNowButton({
       <Button
         variant={variant}
         icon="search"
-        shortcut="sources.start"
+        shortcut={showShortcut ? "sources.start" : undefined}
         disabled={checking || start.isPending}
         data-testid={testId}
         onClick={request}

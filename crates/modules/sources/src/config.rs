@@ -36,6 +36,7 @@
 //! | `APPLICAMP_SOURCES__MANUAL_EVERY_SECS` | `900` (`0` for no spacing) |
 //! | `APPLICAMP_SOURCES__NIGHTLY` | `true` (21:00 Europe/Lisbon) |
 //! | `APPLICAMP_SOURCES__WATCH_EVERY_SECS` | `72000` (a watched company's board is read at most this often; `0` reads it in every search) |
+//! | `APPLICAMP_SOURCES__FULL_SCORES_PER_SEARCH` | `100` (jobs one search reads in full, at most, the best of its quick looks) |
 
 use std::path::PathBuf;
 
@@ -112,6 +113,9 @@ pub struct SourcesConfig {
     /// Seconds between two reads of one watched company's job board.
     #[serde(default, deserialize_with = "number")]
     pub watch_every_secs: Option<u64>,
+    /// Jobs one search reads in full, at most.
+    #[serde(default, deserialize_with = "number")]
+    pub full_scores_per_search: Option<u64>,
     /// Workable's widget API.
     #[serde(default = "workable_url")]
     pub workable_url: Url,
@@ -208,6 +212,7 @@ impl Default for SourcesConfig {
             manual_every_secs: None,
             nightly: None,
             watch_every_secs: None,
+            full_scores_per_search: None,
             workable_url: workable_url(),
             recruitee_url: recruitee_url(),
             teamtailor_url: teamtailor_url(),
@@ -426,6 +431,12 @@ impl SourcesConfig {
         let secs = self.watch_every_secs.unwrap_or(20 * 3600);
         chrono::TimeDelta::seconds(i64::try_from(secs).unwrap_or(i64::MAX))
     }
+
+    /// Jobs one search reads in full, at most: the best of its quick looks
+    /// (at least one).
+    pub fn full_scores_per_search(&self) -> usize {
+        usize::try_from(self.full_scores_per_search.unwrap_or(100).max(1)).unwrap_or(100)
+    }
 }
 
 /// Comma-separated names; blank is unset.
@@ -523,6 +534,7 @@ mod tests {
             std::time::Duration::from_millis(500)
         );
         assert!(config.nightly());
+        assert_eq!(config.full_scores_per_search(), 100);
     }
 
     #[test]
@@ -536,6 +548,7 @@ mod tests {
             "manual_per_day": 0,
             "manual_every_secs": "0",
             "nightly": "false",
+            "full_scores_per_search": "20",
         }}))
         .unwrap();
         assert!(config.is_enabled("greenhouse"));
@@ -549,6 +562,7 @@ mod tests {
         assert_eq!(config.manual_per_day(), None);
         assert_eq!(config.manual_every(), None);
         assert!(!config.nightly());
+        assert_eq!(config.full_scores_per_search(), 20);
         let err = load(serde_json::json!({ "sources": { "enabled": "Linked In" } })).unwrap_err();
         assert!(err.contains("linked in"), "{err}");
     }

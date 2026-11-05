@@ -3,7 +3,7 @@
   "starting": "Démarrage…",
   "confirm": {
     "title": "Lancer une recherche sur les sites d’emploi ?",
-    "body": "Cette recherche coûtera environ {{cost}} d’IA pour évaluer environ {{jobs}} offres. On y va ?",
+    "body": "Cette recherche coûtera environ {{cost}} d’IA pour regarder environ {{jobs}} offres. On y va ?",
     "go": "Rechercher",
     "cancel": "Pas maintenant"
   },
@@ -47,7 +47,7 @@
     "tabs": {
       "label": "Vue des sites d’emploi",
       "boards": "Sites",
-      "scanned": "Analysé"
+      "scanned": "Recherches"
     },
     "loading": "Chargement des sites d’emploi…",
     "loadFailed": "Les sites d’emploi n’ont pas pu être chargés.",
@@ -290,25 +290,64 @@
     }
   },
   "scanned": {
-    "lead": "Ce que chaque recherche et la découverte hebdomadaire ont analysé, site par site.",
-    "filter": "Site",
-    "allBoards": "Tous les sites",
-    "loading": "Chargement de ce qui a été analysé…",
-    "loadFailed": "Ce qui a été analysé n’a pas pu être chargé.",
-    "emptyTitle": "Rien d’analysé pour l’instant",
-    "emptyBody": "Après une recherche, chaque site lu apparaît ici : offres lues, conformes à vos exigences, notées par l’IA, correspondances et coût de l’IA.",
-    "more": "Afficher les précédentes",
+    "lead": "Ce que chaque recherche a trouvé.",
+    "loading": "Chargement des recherches…",
+    "loadFailed": "Les recherches n’ont pas pu être chargées.",
+    "emptyTitle": "Pas encore de recherche",
+    "emptyBody": "Chaque recherche s’affiche ici : les offres lues, celles lues en entier, les bonnes correspondances et ce qu’elle a coûté.",
+    "lastNight": "Hier soir · {{date}}",
     "today": "Aujourd’hui {{time}}",
-    "discovery": "{{at}} · découverte",
-    "search": "{{at}} · {{kind}} · {{cost}}",
-    "nightlySearch": "recherche de nuit",
-    "manualSearch": "recherche",
-    "line": {
-      "read": "{{name}} : {{read}} lues → {{passed}} conformes à vos exigences → {{scored}} notées par l’IA → {{matched}} correspondances · IA {{cost}}",
-      "skipped": "{{name}} : ignoré (limite de lecture), sa dernière réponse utilisée : {{read}} lues → {{passed}} conformes → {{scored}} notées → {{matched}} correspondances",
-      "error": "{{name}} : lecture impossible ({{error}})",
-      "checked": "{{name}} : vérifié · {{note}}"
-    }
+    "manual": "Vous avez cherché · {{at}}",
+    "discovery": "A cherché de nouveaux sites d’emploi · {{date}}",
+    "sitesChecked_one": "{{count}} site vérifié",
+    "sitesChecked_other": "{{count}} sites vérifiés",
+    "figures": {
+      "read_one": "offre lue",
+      "read_other": "offres lues",
+      "readInFull": "lues en entier",
+      "goodMatches_one": "bonne correspondance",
+      "goodMatches_other": "bonnes correspondances",
+      "cost": "coût"
+    },
+    "from": "D’où viennent les correspondances",
+    "noMatches": "Pas de bonne correspondance cette fois.",
+    "companySites": "Sites des entreprises",
+    "leftOut": "Pourquoi des offres ont été écartées",
+    "reasons": {
+      "seen_before": "Déjà vues",
+      "too_old": "Trop anciennes, ou déjà fermées",
+      "not_remote": "Pas à distance, ou pas là où vous pouvez travailler",
+      "quick_look": "Ne conviennent pas, d’après le titre et le résumé",
+      "language": "Dans une langue où vous ne travaillez pas",
+      "not_open_to_location": "Recrutent seulement dans d’autres pays",
+      "below_floor": "Paient moins que ce que vous demandez",
+      "not_good_enough": "Lues en entier, pas de bonnes correspondances",
+      "waiting": "Laissées pour la prochaine recherche"
+    },
+    "count": "{{label}} · {{n}}",
+    "keptWithNote_one": "{{count}} des {{total}} offres lues en entier ne dit pas où elle recrute. Elle est gardée, avec une note.",
+    "keptWithNote_other": "{{count}} des {{total}} offres lues en entier ne disent pas où elles recrutent. Elles sont gardées, avec une note.",
+    "bySite": "Voir par site",
+    "hideBySite": "Masquer par site",
+    "site": {
+      "read": "Lues : {{read}} · Coup d’œil : {{quick}} · Lues en entier : {{full}} · Bonnes correspondances : {{matched}} · Coût : {{cost}}",
+      "skipped": "Pas relu si tôt : ses dernières offres ont été utilisées.",
+      "partial": "{{pages}} pages lues. La page {{page}} n’a pas répondu.",
+      "error": "Lecture impossible : {{error}}",
+      "checked": "Vérifié · {{note}}"
+    },
+    "errors": {
+      "noAnswer": "le site n’a pas répondu.",
+      "slowDown": "le site a demandé à l’app de ralentir.",
+      "needsKey": "il faut une clé.",
+      "badConfig": "ses réglages ne fonctionnent pas."
+    },
+    "earlier": "Recherches précédentes",
+    "details": "Détails",
+    "more": "Voir les plus anciennes",
+    "nightlyLine": "L’app cherche chaque soir à 21 h 00.",
+    "about": "Environ {{cost}}.",
+    "running": "Recherche en cours. Vous pouvez quitter cette page."
   },
   "companies": {
     "loading": "Chargement des entreprises…",

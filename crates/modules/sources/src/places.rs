@@ -505,6 +505,25 @@ fn country_named(text: &str) -> Option<&'static str> {
         .map(|(code, _)| *code)
 }
 
+/// The English name of the country `code` ("Portugal", "United Kingdom"),
+/// when the table has it.
+pub fn country_name(code: &str) -> Option<String> {
+    let (_, names) = COUNTRIES.iter().find(|(c, _)| *c == code)?;
+    let english = names.first()?;
+    Some(
+        english
+            .split(' ')
+            .map(|word| {
+                let mut chars = word.chars();
+                chars.next().map_or_else(String::new, |first| {
+                    first.to_uppercase().chain(chars).collect()
+                })
+            })
+            .collect::<Vec<_>>()
+            .join(" "),
+    )
+}
+
 /// Whether `code` is an EU member.
 pub fn is_eu(code: &str) -> bool {
     EU.contains(&code)
@@ -525,6 +544,13 @@ pub fn same_place(job: &str, wanted: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_country_is_named_in_english() {
+        assert_eq!(country_name("PT").as_deref(), Some("Portugal"));
+        assert_eq!(country_name("GB").as_deref(), Some("United Kingdom"));
+        assert_eq!(country_name("XX"), None);
+    }
 
     #[test]
     fn countries_are_read_from_names_and_cities() {

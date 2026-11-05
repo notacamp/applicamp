@@ -38,7 +38,10 @@ use uuid::Uuid;
 
 use crate::{
     SourcesDeps, board_keys,
-    features::{discovery::CheckBoard, search::SearchTrigger},
+    features::{
+        discovery::CheckBoard,
+        search::{SearchFunnel, SearchTrigger, funnel_of},
+    },
     job_boards::{
         self, Blocker, BoardConfig, BoardRow, KeySpec, Kind, Origin, Priority, Report, Status,
         Terms, host_of,
@@ -319,14 +322,17 @@ pub struct ScanLine {
     pub jobs_read: u32,
     /// Within the person's requirements on the boards' structured fields.
     pub passed_requirements: u32,
-    /// Scored by the AI (now, or before).
+    /// Given a quick look by the AI.
+    pub quick_looked: u32,
+    /// Read in full by the AI.
     pub scored_by_ai: u32,
     /// Good matches that meet every requirement.
     pub matched: u32,
     pub ai_cost_eur: f64,
     pub error_kind: Option<String>,
     pub duration_ms: u32,
-    /// What a discovery check found.
+    /// What a discovery check found, or which page of a board did not
+    /// answer ("Read 2 pages. Page 3 did not answer.").
     pub note: Option<String>,
 }
 
@@ -340,6 +346,8 @@ pub struct ScanRun {
     pub trigger: Option<SearchTrigger>,
     /// What its AI calls cost, in euros (discovery uses none).
     pub cost_eur: f64,
+    /// What a search did with the jobs it read; none for discovery.
+    pub funnel: Option<SearchFunnel>,
     pub lines: Vec<ScanLine>,
 }
 
@@ -1418,11 +1426,14 @@ pub(crate) async fn unique_slug(db: &PgPool, host: &str) -> Result<String> {
 
 /// What was scanned.
 ///
-/// The person's searches and the discovery runs, newest first, ten a page,
-/// each with what it scanned on every board: jobs read, passed their
-/// requirements, scored by the AI, matched, the AI's cost, or why a board
-/// was skipped (its polling limit) or failed; and what a discovery check
-/// found. Filter by board or by search.
+/// The person's searches and the discovery runs, newest first, ten a page.
+/// A search has its funnel: jobs read, given a quick look, read in full,
+/// good matches, kept with a note, and why the others were left out (with
+/// the matches, they add up to the jobs read). Each run has what it scanned
+/// on every board: jobs read, passed their requirements, given a quick
+/// look, read in full by the AI, matched, the AI's cost, or why a board was
+/// skipped (its polling limit), failed or was read in part; and what a
+/// discovery check found. Filter by board or by search.
 #[utoipa::path(
     get,
     path = "/api/v1/boards/scans",
@@ -1475,6 +1486,7 @@ pub async fn scanned(
                 "nightly" => Some(SearchTrigger::Nightly),
                 _ => None,
             },
+            funnel: (run.kind == "search").then(|| funnel_of(&run)),
             id: run.id,
             at: run.at,
             cost_eur: run.cost_usd * rate,
@@ -1490,6 +1502,7 @@ pub async fn scanned(
                 outcome: ScanOutcome::parse(&row.outcome),
                 jobs_read: n(row.jobs_read),
                 passed_requirements: n(row.passed_requirements),
+                quick_looked: n(row.quick_looked),
                 scored_by_ai: n(row.scored_by_ai),
                 matched: n(row.matched),
                 ai_cost_eur: row.ai_cost_eur,

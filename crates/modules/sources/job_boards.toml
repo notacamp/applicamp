@@ -34,13 +34,14 @@ status = "approved"
 endpoint = "https://himalayas.app/jobs/api"
 items = "/jobs"
 cursor = { param = "cursor", from = "/nextCursor" }
-max_pages = 5
+# Ten pages of its newest jobs (#74: five read only the last day or two).
+max_pages = 10
 poll_minutes = 60
 # Under 60 requests a minute.
 min_interval_ms = 1100
 remote_only = true
 # Its keyword search (`q`, 20 jobs a page, no cursor; read 2026-10-28): one
-# page per top skill.
+# page per query (the person's roles and top skills).
 skill_search = { param = "q", separator = " ", endpoint = "https://himalayas.app/jobs/api/search" }
 
 [board.config.fields]

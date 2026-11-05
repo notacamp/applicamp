@@ -290,7 +290,10 @@ async fn the_providers_cost_is_recorded_and_returned(db: PgPool) {
         (spend.month_eur - 0.000_42 * 0.92).abs() < 1e-9,
         "{spend:?}"
     );
-    assert_eq!(spend.month_limit_eur, Some(3.0));
+    assert_eq!(
+        spend.month_limit_eur,
+        Some(crate::config::DEFAULT_ACCOUNT_MONTHLY_EUR)
+    );
     let instance = gateway.instance_spend(&db, now).await.unwrap();
     assert_eq!(instance.calls, 1);
     assert_eq!(instance.limit_eur, Some(15.0));

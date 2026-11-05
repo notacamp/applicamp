@@ -34,7 +34,7 @@ describe("Search now", () => {
 
     await user.click(screen.getByTestId("search-now"));
     expect(await screen.findByTestId("search-confirm")).toBeInTheDocument();
-    expect(document.body).toHaveTextContent("about €0.07 of AI to score about 40 jobs");
+    expect(document.body).toHaveTextContent("about €0.07 of AI to look at about 40 jobs");
     expect(screen.getByTestId("search-confirm-spend")).toHaveTextContent(
       "AI this month: €0.42 of €3",
     );

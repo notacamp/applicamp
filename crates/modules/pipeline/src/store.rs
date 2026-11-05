@@ -536,6 +536,89 @@ pub async fn set_eligibility(
     Ok(done.rows_affected() == 1)
 }
 
+/// An opportunity hidden for `not_open_to_location` whose posting did not
+/// say whether it is open to where the person lives (#74): the facts kept
+/// on it.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct HiddenUnclearRow {
+    pub id: Uuid,
+    pub account_id: Uuid,
+    pub source: String,
+    pub source_ref: String,
+    pub location: Option<String>,
+    pub remote: Option<String>,
+    pub open_to_candidate: Option<String>,
+    pub region_note: Option<String>,
+    pub working_languages: Option<Vec<String>>,
+}
+
+/// Up to `most` Found or Shortlisted opportunities hidden for
+/// `not_open_to_location` whose posting said `open_to_candidate = unclear`,
+/// with an id after `after`, by id.
+pub async fn hidden_unclear(
+    db: &PgPool,
+    after: Uuid,
+    most: usize,
+) -> Result<Vec<HiddenUnclearRow>> {
+    Ok(sqlx::query_as(
+        "SELECT id, account_id, source, source_ref, location, remote, open_to_candidate,
+                region_note, working_languages
+           FROM pipeline.opportunities
+          WHERE stage IN ('found', 'shortlisted') AND hidden_reason = 'not_open_to_location'
+            AND open_to_candidate = 'unclear' AND id > $1
+          ORDER BY id
+          LIMIT $2",
+    )
+    .bind(after)
+    .bind(i64::try_from(most).unwrap_or(i64::MAX))
+    .fetch_all(db)
+    .await?)
+}
+
+/// Show `account`'s opportunity `id` again, with `gaps` first among its gaps
+/// (at most [`MAX_GAPS`], each once): only while it is still Found or
+/// Shortlisted and hidden for `not_open_to_location`. Nothing else changes.
+/// Whether it was shown.
+pub async fn unhide_with_gaps(
+    db: &PgPool,
+    account: Uuid,
+    id: Uuid,
+    gaps: &[String],
+) -> Result<bool> {
+    let mut tx = db.begin().await?;
+    let current: Option<sqlx::types::Json<Vec<String>>> = sqlx::query_scalar(
+        "SELECT match_gaps FROM pipeline.opportunities
+          WHERE id = $1 AND account_id = $2 AND stage IN ('found', 'shortlisted')
+            AND hidden_reason = 'not_open_to_location'
+          FOR UPDATE",
+    )
+    .bind(id)
+    .bind(account)
+    .fetch_optional(&mut *tx)
+    .await?;
+    let Some(current) = current else {
+        return Ok(false);
+    };
+    let mut all: Vec<String> = Vec::new();
+    for gap in gaps.iter().chain(&current.0) {
+        if !all.contains(gap) {
+            all.push(gap.clone());
+        }
+    }
+    let gaps = tidy_list(&all, MAX_GAPS);
+    sqlx::query(
+        "UPDATE pipeline.opportunities SET hidden_reason = NULL, match_gaps = $3
+          WHERE id = $1 AND account_id = $2",
+    )
+    .bind(id)
+    .bind(account)
+    .bind(sqlx::types::Json(&gaps))
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(true)
+}
+
 /// An opportunity a search found whose reasons were never checked against
 /// the profile (found before #27).
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -1081,5 +1164,86 @@ mod tests {
         assert!(updated);
         assert_eq!(hidden, None, "never hidden");
         assert_eq!(count, 1, "never deleted");
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_job_hidden_for_not_saying_where_it_hires_is_shown_again_with_the_note(db: PgPool) {
+        let account = Uuid::now_v7();
+        let events = EventBus::default();
+        let now = Utc::now();
+        let unclear = |source_ref: &str| Found {
+            gaps: vec!["Kafka".into(), "On call".into()],
+            eligibility: Some(Eligibility {
+                remote: "yes".into(),
+                open_to_candidate: "unclear".into(),
+                ..Eligibility::default()
+            }),
+            ..found(source_ref)
+        };
+        add_found(
+            &db,
+            &events,
+            account,
+            vec![unclear("a:1"), unclear("a:2"), found("a:3")],
+            now,
+        )
+        .await
+        .unwrap();
+        // Hidden by the old rule: the first two for "unclear", the third for
+        // a language.
+        sqlx::query(
+            "UPDATE pipeline.opportunities
+                SET hidden_reason = CASE WHEN source_ref = 'a:3' THEN 'language'
+                                         ELSE 'not_open_to_location' END
+              WHERE account_id = $1",
+        )
+        .bind(account)
+        .execute(&db)
+        .await
+        .unwrap();
+        // One moved on: the person's choice, never touched.
+        sqlx::query(
+            "UPDATE pipeline.opportunities SET stage = 'applying'
+              WHERE account_id = $1 AND source_ref = 'a:2'",
+        )
+        .bind(account)
+        .execute(&db)
+        .await
+        .unwrap();
+
+        let rows = hidden_unclear(&db, Uuid::nil(), 100).await.unwrap();
+        assert_eq!(rows.len(), 1);
+        let row = &rows[0];
+        assert_eq!(row.source_ref, "a:1");
+        assert_eq!(row.remote.as_deref(), Some("yes"));
+        assert!(
+            hidden_unclear(&db, row.id, 100).await.unwrap().is_empty(),
+            "keyset"
+        );
+        let note = vec!["Doesn't say if it hires in Portugal".to_owned()];
+        assert!(unhide_with_gaps(&db, account, row.id, &note).await.unwrap());
+        assert!(
+            !unhide_with_gaps(&db, account, row.id, &note).await.unwrap(),
+            "once"
+        );
+        let (hidden, gaps): (Option<String>, sqlx::types::Json<Vec<String>>) = sqlx::query_as(
+            "SELECT hidden_reason, match_gaps FROM pipeline.opportunities WHERE id = $1",
+        )
+        .bind(row.id)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(hidden, None, "back in view");
+        assert_eq!(
+            gaps.0,
+            ["Doesn't say if it hires in Portugal", "Kafka", "On call"],
+            "the note first"
+        );
+        assert!(
+            hidden_unclear(&db, Uuid::nil(), 100)
+                .await
+                .unwrap()
+                .is_empty()
+        );
     }
 }

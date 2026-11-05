@@ -63,6 +63,7 @@ export {
   type DecisionState,
 } from "./components/DecisionCard/DecisionCard";
 export { DataTable, type DataColumn, type DataTableProps } from "./components/DataTable/DataTable";
+export { Figures, type Figure, type FiguresProps } from "./components/Figures/Figures";
 export { Label, LABEL_HUES, type LabelHue, type LabelProps } from "./components/Label/Label";
 export { MatchBar, type MatchBarProps } from "./components/MatchBar/MatchBar";
 export { Page, type PageProps } from "./components/Page/Page";

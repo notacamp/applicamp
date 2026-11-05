@@ -1,9 +1,14 @@
+/*
+ * A small coloured label (a stage, a source): a soft fill of one of the
+ * design system's signal hues under the primary text, mixed the way the
+ * package's pills are, so it reads the same in light and dark.
+ */
 .label {
   display: inline-block;
   max-width: 100%;
   padding: 0 var(--space-1-5);
   border-radius: var(--radius-sm);
-  background: var(--tag-gray);
+  background: var(--surface-selected);
   color: var(--text-primary);
   font-size: var(--text-sm);
   line-height: var(--leading-normal);
@@ -12,34 +17,38 @@
   text-overflow: ellipsis;
 }
 
+.label[data-hue]:not([data-hue="gray"]) {
+  background: color-mix(in oklch, var(--sig) var(--signal-soft-mix, 15%), transparent);
+}
+
 .label[data-hue="brown"] {
-  background: var(--tag-brown);
+  --sig: var(--signal-sort);
 }
 
 .label[data-hue="orange"] {
-  background: var(--tag-orange);
+  --sig: var(--signal-review);
 }
 
 .label[data-hue="yellow"] {
-  background: var(--tag-yellow);
+  --sig: var(--signal-decide);
 }
 
 .label[data-hue="green"] {
-  background: var(--tag-green);
+  --sig: var(--signal-pay);
 }
 
 .label[data-hue="blue"] {
-  background: var(--tag-blue);
+  --sig: var(--signal-nudge);
 }
 
 .label[data-hue="purple"] {
-  background: var(--tag-purple);
+  --sig: var(--signal-do);
 }
 
 .label[data-hue="pink"] {
-  background: var(--tag-pink);
+  --sig: var(--signal-look);
 }
 
 .label[data-hue="red"] {
-  background: var(--tag-red);
+  --sig: var(--danger);
 }

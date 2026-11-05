@@ -121,6 +121,8 @@ services:
       APPLICAMP_SOURCES__LEVER_EU_URL: http://lever.hiring.test:9020
       APPLICAMP_SOURCES__ASHBY_URL: http://ashby.hiring.test:9020
       APPLICAMP_SOURCES__WORKABLE_URL: http://workable.hiring.test:9020
+      # The Workable list (#88): the fake serves invented companies there.
+      APPLICAMP_SOURCES__WORKABLE_LIST_URL: http://workable.hiring.test:9020/boards/workable.xml
       APPLICAMP_SOURCES__RECRUITEE_URL: http://recruitee.hiring.test:9020
       APPLICAMP_SOURCES__TEAMTAILOR_URL: http://teamtailor.hiring.test:9020
       APPLICAMP_SOURCES__PERSONIO_URL: http://personio.hiring.test:9020

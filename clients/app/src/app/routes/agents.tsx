@@ -14,7 +14,7 @@ export interface AgentsProps {
 export function Agents({ run, onRun }: AgentsProps) {
   const { t } = useTranslation();
   return (
-    <Page testId="agents" title={t("agents.title")} lead={t("agents.lead")} wide>
+    <Page testId="agents" title={t("agents.title")} wide>
       <RunsPage selected={run} onSelect={onRun} />
     </Page>
   );

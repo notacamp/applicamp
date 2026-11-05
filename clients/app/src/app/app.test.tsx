@@ -98,15 +98,23 @@ describe("the app", () => {
     const { router } = renderApp("/");
     await screen.findByTestId("today");
 
-    await user.click(tagged("nav-agents"));
+    await user.click(tagged("nav-pipeline"));
+    expect(await screen.findByTestId("pipeline-empty")).toHaveTextContent("No opportunities yet");
+    expect(router.state.location.pathname).toBe("/pipeline");
+    expect(tagged("nav-pipeline")).toHaveAttribute("aria-current", "page");
+    // No key is hinted on a nav item.
+    expect(tagged("nav-pipeline").querySelector("kbd")).toBeNull();
+
+    // Agents is not a place: its key still works, and it counts as Today.
+    expect(screen.queryByTestId("nav-agents")).toBeNull();
+    await user.keyboard("ga");
     expect(await screen.findByTestId("agents-empty")).toHaveTextContent("No runs yet");
     expect(router.state.location.pathname).toBe("/agents");
-    expect(tagged("nav-agents")).toHaveAttribute("aria-current", "page");
+    expect(tagged("nav-today")).toHaveAttribute("aria-current", "page");
 
-    await user.keyboard("gp");
-    expect(await screen.findByTestId("pipeline-empty")).toHaveTextContent("No opportunities yet");
     await user.keyboard("gy");
-    expect(await screen.findByTestId("profile")).toHaveTextContent("Profile & goals");
+    expect((await screen.findByTestId("profile")).querySelector("h1")).toHaveTextContent("You");
+    expect(tagged("nav-profile")).toHaveAttribute("aria-current", "page");
     await user.keyboard("gt");
     expect(await screen.findByTestId("today")).toHaveTextContent("Today");
   });
@@ -124,7 +132,7 @@ describe("the app", () => {
         "Go to a page or run a command",
       );
     });
-    await user.keyboard("Pipeline{Enter}");
+    await user.keyboard("Jobs{Enter}");
     await waitFor(() => {
       expect(router.state.location.pathname).toBe("/pipeline");
     });
@@ -134,20 +142,23 @@ describe("the app", () => {
     expect(document.body).toHaveTextContent("Account");
   });
 
-  it("shows every shortcut on ?", async () => {
+  it("lists the keys on ?, with no button for them in the sidebar", async () => {
     signedIn();
     const user = userEvent.setup();
     renderApp("/");
     await screen.findByTestId("today");
 
-    await user.click(tagged("shortcut-sheet-button"));
+    expect(screen.queryByTestId("shortcut-sheet-button")).toBeNull();
+    await user.keyboard("?");
     await waitFor(() => {
       expect(document.body).toHaveTextContent("Keyboard shortcuts");
     });
-    expect(document.body).toHaveTextContent("Profile & goals");
-    await user.keyboard("{Escape}");
-    await user.keyboard("?");
     expect(document.body).toHaveTextContent("Command menu");
+    expect(document.body).toHaveTextContent("Job sites");
+    await user.keyboard("{Escape}");
+    await waitFor(() => {
+      expect(document.body).not.toHaveTextContent("Keyboard shortcuts");
+    });
   });
 
   it("signs out with the CSRF header and lands on the sign-in page", async () => {
@@ -190,7 +201,8 @@ describe("the app", () => {
     const user = userEvent.setup();
     const { router } = renderApp("/");
     await screen.findByTestId("today");
-    expect(screen.getByTestId("tab-bar")).toHaveTextContent("Pipeline");
+    expect(screen.getByTestId("tab-bar")).toHaveTextContent("Jobs");
+    expect(screen.getByTestId("tab-bar")).not.toHaveTextContent("Agents");
 
     await user.click(screen.getByTestId("jump-phone"));
     await waitFor(() => {

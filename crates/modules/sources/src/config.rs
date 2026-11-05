@@ -24,6 +24,12 @@
 //! | `APPLICAMP_SOURCES__HN_URL` | `https://hn.algolia.com` |
 //! | `APPLICAMP_SOURCES__COMPANY_PAGES` | `true`: company hiring pages found through apply links are checked every day |
 //! | `APPLICAMP_SOURCES__COMPANY_PAGE_CHECKS` | `300` (new company pages one daily run checks, at most) |
+//! | `APPLICAMP_SOURCES__WORKABLE_LIST` | `true`: once a day (06:00 UTC) Workable's list of every company's jobs adds the companies that are hiring as company pages |
+//! | `APPLICAMP_SOURCES__WORKABLE_LIST_URL` | `https://www.workable.com/boards/workable.xml` |
+//! | `APPLICAMP_SOURCES__WORKABLE_LIST_MAX_BYTES` | `1500000000` (the download stops there and keeps what it read; the list is about 860 MB) |
+//! | `APPLICAMP_SOURCES__WORKABLE_LIST_TIMEOUT_SECS` | `3600` (the whole download; an idle connection is cut after 60 s) |
+//! | `APPLICAMP_SOURCES__WORKABLE_LIST_LOOKUPS` | `500` (companies whose address on Workable is looked up a day, one request each) |
+//! | `APPLICAMP_SOURCES__WORKABLE_LIST_EXCLUDE` | none: names or sites of boards Workable already integrates with, never added from the list |
 //! | `APPLICAMP_SOURCES__SEARCH_COMPANY_PAGES` | `false`: a search reads only the company pages of companies the person watches |
 //! | `APPLICAMP_SEARCH__BRAVE_API_KEY_FILE` | unset: web search is off (a file holding the key) |
 //! | `APPLICAMP_SEARCH__BRAVE_URL` | `https://api.search.brave.com` |
@@ -138,6 +144,24 @@ pub struct SourcesConfig {
     /// A search reads the company pages of the companies the person watches.
     #[serde(default, deserialize_with = "flag")]
     pub search_company_pages: Option<bool>,
+    /// Read Workable's list of every company's jobs once a day.
+    #[serde(default, deserialize_with = "flag")]
+    pub workable_list: Option<bool>,
+    /// Where Workable's list is.
+    #[serde(default = "workable_list_url")]
+    pub workable_list_url: Url,
+    /// The most bytes one download reads.
+    #[serde(default, deserialize_with = "number")]
+    pub workable_list_max_bytes: Option<u64>,
+    /// Seconds one download may take.
+    #[serde(default, deserialize_with = "number")]
+    pub workable_list_timeout_secs: Option<u64>,
+    /// Companies whose Workable address is looked up a day, at most.
+    #[serde(default, deserialize_with = "number")]
+    pub workable_list_lookups: Option<u64>,
+    /// Names or sites of boards Workable already integrates with.
+    #[serde(default, deserialize_with = "list")]
+    pub workable_list_exclude: Option<Vec<String>>,
     /// The web search (`APPLICAMP_SEARCH__…`).
     #[serde(skip)]
     pub search: SearchConfig,
@@ -220,6 +244,12 @@ impl Default for SourcesConfig {
             company_pages: None,
             company_page_checks: None,
             search_company_pages: None,
+            workable_list: None,
+            workable_list_url: workable_list_url(),
+            workable_list_max_bytes: None,
+            workable_list_timeout_secs: None,
+            workable_list_lookups: None,
+            workable_list_exclude: None,
             search: SearchConfig::default(),
         }
     }
@@ -243,6 +273,9 @@ fn ashby_url() -> Url {
 }
 fn workable_url() -> Url {
     url("https://apply.workable.com")
+}
+fn workable_list_url() -> Url {
+    url("https://www.workable.com/boards/workable.xml")
 }
 fn recruitee_url() -> String {
     "https://{token}.recruitee.com".to_owned()
@@ -340,6 +373,53 @@ impl SourcesConfig {
     /// New company pages one daily run checks, at most (300 when left out).
     pub fn company_page_checks(&self) -> usize {
         usize::try_from(self.company_page_checks.unwrap_or(300).clamp(1, 10_000)).unwrap_or(300)
+    }
+
+    /// Whether Workable's list is read every day.
+    pub fn workable_list(&self) -> bool {
+        self.workable_list.unwrap_or(true)
+    }
+
+    /// The most bytes one download of the list reads (1.5 GB when left out).
+    pub fn workable_list_max_bytes(&self) -> u64 {
+        self.workable_list_max_bytes
+            .unwrap_or(1_500_000_000)
+            .clamp(1_000, 16_000_000_000)
+    }
+
+    /// How long one download of the list may take (an hour when left out).
+    pub fn workable_list_timeout(&self) -> std::time::Duration {
+        std::time::Duration::from_secs(
+            self.workable_list_timeout_secs
+                .unwrap_or(3_600)
+                .clamp(1, 7_000),
+        )
+    }
+
+    /// Companies whose address on Workable is looked up in a day, at most.
+    pub fn workable_list_lookups(&self) -> usize {
+        usize::try_from(self.workable_list_lookups.unwrap_or(500).min(20_000)).unwrap_or(500)
+    }
+
+    /// Whether `name` or `site` is on the list of boards Workable already
+    /// integrates with (compared in lower case, a site by its host).
+    pub fn workable_list_excludes(&self, name: &str, site: Option<&str>) -> bool {
+        let host = site.and_then(|raw| {
+            Url::parse(raw)
+                .ok()
+                .or_else(|| Url::parse(&format!("https://{raw}")).ok())
+                .and_then(|u| {
+                    u.host_str()
+                        .map(|h| h.trim_start_matches("www.").to_owned())
+                })
+        });
+        self.workable_list_exclude.iter().flatten().any(|entry| {
+            let entry = entry.trim_start_matches("www.");
+            entry == name.to_ascii_lowercase().trim()
+                || host
+                    .as_deref()
+                    .is_some_and(|h| h.eq_ignore_ascii_case(entry))
+        })
     }
 
     /// Whether a search reads the company pages of the companies the person

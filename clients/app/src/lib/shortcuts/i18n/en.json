@@ -1,11 +1,11 @@
 {
   "nav": {
     "today": "Today",
-    "pipeline": "Pipeline",
+    "pipeline": "Jobs",
     "companies": "Companies",
-    "boards": "Boards",
+    "boards": "Job sites",
     "agents": "Agents",
-    "profile": "Profile & goals",
+    "profile": "You",
     "cvs": "CVs"
   },
   "command": {

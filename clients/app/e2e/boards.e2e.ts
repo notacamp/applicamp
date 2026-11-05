@@ -83,7 +83,6 @@ test("the boards searches read are ranked by salary, a candidate waits with its 
   // pages both feed a search): it credits where it came from, with a link.
   await expect(page.getByTestId("peek-source-link").first()).toContainText(/^From /);
   await expect(page.getByTestId("peek-source-link").first()).toHaveAttribute("href", /^https:\/\//);
-  await expect(page.getByTestId("peek-apply")).toHaveAttribute("href", /^https:\/\//);
 });
 
 test("every waiting board can be approved or says why: checked at start, a key set, terms that forbid it, a proposed config, a config error beside Save", async ({

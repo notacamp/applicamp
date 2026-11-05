@@ -82,9 +82,11 @@ test("Three places: Today, Jobs and You, no key hinted, the design system's own 
     .poll(() =>
       page.evaluate(async () => {
         await document.fonts.ready;
-        return [...document.fonts].some(
-          (face) => face.family.includes("Funnel Sans") && face.status === "loaded",
-        );
+        let loaded = false;
+        document.fonts.forEach((face) => {
+          loaded ||= face.family.includes("Funnel Sans") && face.status === "loaded";
+        });
+        return loaded;
       }),
     )
     .toBe(true);
@@ -100,11 +102,13 @@ test("Three places: Today, Jobs and You, no key hinted, the design system's own 
   // Three places, in this order, and nothing else; no key hinted anywhere.
   if (phone) {
     expect(
-      await page.evaluate(() =>
-        [...document.querySelectorAll('[data-testid="tab-bar"] a')].map(
-          (tab) => tab.textContent?.trim() ?? "",
-        ),
-      ),
+      await page.evaluate(() => {
+        const labels: string[] = [];
+        document.querySelectorAll('[data-testid="tab-bar"] a').forEach((tab) => {
+          labels.push(tab.textContent?.trim() ?? "");
+        });
+        return labels;
+      }),
     ).toEqual(["Today", "Jobs", "You"]);
     expect(await linkIn(page, "nav-today")).toBeNull();
   } else {

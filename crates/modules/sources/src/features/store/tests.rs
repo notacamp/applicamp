@@ -1152,7 +1152,11 @@ async fn a_searchs_pool_holds_the_on_sites_and_every_company_page_ranked_without
     titles.sort_unstable();
     assert_eq!(
         titles,
-        ["Backend Developer", "Office Manager", "Senior Rust Engineer"],
+        [
+            "Backend Developer",
+            "Office Manager",
+            "Senior Rust Engineer"
+        ],
         "the On site and the company page; beta is not On"
     );
     assert!(found.iter().all(|p| p.job.description.is_empty()));

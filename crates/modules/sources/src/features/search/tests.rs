@@ -1480,10 +1480,11 @@ async fn a_search_takes_its_jobs_from_the_store_and_a_cheap_preselect_limits_the
     assert_eq!(reasons["preselect"], 20, "{reasons}");
     assert_eq!(reasons["quick_look"], 6, "{reasons}");
     assert_eq!(left_out_total(&reasons) + 4, 30, "the counts add up");
-    let expected: Option<f64> = sqlx::query_scalar("SELECT expected_cost_usd FROM sources.searches")
-        .fetch_one(&h.db)
-        .await
-        .unwrap();
+    let expected: Option<f64> =
+        sqlx::query_scalar("SELECT expected_cost_usd FROM sources.searches")
+            .fetch_one(&h.db)
+            .await
+            .unwrap();
     assert!(expected.unwrap() > 0.0, "the expected cost is recorded");
 
     // What the Searches tab says: where the jobs came from, and per site.

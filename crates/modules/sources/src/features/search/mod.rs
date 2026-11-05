@@ -1761,8 +1761,8 @@ pub(crate) async fn run(
         let look_at: Vec<usize> = (0..unread.len()).filter(|i| fits[*i].is_none()).collect();
         // What the quick looks and the full reads are expected to cost, from
         // what a call has cost this person on average.
-        let expected = calls_for(unread.len() + to_read.len(), slots, Some(look_at.len())) as f64
-            * per_batch;
+        let expected =
+            calls_for(unread.len() + to_read.len(), slots, Some(look_at.len())) as f64 * per_batch;
         done.expected_cost_usd = Some(expected);
         tracing::info!(
             quick_looks = look_at.len(),
@@ -1995,7 +1995,12 @@ pub(crate) async fn run(
     }
     done.kept_with_gap = keep.iter().filter(|(_, noted)| *noted).count();
     let mut keep: Vec<Scored> = keep.into_iter().map(|(scored, _)| scored).collect();
-    hydrate(db, &store_ids, keep.iter_mut().map(|scored| &mut scored.job)).await?;
+    hydrate(
+        db,
+        &store_ids,
+        keep.iter_mut().map(|scored| &mut scored.job),
+    )
+    .await?;
     for scored in &keep {
         for t in tally(&mut tallies, &scored.job) {
             t.matched += 1;

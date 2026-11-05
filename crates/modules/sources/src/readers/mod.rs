@@ -1212,7 +1212,9 @@ impl Reader {
             }
             let started = Instant::now();
             let board = BoardRef::of(row);
-            let result = self.queries_only(db, row, &config, &board, now, &asked).await;
+            let result = self
+                .queries_only(db, row, &config, &board, now, &asked)
+                .await;
             let duration_ms = u32::try_from(started.elapsed().as_millis()).unwrap_or(u32::MAX);
             let (jobs, outcome, error, partial) = match result {
                 Ok(read) => {

@@ -266,7 +266,10 @@ pub async fn pool(db: &PgPool, query: &PoolQuery<'_>, now: DateTime<Utc>) -> Res
 }
 
 /// The descriptions of the stored jobs `ids`.
-pub async fn descriptions(db: &PgPool, ids: &[Uuid]) -> Result<std::collections::HashMap<Uuid, String>> {
+pub async fn descriptions(
+    db: &PgPool,
+    ids: &[Uuid],
+) -> Result<std::collections::HashMap<Uuid, String>> {
     let rows: Vec<(Uuid, String)> =
         sqlx::query_as("SELECT id, description FROM sources.store_jobs WHERE id = ANY($1)")
             .bind(ids)

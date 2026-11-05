@@ -462,9 +462,6 @@ impl SourcesConfig {
         })
     }
 
-    /// Whether a search reads the company pages of the companies the person
-    /// watches (off by default: a job store comes first).
-
     /// Whether every approved site and company page is read into the job
     /// store (on by default).
     pub fn store(&self) -> bool {

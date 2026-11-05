@@ -130,6 +130,9 @@ pub enum FetchError {
     BadConfig,
     /// Its API needs a key, and none is set (or it cannot be opened).
     NeedsKey,
+    /// It answered 304 to a conditional request: nothing changed since the
+    /// last read (only the job store asks that way).
+    NotModified,
 }
 
 impl FetchError {
@@ -147,6 +150,7 @@ impl FetchError {
             Self::Refused => "refused_host".to_owned(),
             Self::BadConfig => "bad_config".to_owned(),
             Self::NeedsKey => "needs_key".to_owned(),
+            Self::NotModified => "not_modified".to_owned(),
         }
     }
 }
@@ -165,6 +169,7 @@ impl std::fmt::Display for FetchError {
             Self::Refused => f.write_str("the board's address is not a public https one"),
             Self::BadConfig => f.write_str("the board's config does not read"),
             Self::NeedsKey => f.write_str("the board's API key is not set"),
+            Self::NotModified => f.write_str("the board says nothing changed"),
         }
     }
 }
@@ -174,6 +179,80 @@ impl std::fmt::Display for FetchError {
 struct Got {
     body: Vec<u8>,
     cached: bool,
+}
+
+/// What a site said about a list so a later read can ask only whether it
+/// changed (`ETag`, `Last-Modified`).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Validators {
+    pub etag: Option<String>,
+    pub last_modified: Option<String>,
+}
+
+impl Validators {
+    /// Whether the site gave neither.
+    pub fn is_empty(&self) -> bool {
+        self.etag.is_none() && self.last_modified.is_none()
+    }
+}
+
+/// What the first request of a read saw.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Seen {
+    /// The status the site answered.
+    pub status: Option<u16>,
+    /// The validators it gave (the ones sent, on a 304).
+    pub validators: Validators,
+}
+
+/// A read for the job store: the validators sent with its first request (a
+/// conditional request), and what that request and the read turned out to
+/// be. Never given to a search's read, which reuses its cache instead.
+#[derive(Debug, Default)]
+pub struct Probe {
+    send: Validators,
+    seen: std::sync::Mutex<Seen>,
+    partial: std::sync::atomic::AtomicBool,
+}
+
+impl Probe {
+    /// A read that asks with `send`.
+    pub fn new(send: Validators) -> Self {
+        Self {
+            send,
+            ..Self::default()
+        }
+    }
+
+    /// What the first request saw.
+    pub fn seen(&self) -> Seen {
+        self.seen
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+
+    /// Whether the read did not list everything the site has (a page limit
+    /// was reached): what it did not list is not closed.
+    pub fn partial(&self) -> bool {
+        self.partial.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    fn set_partial(&self) {
+        self.partial
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    fn note(&self, status: u16, validators: Option<Validators>) {
+        let mut seen = self
+            .seen
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        seen.status = Some(status);
+        if let Some(validators) = validators {
+            seen.validators = validators;
+        }
+    }
 }
 
 /// How reading a job board went.
@@ -377,6 +456,10 @@ impl Reader {
     /// host. `secret` (a board's API key) is added to the request's query
     /// only: the cache, the logs and every error know `url` without it.
     /// `Ok(None)` when the board says there is no such thing (404).
+    ///
+    /// `probe` (the job store's first request of a read) adds the validators
+    /// it holds to the request, and notes what came back; a 304 is
+    /// [`FetchError::NotModified`].
     #[allow(clippy::too_many_arguments)]
     async fn fetch(
         &self,
@@ -387,6 +470,7 @@ impl Reader {
         ttl: Duration,
         spacing: Duration,
         secret: &[(String, String)],
+        probe: Option<&Probe>,
     ) -> Result<Option<Got>, FetchError> {
         if !ttl.is_zero() {
             let fresh_since =
@@ -411,16 +495,44 @@ impl Reader {
                 .query_pairs_mut()
                 .extend_pairs(secret.iter().map(|(k, v)| (k.as_str(), v.as_str())));
         }
-        let mut response = client
-            .get(request_url)
-            .header(
-                reqwest::header::ACCEPT,
-                "application/json, application/rss+xml, application/xml;q=0.9, */*;q=0.8",
-            )
-            .send()
-            .await
-            .map_err(|_| FetchError::Transport)?;
+        let mut request = client.get(request_url).header(
+            reqwest::header::ACCEPT,
+            "application/json, application/rss+xml, application/xml;q=0.9, */*;q=0.8",
+        );
+        if let Some(probe) = probe {
+            if let Some(etag) = &probe.send.etag {
+                request = request.header(reqwest::header::IF_NONE_MATCH, etag);
+            }
+            if let Some(modified) = &probe.send.last_modified {
+                request = request.header(reqwest::header::IF_MODIFIED_SINCE, modified);
+            }
+        }
+        let mut response = request.send().await.map_err(|_| FetchError::Transport)?;
         let status = response.status();
+        if let Some(probe) = probe {
+            let header = |name: reqwest::header::HeaderName| {
+                response
+                    .headers()
+                    .get(name)
+                    .and_then(|v| v.to_str().ok())
+                    .map(|v| v.trim().to_owned())
+                    .filter(|v| !v.is_empty() && v.len() <= 400)
+            };
+            let given = Validators {
+                etag: header(reqwest::header::ETAG),
+                last_modified: header(reqwest::header::LAST_MODIFIED),
+            };
+            // A 304 may leave the validators out: the ones sent stand.
+            let validators = if status == reqwest::StatusCode::NOT_MODIFIED && given.is_empty() {
+                probe.send.clone()
+            } else {
+                given
+            };
+            probe.note(status.as_u16(), Some(validators));
+            if status == reqwest::StatusCode::NOT_MODIFIED {
+                return Err(FetchError::NotModified);
+            }
+        }
         if status == reqwest::StatusCode::NOT_FOUND {
             return Ok(None);
         }
@@ -482,16 +594,30 @@ impl Reader {
         url: &Url,
         max: usize,
     ) -> Result<Option<Vec<u8>>, FetchError> {
-        let config = &self.inner.config;
+        self.get_at_most_with(db, url, max, self.inner.config.cache_ttl(), None)
+            .await
+    }
+
+    /// [`get_at_most`](Self::get_at_most), reusing the cache for `ttl`, and
+    /// asking as `probe` (a job store read's first request) says.
+    async fn get_at_most_with(
+        &self,
+        db: &PgPool,
+        url: &Url,
+        max: usize,
+        ttl: Duration,
+        probe: Option<&Probe>,
+    ) -> Result<Option<Vec<u8>>, FetchError> {
         Ok(self
             .fetch(
                 &self.inner.http,
                 db,
                 url,
                 max,
-                config.cache_ttl(),
+                ttl,
                 Duration::ZERO,
                 &[],
+                probe,
             )
             .await?
             .map(|got| got.body))
@@ -503,7 +629,19 @@ impl Reader {
         db: &PgPool,
         url: &Url,
     ) -> Result<Option<T>, FetchError> {
-        match self.get_at_most(db, url, MAX_BODY).await? {
+        self.get_json_with(db, url, self.inner.config.cache_ttl(), None)
+            .await
+    }
+
+    /// [`get_json`](Self::get_json) with a cache time and a probe.
+    async fn get_json_with<T: DeserializeOwned>(
+        &self,
+        db: &PgPool,
+        url: &Url,
+        ttl: Duration,
+        probe: Option<&Probe>,
+    ) -> Result<Option<T>, FetchError> {
+        match self.get_at_most_with(db, url, MAX_BODY, ttl, probe).await? {
             None => Ok(None),
             Some(body) => serde_json::from_slice(&body)
                 .map(Some)
@@ -544,6 +682,7 @@ impl Reader {
                 Duration::ZERO,
                 spacing,
                 secret,
+                None,
             )
             .await?
             .map(|got| got.body))
@@ -641,6 +780,7 @@ impl Reader {
         ttl: Duration,
         spacing: Duration,
         secret: &[(String, String)],
+        probe: Option<&Probe>,
     ) -> Result<Got, FetchError> {
         net::check(url, self.inner.config.allow_private_hosts())
             .map_err(|_| FetchError::Refused)?;
@@ -652,6 +792,7 @@ impl Reader {
             ttl,
             spacing,
             secret,
+            probe,
         )
         .await?
         .ok_or(FetchError::Status(404))
@@ -680,6 +821,19 @@ impl Reader {
 
     /// The jobs on `board`.
     pub async fn board(&self, db: &PgPool, board: &Board) -> Result<Vec<Job>, FetchError> {
+        self.board_with(db, board, self.inner.config.cache_ttl(), None)
+            .await
+    }
+
+    /// The jobs on `board`, its answer reused for `ttl` (never, for the job
+    /// store), asking as `probe` says.
+    async fn board_with(
+        &self,
+        db: &PgPool,
+        board: &Board,
+        ttl: Duration,
+        probe: Option<&Probe>,
+    ) -> Result<Vec<Job>, FetchError> {
         if !is_token(&board.token) {
             return Err(FetchError::BadUrl);
         }
@@ -691,7 +845,8 @@ impl Reader {
                     &["v1", "boards", board.token.as_str(), "jobs"],
                     &[],
                 )?;
-                let list: Option<greenhouse::List> = self.get_json(db, &url).await?;
+                let list: Option<greenhouse::List> =
+                    self.get_json_with(db, &url, ttl, probe).await?;
                 list.map(|list| greenhouse::jobs(list, board))
             }
             Source::Lever => {
@@ -705,7 +860,8 @@ impl Reader {
                     &["v0", "postings", board.token.as_str()],
                     &[("mode", "json")],
                 )?;
-                let list: Option<Vec<lever::Posting>> = self.get_json(db, &url).await?;
+                let list: Option<Vec<lever::Posting>> =
+                    self.get_json_with(db, &url, ttl, probe).await?;
                 list.map(|list| lever::jobs(list, board))
             }
             Source::Ashby => {
@@ -714,7 +870,7 @@ impl Reader {
                     &["posting-api", "job-board", board.token.as_str()],
                     &[("includeCompensation", "true")],
                 )?;
-                let list: Option<ashby::List> = self.get_json(db, &url).await?;
+                let list: Option<ashby::List> = self.get_json_with(db, &url, ttl, probe).await?;
                 list.map(|list| ashby::jobs(list, board))
             }
             Source::Workable => {
@@ -723,7 +879,7 @@ impl Reader {
                     &["api", "v1", "widget", "accounts", board.token.as_str()],
                     &[],
                 )?;
-                let list: Option<workable::List> = self.get_json(db, &url).await?;
+                let list: Option<workable::List> = self.get_json_with(db, &url, ttl, probe).await?;
                 list.map(|list| workable::jobs(&list, board))
             }
             Source::Recruitee => {
@@ -731,7 +887,8 @@ impl Reader {
                     .company_host(&config.recruitee_url, &board.token)
                     .ok_or(FetchError::BadUrl)?;
                 let url = Self::url(&base, &["api", "offers"], &[])?;
-                let list: Option<recruitee::List> = self.get_json(db, &url).await?;
+                let list: Option<recruitee::List> =
+                    self.get_json_with(db, &url, ttl, probe).await?;
                 list.map(|list| recruitee::jobs(&list, board))
             }
             Source::Teamtailor => {
@@ -739,7 +896,7 @@ impl Reader {
                     .company_host(&config.teamtailor_url, &board.token)
                     .ok_or(FetchError::BadUrl)?;
                 let url = Self::url(&base, &["jobs.rss"], &[])?;
-                self.get(db, &url)
+                self.get_at_most_with(db, &url, MAX_BODY, ttl, probe)
                     .await?
                     .map(|body| teamtailor::jobs(&body, board))
             }
@@ -748,7 +905,7 @@ impl Reader {
                     .company_host(&config.personio_url, &board.token)
                     .ok_or(FetchError::BadUrl)?;
                 let url = Self::url(&base, &["xml"], &[])?;
-                self.get(db, &url)
+                self.get_at_most_with(db, &url, MAX_BODY, ttl, probe)
                     .await?
                     .map(|body| personio::jobs(&body, board))
             }
@@ -791,6 +948,7 @@ impl Reader {
                     ttl,
                     Duration::ZERO,
                     &[],
+                    None,
                 )
                 .await?
                 .ok_or(FetchError::Status(404))?;
@@ -888,7 +1046,9 @@ impl Reader {
     ) -> BoardRead {
         let started = Instant::now();
         let board = BoardRef::of(row);
-        let result = self.read_board(db, row, &board, now, skills).await;
+        let result = self
+            .read_board(db, row, &board, now, skills, None, None)
+            .await;
         let duration_ms = u32::try_from(started.elapsed().as_millis()).unwrap_or(u32::MAX);
         let (jobs, outcome, error) = match result {
             Ok((jobs, cached)) => {
@@ -961,7 +1121,47 @@ impl Reader {
         reads
     }
 
-    /// `row`'s jobs, and whether every answer came from the cache.
+    /// The jobs `row` lists now, for the job store: never from the cache,
+    /// the first request conditional on `probe`'s validators, no search by
+    /// skill, and every apply link noted for the company pages by the
+    /// caller. A company page is read through its system's reader.
+    pub async fn store_read(
+        &self,
+        db: &PgPool,
+        row: &BoardRow,
+        now: DateTime<Utc>,
+        probe: &Probe,
+    ) -> Result<Vec<Job>, FetchError> {
+        match row.kind() {
+            Some(Kind::CompanyPage) => {
+                let (Some(source), Some(token)) = (
+                    row.system.as_deref().and_then(Source::parse),
+                    row.company_token.clone(),
+                ) else {
+                    return Err(FetchError::BadConfig);
+                };
+                let board = Board {
+                    kind: source,
+                    token,
+                    company: row.name.clone(),
+                    eu: row.eu,
+                };
+                self.board_with(db, &board, Duration::ZERO, Some(probe))
+                    .await
+            }
+            Some(Kind::HiringSystem) | None => Err(FetchError::BadConfig),
+            Some(_) => {
+                let board = BoardRef::of(row);
+                self.read_board(db, row, &board, now, &[], Some(Duration::ZERO), Some(probe))
+                    .await
+                    .map(|(jobs, _)| jobs)
+            }
+        }
+    }
+
+    /// `row`'s jobs, and whether every answer came from the cache; `ttl`
+    /// (the polling interval when left out) is how long answers are reused.
+    #[allow(clippy::too_many_arguments)]
     async fn read_board(
         &self,
         db: &PgPool,
@@ -969,6 +1169,8 @@ impl Reader {
         board: &BoardRef,
         now: DateTime<Utc>,
         skills: &[String],
+        ttl_now: Option<Duration>,
+        probe: Option<&Probe>,
     ) -> Result<(Vec<Job>, bool), FetchError> {
         if row.backoff_until.is_some_and(|until| until > now) {
             return Err(FetchError::BackingOff);
@@ -978,7 +1180,8 @@ impl Reader {
         config.validate(kind).map_err(|_| FetchError::BadConfig)?;
         let secret =
             board_keys::query(self.keys(), row, &config).map_err(|_| FetchError::NeedsKey)?;
-        let mut ttl = config.poll().to_std().unwrap_or(Duration::from_secs(3_600));
+        let mut ttl =
+            ttl_now.unwrap_or_else(|| config.poll().to_std().unwrap_or(Duration::from_secs(3_600)));
         match kind {
             Kind::JsonApi => {
                 let stack = config.stack_queries(skills);
@@ -987,13 +1190,14 @@ impl Reader {
                 {
                     ttl = stack_ttl(ttl, per_day, stack.len());
                 }
-                let (mut jobs, mut cached) =
-                    self.json_api(db, &config, board, ttl, &secret).await?;
+                let (mut jobs, mut cached) = self
+                    .json_api(db, &config, board, ttl, &secret, probe)
+                    .await?;
                 for value in &stack {
                     let Some(extra) = config.for_skill(value) else {
                         break;
                     };
-                    match self.json_api(db, &extra, board, ttl, &secret).await {
+                    match self.json_api(db, &extra, board, ttl, &secret, None).await {
                         Ok((more, was_cached)) => {
                             cached &= was_cached;
                             jobs.extend(more);
@@ -1009,8 +1213,11 @@ impl Reader {
                 jobs.retain(|job| seen.insert(job.source_ref.clone()));
                 Ok((jobs, cached))
             }
-            Kind::Rss => self.feed(db, &config, board, ttl, &secret).await,
-            Kind::JsonldSitemap => self.sitemap(db, &config, row, board, ttl, &secret).await,
+            Kind::Rss => self.feed(db, &config, board, ttl, &secret, probe).await,
+            Kind::JsonldSitemap => {
+                self.sitemap(db, &config, row, board, ttl, &secret, probe)
+                    .await
+            }
             Kind::HiringSystem | Kind::CompanyPage => Err(FetchError::BadConfig),
             Kind::Hn => {
                 let (mut jobs, cached) = self.hn_with(db, ttl).await?;
@@ -1038,11 +1245,14 @@ impl Reader {
         board: &BoardRef,
         ttl: Duration,
         secret: &[(String, String)],
+        probe: Option<&Probe>,
     ) -> Result<(Vec<Job>, bool), FetchError> {
         let endpoint = config.endpoint.as_ref().ok_or(FetchError::BadConfig)?;
         let mut jobs = Vec::new();
         let mut cached = true;
         let mut cursor: Option<String> = None;
+        // Whether the last page was reached (not the page limit).
+        let mut ended = false;
         for page in 1..=config.pages() {
             let mut url = endpoint.clone();
             {
@@ -1061,7 +1271,14 @@ impl Reader {
                 url.set_query(None);
             }
             let got = self
-                .get_board(db, &url, ttl, config.spacing(), secret)
+                .get_board(
+                    db,
+                    &url,
+                    ttl,
+                    config.spacing(),
+                    secret,
+                    probe.filter(|_| page == 1),
+                )
                 .await?;
             cached &= got.cached;
             let answer: serde_json::Value =
@@ -1098,8 +1315,12 @@ impl Reader {
                 false
             };
             if !more || (jobs.len() == before && items.is_empty()) {
+                ended = true;
                 break;
             }
+        }
+        if !ended && let Some(probe) = probe {
+            probe.set_partial();
         }
         Ok((jobs, cached))
     }
@@ -1112,10 +1333,11 @@ impl Reader {
         board: &BoardRef,
         ttl: Duration,
         secret: &[(String, String)],
+        probe: Option<&Probe>,
     ) -> Result<(Vec<Job>, bool), FetchError> {
         let endpoint = config.endpoint.as_ref().ok_or(FetchError::BadConfig)?;
         let got = self
-            .get_board(db, endpoint, ttl, config.spacing(), secret)
+            .get_board(db, endpoint, ttl, config.spacing(), secret, probe)
             .await?;
         let jobs = rss::items(&got.body)
             .iter()
@@ -1126,6 +1348,7 @@ impl Reader {
 
     /// JSON-LD postings through a sitemap, on paths its robots rules (as
     /// checked) allow.
+    #[allow(clippy::too_many_arguments)]
     async fn sitemap(
         &self,
         db: &PgPool,
@@ -1134,11 +1357,17 @@ impl Reader {
         board: &BoardRef,
         ttl: Duration,
         secret: &[(String, String)],
+        probe: Option<&Probe>,
     ) -> Result<(Vec<Job>, bool), FetchError> {
         let sitemap = config.sitemap.as_ref().ok_or(FetchError::BadConfig)?;
         let got = self
-            .get_board(db, sitemap, ttl, config.spacing(), secret)
+            .get_board(db, sitemap, ttl, config.spacing(), secret, probe)
             .await?;
+        // Only some of its postings are read: what is not listed is not
+        // closed.
+        if let Some(probe) = probe {
+            probe.set_partial();
+        }
         let mut cached = got.cached;
         let most = usize::try_from(
             config
@@ -1158,7 +1387,10 @@ impl Reader {
             if !robots::allowed(&rules, &robots::path_of(&page)).0 {
                 continue;
             }
-            let got = match self.get_board(db, &page, ttl, config.spacing(), &[]).await {
+            let got = match self
+                .get_board(db, &page, ttl, config.spacing(), &[], None)
+                .await
+            {
                 Ok(got) => got,
                 Err(FetchError::Status(404)) => continue,
                 Err(e) => return Err(e),

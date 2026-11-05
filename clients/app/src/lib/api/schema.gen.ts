@@ -238,6 +238,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/boards/store": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How the job store is doing.
+         * @description Jobs stored, new in the last 7 days, sites read today and the reads that
+         *     failed, for the board owners. No job is shown here.
+         */
+        get: operations["sources.store_totals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/boards/suggestions": {
         parameters: {
             query?: never;
@@ -6092,6 +6113,51 @@ export interface components {
             /** Format: double */
             today_eur: number;
         };
+        /** @description How the job store is doing, for the owner. */
+        StoreTotals: {
+            /**
+             * Format: int32
+             * @description Reads that failed today.
+             */
+            failures_today: number;
+            /**
+             * Format: int32
+             * @description Jobs it still holds that their sites no longer list.
+             */
+            jobs_closed: number;
+            /**
+             * Format: int32
+             * @description Jobs it holds that their sites still list.
+             */
+            jobs_stored: number;
+            /**
+             * Format: date-time
+             * @description When the latest read was.
+             */
+            last_read_at?: string | null;
+            /**
+             * Format: int32
+             * @description Jobs it stored for the first time in the last 7 days.
+             */
+            new_7d: number;
+            /** @description Whether the store is on (`APPLICAMP_SOURCES__STORE`). */
+            on: boolean;
+            /**
+             * Format: int32
+             * @description Reads made today, failed ones included.
+             */
+            reads_today: number;
+            /**
+             * Format: int32
+             * @description Sites whose latest read failed.
+             */
+            sites_failing: number;
+            /**
+             * Format: int32
+             * @description Sites read today (UTC) without failing.
+             */
+            sites_read_today: number;
+        };
         /**
          * @description What would make the profile stronger.
          * @enum {string}
@@ -6921,6 +6987,44 @@ export interface operations {
             };
             /** @description `session_required` */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "sources.store_totals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The totals. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoreTotals"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_board_owner` */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

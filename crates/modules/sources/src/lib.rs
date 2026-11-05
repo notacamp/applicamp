@@ -27,6 +27,13 @@
 //!   names a company page, registered with no request, and a daily check
 //!   approves it after one sample read when its system is approved and it
 //!   posted lately. Searches do not read them yet (a job store comes first).
+//! - **The job store** ([`features::store`], #89): every approved job board
+//!   and company page is read on its own schedule (its polling limit, its
+//!   terms' fetches a day, conditional requests, a site that stays quiet read
+//!   less often, a host one request at a time) into `sources.store_jobs`:
+//!   new or changed jobs kept, jobs a full read no longer lists closed and
+//!   deleted after a while, expired ones dropped. No model is called. A
+//!   search does not read it yet.
 //! - **The Workable list** ([`features::workable_list`], #88): once a day
 //!   Workable's documented list of every company's jobs is streamed (never
 //!   held), and each company with a job posted in the last 60 days becomes a
@@ -197,7 +204,7 @@ impl SourcesDeps {
 pub fn module(deps: SourcesDeps) -> Module {
     use features::{
         board_requests as requests, boards as board, company_pages, discovery, recheck, reground,
-        search, watch, workable_list,
+        search, store, watch, workable_list,
     };
     let router = OpenApiRouter::new()
         .routes(routes!(search::start))
@@ -211,6 +218,7 @@ pub fn module(deps: SourcesDeps) -> Module {
         .routes(routes!(requests::reopen))
         .routes(routes!(board::list))
         .routes(routes!(board::scanned))
+        .routes(routes!(store::totals))
         .routes(routes!(board::get))
         .routes(routes!(board::approve))
         .routes(routes!(board::decline))
@@ -239,6 +247,7 @@ pub fn module(deps: SourcesDeps) -> Module {
             .job_with::<company_pages::CheckPages, _>(deps.clone())
             .job_with::<company_pages::CheckPagesSoon, _>(deps.clone())
             .job_with::<company_pages::web_search::WebSearch, _>(deps.clone())
+            .job_with::<store::ReadStore, _>(deps.clone())
             .job_with::<workable_list::ReadList, _>(deps.clone())
             .job_with::<workable_list::ReadListSoon, _>(deps.clone())
             .job_with::<watch::FindBoard, _>(deps)
@@ -285,6 +294,9 @@ pub async fn start(db: &PgPool, deps: &SourcesDeps) -> Result<(), String> {
     let page_checks = features::company_pages::schedule(db, deps)
         .await
         .map_err(|e| e.to_string())?;
+    let store = features::store::schedule(db, deps)
+        .await
+        .map_err(|e| e.to_string())?;
     let scheduled = features::search::schedule_nightly(db, deps)
         .await
         .map_err(|e| e.to_string())?;
@@ -300,6 +312,7 @@ pub async fn start(db: &PgPool, deps: &SourcesDeps) -> Result<(), String> {
         company_pages_added,
         page_checks,
         web_search,
+        store,
         workable_list,
         company_boards = deps.config.company_boards(),
         discovery,
@@ -337,6 +350,7 @@ mod tests {
                 "sources.discover_boards",
                 "sources.find_board",
                 "sources.nightly",
+                "sources.read_store",
                 "sources.recheck_requirements",
                 "sources.reground_reasons",
                 "sources.search",

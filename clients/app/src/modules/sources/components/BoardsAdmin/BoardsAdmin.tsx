@@ -91,7 +91,6 @@ export function BoardsAdmin({ back }: BoardsAdminProps) {
             action={
               <Button
                 variant="secondary"
-                size="lg"
                 onClick={() => {
                   void overview.refetch();
                 }}
@@ -258,7 +257,6 @@ function WaitingRow({
         actions={
           <Button
             variant="secondary"
-            size="lg"
             disabled={reopen.isPending}
             data-testid="boards-admin-undo"
             onClick={() => {
@@ -293,7 +291,6 @@ function WaitingRow({
       actions={
         <Button
           variant="secondary"
-          size="lg"
           data-testid="boards-admin-waiting-open"
           onClick={() => {
             onOpen(row);
@@ -364,7 +361,6 @@ function Waiting({
           {rows.length > shown.length || query.hasNextPage ? (
             <Button
               variant="ghost"
-              size="lg"
               data-testid="boards-admin-waiting-more"
               disabled={query.isFetchingNextPage}
               onClick={() => {
@@ -411,7 +407,6 @@ function AllBoards({
         <TextField
           label={t("admin.all.search")}
           type="search"
-          size="lg"
           autoComplete="off"
           placeholder={t("admin.all.searchHint")}
           value={search}
@@ -422,7 +417,6 @@ function AllBoards({
         />
         <Select
           label={t("admin.filters.show")}
-          size="lg"
           options={SHOW_OPTIONS.map((value) => ({
             value,
             label: t(`admin.filters.options.${value}`),
@@ -443,7 +437,6 @@ function AllBoards({
             action={
               <Button
                 variant="secondary"
-                size="lg"
                 onClick={() => {
                   void query.refetch();
                 }}
@@ -462,7 +455,6 @@ function AllBoards({
             filtered ? (
               <Button
                 variant="secondary"
-                size="lg"
                 data-testid="boards-admin-clear"
                 onClick={() => {
                   onSearch("");
@@ -495,7 +487,6 @@ function AllBoards({
                   actions={
                     <Button
                       variant="secondary"
-                      size="lg"
                       data-testid="boards-admin-open"
                       onClick={() => {
                         onOpen(row);
@@ -526,7 +517,6 @@ function AllBoards({
           {query.hasNextPage ? (
             <Button
               variant="ghost"
-              size="lg"
               data-testid="boards-admin-more"
               disabled={query.isFetchingNextPage}
               onClick={() => {

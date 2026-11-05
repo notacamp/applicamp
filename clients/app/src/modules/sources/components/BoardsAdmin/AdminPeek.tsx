@@ -154,7 +154,6 @@ export function AdminPeek({ row: listed, onClose, onDeclined }: AdminPeekProps) 
               <Cluster>
                 <Button
                   variant="ghost"
-                  size="lg"
                   data-testid="boards-admin-more-options"
                   onClick={() => {
                     setMore(row.board.id);
@@ -293,7 +292,6 @@ function DeclineButton({
   return (
     <Button
       variant="secondary"
-      size="lg"
       data-testid="boards-admin-decline"
       onClick={() => {
         setAsking(true);
@@ -347,7 +345,6 @@ function PermissionDecision({
           <Cluster>
             <Button
               variant="primary"
-              size="lg"
               icon="check"
               disabled={asked.isPending}
               data-testid="boards-admin-asked"
@@ -369,7 +366,6 @@ function PermissionDecision({
             <Cluster>
               <Button
                 variant="primary"
-                size="lg"
                 icon="check"
                 disabled={answer.isPending}
                 data-testid="boards-admin-yes"
@@ -381,7 +377,6 @@ function PermissionDecision({
               </Button>
               <Button
                 variant="secondary"
-                size="lg"
                 disabled={answer.isPending}
                 data-testid="boards-admin-no"
                 onClick={() => {
@@ -482,7 +477,6 @@ function KeyDecision({
         <Cluster>
           <Button
             variant="primary"
-            size="lg"
             icon="check"
             disabled={!filled || action.isPending}
             data-testid="boards-admin-key-save"
@@ -511,7 +505,6 @@ function ChoiceDecision({ row, onDeclined }: { row: AdminRow; onDeclined: (id: s
         <Cluster>
           <Button
             variant="primary"
-            size="lg"
             disabled={action.isPending}
             data-testid="boards-admin-choice-yes"
             onClick={() => {
@@ -522,7 +515,6 @@ function ChoiceDecision({ row, onDeclined }: { row: AdminRow; onDeclined: (id: s
           </Button>
           <Button
             variant="secondary"
-            size="lg"
             disabled={action.isPending}
             data-testid="boards-admin-choice-no"
             onClick={() => {
@@ -560,7 +552,6 @@ function ApproveDecision({ row, onDeclined }: { row: AdminRow; onDeclined: (id: 
         <Cluster>
           <Button
             variant="primary"
-            size="lg"
             icon="check"
             disabled={action.isPending}
             data-testid="boards-admin-approve"
@@ -593,7 +584,6 @@ function CheckingDecision({ row }: { row: AdminRow }) {
         <Cluster>
           <Button
             variant="secondary"
-            size="lg"
             disabled={action.isPending}
             data-testid="boards-admin-check"
             onClick={() => {
@@ -628,7 +618,6 @@ function NotAllowedDecision({ row }: { row: AdminRow }) {
           <Cluster>
             <Button
               variant="secondary"
-              size="lg"
               disabled={reopen.isPending}
               data-testid="boards-admin-peek-undo"
               onClick={() => {
@@ -664,7 +653,6 @@ function ReadingDecision({ row, onDeclined }: { row: AdminRow; onDeclined: (id: 
           {row.status === "paused" ? (
             <Button
               variant="secondary"
-              size="lg"
               disabled={action.isPending}
               data-testid="boards-admin-resume"
               onClick={() => {
@@ -676,7 +664,6 @@ function ReadingDecision({ row, onDeclined }: { row: AdminRow; onDeclined: (id: 
           ) : (
             <Button
               variant="secondary"
-              size="lg"
               disabled={action.isPending}
               data-testid="boards-admin-pause"
               onClick={() => {
@@ -688,7 +675,6 @@ function ReadingDecision({ row, onDeclined }: { row: AdminRow; onDeclined: (id: 
           )}
           <Button
             variant="secondary"
-            size="lg"
             disabled={action.isPending}
             data-testid="boards-admin-check"
             onClick={() => {
@@ -699,7 +685,6 @@ function ReadingDecision({ row, onDeclined }: { row: AdminRow; onDeclined: (id: 
           </Button>
           <Button
             variant="secondary"
-            size="lg"
             disabled={action.isPending}
             data-testid="boards-admin-stop"
             onClick={() => {

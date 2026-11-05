@@ -318,6 +318,10 @@ struct ApiRead {
     jobs: Vec<Job>,
     cached: bool,
     partial: Option<PartialRead>,
+    /// A page after the first or a query was told to slow down (with the
+    /// seconds its `Retry-After` gave): the board is asked nothing more now,
+    /// and left alone for a while.
+    slow_down: Option<Option<u64>>,
 }
 
 /// What a search read.
@@ -1090,8 +1094,24 @@ impl Reader {
                 jobs,
                 cached,
                 partial: part,
+                slow_down,
             }) => {
                 partial = part;
+                // Asked to slow down part way: left alone for its polling
+                // interval at least (or as long as it asked), so the next
+                // search uses what was read.
+                let backoff = slow_down.and_then(|secs| {
+                    let poll = row
+                        .config()
+                        .ok()
+                        .and_then(|config| config.poll().to_std().ok())
+                        .unwrap_or(BACKOFF.0);
+                    let wait = secs
+                        .map_or(BACKOFF.0, Duration::from_secs)
+                        .max(poll)
+                        .min(BACKOFF.1);
+                    chrono::TimeDelta::from_std(wait).ok().map(|d| now + d)
+                });
                 if cached {
                     let read_lately = row.last_fetch_at.is_some_and(|at| at >= fresh_since);
                     let outcome = if read_lately {
@@ -1103,7 +1123,7 @@ impl Reader {
                 } else {
                     crate::company_pages::note_links(db, &jobs, &row.name, now).await;
                     let kept = async {
-                        job_boards::record_fetch(db, row.id, now, Some(jobs.len()), None, None)
+                        job_boards::record_fetch(db, row.id, now, Some(jobs.len()), None, backoff)
                             .await?;
                         job_boards::keep_listed(db, row.id, &listed(&jobs), false, now).await
                     }
@@ -1194,9 +1214,13 @@ impl Reader {
             Some(Kind::HiringSystem) | None => Err(FetchError::BadConfig),
             Some(_) => {
                 let board = BoardRef::of(row);
+                // Told to slow down part way: the store backs off as it did.
                 self.read_board(db, row, &board, now, &[], Some(Duration::ZERO), Some(probe))
                     .await
-                    .map(|read| read.jobs)
+                    .and_then(|read| match read.slow_down {
+                        Some(secs) => Err(FetchError::RateLimited(secs)),
+                        None => Ok(read.jobs),
+                    })
             }
         }
     }
@@ -1229,6 +1253,7 @@ impl Reader {
             jobs,
             cached,
             partial: None,
+            slow_down: None,
         };
         match kind {
             Kind::JsonApi => {
@@ -1241,6 +1266,12 @@ impl Reader {
                 let mut read = self
                     .json_api(db, &config, board, ttl, &secret, probe, &row.slug)
                     .await?;
+                // Told to slow down: no query now.
+                let asked = if read.slow_down.is_some() {
+                    Vec::new()
+                } else {
+                    asked
+                };
                 for value in &asked {
                     let Some(extra) = config.for_skill(value) else {
                         break;
@@ -1252,6 +1283,15 @@ impl Reader {
                         Ok(more) => {
                             read.cached &= more.cached;
                             read.jobs.extend(more.jobs);
+                            if more.slow_down.is_some() {
+                                read.slow_down = more.slow_down;
+                                break;
+                            }
+                        }
+                        Err(FetchError::RateLimited(secs)) => {
+                            tracing::info!(board = %row.slug, "a board query was told to slow down; no more now");
+                            read.slow_down = Some(secs);
+                            break;
                         }
                         Err(e) => {
                             // The plain read stands; ask no more.
@@ -1311,6 +1351,7 @@ impl Reader {
         let mut cached = true;
         let mut cursor: Option<String> = None;
         let mut partial = None;
+        let mut slow_down = None;
         // Whether the last page was reached (not the page limit).
         let mut ended = false;
         for page in 1..=config.pages() {
@@ -1352,6 +1393,9 @@ impl Reader {
                     // The pages before it stand.
                     tracing::info!(board = %slug, page, error = %e.kind(), "a job board's page could not be read; the pages before it are kept");
                     partial = Some(PartialRead { failed_page: page });
+                    if let FetchError::RateLimited(secs) = e {
+                        slow_down = Some(secs);
+                    }
                     break;
                 }
                 Err(e) => return Err(e),
@@ -1408,6 +1452,7 @@ impl Reader {
             jobs,
             cached,
             partial,
+            slow_down,
         })
     }
 

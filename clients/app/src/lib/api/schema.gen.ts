@@ -6020,9 +6020,9 @@ export interface components {
             good_matches: number;
             /**
              * Format: int32
-             * @description Of the jobs read in full, the ones that meet every requirement but
-             *     whose posting does not say whether it hires where the person lives:
-             *     kept, with a note.
+             * @description Of the jobs read in full now, the good matches kept although their
+             *     posting does not say whether it hires where the person lives: they
+             *     carry a note saying so.
              */
             kept_with_note: number;
             left_out?: components["schemas"]["JobsLeftOut"] | null;

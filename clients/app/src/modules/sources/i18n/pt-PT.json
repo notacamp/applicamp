@@ -333,7 +333,8 @@
     "site": {
       "read": "Lidas: {{read}} · De relance: {{quick}} · Lidas por inteiro: {{full}} · Boas correspondências: {{matched}} · Custo: {{cost}}",
       "skipped": "Não foi lido outra vez tão cedo: usaram-se as últimas ofertas.",
-      "partial": "Lidas {{pages}} páginas. A página {{page}} não respondeu.",
+      "partial_one": "Lida {{count}} página. A página {{page}} não respondeu.",
+      "partial_other": "Lidas {{count}} páginas. A página {{page}} não respondeu.",
       "error": "Não foi possível ler: {{error}}",
       "checked": "Verificado · {{note}}"
     },
@@ -488,7 +489,7 @@
           "price": "Avaliadas com a pesquisa noturna · cerca de 0,0003 € cada"
         }
       },
-      "limits": "Até {{max}} empresas vigiadas. Conta para os seus limites (0,30 € por dia, 5 € por mês), e nada é repetido depois de um limite."
+      "limits": "Até {{max}} empresas vigiadas. Conta para os seus limites de 1 € por dia e 10 € por mês, e nada é repetido depois de um limite."
     }
   },
   "admin": {

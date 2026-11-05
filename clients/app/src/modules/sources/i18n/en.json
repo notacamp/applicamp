@@ -333,7 +333,8 @@
     "site": {
       "read": "Read: {{read}} · Quick look: {{quick}} · Read in full: {{full}} · Good matches: {{matched}} · Cost: {{cost}}",
       "skipped": "Not read again so soon: its last jobs were used.",
-      "partial": "Read {{pages}} pages. Page {{page}} did not answer.",
+      "partial_one": "Read {{count}} page. Page {{page}} did not answer.",
+      "partial_other": "Read {{count}} pages. Page {{page}} did not answer.",
       "error": "Could not be read: {{error}}",
       "checked": "Checked · {{note}}"
     },
@@ -488,7 +489,7 @@
           "price": "Scored with the nightly search · about €0.0003 each"
         }
       },
-      "limits": "Up to {{max}} watched companies. It counts against your limits (€0.30 a day, €5 a month), and nothing is retried past a limit."
+      "limits": "Up to {{max}} watched companies. It counts against your limits of €1 a day and €10 a month, and nothing is retried past a limit."
     }
   },
   "admin": {

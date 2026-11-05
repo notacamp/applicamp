@@ -333,7 +333,8 @@
     "site": {
       "read": "Leídas: {{read}} · Por encima: {{quick}} · Leídas enteras: {{full}} · Buenas coincidencias: {{matched}} · Coste: {{cost}}",
       "skipped": "No se volvió a leer tan pronto: se usaron sus últimas ofertas.",
-      "partial": "Se leyeron {{pages}} páginas. La página {{page}} no respondió.",
+      "partial_one": "Se leyó {{count}} página. La página {{page}} no respondió.",
+      "partial_other": "Se leyeron {{count}} páginas. La página {{page}} no respondió.",
       "error": "No se pudo leer: {{error}}",
       "checked": "Revisado · {{note}}"
     },
@@ -488,7 +489,7 @@
           "price": "Puntuadas con la búsqueda nocturna · unos 0,0003 € cada una"
         }
       },
-      "limits": "Hasta {{max}} empresas vigiladas. Cuenta para tus límites (0,30 € al día, 5 € al mes), y nada se reintenta pasado un límite."
+      "limits": "Hasta {{max}} empresas vigiladas. Cuenta para tus límites de 1 € al día y 10 € al mes, y nada se reintenta pasado un límite."
     }
   },
   "admin": {

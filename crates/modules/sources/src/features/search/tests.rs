@@ -1265,7 +1265,7 @@ async fn a_limit_during_the_quick_looks_keeps_what_was_looked_at(db: PgPool) {
 
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_remote_job_that_does_not_say_where_it_hires_is_kept_with_a_note(db: PgPool) {
-    let boards = board_of(2).await;
+    let boards = board_of(3).await;
     let model = MockServer::start().await;
     Mock::given(method("POST"))
         .respond_with(|request: &wiremock::Request| {
@@ -1274,14 +1274,19 @@ async fn a_remote_job_that_does_not_say_where_it_hires_is_kept_with_a_note(db: P
                 .map(|posting| {
                     let reference = posting["ref"].as_str().unwrap_or("");
                     let mut facts = open_facts();
-                    if reference == "j1" {
-                        facts["open_to_candidate"] = json!("unclear");
-                        facts["region_note"] = json!("");
-                    } else {
+                    let mut score = 85;
+                    if reference == "j2" {
                         facts["open_to_candidate"] = json!("no");
                         facts["region_note"] = json!("US only");
+                    } else {
+                        facts["open_to_candidate"] = json!("unclear");
+                        facts["region_note"] = json!("");
                     }
-                    answer_for(reference, 85, &facts)
+                    if reference == "j3" {
+                        // Says nothing about where it hires, and is no match.
+                        score = 30;
+                    }
+                    answer_for(reference, score, &facts)
                 })
                 .collect();
             ResponseTemplate::new(200).set_body_json(completion(&json!({ "jobs": jobs }), 0.0004))
@@ -1308,13 +1313,63 @@ async fn a_remote_job_that_does_not_say_where_it_hires_is_kept_with_a_note(db: P
         added[0].score.gaps
     );
     let (_, full, gap, reasons) = funnel_row(&h).await;
-    assert_eq!((full, gap), (2, 1));
+    assert_eq!(
+        (full, gap),
+        (3, 1),
+        "only the match kept is counted with the note"
+    );
     assert_eq!(reasons["not_open_to_location"], 1, "{reasons}");
-    assert_eq!(left_out_total(&reasons) + 1, 2);
+    assert_eq!(reasons["not_good_enough"], 1, "{reasons}");
+    assert_eq!(left_out_total(&reasons) + 1, 3);
     let excluded: Vec<Option<String>> =
         sqlx::query_scalar("SELECT excluded_reason FROM sources.scores ORDER BY source_ref")
             .fetch_all(&h.db)
             .await
             .unwrap();
-    assert_eq!(excluded, [None, Some("not_open_to_location".to_owned())]);
+    assert_eq!(
+        excluded,
+        [None, Some("not_open_to_location".to_owned()), None]
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn quick_looks_about_no_job_of_the_batch_count_as_failed_calls(db: PgPool) {
+    let boards = board_of(30).await;
+    // The model answers every quick look with its refs as numbers: it parses,
+    // and names no job of the batch.
+    let model = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(|request: &wiremock::Request| {
+            let jobs: Vec<Value> = crate::testkit::postings(request)
+                .iter()
+                .enumerate()
+                .map(|(i, _)| json!({ "ref": i + 1, "fit": 90, "reason": "Backend work" }))
+                .collect();
+            ResponseTemplate::new(200).set_body_json(completion(&json!({ "jobs": jobs }), 0.0004))
+        })
+        .mount(&model)
+        .await;
+    let mut settings = config(&boards);
+    settings.full_scores_per_search = Some(4);
+    let h = Harness::new(
+        db,
+        settings,
+        Some(gateway(&model, BudgetConfig::default())),
+        Fake::ready(),
+    )
+    .await;
+    h.post("/api/v1/searches").await;
+    h.work().await;
+    let search = latest(&h).await;
+    assert_eq!(search["status"], "finished", "{search}");
+    assert_eq!(search["stopped"], "ai_failed", "{search}");
+    // 25 (unusable, split), 12 and 13 (unusable again), then 5: four in a row.
+    assert_eq!(
+        model_calls(&model).await,
+        usize::try_from(super::FAILED_IN_A_ROW).unwrap()
+    );
+    let (quick, full, _, reasons) = funnel_row(&h).await;
+    assert_eq!((quick, full), (0, 0));
+    assert_eq!(reasons["waiting"], 30, "{reasons}");
+    assert_eq!(search["added"], 0);
 }

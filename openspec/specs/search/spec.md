@@ -156,9 +156,11 @@ query for each of the first 3 wanted roles, without seniority words ("Senior
 Ruby Developer" is "ruby developer"), and for each of the first 3 skills in
 the person's order, without repeats and at most 6, in addition to the
 board's plain read, one page each; merge and deduplicate the answers, and
-rank jobs that name a top skill higher. It SHALL stay within each board's
-polling limits and terms and add no model call. With no roles and no
-skills, or on a board with no keyword search, it SHALL read as before.
+rank jobs that name a top skill higher. At night a board SHALL be asked
+everyone's queries in turn, at most 6 in all, the same for the nightly
+reading and every nightly search. It SHALL stay within each board's polling
+limits and terms and add no model call. With no roles and no skills, or on
+a board with no keyword search, it SHALL read as before.
 
 #### Scenario: A Ruby on Rails developer
 - **WHEN** the goals want "Senior Ruby Developer" and the profile's first skills are Ruby on Rails, React and PostgreSQL, and a search runs
@@ -171,6 +173,10 @@ skills, or on a board with no keyword search, it SHALL read as before.
 #### Scenario: A board's fetch limit
 - **WHEN** a board allows 24 fetches a day and six queries are added
 - **THEN** each of its seven addresses is reused for 7 hours, so it is fetched at most 24 times a day
+
+#### Scenario: Several people at night
+- **WHEN** two people with goals each have four queries and the nightly search runs
+- **THEN** each board that searches is asked six of them, their first ones in turn, and no more that night
 
 #### Scenario: No skills
 - **WHEN** the goals name no role and the profile lists no skills
@@ -252,7 +258,10 @@ jobs with the best quick fit, at most 100 a search (the setting
 `FULL_SCORES_PER_SEARCH`), and add the good matches. A job read in full SHALL
 never take a slot again while the profile, goals and rules are the same.
 When every job without a full read fits in the slots, the search SHALL read
-them all in full with no quick look. A watched company's new posting SHALL be
+them all in full with no quick look. A job whose description is not read yet
+SHALL be judged from its title, company and place, and the model SHALL be
+told so. An answer that names no job of its batch SHALL count as a failed
+call. A watched company's new posting SHALL be
 read in full ahead of the cut. Every call SHALL stay within the spending
 limits, and the search SHALL stop looking and reading after ten minutes,
 keeping what it has. The nightly search SHALL start for a person when a job
@@ -278,6 +287,10 @@ within their limits has neither a quick look nor a full read.
 - **WHEN** the account's daily limit is reached during the quick looks
 - **THEN** no further call is sent, what was looked at is kept, and the search ends saying the limit was reached
 
+#### Scenario: An answer about no job of the batch
+- **WHEN** the model answers every quick look with references that are not the batch's
+- **THEN** each answer counts as a failed call, it is asked again in halves once, and four in a row end the search with `ai_failed`
+
 #### Scenario: Nothing new for the nightly search
 - **WHEN** every job within a person's limits already has a quick look or a full read
 - **THEN** no nightly search starts for them
@@ -285,8 +298,14 @@ within their limits has neither a quick look nor a full read.
 ### Requirement: A page that fails keeps the pages already read
 A search SHALL keep the jobs of the pages of a site it already read when a
 later page fails, and the site's line SHALL say which page did not answer. A
-first page that fails SHALL fail the site for that search, as before.
+first page that fails SHALL fail the site for that search, as before. A site
+that asks to slow down part way SHALL be asked nothing more then, and SHALL
+be left alone for at least its polling interval, or as long as it asked.
 
 #### Scenario: The third page answers 500
 - **WHEN** a site's first two pages answer and the third answers 500
 - **THEN** the jobs of the first two are used, and the site's line says page 3 did not answer
+
+#### Scenario: Asked to slow down on page 4
+- **WHEN** Himalayas answers its fourth page with 429 and `Retry-After: 600`
+- **THEN** its first three pages are used, its queries are not sent, and a search 15 minutes later does not ask it

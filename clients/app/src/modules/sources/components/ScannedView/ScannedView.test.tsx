@@ -174,6 +174,36 @@ describe("The Searches tab", () => {
     });
   });
 
+  it("opens the newest search, not a later check for new job sites", async () => {
+    const check = { ...discoveryRun(), at: new Date(Date.now() - 60 * 60 * 1000).toISOString() };
+    renderSearches([check, lastNight()]);
+    const open = await screen.findByTestId("scanned-run");
+    expect(open).toHaveTextContent(/^Last night · /);
+    expect(screen.getAllByTestId("scanned-earlier-run")[0]).toHaveTextContent(
+      "Looked for new job sites",
+    );
+  });
+
+  it("says how many matches carry the note even when nothing was left out", async () => {
+    renderSearches([
+      run({
+        funnel: {
+          read: 3,
+          quick_looked: 0,
+          read_in_full: 3,
+          good_matches: 3,
+          kept_with_note: 1,
+          left_out: {},
+          stopped: null,
+        },
+      }),
+    ]);
+    expect(await screen.findByTestId("scanned-kept-with-note")).toHaveTextContent(
+      "1 of the 3 read in full doesn’t say where it hires. It is kept, with a note.",
+    );
+    expect(screen.queryByTestId("scanned-left-out")).toBeNull();
+  });
+
   it("says when there is no search yet", async () => {
     renderSearches([]);
     expect(await screen.findByTestId("scanned-empty")).toHaveTextContent("No searches yet");

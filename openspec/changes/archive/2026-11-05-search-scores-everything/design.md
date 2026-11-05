@@ -27,6 +27,11 @@
 6. Full reads as today (`scoring.rs`, 10 a call), then the requirement rules, the bar (65) and
    the 25-a-search cap.
 
+An answer that parses but names no job of its batch counts as a failed call, like a cut-off one,
+in both stages. A quick look's fit outside 0 to 100 is left out, not clamped, and its reason may
+cite only the job's own text. A job with no description yet is sent with `posting: null`, and the
+prompt says to judge it from the title, company and place.
+
 Time: one ten-minute budget for both stages; quick looks stop at half of it so the full reads
 always get their turn. The job's lease stays 15 minutes.
 
@@ -39,8 +44,9 @@ read says it is not remote), `quick_look` (looked at now, not among the best), `
 `not_open_to_location` (the site's regions or the posting limit it to other places),
 `below_floor`, `not_good_enough` (read in full, under the bar or with no reason the profile
 supports), `waiting` (stopped by a limit, a failed call or the 25-a-search cap: the next search
-takes them), and the good matches (`added`). `kept_with_gap` counts the jobs read in full now that
-meet every requirement but carry the "doesn't say if it hires in" note.
+takes them), and the good matches (`added`). `kept_with_gap` counts the good matches read in full now
+and kept with the "doesn't say if it hires in" note; the Searches tab shows its line whenever it is
+above 0.
 
 ## Rules (`requirements.rs`, `RULES_VERSION` 3)
 For someone who works remote only, or would not move: `remote = yes` and `open_to_candidate =
@@ -68,11 +74,22 @@ seniority or level words (`senior`, `staff`, `lead`, `principal`, `junior`, `mid
 (ignoring case), at most 6. A site with a skill search (`skill_search.param`) is asked each, one
 page, as the board spells it (`SkillSearch::value_of`), with each address cached for the board's
 polling interval stretched to its daily limit (Jobicy: 7 addresses at 24 a day is one fetch of
-each every 7 hours). The nightly reading reads the first 6 of everyone's queries once.
+each every 7 hours). At night every account's queries take turns, 6 at most in all
+(`matching::shared_queries`), and the nightly reading and every nightly search ask the same 6, so a
+board's daily fetches stay within its terms however many people search. A search started by hand
+asks the person's own.
 
 `json_api` keeps the pages it read when a later page fails (an error or an answer that is not the
 JSON expected): it logs the board and the error kind and the site's line says "Read 2 pages. Page
-3 did not answer." A failed first page still fails the site.
+3 did not answer." A failed first page still fails the site. A later page or a query that is told
+to slow down (429, 503) ends the reading: no query is sent, and the board's `backoff_until` is set
+to the longer of its `Retry-After` and its polling interval, at most a day. For the job store such
+a read stays the slow-down error it was, and any other part read tells the store it was partial,
+so nothing unseen is taken as closed.
+
+## Token cap
+`DEFAULT_DAILY_TOKENS` (crates/ai) goes from 200,000 to 3,000,000: the euro limits are the real
+guard, and a first night's quick looks alone use about 300,000.
 
 ## API (scope: a signed-in person, `session`)
 - `GET /api/v1/boards/scans`: each search run gains `funnel` (`read`, `quick_looked`,

@@ -333,7 +333,8 @@
     "site": {
       "read": "Lues : {{read}} · Coup d’œil : {{quick}} · Lues en entier : {{full}} · Bonnes correspondances : {{matched}} · Coût : {{cost}}",
       "skipped": "Pas relu si tôt : ses dernières offres ont été utilisées.",
-      "partial": "{{pages}} pages lues. La page {{page}} n’a pas répondu.",
+      "partial_one": "{{count}} page lue. La page {{page}} n’a pas répondu.",
+      "partial_other": "{{count}} pages lues. La page {{page}} n’a pas répondu.",
       "error": "Lecture impossible : {{error}}",
       "checked": "Vérifié · {{note}}"
     },
@@ -488,7 +489,7 @@
           "price": "Évaluées avec la recherche de nuit · environ 0,0003 € chacune"
         }
       },
-      "limits": "Jusqu’à {{max}} entreprises suivies. Cela compte dans vos limites (0,30 € par jour, 5 € par mois), et rien n’est retenté au-delà d’une limite."
+      "limits": "Jusqu’à {{max}} entreprises suivies. Cela compte dans vos limites de 1 € par jour et 10 € par mois, et rien n’est retenté au-delà d’une limite."
     }
   },
   "admin": {

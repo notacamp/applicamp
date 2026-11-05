@@ -278,9 +278,9 @@ pub struct SearchFunnel {
     pub read_in_full: u32,
     /// Good matches added to the person's jobs.
     pub good_matches: u32,
-    /// Of the jobs read in full, the ones that meet every requirement but
-    /// whose posting does not say whether it hires where the person lives:
-    /// kept, with a note.
+    /// Of the jobs read in full now, the good matches kept although their
+    /// posting does not say whether it hires where the person lives: they
+    /// carry a note saying so.
     pub kept_with_note: u32,
     /// Why the others were left out; none for a search from before these
     /// were counted.
@@ -732,8 +732,8 @@ struct Progress {
     quick_looked: usize,
     /// Jobs read in full now.
     read_in_full: usize,
-    /// Of those, kept with the note that the posting does not say where it
-    /// hires.
+    /// Of those, the good matches kept with the note that their posting does
+    /// not say where it hires.
     kept_with_gap: usize,
     /// Why the other jobs read were left out.
     left: JobsLeftOut,
@@ -1240,25 +1240,38 @@ impl Calls {
                 self.stopped = Some(SearchStop::AiUnavailable);
                 AfterFailure::Stop
             }
-            e => {
-                // A call was made: count it.
-                done.batches += 1;
-                self.failed_in_a_row += 1;
-                if self.failed_in_a_row >= FAILED_IN_A_ROW {
-                    tracing::warn!(error = %e, "model calls keep failing; the search keeps what it has");
-                    self.stopped = Some(SearchStop::AiFailed);
-                    AfterFailure::Stop
-                } else if may_split && jobs > 1 {
-                    tracing::warn!(error = %e, jobs, "a model call failed; asking again in halves");
-                    AfterFailure::Split
-                } else {
-                    tracing::warn!(error = %e, jobs, "a model call failed again; these jobs wait for the next search");
-                    AfterFailure::Skip
-                }
-            }
+            e => self.unusable(e, done, jobs, may_split),
+        }
+    }
+
+    /// A call about `jobs` jobs was made and its answer is of no use (`why`):
+    /// cut off, not the JSON asked for, or about no job of the batch.
+    fn unusable(
+        &mut self,
+        why: &dyn std::fmt::Display,
+        done: &mut Progress,
+        jobs: usize,
+        may_split: bool,
+    ) -> AfterFailure {
+        // A call was made: count it.
+        done.batches += 1;
+        self.failed_in_a_row += 1;
+        if self.failed_in_a_row >= FAILED_IN_A_ROW {
+            tracing::warn!(error = %why, "model calls keep failing; the search keeps what it has");
+            self.stopped = Some(SearchStop::AiFailed);
+            AfterFailure::Stop
+        } else if may_split && jobs > 1 {
+            tracing::warn!(error = %why, jobs, "a model call failed; asking again in halves");
+            AfterFailure::Split
+        } else {
+            tracing::warn!(error = %why, jobs, "a model call failed again; these jobs wait for the next search");
+            AfterFailure::Skip
         }
     }
 }
+
+/// Why an answer that parsed is still of no use.
+const ABOUT_NO_JOB: &str = "the answer is about no job of the batch";
 
 /// A job read in full that is not a match: read now, or judged by an
 /// earlier search.
@@ -1318,13 +1331,19 @@ pub(crate) async fn run(
         .await;
     };
 
-    // Read the boards, asking the ones that search for their roles and stack.
-    let fresh_since = if row.trigger == "nightly" {
-        row.started_at - NIGHTLY_READ
+    // Read the boards, asking the ones that search for their roles and stack:
+    // at night, what the night asks for everyone (read just before, and
+    // never more than a board's share); else this person's own.
+    let (fresh_since, queries) = if row.trigger == "nightly" {
+        let accounts = neighbours.accounts_with_goals(db).await?;
+        (
+            row.started_at - NIGHTLY_READ,
+            night_queries(neighbours.as_ref(), db, &accounts, now).await?,
+        )
     } else {
-        row.started_at
+        (row.started_at, input.queries.clone())
     };
-    let reading = read_sources(deps, reader, db, now, fresh_since, &input.queries).await?;
+    let reading = read_sources(deps, reader, db, now, fresh_since, &queries).await?;
     let failed = reading.failed;
     let scanned = reading.boards;
     let mut jobs = reading.jobs;
@@ -1463,7 +1482,15 @@ pub(crate) async fn run(
                 account,
                 now: deps.clock.now(),
             };
-            match quick::look(ai, caller, &input, &jobs).await {
+            let after = match quick::look(ai, caller, &input, &jobs).await {
+                // Answered, but about no job of the batch (its refs as
+                // numbers, or names it made up): as unusable as a cut-off
+                // answer.
+                Ok((looks, cost)) if looks.is_empty() => {
+                    done.cost_usd += cost;
+                    charge(&mut tallies, &mut watched, &jobs, cost);
+                    Some(calls.unusable(&ABOUT_NO_JOB, &mut done, batch.len(), may_split))
+                }
                 Ok((looks, cost)) => {
                     calls.answered();
                     done.batches += 1;
@@ -1483,16 +1510,18 @@ pub(crate) async fn run(
                         }
                     }
                     progress(db, id, &done).await?;
+                    None
                 }
-                Err(e) => match calls.failed(&e, &mut done, batch.len(), may_split) {
-                    AfterFailure::Stop => break,
-                    AfterFailure::Split => {
-                        let (first, second) = batch.split_at(batch.len() / 2);
-                        queue.push_front((second, false));
-                        queue.push_front((first, false));
-                    }
-                    AfterFailure::Skip => {}
-                },
+                Err(e) => Some(calls.failed(&e, &mut done, batch.len(), may_split)),
+            };
+            match after {
+                None | Some(AfterFailure::Skip) => {}
+                Some(AfterFailure::Stop) => break,
+                Some(AfterFailure::Split) => {
+                    let (first, second) = batch.split_at(batch.len() / 2);
+                    queue.push_front((second, false));
+                    queue.push_front((first, false));
+                }
             }
         }
         let mut ranked: Vec<(u8, usize)> = fits
@@ -1548,7 +1577,12 @@ pub(crate) async fn run(
             account,
             now: deps.clock.now(),
         };
-        match scoring::score(ai, caller, &input, &jobs).await {
+        let after = match scoring::score(ai, caller, &input, &jobs).await {
+            Ok((scores, cost)) if scores.is_empty() => {
+                done.cost_usd += cost;
+                charge(&mut tallies, &mut watched, &jobs, cost);
+                Some(calls.unusable(&ABOUT_NO_JOB, &mut done, range.len(), may_split))
+            }
             Ok((scores, cost)) => {
                 calls.answered();
                 done.batches += 1;
@@ -1572,16 +1606,18 @@ pub(crate) async fn run(
                 }
                 done.scored = scored.len();
                 progress(db, id, &done).await?;
+                None
             }
-            Err(e) => match calls.failed(&e, &mut done, range.len(), may_split) {
-                AfterFailure::Stop => break,
-                AfterFailure::Split => {
-                    let middle = range.start + range.len() / 2;
-                    queue.push_front((middle..range.end, false));
-                    queue.push_front((range.start..middle, false));
-                }
-                AfterFailure::Skip => {}
-            },
+            Err(e) => Some(calls.failed(&e, &mut done, range.len(), may_split)),
+        };
+        match after {
+            None | Some(AfterFailure::Skip) => {}
+            Some(AfterFailure::Stop) => break,
+            Some(AfterFailure::Split) => {
+                let middle = range.start + range.len() / 2;
+                queue.push_front((middle..range.end, false));
+                queue.push_front((range.start..middle, false));
+            }
         }
     }
     // What was chosen but not read waits for the next search; a watched
@@ -1602,7 +1638,9 @@ pub(crate) async fn run(
 
     // Keep the good ones that meet every requirement: the rules decide on
     // the facts, never the score.
-    let mut keep: Vec<Scored> = Vec::new();
+    // Each with whether it was read now and kept with the note that its
+    // posting does not say where it hires.
+    let mut keep: Vec<(Scored, bool)> = Vec::new();
     for (job, mut score, read_now) in scored {
         let verdict = requirements::check(&input, &score.facts, place_of(&job, &score));
         if let Some(reason) = verdict.excluded {
@@ -1613,9 +1651,6 @@ pub(crate) async fn run(
                 add(&mut done.left.seen_before, 1);
             }
             continue;
-        }
-        if read_now && verdict.hires_unclear {
-            done.kept_with_gap += 1;
         }
         if score.ungrounded {
             done.not_grounded += 1;
@@ -1641,18 +1676,23 @@ pub(crate) async fn run(
             .map(|(_, company)| OwnBoard {
                 company: company.clone(),
             });
-        keep.push(Scored {
-            job,
-            score,
-            own_board,
-        });
+        keep.push((
+            Scored {
+                job,
+                score,
+                own_board,
+            },
+            read_now && verdict.hires_unclear,
+        ));
     }
-    keep.sort_by_key(|scored| std::cmp::Reverse(scored.score.match_score));
+    keep.sort_by_key(|(scored, _)| std::cmp::Reverse(scored.score.match_score));
     // The most one search adds; the rest are added by the next.
     if keep.len() > MAX_ADDED {
         add(&mut done.left.waiting, keep.len() - MAX_ADDED);
         keep.truncate(MAX_ADDED);
     }
+    done.kept_with_gap = keep.iter().filter(|(_, noted)| *noted).count();
+    let keep: Vec<Scored> = keep.into_iter().map(|(scored, _)| scored).collect();
     for scored in &keep {
         for t in tally(&mut tallies, &scored.job) {
             t.matched += 1;
@@ -1687,6 +1727,24 @@ pub(crate) async fn run(
         tracing::warn!(error = %e, "company suggestions could not be worked out");
     }
     finished
+}
+
+/// What the boards are asked in a night ([`matching::shared_queries`]): every
+/// account's roles and top skills in turn, six at most, the same for the
+/// nightly reading and every nightly search it starts.
+async fn night_queries(
+    neighbours: &dyn crate::Neighbours,
+    db: &PgPool,
+    accounts: &[Uuid],
+    now: DateTime<Utc>,
+) -> Result<Vec<String>> {
+    let mut each: Vec<Vec<String>> = Vec::new();
+    for account in accounts {
+        if let Some(input) = neighbours.matching_input(db, *account, now).await? {
+            each.push(input.queries);
+        }
+    }
+    Ok(matching::shared_queries(&each))
 }
 
 /// The nightly search: every evening at 21:00 Lisbon time, for each account
@@ -1749,21 +1807,9 @@ pub(crate) async fn nightly(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
         return Ok(());
     }
     // Read once: the searches it starts read the same answers from the
-    // cache (within each board's polling interval).
+    // cache (within each board's polling interval), with the same queries.
     let now = deps.clock.now();
-    // What they ask the boards for too (their roles and top skills), so the
-    // queries are among what is read once: everyone's, in order, without
-    // repeats; a board takes the first few.
-    let mut queries: Vec<String> = Vec::new();
-    for account in &accounts {
-        if let Some(input) = neighbours.matching_input(db, *account, now).await? {
-            for query in &input.queries {
-                if !queries.iter().any(|q| q.eq_ignore_ascii_case(query)) {
-                    queries.push(query.clone());
-                }
-            }
-        }
-    }
+    let queries = night_queries(neighbours.as_ref(), db, &accounts, now).await?;
     let jobs = read_sources(deps, reader, db, now, now, &queries)
         .await?
         .jobs;

@@ -17312,7 +17312,7 @@
           "kept_with_note": {
             "type": "integer",
             "format": "int32",
-            "description": "Of the jobs read in full, the ones that meet every requirement but\nwhose posting does not say whether it hires where the person lives:\nkept, with a note.",
+            "description": "Of the jobs read in full now, the good matches kept although their\nposting does not say whether it hires where the person lives: they\ncarry a note saying so.",
             "minimum": 0
           },
           "left_out": {

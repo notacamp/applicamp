@@ -10,7 +10,8 @@
 //!   `APPLICAMP_AI__COMPLETE__API_KEY`: the bearer key, if the provider needs
 //!   one.
 //! - `APPLICAMP_AI__DAILY_TOKENS`: tokens (in + out) one account may use per
-//!   UTC day; default [`DEFAULT_DAILY_TOKENS`], `0` for no cap.
+//!   UTC day; default [`DEFAULT_DAILY_TOKENS`] (3,000,000), `0` for no cap.
+//!   A safety net above the spending limits, which are the real guard.
 //! - `APPLICAMP_AI__COMPLETE__INCLUDE_USAGE`: ask the provider for each
 //!   call's cost (`"usage": {"include": true}`, OpenRouter); default `true`,
 //!   `false` for a provider that refuses unknown fields.
@@ -57,8 +58,12 @@ use url::Url;
 
 use crate::Error;
 
-/// Tokens one account may use per UTC day when nothing else is set.
-pub const DEFAULT_DAILY_TOKENS: u64 = 200_000;
+/// Tokens one account may use per UTC day when nothing else is set: a safety
+/// net well above what the spending limits allow at a cheap model's price
+/// (the euro limits are the real guard). A first night's search alone, a
+/// quick look at about a thousand jobs and a hundred read in full, takes
+/// about 400,000 (#74).
+pub const DEFAULT_DAILY_TOKENS: u64 = 3_000_000;
 /// The reasoning effort sent to OpenRouter unless configured: enough to
 /// answer well, short enough to leave room for the answer.
 pub const DEFAULT_REASONING_EFFORT: &str = "low";
@@ -446,6 +451,20 @@ mod tests {
 
     fn load(value: serde_json::Value) -> Result<AiConfig, Error> {
         AiConfig::from_figment(&Figment::from(Serialized::defaults(value)))
+    }
+
+    #[test]
+    fn a_first_nights_search_fits_in_the_daily_tokens() {
+        // A first night for someone with about a thousand jobs within their
+        // limits: 40 quick looks of 25 jobs and 10 full reads of 10, each at
+        // its worst (a prompt of 8,000 tokens and the whole answer it may
+        // give: 5,000 for a quick look, 8,000 for a full read).
+        let quick_looks = 40 * (8_000 + 5_000);
+        let full_reads = 10 * (8_000 + 8_000);
+        assert!(
+            DEFAULT_DAILY_TOKENS >= 2 * (quick_looks + full_reads),
+            "with room for the day's other work"
+        );
     }
 
     #[test]

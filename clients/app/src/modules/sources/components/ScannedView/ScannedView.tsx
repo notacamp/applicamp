@@ -203,7 +203,10 @@ export function siteText(line: ScanLine, locale: string, t: TFunction<"sources">
         line.outcome === "skipped_poll_limit" ? t("scanned.site.skipped") : null,
         partial === null
           ? null
-          : t("scanned.site.partial", { pages: partial[1] ?? "", page: partial[2] ?? "" }),
+          : t("scanned.site.partial", {
+              count: Number(partial[1] ?? "0"),
+              page: partial[2] ?? "",
+            }),
       ].filter((note) => note !== null);
       return [counts, ...notes].join(" ");
     }
@@ -271,18 +274,18 @@ function RunDetail({ run }: { run: ScanRun }) {
             {t("scanned.leftOut")}
           </Heading>
           <Bullets items={left} testId="scanned-left-out" />
-          {funnel.kept_with_note > 0 ? (
-            <Tagged testId="scanned-kept-with-note">
-              <Text tone="secondary">
-                {t("scanned.keptWithNote", {
-                  count: funnel.kept_with_note,
-                  total: formatCount(funnel.read_in_full, locale),
-                })}
-              </Text>
-            </Tagged>
-          ) : null}
         </Stack>
       )}
+      {funnel.kept_with_note > 0 ? (
+        <Tagged testId="scanned-kept-with-note">
+          <Text tone="secondary">
+            {t("scanned.keptWithNote", {
+              count: funnel.kept_with_note,
+              total: formatCount(funnel.read_in_full, locale),
+            })}
+          </Text>
+        </Tagged>
+      ) : null}
       {run.lines.length === 0 ? null : (
         <Stack gap="sm">
           <Cluster>
@@ -388,7 +391,9 @@ export function ScannedView() {
       </Placeholder>
     );
   } else {
-    const open = runs.find((run) => run.id === chosen) ?? runs[0];
+    // The newest search opens, not a discovery run that came after it.
+    const open =
+      runs.find((run) => run.id === chosen) ?? runs.find((run) => run.kind === "search") ?? runs[0];
     const others = runs.filter((run) => run.id !== open?.id);
     body = (
       <Stack gap="lg">

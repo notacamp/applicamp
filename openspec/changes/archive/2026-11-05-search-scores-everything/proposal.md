@@ -23,7 +23,10 @@ night, and the Scanned view could not say why.
   `APPLICAMP_SOURCES__FULL_SCORES_PER_SEARCH` (100) by quick fit are then **read in full** as
   today (10 a call, 1,500 characters, the posting's facts). A job read in full never takes a slot
   again; a rejected job is read again only when the profile, goals or rules version changes. When
-  every job without a full read fits in the slots, no quick look is made (it would change nothing).
+  every job without a full read fits in the slots, no quick look is made, since it would change
+  nothing. A job whose description is not read yet, as on a company board's list, is judged from
+  its title, company and place, and the model is told so; the description is read only for the
+  jobs chosen to be read in full.
   The stop rules stay (four failed calls in a row, ten minutes), and every call reserves its budget
   first; at a spending limit the search keeps what it has and says `ai_budget_reached`.
 - **"Unclear" is a note, not a drop.** For someone who works remote only, or who would not move, a
@@ -44,8 +47,9 @@ night, and the Scanned view could not say why.
   Details. "Search now" is a plain button with "About €0.10." on the line under it.
 - **The nightly search** still skips a person when no new job within their limits is unseen; a job
   counts as seen once it has a quick look or a full read.
-- **Spending limits** default to €1 a day and €10 a month per account (were €0.30 and €3); the
-  instance stays at €15 a month.
+- **Spending limits** default to €1 a day and €10 a month per account, up from €0.30 and €3; the
+  instance stays at €15 a month. The daily token cap becomes a safety net above them, 3,000,000
+  tokens instead of 200,000, which a first night's quick looks alone would have used up.
 
 ## What the app does by itself / what waits on the person
 By itself: looks at every job within the limits, reads the best 100 in full, keeps a job that does

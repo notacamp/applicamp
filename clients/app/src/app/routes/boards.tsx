@@ -53,7 +53,7 @@ export function Boards({ tab, onTab }: BoardsProps) {
     );
   }
   return (
-    <Page testId="boards" title={t("boards.title")} lead={t("boards.lead")} wide>
+    <Page testId="boards" title={t("boards.title")} wide>
       <BoardsPage tab={tab === "admin" ? "boards" : tab} onTab={onTab} />
     </Page>
   );

@@ -56,17 +56,17 @@
       "approved": {
         "title": "Aprobados",
         "description": "Todas las búsquedas leen estos portales, dentro de sus términos. Primero el salario medio más alto.",
-        "empty": "Todavía no hay portales aprobados."
+        "empty": "Los portales que apruebes aparecen aquí, con sus ofertas y los salarios que publican."
       },
       "waiting": {
         "title": "Esperándote",
         "description": "Encontrados por el descubrimiento semanal o sugeridos. No se lee nada de ellos hasta que se aprueban.",
-        "empty": "No hay nada esperándote."
+        "empty": "Un portal nuevo aparece aquí cuando necesita tu aprobación, una clave o un permiso."
       },
       "declined": {
         "title": "Rechazados",
         "description": "Nunca se leen, cada uno con su motivo.",
-        "empty": "Ningún portal está rechazado."
+        "empty": "Un portal que rechaces aparece aquí, con el motivo."
       }
     },
     "status": {

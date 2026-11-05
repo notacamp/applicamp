@@ -56,17 +56,17 @@
       "approved": {
         "title": "Approved",
         "description": "Every search reads these, within their terms. Highest average salary first.",
-        "empty": "No board is approved yet."
+        "empty": "Boards you approve show here, with their jobs and the salaries they list."
       },
       "waiting": {
         "title": "Waiting for you",
         "description": "Found by the weekly discovery or suggested. Nothing is read from them until they’re approved.",
-        "empty": "Nothing is waiting for you."
+        "empty": "A new board shows here when it needs your approval, a key or a permission."
       },
       "declined": {
         "title": "Declined",
         "description": "Never read, each with the reason.",
-        "empty": "No board is declined."
+        "empty": "A board you decline shows here, with the reason."
       }
     },
     "status": {

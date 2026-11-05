@@ -56,17 +56,17 @@
       "approved": {
         "title": "Approuvés",
         "description": "Chaque recherche les lit, dans le respect de leurs conditions. Le salaire moyen le plus élevé d’abord.",
-        "empty": "Aucun site n’est encore approuvé."
+        "empty": "Les sites que vous approuvez apparaissent ici, avec leurs offres et les salaires affichés."
       },
       "waiting": {
         "title": "En attente de vous",
         "description": "Trouvés par la découverte hebdomadaire ou suggérés. Rien n’y est lu avant leur approbation.",
-        "empty": "Rien ne vous attend."
+        "empty": "Un nouveau site apparaît ici quand il attend votre approbation, une clé ou une permission."
       },
       "declined": {
         "title": "Refusés",
         "description": "Jamais lus, chacun avec sa raison.",
-        "empty": "Aucun site n’est refusé."
+        "empty": "Un site que vous refusez apparaît ici, avec la raison."
       }
     },
     "status": {

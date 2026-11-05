@@ -630,6 +630,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{id}/undo-not-interested": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo "Not interested" in a company.
+         * @description Puts it back among the suggestions, as it was. Only for a company the
+         *     person said "Not interested" in (404 otherwise).
+         */
+        post: operations["sources.undo_dismiss_company"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{id}/watch": {
         parameters: {
             query?: never;
@@ -717,6 +738,55 @@ export interface paths {
          */
         get: operations["identity.me"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/my-sites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My job sites.
+         * @description The sites the app can read for the signed-in person, in groups: Remote,
+         *     worldwide; Europe; their country; By trade; Startups and all-jobs sites.
+         *     Each is On or Off: the app sets it from their goals (where they want to
+         *     work, remote or not, where they live, their roles and skills against what
+         *     the site offers) until they choose themselves. `q` finds a site by name;
+         *     `show` keeps the sites that are On, remote, in Europe, in their country or
+         *     for one trade. Also: the sites that do not allow apps to read them, and
+         *     how many company hiring pages the app reads besides.
+         */
+        get: operations["sources.my_sites"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/my-sites/{board_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Turn a site On or Off.
+         * @description The person's own choice: the app does not change it again, even when
+         *     their goals change. A site that needs a key cannot be turned On until the
+         *     key is set (409 `needs_key`); a site that is not on the list is 404.
+         */
+        put: operations["sources.set_my_site"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2969,6 +3039,16 @@ export interface components {
          * @enum {string}
          */
         Blocked: "stage_too_early" | "per_opportunity_cap" | "daily_cap" | "ai_unavailable";
+        /** @description The sites that do not allow apps to read them. */
+        BlockedSites: {
+            /**
+             * Format: int32
+             * @description How many.
+             */
+            count: number;
+            /** @description Their names (the first ones). */
+            names: string[];
+        };
         /** @description The answer to record. */
         BoardAnswer: {
             answer: components["schemas"]["RequestAnswer"];
@@ -5149,6 +5229,85 @@ export interface components {
             id: string;
             text: string;
         };
+        /** @description One site, as a person sees it. */
+        MySite: {
+            group: components["schemas"]["SiteGroup"];
+            /** Format: uuid */
+            id: string;
+            /** @description The kinds of jobs it has (`tech`, `design`...); none: every kind. */
+            kinds: string[];
+            name: string;
+            /** @description It needs an API key before it can be read: the owner adds it. */
+            needs_key: boolean;
+            /**
+             * Format: int32
+             * @description Jobs new on the site in the last 7 days, from the job store; none
+             *     when the store has no count for it yet.
+             */
+            new_this_week?: number | null;
+            /** @description It is On for the person. */
+            on: boolean;
+            /**
+             * @description Where its jobs are: `worldwide`, `europe`, a region (`north-america`)
+             *     or a country's code; none when not known.
+             */
+            place?: string | null;
+            remote: components["schemas"]["SiteRemote"];
+            salary_basis?: components["schemas"]["SiteSalaryBasis"] | null;
+            /**
+             * Format: double
+             * @description Its typical salary in euros a year, rounded to a thousand; none when
+             *     not known.
+             */
+            salary_eur_year?: number | null;
+            /** @description Who set it. */
+            set_by: components["schemas"]["SiteSetBy"];
+            /** @description The stack or trade it is built around, as plain words. */
+            specialities: string[];
+        };
+        /** @description The person's choice for a site. */
+        MySiteChange: {
+            /** @description On or Off. */
+            on: boolean;
+        };
+        /** @description A site as the person now has it. */
+        MySiteChoice: {
+            /** Format: uuid */
+            id: string;
+            on: boolean;
+            set_by: components["schemas"]["SiteSetBy"];
+        };
+        /** @description A group of the list. */
+        MySiteGroup: {
+            group: components["schemas"]["SiteGroup"];
+            sites: components["schemas"]["MySite"][];
+        };
+        /** @description The person's job sites. */
+        MySites: {
+            /**
+             * Format: int32
+             * @description Sites the app can read for them, whatever is searched or shown.
+             */
+            available: number;
+            blocked: components["schemas"]["BlockedSites"];
+            /**
+             * Format: int32
+             * @description Company hiring pages the app also reads, one by one unlisted.
+             */
+            company_pages: number;
+            /** @description The country they live in (ISO 3166-1), when known. */
+            country?: string | null;
+            /**
+             * @description The groups in order, with the sites that match what is searched and
+             *     shown; a group with none is left out.
+             */
+            groups: components["schemas"]["MySiteGroup"][];
+            /**
+             * Format: int32
+             * @description Of those, the ones that are On.
+             */
+            on: number;
+        };
         /** @description A job to add by its link. */
         NewOpportunity: {
             /** @description The company, for a link to a site that is not a job board. */
@@ -6121,15 +6280,35 @@ export interface components {
          */
         ShortlistedBy: "person" | "app";
         /**
+         * @description The groups a person's list is in, in the order it is shown.
+         * @enum {string}
+         */
+        SiteGroup: "remote_worldwide" | "europe" | "country" | "trade" | "everything";
+        /**
          * @description Where the company's site came from.
          * @enum {string}
          */
         SiteOrigin: "board" | "apply_host" | "person" | "posting_link" | "posting_email" | "name_guess";
+        /**
+         * @description How remote a site's jobs are.
+         * @enum {string}
+         */
+        SiteRemote: "mostly" | "some" | "no";
         /** @description An employer's own website, typed. */
         SiteRequest: {
             /** @description An http or https address; only its host (and port) is kept. */
             url: string;
         };
+        /**
+         * @description How a site's typical salary is known.
+         * @enum {string}
+         */
+        SiteSalaryBasis: "listed" | "country";
+        /**
+         * @description Who last set a site On or Off.
+         * @enum {string}
+         */
+        SiteSetBy: "app" | "person";
         /** @description The pages and the size. */
         SizeCheck: {
             /** Format: int64 */
@@ -8078,6 +8257,47 @@ export interface operations {
             };
         };
     };
+    "sources.undo_dismiss_company": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The company. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Suggested again. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyList"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "sources.watch_company": {
         parameters: {
             query?: never;
@@ -8248,6 +8468,112 @@ export interface operations {
             };
             /** @description `session_required`: no live session. */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "sources.my_sites": {
+        parameters: {
+            query?: {
+                /** @description Only sites whose name has this in it, ignoring case. */
+                q?: string;
+                /** @description What to show; all sites when left out. */
+                show?: "all" | "on" | "remote" | "europe" | "country" | "trade";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The person's sites. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MySites"];
+                };
+            };
+            /** @description `invalid_query` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "sources.set_my_site": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The site. */
+                board_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MySiteChange"];
+            };
+        };
+        responses: {
+            /** @description Set. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MySiteChoice"];
+                };
+            };
+            /** @description `invalid_site` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `needs_key` */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

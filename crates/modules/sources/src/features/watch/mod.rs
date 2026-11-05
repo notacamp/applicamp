@@ -310,6 +310,41 @@ pub async fn stop(
     Ok(Json(list_of(&state.db, account, now).await?))
 }
 
+/// Undo "Not interested" in a company.
+///
+/// Puts it back among the suggestions, as it was. Only for a company the
+/// person said "Not interested" in (404 otherwise).
+#[utoipa::path(
+    post,
+    path = "/api/v1/companies/{id}/undo-not-interested",
+    tag = "sources",
+    operation_id = "sources.undo_dismiss_company",
+    security(("session" = [])),
+    params(("id" = Uuid, Path, description = "The company.")),
+    responses(
+        (status = 200, description = "Suggested again.", body = CompanyList),
+        (status = 401, description = "`session_required`", body = Problem,
+            content_type = "application/problem+json"),
+        (status = 404, description = "`not_found`", body = Problem,
+            content_type = "application/problem+json"),
+    ),
+)]
+pub async fn undo_not_interested(
+    State(state): State<AppState>,
+    SignedIn(principal): SignedIn,
+    Path(id): Path<Uuid>,
+) -> Result<Json<CompanyList>> {
+    let account = principal.account_id;
+    let now = state.clock.now();
+    let dismissed = store::of_company(&state.db, account, id)
+        .await?
+        .is_some_and(|row| row.state == "not_interested");
+    if !dismissed || !store::set_state(&state.db, account, id, "suggested", now).await? {
+        return Err(Error::NotFound);
+    }
+    Ok(Json(list_of(&state.db, account, now).await?))
+}
+
 fn invalid_url() -> Error {
     Error::BadRequest(
         "invalid_url",

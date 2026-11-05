@@ -696,5 +696,112 @@
     "declined": "Rechazado",
     "open": "Abrir",
     "more": "Mostrar más"
+  },
+  "sites": {
+    "loadFailed": "No se pudieron cargar los sitios de empleo.",
+    "retry": "Reintentar",
+    "views": {
+      "label": "Vista de los sitios de empleo",
+      "mine": "Tus sitios",
+      "all": "Todos los sitios",
+      "scanned": "Búsquedas"
+    },
+    "count": "{{available}} disponibles, {{on}} activados",
+    "find": "Buscar un sitio",
+    "show": {
+      "label": "Mostrar",
+      "all": "Todos los sitios",
+      "on": "Sitios activados",
+      "remote": "Remoto",
+      "europe": "Europa",
+      "country": "Tu país",
+      "trade": "Por oficio"
+    },
+    "groups": {
+      "remote_worldwide": "Remoto, en todo el mundo",
+      "europe": "Europa",
+      "country": "Tu país",
+      "trade": "Por oficio",
+      "everything": "Startups y sitios con todo tipo de empleos"
+    },
+    "on": "Activado",
+    "off": "Desactivado",
+    "toggle": "{{state}}: {{name}}",
+    "addKey": "Añadir la clave",
+    "adminAddsKey": "El administrador añade esta clave",
+    "saveFailed": "No se guardó. Inténtalo de nuevo.",
+    "noneYet": "Todavía no hay sitios listos. Aparecen aquí a medida que la aplicación revisa nuevos.",
+    "noMatch": "Ningún sitio coincide. Prueba otra palabra o muestra todos los sitios.",
+    "salary": {
+      "listed": "Salario típico de {{pay}} al año",
+      "country": "Paga unos {{pay}} al año en el país del sitio"
+    },
+    "kinds": {
+      "tech": "tecnología",
+      "data": "datos",
+      "design": "diseño",
+      "product": "producto",
+      "marketing": "marketing",
+      "sales": "ventas",
+      "finance": "finanzas",
+      "legal": "derecho",
+      "people": "personas y selección",
+      "operations": "operaciones",
+      "support": "atención al cliente",
+      "health-care": "salud",
+      "education": "educación",
+      "hospitality-travel": "hostelería y viajes",
+      "retail": "comercio",
+      "logistics": "logística",
+      "trades": "oficios",
+      "climate": "clima",
+      "nonprofit": "sin ánimo de lucro",
+      "public-sector": "sector público",
+      "media": "medios",
+      "science": "ciencia"
+    },
+    "places": {
+      "worldwide": "Todo el mundo",
+      "europe": "Europa",
+      "north-america": "Norteamérica",
+      "latin-america": "Latinoamérica",
+      "asia": "Asia",
+      "africa": "África",
+      "oceania": "Oceanía"
+    },
+    "line": {
+      "trade": "Solo empleos de {{what}}.",
+      "allKinds": "Empleos de todo tipo.",
+      "mostly": "Sobre todo {{kinds}}.",
+      "remote": "Empleos remotos, sobre todo {{kinds}}.",
+      "remoteAll": "Empleos remotos de todo tipo.",
+      "place": "{{place}}. {{what}}",
+      "someRemote": "Algunos empleos son remotos.",
+      "needsKey": "Necesita una clave gratuita del sitio.",
+      "newThisWeek": "Unas {{n}} nuevas por semana."
+    },
+    "blocked": {
+      "sentence_one": "{{names}} no permite que las aplicaciones lo lean, así que no está en la lista.",
+      "sentence_other": "{{names}} no permiten que las aplicaciones los lean, así que no están en la lista.",
+      "more": "{{names}} y otros {{rest}} no permiten que las aplicaciones los lean, así que no están en la lista."
+    },
+    "companyPages_one": "También lee {{n}} página de empleo de empresa.",
+    "companyPages_other": "También lee {{n}} páginas de empleo de empresas.",
+    "companies": {
+      "title": "Empresas",
+      "description": "{{followed}} seguidas, {{proposed}} propuestas. Sigue una empresa y la aplicación revisa su página de empleo cada día.",
+      "checkedDaily": "Revisada cada día",
+      "following": "Siguiendo",
+      "stop": "Dejar de seguir",
+      "keep": "Seguir",
+      "drop": "Descartar",
+      "dropped": "Descartada",
+      "stopped": "Dejada de seguir",
+      "undo": "Deshacer",
+      "more_one": "{{count}} propuesta más",
+      "more_other": "{{count}} propuestas más",
+      "show": "Mostrar",
+      "empty": "Todavía no hay empresas. Aparecen cuando empleos que te encajan siguen viniendo de la misma empresa."
+    }
   }
 }

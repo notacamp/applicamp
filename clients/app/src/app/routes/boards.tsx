@@ -1,26 +1,36 @@
 import { useTranslation } from "react-i18next";
 
-import { ButtonLink, Page, SkeletonList, Tagged } from "~/lib/ui";
-import { BoardsAdmin, BoardsPage, useBoards, type BoardsTab } from "~/modules/sources";
+import { ButtonLink, Page, SkeletonList, Stack, Tagged, ViewSwitch } from "~/lib/ui";
+import {
+  BoardsAdmin,
+  BoardsPage,
+  MySitesPage,
+  ScannedView,
+  useBoards,
+  type BoardsTab,
+} from "~/modules/sources";
 
 import { useInAppLink } from "../links";
 
-/** `admin` is the owners' page; `boards` and `scanned` are the list and what each search scanned. */
-export type BoardsRouteTab = BoardsTab | "admin";
+/** `mine`: everyone's sites; `all`: the owners' page; `scanned` and `list`: searches and boards by status. */
+export type BoardsRouteTab = "mine" | "all" | "scanned" | "list";
 
 export interface BoardsProps {
-  tab: BoardsRouteTab;
-  onTab: (tab: BoardsTab) => void;
+  /** None: the owners' page for the owners, the person's sites for everyone else. */
+  tab: BoardsRouteTab | undefined;
+  onTab: (tab: BoardsRouteTab) => void;
 }
 
 /**
- * `/boards`: for the people who manage the job boards, one page with every board's status, what
- * waits for them and the permission emails to copy; for everyone else, the job boards searches
- * read, ranked by average salary, and what each search scanned (`?tab=scanned`). The owners' list
- * of boards by status stays at `?tab=list`.
+ * `/boards`: the Job sites. For everyone, the sites the app reads for them, each On or Off, and
+ * the companies to follow. The people who manage the job boards also see "All sites", every
+ * board's status, what waits for them and the permission emails to copy, and open on it. What
+ * each search scanned is under "Searches"; the owners' list of boards by status stays at
+ * `?tab=list`.
  */
 export function Boards({ tab, onTab }: BoardsProps) {
   const { t } = useTranslation();
+  const { t: sources } = useTranslation("sources");
   const boards = useBoards();
   const link = useInAppLink();
   if (boards.isPending) {
@@ -32,29 +42,78 @@ export function Boards({ tab, onTab }: BoardsProps) {
       </Page>
     );
   }
-  if (tab === "admin" && boards.data?.can_manage === true) {
+  const owner = boards.data?.can_manage === true;
+  if (tab === "list") {
     return (
-      <Page testId="boards" title={t("boards.adminTitle")} eyebrow={t("boards.eyebrow")} wide>
-        <BoardsAdmin
-          back={
-            <div>
-              <ButtonLink
-                variant="ghost"
-                icon="chevron-left"
-                data-testid="boards-back"
-                {...link("/profile")}
-              >
-                {t("boards.back")}
-              </ButtonLink>
-            </div>
-          }
+      <Page testId="boards" title={t("boards.title")} wide>
+        <BoardsPage
+          tab="boards"
+          onTab={(next: BoardsTab) => {
+            onTab(next === "scanned" ? "scanned" : "list");
+          }}
         />
       </Page>
     );
   }
+  const view =
+    tab === undefined ? (owner ? "all" : "mine") : tab === "all" && !owner ? "mine" : tab;
+  const back = (
+    <div>
+      <ButtonLink
+        variant="ghost"
+        icon="chevron-left"
+        data-testid="boards-back"
+        {...link("/profile")}
+      >
+        {t("boards.back")}
+      </ButtonLink>
+    </div>
+  );
+  const views = (
+    <ViewSwitch
+      label={sources("sites.views.label")}
+      options={[
+        { value: "mine" as const, label: sources("sites.views.mine"), testId: "boards-view-mine" },
+        ...(owner
+          ? [
+              {
+                value: "all" as const,
+                label: sources("sites.views.all"),
+                testId: "boards-view-all",
+              },
+            ]
+          : []),
+        {
+          value: "scanned" as const,
+          label: sources("sites.views.scanned"),
+          testId: "boards-view-scanned",
+        },
+      ]}
+      value={view}
+      onChange={onTab}
+    />
+  );
+  const head = (
+    <Stack gap="sm">
+      {back}
+      {views}
+    </Stack>
+  );
   return (
-    <Page testId="boards" title={t("boards.title")} wide>
-      <BoardsPage tab={tab === "admin" ? "boards" : tab} onTab={onTab} />
+    <Page
+      testId="boards"
+      title={view === "all" ? t("boards.adminTitle") : t("boards.title")}
+      eyebrow={t("boards.eyebrow")}
+      wide
+    >
+      {view === "all" ? (
+        <BoardsAdmin back={head} />
+      ) : (
+        <Stack gap="lg">
+          {head}
+          {view === "scanned" ? <ScannedView /> : <MySitesPage canManage={owner} />}
+        </Stack>
+      )}
     </Page>
   );
 }

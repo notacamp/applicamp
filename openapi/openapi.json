@@ -2054,6 +2054,65 @@
         ]
       }
     },
+    "/api/v1/companies/{id}/undo-not-interested": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Undo \"Not interested\" in a company.",
+        "description": "Puts it back among the suggestions, as it was. Only for a company the\nperson said \"Not interested\" in (404 otherwise).",
+        "operationId": "sources.undo_dismiss_company",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The company.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Suggested again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/v1/companies/{id}/watch": {
       "post": {
         "tags": [
@@ -2273,6 +2332,171 @@
           },
           "401": {
             "description": "`session_required`: no live session.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/my-sites": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "My job sites.",
+        "description": "The sites the app can read for the signed-in person, in groups: Remote,\nworldwide; Europe; their country; By trade; Startups and all-jobs sites.\nEach is On or Off: the app sets it from their goals (where they want to\nwork, remote or not, where they live, their roles and skills against what\nthe site offers) until they choose themselves. `q` finds a site by name;\n`show` keeps the sites that are On, remote, in Europe, in their country or\nfor one trade. Also: the sites that do not allow apps to read them, and\nhow many company hiring pages the app reads besides.",
+        "operationId": "sources.my_sites",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Only sites whose name has this in it, ignoring case.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "show",
+            "in": "query",
+            "description": "What to show; all sites when left out.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "What the list shows.",
+              "enum": [
+                "all",
+                "on",
+                "remote",
+                "europe",
+                "country",
+                "trade"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The person's sites.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MySites"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_query`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/my-sites/{board_id}": {
+      "put": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Turn a site On or Off.",
+        "description": "The person's own choice: the app does not change it again, even when\ntheir goals change. A site that needs a key cannot be turned On until the\nkey is set (409 `needs_key`); a site that is not on the list is 404.",
+        "operationId": "sources.set_my_site",
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "path",
+            "description": "The site.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MySiteChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Set.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MySiteChoice"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_site`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`needs_key`",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -9735,6 +9959,29 @@
           "ai_unavailable"
         ]
       },
+      "BlockedSites": {
+        "type": "object",
+        "description": "The sites that do not allow apps to read them.",
+        "required": [
+          "count",
+          "names"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many.",
+            "minimum": 0
+          },
+          "names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Their names (the first ones)."
+          }
+        }
+      },
       "BoardAnswer": {
         "type": "object",
         "description": "The answer to record.",
@@ -15139,6 +15386,198 @@
           }
         }
       },
+      "MySite": {
+        "type": "object",
+        "description": "One site, as a person sees it.",
+        "required": [
+          "id",
+          "name",
+          "group",
+          "kinds",
+          "remote",
+          "specialities",
+          "on",
+          "set_by",
+          "needs_key"
+        ],
+        "properties": {
+          "group": {
+            "$ref": "#/components/schemas/SiteGroup"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kinds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The kinds of jobs it has (`tech`, `design`...); none: every kind."
+          },
+          "name": {
+            "type": "string"
+          },
+          "needs_key": {
+            "type": "boolean",
+            "description": "It needs an API key before it can be read: the owner adds it."
+          },
+          "new_this_week": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Jobs new on the site in the last 7 days, from the job store; none\nwhen the store has no count for it yet.",
+            "minimum": 0
+          },
+          "on": {
+            "type": "boolean",
+            "description": "It is On for the person."
+          },
+          "place": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where its jobs are: `worldwide`, `europe`, a region (`north-america`)\nor a country's code; none when not known."
+          },
+          "remote": {
+            "$ref": "#/components/schemas/SiteRemote"
+          },
+          "salary_basis": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SiteSalaryBasis"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "salary_eur_year": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Its typical salary in euros a year, rounded to a thousand; none when\nnot known."
+          },
+          "set_by": {
+            "$ref": "#/components/schemas/SiteSetBy",
+            "description": "Who set it."
+          },
+          "specialities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The stack or trade it is built around, as plain words."
+          }
+        }
+      },
+      "MySiteChange": {
+        "type": "object",
+        "description": "The person's choice for a site.",
+        "required": [
+          "on"
+        ],
+        "properties": {
+          "on": {
+            "type": "boolean",
+            "description": "On or Off."
+          }
+        },
+        "additionalProperties": false
+      },
+      "MySiteChoice": {
+        "type": "object",
+        "description": "A site as the person now has it.",
+        "required": [
+          "id",
+          "on",
+          "set_by"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "on": {
+            "type": "boolean"
+          },
+          "set_by": {
+            "$ref": "#/components/schemas/SiteSetBy"
+          }
+        }
+      },
+      "MySiteGroup": {
+        "type": "object",
+        "description": "A group of the list.",
+        "required": [
+          "group",
+          "sites"
+        ],
+        "properties": {
+          "group": {
+            "$ref": "#/components/schemas/SiteGroup"
+          },
+          "sites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MySite"
+            }
+          }
+        }
+      },
+      "MySites": {
+        "type": "object",
+        "description": "The person's job sites.",
+        "required": [
+          "available",
+          "on",
+          "groups",
+          "blocked",
+          "company_pages"
+        ],
+        "properties": {
+          "available": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Sites the app can read for them, whatever is searched or shown.",
+            "minimum": 0
+          },
+          "blocked": {
+            "$ref": "#/components/schemas/BlockedSites"
+          },
+          "company_pages": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Company hiring pages the app also reads, one by one unlisted.",
+            "minimum": 0
+          },
+          "country": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The country they live in (ISO 3166-1), when known."
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MySiteGroup"
+            },
+            "description": "The groups in order, with the sites that match what is searched and\nshown; a group with none is left out."
+          },
+          "on": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Of those, the ones that are On.",
+            "minimum": 0
+          }
+        }
+      },
       "NewOpportunity": {
         "type": "object",
         "description": "A job to add by its link.",
@@ -17543,6 +17982,17 @@
           "app"
         ]
       },
+      "SiteGroup": {
+        "type": "string",
+        "description": "The groups a person's list is in, in the order it is shown.",
+        "enum": [
+          "remote_worldwide",
+          "europe",
+          "country",
+          "trade",
+          "everything"
+        ]
+      },
       "SiteOrigin": {
         "type": "string",
         "description": "Where the company's site came from.",
@@ -17553,6 +18003,15 @@
           "posting_link",
           "posting_email",
           "name_guess"
+        ]
+      },
+      "SiteRemote": {
+        "type": "string",
+        "description": "How remote a site's jobs are.",
+        "enum": [
+          "mostly",
+          "some",
+          "no"
         ]
       },
       "SiteRequest": {
@@ -17568,6 +18027,22 @@
           }
         },
         "additionalProperties": false
+      },
+      "SiteSalaryBasis": {
+        "type": "string",
+        "description": "How a site's typical salary is known.",
+        "enum": [
+          "listed",
+          "country"
+        ]
+      },
+      "SiteSetBy": {
+        "type": "string",
+        "description": "Who last set a site On or Off.",
+        "enum": [
+          "app",
+          "person"
+        ]
       },
       "SizeCheck": {
         "type": "object",

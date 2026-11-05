@@ -725,6 +725,38 @@ impl Reader {
             .map(|got| got.body))
     }
 
+    /// [`visit_with`](Self::visit_with), also giving what the site said about
+    /// the page's age (`Last-Modified`, `ETag`). Nothing conditional is sent.
+    pub async fn visit_noting(
+        &self,
+        db: &PgPool,
+        url: &Url,
+        max: usize,
+        secret: &[(String, String)],
+    ) -> Result<(Option<Vec<u8>>, Validators), FetchError> {
+        let allow_private = self.inner.config.allow_private_hosts();
+        net::check(url, allow_private).map_err(|_| FetchError::Refused)?;
+        let spacing = if allow_private {
+            Duration::ZERO
+        } else {
+            Duration::from_secs(1)
+        };
+        let probe = Probe::new(Validators::default());
+        let got = self
+            .fetch(
+                &self.inner.boards_http,
+                db,
+                url,
+                max.min(MAX_BOARD_BODY),
+                Duration::ZERO,
+                spacing,
+                secret,
+                Some(&probe),
+            )
+            .await?;
+        Ok((got.map(|got| got.body), probe.seen().validators))
+    }
+
     /// One web page of a company's own site (or the posting), for the facts
     /// a tailored CV is built on: a public https address only (unless
     /// allowed), never from the cache, at most `max` bytes, [`TIMEOUT`] per

@@ -3236,6 +3236,12 @@ export interface components {
              */
             remote_share?: number | null;
             robots?: components["schemas"]["RobotsReport"];
+            /**
+             * Format: int32
+             * @description The version of the check's rules this report is from (a candidate
+             *     checked under older rules is checked again, once).
+             */
+            rules?: number;
             /** @description Up to 20 jobs parsed with the proposed config. */
             sample?: components["schemas"]["SampleJob"][];
             /** @description A fingerprint of the terms page, to notice a change. */
@@ -3253,6 +3259,11 @@ export interface components {
             terms_sentences?: string[];
             /** @description The terms page found. */
             terms_url?: string | null;
+            /**
+             * @description Why it still waits for the owner, in one plain sentence; empty when
+             *     the app approved it.
+             */
+            waiting_because?: string;
             /**
              * Format: double
              * @description Share of the sample open worldwide (0–1).

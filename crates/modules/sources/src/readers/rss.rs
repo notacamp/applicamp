@@ -130,7 +130,8 @@ fn find_open(lower: &str, open: &str, from: usize) -> Option<usize> {
     None
 }
 
-/// The items of a feed (RSS `<item>` or Atom `<entry>`), at most 500.
+/// The items of a feed (RSS `<item>`, Atom `<entry>` or a job feed's
+/// `<job>`), at most 500.
 ///
 /// Read leniently, as feeds are in the wild: tags in any case, a byte-order
 /// mark, a bare `&` in a link, and an item left unclosed (it ends where the
@@ -142,7 +143,11 @@ pub fn items(body: &[u8]) -> Vec<FeedItem> {
     // and read from `text`.
     let lower = text.to_ascii_lowercase();
     let mut items = Vec::new();
-    for (open, close) in [("<item", "</item>"), ("<entry", "</entry>")] {
+    for (open, close) in [
+        ("<item", "</item>"),
+        ("<entry", "</entry>"),
+        ("<job", "</job>"),
+    ] {
         let mut at = 0;
         while let Some(start) = find_open(&lower, open, at) {
             let Some(tag_end) = lower[start..].find('>') else {
@@ -168,6 +173,24 @@ pub fn items(body: &[u8]) -> Vec<FeedItem> {
         }
     }
     items
+}
+
+/// The feed's own date, as written: the channel's `lastBuildDate`, an Atom
+/// feed's `updated`, `dc:date` or the channel's `pubDate`, from what comes
+/// before the first item.
+pub fn feed_date(body: &[u8]) -> Option<String> {
+    let text = decode(body);
+    let text = text.trim_start_matches('\u{feff}');
+    let lower = text.to_ascii_lowercase();
+    let first = ["<item", "<entry", "<job"]
+        .iter()
+        .filter_map(|open| find_open(&lower, open, 0))
+        .min()
+        .unwrap_or(text.len());
+    let head = children(text.get(..first)?);
+    ["lastBuildDate", "updated", "dc:date", "pubDate"]
+        .iter()
+        .find_map(|name| head.get(*name).filter(|v| !v.trim().is_empty()).cloned())
 }
 
 /// The feeds a page links to (`<link rel="alternate" type="application/rss+xml" href=…>`).
@@ -282,5 +305,40 @@ mod tests {
     fn pages_name_their_feeds() {
         let html = r#"<html lang="en"><head><link rel="alternate" type="application/rss+xml" href="https://board.example/feed.xml"><link rel="stylesheet" href="/x.css"></head></html>"#;
         assert_eq!(feed_links(html), ["https://board.example/feed.xml"]);
+    }
+
+    #[test]
+    fn a_feed_has_its_own_date_and_job_feeds_have_job_items() {
+        let rss = "<rss><channel><title>Jobs</title>\
+            <lastBuildDate>Wed, 04 Nov 2026 13:23:01 +0000</lastBuildDate>\
+            <item><title>Role at Co</title><link>https://board.example/jobs/1</link></item>\
+            <pubDate>Mon, 01 Jan 2024 00:00:00 +0000</pubDate></channel></rss>";
+        assert_eq!(
+            feed_date(rss.as_bytes()).as_deref(),
+            Some("Wed, 04 Nov 2026 13:23:01 +0000"),
+            "only what comes before the first item"
+        );
+        let atom = "<feed><title>Jobs</title><updated>2026-11-04T10:00:00Z</updated>\
+            <entry><title>Role</title><updated>2020-01-01T00:00:00Z</updated></entry></feed>";
+        assert_eq!(
+            feed_date(atom.as_bytes()).as_deref(),
+            Some("2026-11-04T10:00:00Z")
+        );
+        assert_eq!(
+            feed_date(b"<rss><channel><item><title>x</title></item></channel></rss>"),
+            None
+        );
+
+        // A job feed (Job Boardly's `/jobs.xml`): `<job>` elements.
+        let jobs = "<jobs><job><url>https://board.example/jobs/a</url><title>IT Support</title>\
+            <company_name>Example Co</company_name><published_at>2026-11-04T00:00:00-06:00</published_at></job>\
+            <job><url>https://board.example/jobs/b</url><title>Designer</title></job></jobs>";
+        let items = items(jobs.as_bytes());
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].raw("company_name").as_deref(), Some("Example Co"));
+        assert_eq!(
+            items[1].raw("url").as_deref(),
+            Some("https://board.example/jobs/b")
+        );
     }
 }

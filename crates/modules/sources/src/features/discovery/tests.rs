@@ -384,10 +384,12 @@ async fn a_site_with_postings_in_its_sitemap_gets_a_sitemap_config_proposed(db: 
     assert_eq!(proposal.config["job_path"], "/jobs/");
     assert_eq!(report.sample.len(), 2);
     assert_eq!(report.sample[0].title, "Staff Engineer");
-    // The probes were each asked once; the page that is no posting never.
+    // The sitemap came first, so no guessed path was asked; the page that is
+    // no posting never.
     for probe in PROBES {
-        assert!(requests_to(&site, probe).await <= 1, "{probe}");
+        assert_eq!(super::find_tests::asked(&site, probe).await, 0, "{probe}");
     }
+    assert_eq!(requests_to(&site, "/sitemap.xml").await, 1);
     assert_eq!(requests_to(&site, "/about").await, 0);
 }
 

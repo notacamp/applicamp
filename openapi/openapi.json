@@ -10438,6 +10438,12 @@
           "robots": {
             "$ref": "#/components/schemas/RobotsReport"
           },
+          "rules": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The version of the check's rules this report is from (a candidate\nchecked under older rules is checked again, once).",
+            "minimum": 0
+          },
           "sample": {
             "type": "array",
             "items": {
@@ -10466,6 +10472,10 @@
               "null"
             ],
             "description": "The terms page found."
+          },
+          "waiting_because": {
+            "type": "string",
+            "description": "Why it still waits for the owner, in one plain sentence; empty when\nthe app approved it."
           },
           "worldwide_share": {
             "type": [

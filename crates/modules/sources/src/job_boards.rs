@@ -902,6 +902,18 @@ pub struct Report {
     /// whose config changed since is checked again at start.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub config_fingerprint: String,
+    /// Why it still waits for the owner, in one plain sentence; empty when
+    /// the app approved it.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub waiting_because: String,
+    /// The version of the check's rules this report is from (a candidate
+    /// checked under older rules is checked again, once).
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub rules: u32,
+}
+
+fn is_zero(n: &u32) -> bool {
+    *n == 0
 }
 
 /// A config a check proposes, and the kind it reads.

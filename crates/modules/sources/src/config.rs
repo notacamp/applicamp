@@ -13,6 +13,7 @@
 //! | `APPLICAMP_SOURCES__DISCOVERY_LIST_URL` | the CC0 list `emredurukn/awesome-job-boards` |
 //! | `APPLICAMP_SOURCES__DISCOVERY_SOURCES` | every list discovery reads (`awesome-job-boards`, `awesome-remote-job`, `remote-working-list`, `awesome-remote-jobs`, `idimetrix-awesome-job-boards`, `wikidata`); else the ones listed |
 //! | `APPLICAMP_SOURCES__DISCOVERY_MAX_CHECKS` | `100` (boards one discovery run checks, at most) |
+//! | `APPLICAMP_SOURCES__DISCOVERY_MAX_REQUESTS` | `25` (requests one check of a site makes after its robots.txt and homepage, at most) |
 //! | `APPLICAMP_SOURCES__GREENHOUSE_URL` | `https://boards-api.greenhouse.io` |
 //! | `APPLICAMP_SOURCES__LEVER_URL` | `https://api.lever.co` |
 //! | `APPLICAMP_SOURCES__LEVER_EU_URL` | `https://api.eu.lever.co` |
@@ -92,6 +93,10 @@ pub struct SourcesConfig {
     pub discovery_sources: Option<Vec<String>>,
     #[serde(default, deserialize_with = "number")]
     pub discovery_max_checks: Option<u64>,
+    /// Requests one check of a site may make after robots.txt and the
+    /// homepage (25 when left out).
+    #[serde(default, deserialize_with = "number")]
+    pub discovery_max_requests: Option<u64>,
     /// Greenhouse's job board API.
     #[serde(default = "greenhouse_url")]
     pub greenhouse_url: Url,
@@ -260,6 +265,7 @@ impl Default for SourcesConfig {
             discovery_list_url: discovery_list_url(),
             discovery_sources: None,
             discovery_max_checks: None,
+            discovery_max_requests: None,
             greenhouse_url: greenhouse_url(),
             lever_url: lever_url(),
             lever_eu_url: lever_eu_url(),
@@ -559,6 +565,12 @@ impl SourcesConfig {
     /// Boards one discovery run checks, at most (100 when left out).
     pub fn discovery_max_checks(&self) -> usize {
         usize::try_from(self.discovery_max_checks.unwrap_or(100).clamp(1, 5_000)).unwrap_or(100)
+    }
+
+    /// Requests one check of a site may make after robots.txt and the
+    /// homepage (25 when left out; 5 to 100).
+    pub fn discovery_max_requests(&self) -> usize {
+        usize::try_from(self.discovery_max_requests.unwrap_or(25).clamp(5, 100)).unwrap_or(25)
     }
 
     /// Whether discovery reads the list `id` (every list when left out).

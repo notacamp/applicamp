@@ -419,9 +419,9 @@ impl applicamp_sources::Neighbours for SourcesWiring {
         account: Uuid,
         found_jobs: Vec<Scored>,
         now: DateTime<Utc>,
-    ) -> BoxFuture<'a, Result<u32>> {
+    ) -> BoxFuture<'a, Result<Vec<bool>>> {
         let rows: Vec<Found> = found_jobs.into_iter().map(found).collect();
-        Box::pin(applicamp_pipeline::store::add_found(
+        Box::pin(applicamp_pipeline::store::add_found_each(
             db, events, account, rows, now,
         ))
     }

@@ -17516,6 +17516,7 @@
           "board_id",
           "board_slug",
           "board_name",
+          "company_page",
           "outcome",
           "jobs_read",
           "passed_requirements",
@@ -17539,6 +17540,10 @@
           },
           "board_slug": {
             "type": "string"
+          },
+          "company_page": {
+            "type": "boolean",
+            "description": "A company's own hiring page, not a job site."
           },
           "duration_ms": {
             "type": "integer",

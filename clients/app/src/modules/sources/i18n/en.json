@@ -317,7 +317,11 @@
     "fromSites_other": "{{count}} sites",
     "fromPages_one": "{{count}} company page",
     "fromPages_other": "{{count}} company pages",
-    "companySites": "Company sites",
+    "companyPage": "{{name}}’s hiring page",
+    "companyPages_one": "{{count}} company hiring page",
+    "companyPages_other": "{{count}} company hiring pages",
+    "otherSites_one": "{{count}} other job site",
+    "otherSites_other": "{{count}} other job sites",
     "leftOut": "Why jobs were left out",
     "reasons": {
       "seen_before": "Seen before",

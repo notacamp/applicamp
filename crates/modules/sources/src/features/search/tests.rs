@@ -806,7 +806,9 @@ async fn the_same_job_on_two_boards_is_one_opportunity_crediting_both(db: PgPool
     assert!(himalayas["ai_cost_eur"].as_f64().unwrap() > 0.0);
     let remoteok = line("remoteok");
     assert_eq!(remoteok["jobs_read"], 2);
-    assert_eq!(remoteok["matched"], 2);
+    // Example Co is on both: it counts under Himalayas, which listed it
+    // first, so the lines add up to the four good matches.
+    assert_eq!(remoteok["matched"], 1);
     // What the search did with the five jobs it read: none needed a quick
     // look (four fit in what one search reads in full), the expired one is
     // out, and the counts add up.
@@ -815,6 +817,13 @@ async fn the_same_job_on_two_boards_is_one_opportunity_crediting_both(db: PgPool
     assert_eq!(funnel["quick_looked"], 0);
     assert_eq!(funnel["read_in_full"], 4);
     assert_eq!(funnel["good_matches"], 4);
+    let credited: u64 = run["lines"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|l| l["matched"].as_u64())
+        .sum();
+    assert_eq!(credited, 4, "every match is under exactly one source");
     assert_eq!(funnel["left_out"]["too_old"], 1);
     assert_eq!(left_out_total(&funnel["left_out"]), 1);
     assert_eq!(himalayas["quick_looked"], 0);
@@ -1539,4 +1548,129 @@ async fn a_search_takes_its_jobs_from_the_store_and_a_cheap_preselect_limits_the
     assert_eq!(night["trigger"], "nightly");
     assert_eq!(night["fetched"], 1, "{night}");
     assert_eq!(added_numbers(&h), [15, 16, 17, 18, 31]);
+}
+
+/// A job of the store, posted the day before the fixtures' today.
+async fn store_job(db: &PgPool, board: Uuid, source_ref: &str, n: u64) {
+    let at = crate::testkit::today() - TimeDelta::days(1);
+    sqlx::query(
+        "INSERT INTO sources.store_jobs
+            (id, board_id, source_ref, title, company, url, work_mode, description, content_hash,
+             posted_at, first_seen_at, last_seen_at)
+         VALUES ($1, $2, $3, $4, 'Acme', $5, 'remote', 'Rust services.', $6, $7, $7, $7)",
+    )
+    .bind(Uuid::now_v7())
+    .bind(board)
+    .bind(source_ref)
+    .bind(format!("Senior Backend Engineer {n}"))
+    .bind(format!("https://example.com/jobs/{n}"))
+    .bind(format!("hash-{board}-{source_ref}"))
+    .bind(at)
+    .execute(db)
+    .await
+    .unwrap();
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_match_from_a_site_and_a_company_page_is_credited_to_the_page_and_the_list_adds_up(
+    db: PgPool,
+) {
+    let site = MockServer::start().await;
+    let seed = crate::job_boards::parse(&store_site(&site)).unwrap();
+    crate::job_boards::sync(&db, &seed, crate::testkit::today())
+        .await
+        .unwrap();
+    crate::company_pages::ensure_systems(&db, crate::testkit::today())
+        .await
+        .unwrap();
+    crate::company_pages::register(
+        &db,
+        &[crate::hiring_systems::CompanyLink {
+            source: crate::job::Source::Greenhouse,
+            token: "wayfarer-co".to_owned(),
+            eu: false,
+        }],
+        "an apply link on Board alpha",
+        crate::testkit::today(),
+    )
+    .await
+    .unwrap();
+    sqlx::query(
+        "UPDATE sources.job_boards SET status = 'approved', approved_by = 'app',
+                approved_at = now() WHERE system = 'greenhouse'",
+    )
+    .execute(&db)
+    .await
+    .unwrap();
+    let alpha: Uuid = sqlx::query_scalar("SELECT id FROM sources.job_boards WHERE slug = 'alpha'")
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    let page: Uuid =
+        sqlx::query_scalar("SELECT id FROM sources.job_boards WHERE kind = 'company_page'")
+            .fetch_one(&db)
+            .await
+            .unwrap();
+    // The site lists jobs 1 to 3; the company's own page lists job 1 (the
+    // same job, same link) and job 4.
+    for n in 1..=3 {
+        store_job(&db, alpha, &n.to_string(), n).await;
+    }
+    store_job(&db, page, "wayfarer-co:9001", 1).await;
+    store_job(&db, page, "wayfarer-co:9004", 4).await;
+
+    let model = model_scoring(82).await;
+    let mut settings = crate::testkit::boards_config();
+    settings.store = Some(true);
+    settings.full_scores_per_search = Some(10);
+    let h = Harness::new(
+        db,
+        settings,
+        Some(gateway(&model, BudgetConfig::default())),
+        Fake::ready(),
+    )
+    .await;
+    turn_on(&h, &["alpha"]).await;
+    h.post("/api/v1/searches").await;
+    h.work().await;
+    let search = latest(&h).await;
+    assert_eq!(search["status"], "finished", "{search}");
+    // Five jobs, four different ones: job 1 is added once.
+    assert_eq!(search["added"], 4, "{search}");
+    let added = h.fake.added();
+    let ones: Vec<_> = added
+        .iter()
+        .filter(|s| s.job.title == "Senior Backend Engineer 1")
+        .collect();
+    assert_eq!(ones.len(), 1, "one opportunity");
+    assert!(
+        ones[0].job.board.is_none(),
+        "the company page's copy is the one added"
+    );
+    // The site's link is credited on it too.
+    assert!(
+        h.fake
+            .attached()
+            .iter()
+            .any(|a| a.links.iter().any(|l| l.board == "alpha")),
+        "{:?}",
+        h.fake.attached()
+    );
+
+    let (_, scans) = h.get("/api/v1/boards/scans").await;
+    let run = &scans["runs"][0];
+    let lines = run["lines"].as_array().unwrap();
+    let alpha_line = lines.iter().find(|l| l["board_slug"] == "alpha").unwrap();
+    let page_line = lines.iter().find(|l| l["company_page"] == true).unwrap();
+    assert_eq!(alpha_line["company_page"], false);
+    assert_eq!(page_line["board_name"], "Wayfarer Co");
+    // Job 1 and job 4 are the page's; jobs 2 and 3 the site's.
+    assert_eq!(page_line["matched"], 2, "{lines:?}");
+    assert_eq!(alpha_line["matched"], 2, "{lines:?}");
+    let credited: u64 = lines.iter().filter_map(|l| l["matched"].as_u64()).sum();
+    assert_eq!(
+        credited,
+        run["funnel"]["good_matches"].as_u64().unwrap(),
+        "where the matches came from adds up to the good matches"
+    );
 }

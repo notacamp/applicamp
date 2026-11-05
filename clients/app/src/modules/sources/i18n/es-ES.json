@@ -317,7 +317,11 @@
     "fromSites_other": "{{count}} sitios",
     "fromPages_one": "{{count}} página de empresa",
     "fromPages_other": "{{count}} páginas de empresas",
-    "companySites": "Webs de las empresas",
+    "companyPage": "Página de empleo de {{name}}",
+    "companyPages_one": "{{count}} página de empleo de empresa",
+    "companyPages_other": "{{count}} páginas de empleo de empresas",
+    "otherSites_one": "{{count}} otro sitio de empleo",
+    "otherSites_other": "{{count}} otros sitios de empleo",
     "leftOut": "Por qué se quedaron fuera",
     "reasons": {
       "seen_before": "Vistas antes",

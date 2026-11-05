@@ -190,6 +190,9 @@ pub struct ScanRow {
     /// The job board's slug; `watch` for a watched company's own board.
     pub board_slug: String,
     pub board_name: String,
+    /// The line is a company's own hiring page (a company page, or a
+    /// watched company's job board), not a job site.
+    pub company_page: bool,
     pub outcome: String,
     pub jobs_read: i32,
     pub passed_requirements: i32,
@@ -251,6 +254,7 @@ pub async fn runs(
         "SELECT coalesce(b.search_id, b.discovery_run_id) AS run_id,
                 coalesce(b.board_id, b.company_id) AS board_id,
                 coalesce(j.slug, 'watch') AS board_slug, coalesce(j.name, c.name) AS board_name,
+                (j.id IS NULL OR j.kind = 'company_page') AS company_page,
                 b.outcome, b.jobs_read,
                 b.passed_requirements, b.quick_looked, b.scored_by_ai, b.matched, b.ai_cost_eur,
                 b.error_kind, b.duration_ms, b.note

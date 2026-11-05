@@ -64,7 +64,10 @@ SHALL come last.
 The Searches tab of the Job sites page SHALL show each search with four
 numbers first: jobs read, read in full, good matches and its cost. Under the
 latest search it SHALL show how many sites and company pages the job store gave
-jobs from, where the matches came from, by site, and why the
+jobs from, where the matches came from (each match under one source,
+a job site or a company's hiring page shown by the company's name, the five biggest
+one by one and the rest as one line each for company pages and for sites, adding
+up to the good matches), and why the
 other jobs were left out, in plain words with counts that add up to the jobs
 read (including the jobs not among the closest to the person's roles, which got
 no quick look), and how many of the jobs read in full do not say where they hire and
@@ -90,6 +93,14 @@ with the estimated cost on the line under it and no keyboard shortcut shown.
 #### Scenario: A site read in part
 - **WHEN** a site's third page did not answer during a search
 - **THEN** its line under "Show by site" says so, and its first two pages count as read
+
+#### Scenario: Where the matches came from
+- **WHEN** a search found 16 good matches, 9 credited to Himalayas, 5 to Wayfarer Co's page and 2 to Remote OK
+- **THEN** the tab lists "Himalayas · 9", "Wayfarer Co’s hiring page · 5" and "Remote OK · 2", adding up to 16
+
+#### Scenario: Many company pages
+- **WHEN** twelve company pages gave one or two matches each
+- **THEN** the list shows the five biggest sources and then "N company hiring pages" as one line with their total
 
 ### Requirement: Every waiting board can be approved or says why
 A board waiting for the owner SHALL either be approvable or show every
@@ -560,6 +571,7 @@ cheap preselect, with no setting to turn that off.
 #### Scenario: Thousands of company pages
 - **WHEN** thousands of company pages are approved and read into the store
 - **THEN** a search considers their jobs, and gives a quick look only to the closest ones
+
 ### Requirement: Each person has their own list of job sites, On or Off
 The app SHALL keep, for each person, whether each approved job site is On or Off, and who set it
 (the app or the person). Hiring systems and company pages SHALL NOT be on the list. A person's own

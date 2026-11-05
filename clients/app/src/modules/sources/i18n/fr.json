@@ -317,7 +317,11 @@
     "fromSites_other": "{{count}} sites",
     "fromPages_one": "{{count}} page d’entreprise",
     "fromPages_other": "{{count}} pages d’entreprises",
-    "companySites": "Sites des entreprises",
+    "companyPage": "Page emploi de {{name}}",
+    "companyPages_one": "{{count}} page emploi d’entreprise",
+    "companyPages_other": "{{count}} pages emploi d’entreprises",
+    "otherSites_one": "{{count}} autre site d’emploi",
+    "otherSites_other": "{{count}} autres sites d’emploi",
     "leftOut": "Pourquoi des offres ont été écartées",
     "reasons": {
       "seen_before": "Déjà vues",

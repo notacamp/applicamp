@@ -453,15 +453,30 @@ pub async fn add_found(
     found: Vec<Found>,
     now: DateTime<Utc>,
 ) -> Result<u32> {
+    let each = add_found_each(db, events, account, found, now).await?;
+    Ok(u32::try_from(each.iter().filter(|added| **added).count()).unwrap_or(u32::MAX))
+}
+
+/// [`add_found`], saying for each of `found`, in order, whether it was added
+/// (a posting already there, or one that is not valid, was not).
+pub async fn add_found_each(
+    db: &PgPool,
+    events: &EventBus,
+    account: Uuid,
+    found: Vec<Found>,
+    now: DateTime<Utc>,
+) -> Result<Vec<bool>> {
     let mut tx = db.begin().await?;
-    let mut added = 0_u32;
-    for row in found.into_iter().filter_map(NewRow::of_found) {
-        if insert(&mut tx, events, account, &row, now).await?.is_some() {
-            added += 1;
-        }
+    let mut each = Vec::with_capacity(found.len());
+    for row in found {
+        let added = match NewRow::of_found(row) {
+            Some(row) => insert(&mut tx, events, account, &row, now).await?.is_some(),
+            None => false,
+        };
+        each.push(added);
     }
     tx.commit().await?;
-    Ok(added)
+    Ok(each)
 }
 
 /// An opportunity a search found before the requirement rules.

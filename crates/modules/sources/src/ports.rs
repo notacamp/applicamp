@@ -198,7 +198,8 @@ pub trait Neighbours: Send + Sync + 'static {
         account: Uuid,
     ) -> BoxFuture<'a, Result<Option<String>>>;
 
-    /// Add `found` to `account`'s pipeline as Found; how many were new.
+    /// Add `found` to `account`'s pipeline as Found; for each, in order,
+    /// whether it was new (one the pipeline already had was not).
     fn add_found<'a>(
         &'a self,
         db: &'a PgPool,
@@ -206,7 +207,7 @@ pub trait Neighbours: Send + Sync + 'static {
         account: Uuid,
         found: Vec<Scored>,
         now: DateTime<Utc>,
-    ) -> BoxFuture<'a, Result<u32>>;
+    ) -> BoxFuture<'a, Result<Vec<bool>>>;
 
     /// Up to `most` Found or Shortlisted opportunities, found by a search,
     /// whose requirements were never checked; newest first.

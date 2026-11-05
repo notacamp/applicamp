@@ -22,6 +22,7 @@
 //!   every evening for the accounts with goals, only when the boards have
 //!   jobs they have not seen.
 
+mod credit;
 #[cfg(test)]
 mod tests;
 
@@ -1081,6 +1082,10 @@ pub(crate) struct Reading {
     pub ids: HashMap<(String, String), Uuid>,
     /// How close each of those is to the person's roles and skills.
     pub ranks: HashMap<(String, String), f32>,
+    /// The company page each job of a page came from, by job key.
+    pub page_of: HashMap<(String, String), Uuid>,
+    /// Jobs each company page gave.
+    pub page_reads: HashMap<Uuid, u32>,
     /// Jobs of the store the database left out, so the funnel adds up: too
     /// old, not a way of working they want, and past the pool's limit.
     pub outside: Outside,
@@ -1253,21 +1258,23 @@ pub(crate) async fn read_sources(
             not_closest: clamp_u32(counts.passing() - i64::try_from(pool.len()).unwrap_or(0)),
         };
         let mut per_site: HashMap<Uuid, u32> = HashMap::new();
-        let mut pages: HashSet<Uuid> = HashSet::new();
         for stored in pool {
-            if stored.job.board_kind == "company_page" {
-                pages.insert(stored.job.board_id);
-            } else {
-                add_one(per_site.entry(stored.job.board_id).or_default());
+            let page = (stored.job.board_kind == "company_page").then_some(stored.job.board_id);
+            match page {
+                Some(id) => add_one(reading.page_reads.entry(id).or_default()),
+                None => add_one(per_site.entry(stored.job.board_id).or_default()),
             }
             let (id, rank) = (stored.job.id, stored.rank);
             let job = stored.job.into_job();
+            if let Some(page) = page {
+                reading.page_of.insert(job.key(), page);
+            }
             reading.ids.insert(job.key(), id);
             reading.ranks.insert(job.key(), rank);
             jobs.push(job);
         }
         reading.from_sites = per_site.len();
-        reading.from_company_pages = pages.len();
+        reading.from_company_pages = reading.page_reads.len();
         // One line for every On site: what the store gave, and what its own
         // queries gave live.
         let mut lines: Vec<Scanned> = Vec::with_capacity(rows.len());
@@ -1403,8 +1410,18 @@ impl Watched {
     }
 }
 
-/// Keep what search `row` scanned on each job board, and on each watched
-/// company's own board.
+/// What a search took from one company page: the jobs it gave, and the good
+/// matches credited to it.
+#[derive(Debug, Clone, Copy)]
+struct PageScan {
+    page: Uuid,
+    read: u32,
+    matched: u32,
+}
+
+/// Keep what search `row` scanned on each job board, on each company page
+/// that gave a good match, and on each watched company's own board.
+#[allow(clippy::too_many_arguments)]
 async fn record_scans(
     deps: &SourcesDeps,
     db: &PgPool,
@@ -1412,6 +1429,7 @@ async fn record_scans(
     boards: &[Scanned],
     tallies: &HashMap<String, Tally>,
     watched: &Watched,
+    pages: &[PageScan],
     now: DateTime<Utc>,
 ) -> Result<()> {
     let rate = usd_to_eur(deps);
@@ -1438,6 +1456,15 @@ async fn record_scans(
             }
         })
         .collect();
+    for page in pages.iter().filter(|page| page.matched > 0) {
+        rows.push(Scan {
+            board: page.page,
+            outcome: Outcome::Read.as_str(),
+            jobs_read: page.read,
+            matched: page.matched,
+            ..Scan::default()
+        });
+    }
     for read in &watched.reading.reads {
         let t = watched
             .tallies
@@ -1663,6 +1690,7 @@ pub(crate) async fn run(
     let failed = reading.failed;
     let scanned = reading.boards;
     let (store_ids, store_ranks) = (reading.ids, reading.ranks);
+    let (page_of, page_reads) = (reading.page_of, reading.page_reads);
     done.from_sites = reading.from_sites;
     done.from_company_pages = reading.from_company_pages;
     let outside = reading.outside;
@@ -1684,7 +1712,7 @@ pub(crate) async fn run(
     progress(db, id, &done).await?;
     if jobs.is_empty() && watched.reading.jobs.is_empty() && failed > 0 {
         let now = deps.clock.now();
-        record_scans(deps, db, &row, &scanned, &tallies, &watched, now).await?;
+        record_scans(deps, db, &row, &scanned, &tallies, &watched, &[], now).await?;
         return finish(
             db,
             events,
@@ -2067,22 +2095,75 @@ pub(crate) async fn run(
         keep.iter_mut().map(|scored| &mut scored.job),
     )
     .await?;
-    for scored in &keep {
-        for t in tally(&mut tallies, &scored.job) {
-            t.matched += 1;
+    let now = deps.clock.now();
+    let kept = keep.len();
+    // The copies of one job merge into one match, credited to one source:
+    // the company page when it is among them, else the site that listed it
+    // first.
+    let matches = credit::merge(
+        keep.into_iter()
+            .map(|scored| {
+                let origins = credit::origins_of(&scored.job, &page_of, &watched.reading.of);
+                (scored, origins)
+            })
+            .collect(),
+    );
+    let added_each = neighbours
+        .add_found(
+            db,
+            events,
+            account,
+            matches.iter().map(|m| m.scored.clone()).collect(),
+            now,
+        )
+        .await;
+    // Only what was added is a good match, and each is counted once.
+    let mut page_matched: HashMap<Uuid, u32> = HashMap::new();
+    for (found, added) in matches.iter().zip(added_each.iter().flatten()) {
+        if !added {
+            continue;
         }
-        if let Some(t) = watched.tally(&scored.job) {
-            t.matched += 1;
+        match &found.origin {
+            Some(credit::Origin::Site(slug)) => {
+                if let Some(t) = tallies.get_mut(slug) {
+                    t.matched += 1;
+                }
+            }
+            Some(credit::Origin::Watch(watch)) => {
+                watched.tallies.entry(*watch).or_default().matched += 1;
+            }
+            Some(credit::Origin::Page(page)) => add_one(page_matched.entry(*page).or_default()),
+            None => {}
         }
     }
-    let now = deps.clock.now();
-    record_scans(deps, db, &row, &scanned, &tallies, &watched, now).await?;
-    let matched = keep.len();
-    let added = neighbours.add_found(db, events, account, keep, now).await?;
+    let pages: Vec<PageScan> = page_reads
+        .iter()
+        .map(|(page, read)| PageScan {
+            page: *page,
+            read: *read,
+            matched: page_matched.get(page).copied().unwrap_or(0),
+        })
+        .collect();
+    record_scans(deps, db, &row, &scanned, &tallies, &watched, &pages, now).await?;
+    let added_each = added_each?;
+    let added = u32::try_from(added_each.iter().filter(|added| **added).count()).unwrap_or(0);
+    // The other copies' links are credited on the opportunity too.
+    let attach: Vec<Attach> = matches
+        .iter()
+        .filter(|found| !found.extra_links.is_empty())
+        .map(|found| Attach {
+            canonical_url: dedupe::job_url(&found.scored.job),
+            dedupe_key: dedupe::dedupe_key(&found.scored.job),
+            links: found.extra_links.clone(),
+        })
+        .collect();
+    if !attach.is_empty() {
+        neighbours.attach_sources(db, account, attach, now).await?;
+    }
     // Matches the pipeline already had (the same job under another link).
     add(
         &mut done.left.seen_before,
-        matched.saturating_sub(usize::try_from(added).unwrap_or(0)),
+        kept.saturating_sub(usize::try_from(added).unwrap_or(0)),
     );
     let mut seen: HashMap<Uuid, Vec<(String, String)>> = HashMap::new();
     for (key, watch) in &watched.reading.of {

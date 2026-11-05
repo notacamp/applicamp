@@ -264,8 +264,8 @@ impl Neighbours for Fake {
         _account: Uuid,
         found: Vec<Scored>,
         _now: DateTime<Utc>,
-    ) -> BoxFuture<'a, Result<u32>> {
-        let mut added = 0;
+    ) -> BoxFuture<'a, Result<Vec<bool>>> {
+        let mut added = Vec::with_capacity(found.len());
         {
             let mut known = lock(&self.known);
             let mut links = lock(&self.links);
@@ -279,7 +279,9 @@ impl Neighbours for Fake {
                         links.keys.insert(key);
                     }
                     list.push(scored);
-                    added += 1;
+                    added.push(true);
+                } else {
+                    added.push(false);
                 }
             }
         }

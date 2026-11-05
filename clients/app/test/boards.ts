@@ -192,6 +192,7 @@ export function line(overrides: Partial<ScanLine> = {}): ScanLine {
     board_id: HIMALAYAS,
     board_slug: "himalayas",
     board_name: "Himalayas",
+    company_page: false,
     outcome: "read",
     jobs_read: 412,
     passed_requirements: 30,

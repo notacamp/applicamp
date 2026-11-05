@@ -318,6 +318,8 @@ pub struct ScanLine {
     pub board_id: Uuid,
     pub board_slug: String,
     pub board_name: String,
+    /// A company's own hiring page, not a job site.
+    pub company_page: bool,
     pub outcome: ScanOutcome,
     pub jobs_read: u32,
     /// Within the person's requirements on the boards' structured fields.
@@ -1499,6 +1501,7 @@ pub async fn scanned(
                 board_id: row.board_id,
                 board_slug: row.board_slug,
                 board_name: row.board_name,
+                company_page: row.company_page,
                 outcome: ScanOutcome::parse(&row.outcome),
                 jobs_read: n(row.jobs_read),
                 passed_requirements: n(row.passed_requirements),

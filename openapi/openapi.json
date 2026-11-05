@@ -705,6 +705,53 @@
         ]
       }
     },
+    "/api/v1/boards/store": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "How the job store is doing.",
+        "description": "Jobs stored, new in the last 7 days, sites read today and the reads that\nfailed, for the board owners. No job is shown here.",
+        "operationId": "sources.store_totals",
+        "responses": {
+          "200": {
+            "description": "The totals.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreTotals"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`not_board_owner`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/v1/boards/suggestions": {
       "post": {
         "tags": [
@@ -17723,6 +17770,76 @@
           "today_eur": {
             "type": "number",
             "format": "double"
+          }
+        }
+      },
+      "StoreTotals": {
+        "type": "object",
+        "description": "How the job store is doing, for the owner.",
+        "required": [
+          "on",
+          "jobs_stored",
+          "jobs_closed",
+          "new_7d",
+          "sites_read_today",
+          "reads_today",
+          "failures_today",
+          "sites_failing"
+        ],
+        "properties": {
+          "failures_today": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Reads that failed today.",
+            "minimum": 0
+          },
+          "jobs_closed": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Jobs it still holds that their sites no longer list.",
+            "minimum": 0
+          },
+          "jobs_stored": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Jobs it holds that their sites still list.",
+            "minimum": 0
+          },
+          "last_read_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the latest read was."
+          },
+          "new_7d": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Jobs it stored for the first time in the last 7 days.",
+            "minimum": 0
+          },
+          "on": {
+            "type": "boolean",
+            "description": "Whether the store is on (`APPLICAMP_SOURCES__STORE`)."
+          },
+          "reads_today": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Reads made today, failed ones included.",
+            "minimum": 0
+          },
+          "sites_failing": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Sites whose latest read failed.",
+            "minimum": 0
+          },
+          "sites_read_today": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Sites read today (UTC) without failing.",
+            "minimum": 0
           }
         }
       },

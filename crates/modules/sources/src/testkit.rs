@@ -449,6 +449,8 @@ pub(crate) fn boards_config() -> SourcesConfig {
         manual_per_day: Some(0),
         manual_every_secs: Some(0),
         nightly: Some(false),
+        // The job store's tests turn it on.
+        store: Some(false),
         ..SourcesConfig::default()
     }
 }

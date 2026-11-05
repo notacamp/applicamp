@@ -375,7 +375,7 @@ pub(crate) async fn is_owner(deps: &SourcesDeps, db: &PgPool, account: Uuid) -> 
     Ok(email.is_some_and(|email| deps.config.is_board_owner(&email)))
 }
 
-async fn owner_only(deps: &SourcesDeps, db: &PgPool, account: Uuid) -> Result<()> {
+pub(crate) async fn owner_only(deps: &SourcesDeps, db: &PgPool, account: Uuid) -> Result<()> {
     if is_owner(deps, db, account).await? {
         Ok(())
     } else {

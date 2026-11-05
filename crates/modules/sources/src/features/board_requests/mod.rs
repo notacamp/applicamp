@@ -834,6 +834,8 @@ pub struct AdminBoard {
     pub decline_reason: Option<String>,
     /// Its check's note.
     pub note: Option<String>,
+    /// Why it still waits, as a code and a detail; set for a candidate its check did not approve.
+    pub waiting: Option<job_boards::Waiting>,
 }
 
 /// A page of the admin list.
@@ -887,6 +889,9 @@ fn admin_board(row: &BoardRow, open: &[&OpenRequest], system_ok: bool) -> AdminB
             .report()
             .map(|r| r.notes)
             .filter(|n| !n.trim().is_empty()),
+        waiting: (row.status() == Status::Candidate)
+            .then(|| row.report().and_then(|r| r.waiting_because))
+            .flatten(),
     }
 }
 

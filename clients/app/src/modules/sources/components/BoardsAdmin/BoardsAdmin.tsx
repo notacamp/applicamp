@@ -35,6 +35,7 @@ import { SHOW_OPTIONS, type AdminRow, type ShowFilter } from "../../api/admin-ro
 import { shortDate } from "../../api/format";
 import { AdminPeek } from "./AdminPeek";
 import { StageLabel } from "./StageLabel";
+import { WhyLine } from "./WhyLine";
 
 /** Boards of the waiting list shown before "Show more". */
 const WAITING_SHOWN = 8;
@@ -281,6 +282,7 @@ function WaitingRow({
       meta={
         <>
           <StageLabel status="waiting" />
+          <WhyLine waiting={row.board.waiting} />
           {row.askedAt === undefined ? null : (
             <Text tone="secondary">
               {t("admin.askedOn", { date: shortDate(row.askedAt, i18n.language) })}
@@ -546,6 +548,9 @@ function boardColumns(t: TFunction<"sources">, locale: string): DataColumn<Admin
           <Text as="span" tone="secondary" size="sm">
             {` · ${howRead(row.board.kind, t)}`}
           </Text>
+          {row.status === "waiting" || row.status === "checking" ? (
+            <WhyLine waiting={row.board.waiting} />
+          ) : null}
         </>
       ),
     },

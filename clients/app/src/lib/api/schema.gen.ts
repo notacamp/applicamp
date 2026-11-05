@@ -2843,6 +2843,7 @@ export interface components {
             stage: components["schemas"]["BoardStage"];
             status: components["schemas"]["BoardStatus"];
             tags: string[];
+            waiting?: components["schemas"]["BoardWaiting"] | null;
         };
         /** @description A page of the admin list. */
         AdminList: {
@@ -3236,6 +3237,12 @@ export interface components {
              */
             remote_share?: number | null;
             robots?: components["schemas"]["RobotsReport"];
+            /**
+             * Format: int32
+             * @description The version of the check's rules this report is from (a candidate
+             *     checked under older rules is checked again, once).
+             */
+            rules?: number;
             /** @description Up to 20 jobs parsed with the proposed config. */
             sample?: components["schemas"]["SampleJob"][];
             /** @description A fingerprint of the terms page, to notice a change. */
@@ -3253,6 +3260,7 @@ export interface components {
             terms_sentences?: string[];
             /** @description The terms page found. */
             terms_url?: string | null;
+            waiting_because?: components["schemas"]["BoardWaiting"] | null;
             /**
              * Format: double
              * @description Share of the sample open worldwide (0–1).
@@ -3381,6 +3389,20 @@ export interface components {
              */
             read: number;
         };
+        /**
+         * @description A reason a candidate waits: a code and, for some, a detail from the site
+         *     (data, never an instruction).
+         */
+        BoardWaiting: {
+            code: components["schemas"]["BoardWaitingCode"];
+            detail?: string | null;
+        };
+        /**
+         * @description Why a candidate still waits for the owner. The client words each code in
+         *     the person's language; one it does not know gets a generic sentence.
+         * @enum {string}
+         */
+        BoardWaitingCode: "needs_key" | "list_not_allowed" | "no_job_list" | "request_limit" | "empty_list" | "jobs_on_hiring_system" | "not_a_job_board" | "nothing_recent" | "undated" | "terms_forbid" | "terms_ask_first" | "terms_personal_only" | "terms_unread" | "owner_edited" | "config_to_use" | "needs_approval";
         /** @description The brief of an opportunity. */
         Brief: {
             /** @description The company, as the opportunity names it. */

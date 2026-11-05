@@ -43,6 +43,7 @@ import {
 import { formatWhen, shortDate } from "../../api/format";
 import { BoardPeek } from "../BoardPeek/BoardPeek";
 import { StageLabel } from "./StageLabel";
+import { WhyLine } from "./WhyLine";
 
 /** What a decline from this page says, kept with the board. */
 const DECLINED_HERE = "Declined from the Job sites page.";
@@ -134,6 +135,9 @@ export function AdminPeek({ row: listed, onClose, onDeclined }: AdminPeekProps) 
             {row.board.note === undefined || row.board.note === null ? null : (
               <Text tone="secondary">{row.board.note}</Text>
             )}
+            {row.status === "waiting" || row.status === "checking" ? (
+              <WhyLine waiting={row.board.waiting} />
+            ) : null}
           </Stack>
           {board.isError ? (
             <Tagged testId="boards-admin-peek-error">

@@ -1,0 +1,12 @@
+# Tasks
+- [x] 1 `postings`: posting evidence, title patterns, company from titles, with tests
+- [x] 2 alive: default date mapping, feed date, `Last-Modified`, with tests
+- [x] 3 request budget on the check's visits
+- [x] 4 finder: linked feeds, platforms, Jobs page, sitemap index walk, more feed paths
+- [x] 5 platforms verified against public boards, fixtures
+- [x] 6 terms page at usual paths and on the Jobs page
+- [x] 7 one hiring system: register the company page, site waits
+- [x] 8 report: `waiting_because`, `rules`; OpenAPI and client types
+- [x] 9 re-check queue under new rules
+- [x] 10 tests with wiremock for each path, the budget, the queue; changelog
+- [x] 11 recording by the reviewer

@@ -8,29 +8,46 @@
 //!   someone suggested or the seed list holds that were never checked. At
 //!   most `APPLICAMP_SOURCES__DISCOVERY_MAX_CHECKS` a run (100); each board
 //!   records the list it was found through.
-//! - **The check** (one request per path, robots respected): robots.txt of
-//!   the feed's host (else the site's); the site (its language, its feeds,
-//!   JSON-LD postings, a link to its terms); the terms page, whose
-//!   sentences about scraping, robots, automation, aggregation, the API,
-//!   linking back, attribution or commercial use are kept verbatim (at most
-//!   10); then the config's own address (with the board's key, when it
-//!   needs one), read with its own config for up to 20 sample jobs. A board
-//!   with no usable config is probed instead: the site's feeds (RSS
-//!   autodiscovery), `/api`, `/jobs/api`, `/feed`, `/rss`, then JSON-LD
-//!   postings through `/sitemap.xml`; the first that reads gives the sample
+//! - **The check** (one request per path, robots respected, at most
+//!   `APPLICAMP_SOURCES__DISCOVERY_MAX_REQUESTS` requests after robots.txt and
+//!   the homepage, 25): robots.txt of the feed's host (else the site's); the
+//!   site (its language, its feeds, JSON-LD postings, a link to its terms);
+//!   the terms page (linked from the homepage or the Jobs page, else at
+//!   `/terms`, `/terms-of-service`, `/tos`, `/legal` or
+//!   `/terms-and-conditions`), whose sentences about scraping, robots,
+//!   automation, aggregation, the API, linking back, attribution or
+//!   commercial use are kept verbatim (at most 10); then the config's own
+//!   address (with the board's key, when it needs one), read with its own
+//!   config for up to 20 sample jobs. A board with no usable config is
+//!   probed instead (`finder`): the feeds its site links to, a job-board
+//!   platform recognised from its markup (WP Job Manager, Job Boardly,
+//!   JBoard, Niceboard) read at its public address, the site's own Jobs page
+//!   and its feeds, the sitemaps robots.txt lists (else `/sitemap.xml`)
+//!   followed through indexes down to the sitemap of jobs, then the common
+//!   feed and API paths ([`PROBES`]); the first that reads gives the sample
 //!   and a **proposed config** the owner may use (applied by itself only to
 //!   a discovered or suggested board nobody edited). The sample's remote
 //!   and worldwide shares set the priority; its salaries rank the candidate.
+//!   A feed with no company field gets the company from its titles when one
+//!   pattern is consistent (`postings`); proposed feed configs map dates by
+//!   default.
 //! - **The terms, read by a model** ([`crate::terms`]): one small call per
 //!   board (and again when its terms change), within the spending limits,
 //!   gives a verdict, the sentence that decided it and tags for what the
 //!   board offers; a board with no terms page is silent.
 //! - **Approval by the app**: a candidate nobody edited whose config reads
 //!   sample jobs, whose robots rules allow every path read, that is a job
-//!   board (at least 5 sample items with a title and a company or apply
-//!   link), that posted in the last 30 days, whose terms allow apps or say
-//!   nothing, and that has no blocker and needs no key, is approved by the
-//!   app (`approved_by = 'app'`). Anything else waits for the owner.
+//!   board (at least 5 sample items with a title and a company, an apply
+//!   link, or a link to the job's own page on the site; not every job
+//!   applying on one company's hiring page), that is alive (a job posted in
+//!   the last 30 days or, when no job says when, the feed's own date or
+//!   `Last-Modified` that recent), whose terms allow apps or say nothing,
+//!   and that has no blocker and needs no key, is approved by the app
+//!   (`approved_by = 'app'`). Anything else waits for the owner, with the
+//!   reason in one plain sentence in its report (`waiting`).
+//! - **Re-checks under new rules**: a candidate checked under older rules
+//!   ([`RULES`]) is checked once more, oldest check first, within the day's
+//!   checks.
 //! - **Seeded boards at start** (`sources.check_seeded_boards`): every seeded
 //!   board waiting for the owner that was never checked with its current
 //!   config is checked once, unless the research found its terms or robots
@@ -43,9 +60,15 @@
 //! board now (a suggestion, or the owner's "Check again").
 
 #[cfg(test)]
+mod find_tests;
+#[cfg(test)]
 mod tests;
 
-use std::{collections::HashSet, sync::LazyLock, time::Instant};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::LazyLock,
+    time::Instant,
+};
 
 use applicamp_kernel::{Error, JobContext, JobError, Result, jobs};
 use chrono::{DateTime, TimeDelta, Utc};
@@ -59,6 +82,7 @@ use uuid::Uuid;
 use crate::{
     SourcesDeps, board_keys,
     features::boards::{blockers, unique_slug},
+    hiring_systems,
     job::html_to_text,
     job_boards::{
         self, BoardConfig, BoardRow, Fields, Kind, Proposal, Report, SampleJob, Status,
@@ -75,7 +99,10 @@ use crate::{
     terms,
 };
 
+mod finder;
 pub mod lists;
+mod postings;
+mod waiting;
 
 /// Sample jobs a check keeps.
 pub const SAMPLE: usize = 20;
@@ -83,6 +110,9 @@ pub const SAMPLE: usize = 20;
 pub const SENTENCES: (usize, usize) = (10, 300);
 /// How long until an approved board is checked again.
 pub const RECHECK: TimeDelta = TimeDelta::days(182);
+/// The version of the check's rules. A candidate checked under older rules
+/// is checked again once, oldest first, within the day's checks (#108).
+pub const RULES: u32 = 1;
 
 static LIST_ENTRY: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^\s*(?:[-*]|\d+\.)\s*\[([^\]]{1,100})\]\((https?://[^)\s]{1,300})\)")
@@ -188,7 +218,8 @@ impl applicamp_kernel::Job for Discover {
     const QUEUE: &'static str = "boards";
     // Never retried: the next week tries again.
     const MAX_ATTEMPTS: u32 = 1;
-    const LEASE: std::time::Duration = std::time::Duration::from_secs(30 * 60);
+    // A hundred checks, each a few seconds apart on its own site.
+    const LEASE: std::time::Duration = std::time::Duration::from_secs(90 * 60);
 
     async fn run(self, ctx: JobContext) -> std::result::Result<(), JobError> {
         let deps = ctx
@@ -231,7 +262,7 @@ impl applicamp_kernel::Job for CheckSeeded {
     const QUEUE: &'static str = "boards";
     // Never retried: the next start tries what is left.
     const MAX_ATTEMPTS: u32 = 1;
-    const LEASE: std::time::Duration = std::time::Duration::from_secs(30 * 60);
+    const LEASE: std::time::Duration = std::time::Duration::from_secs(90 * 60);
 
     async fn run(self, ctx: JobContext) -> std::result::Result<(), JobError> {
         let deps = ctx
@@ -481,6 +512,31 @@ pub async fn discover(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
         }
     }
 
+    // Candidates checked under older rules (#108): once each, oldest check
+    // first, within what is left of the day's checks.
+    if !stopped && checked < max {
+        let older: Vec<BoardRow> = sqlx::query_as(concat!(
+            "SELECT ",
+            board_columns!(),
+            " FROM sources.job_boards
+              WHERE status = 'candidate' AND kind NOT IN ('hiring_system', 'company_page')
+                AND report->>'checked_at' IS NOT NULL AND blockers = '[]'::jsonb
+                AND coalesce((report->>'rules')::int, 0) < $1
+              ORDER BY (report->>'checked_at')::timestamptz, created_at LIMIT $2"
+        ))
+        .bind(i32::try_from(RULES).unwrap_or(i32::MAX))
+        .bind(i64::try_from(max - checked).unwrap_or(0))
+        .fetch_all(db)
+        .await?;
+        for row in &older {
+            checked += 1;
+            if check(deps, reader, db, row, run).await? == Checked::BudgetReached {
+                stopped = true;
+                break;
+            }
+        }
+    }
+
     // Approved boards due a re-check.
     let due: Vec<BoardRow> = sqlx::query_as(concat!(
         "SELECT ",
@@ -721,47 +777,108 @@ pub fn contact_email(home: &str, terms: Option<&str>) -> Option<String> {
         .filter(|email| !email.ends_with(".png") && !email.ends_with(".jpg"))
 }
 
-/// How many sample items look like job postings: a title, and a company or
-/// an apply link.
-pub fn postings(sample: &[crate::job::Job]) -> usize {
-    sample
-        .iter()
-        .filter(|job| {
-            !job.title.trim().is_empty()
-                && (!job.company.trim().is_empty()
-                    || job.board.as_ref().is_some_and(|b| b.apply_url.is_some()))
-        })
-        .count()
+/// How many sample items look like job postings: a title, and a company,
+/// an apply link, or a link to the posting's own page on the site (`hosts`).
+pub fn postings(sample: &[crate::job::Job], hosts: &[String]) -> usize {
+    postings::count(sample, hosts)
 }
 
 /// The least sample items that must look like postings for a site to be a
 /// job board (a CV tool or a blog has none).
 pub const MIN_POSTINGS: usize = 5;
 
+/// How recent a job board's newest job must be.
+pub const ALIVE_DAYS: i64 = 30;
+
 /// Whether the sample says the site is a job board that is alive: enough
-/// postings, and one posted in the last 30 days.
-pub fn is_a_live_job_board(sample: &[crate::job::Job], now: DateTime<Utc>) -> bool {
-    postings(sample) >= MIN_POSTINGS
-        && sample.iter().any(|job| {
-            job.posted_at
-                .is_some_and(|at| at >= now - TimeDelta::days(30))
-        })
+/// postings, and one posted in the last 30 days. When no job says when it
+/// was posted, the feed's own date (`fresh_at`: its `lastBuildDate` or
+/// `updated`, or the `Last-Modified` the site answered with) within 30 days
+/// counts.
+pub fn is_a_live_job_board(
+    sample: &[crate::job::Job],
+    hosts: &[String],
+    now: DateTime<Utc>,
+    fresh_at: Option<DateTime<Utc>>,
+) -> bool {
+    postings(sample, hosts) >= MIN_POSTINGS && posted_recently(sample, now, fresh_at)
 }
 
-/// Pages one check reads, each path once.
+/// A job was posted in the last 30 days, or none says when and the feed's
+/// own date is that recent.
+pub fn posted_recently(
+    sample: &[crate::job::Job],
+    now: DateTime<Utc>,
+    fresh_at: Option<DateTime<Utc>>,
+) -> bool {
+    let since = now - TimeDelta::days(ALIVE_DAYS);
+    if sample
+        .iter()
+        .any(|job| job.posted_at.is_some_and(|at| at >= since))
+    {
+        return true;
+    }
+    sample.iter().all(|job| job.posted_at.is_none()) && fresh_at.is_some_and(|at| at >= since)
+}
+
+/// Pages one check reads, each path once, and no more than its budget of
+/// requests.
 struct Visits<'a> {
     reader: &'a Reader,
     db: &'a PgPool,
     seen: HashSet<String>,
+    /// Requests made, the most there may be, and how many were made before
+    /// the budget began.
+    used: usize,
+    budget: usize,
+    base: usize,
+    /// A request was refused because the budget was used up.
+    exhausted: bool,
+    /// What each page answered for `Last-Modified`.
+    modified: HashMap<String, String>,
 }
 
-impl Visits<'_> {
+impl<'a> Visits<'a> {
+    fn new(reader: &'a Reader, db: &'a PgPool) -> Self {
+        Self {
+            reader,
+            db,
+            seen: HashSet::new(),
+            used: 0,
+            budget: usize::MAX,
+            base: 0,
+            exhausted: false,
+            modified: HashMap::new(),
+        }
+    }
+
+    /// From now on, at most `requests` more requests (robots.txt and the
+    /// homepage are not counted).
+    fn limit(&mut self, requests: usize) {
+        self.base = self.used;
+        self.budget = self.used.saturating_add(requests);
+    }
+
+    /// Requests made since the budget began.
+    fn spent(&self) -> usize {
+        self.used - self.base
+    }
+
     /// `url`'s body, unless this check already asked for it, it is not
-    /// found, or it failed.
+    /// found, it failed, or the budget is used up.
     async fn get(&mut self, url: &Url) -> Option<String> {
         self.get_with(url, MAX_PAGE, &[])
             .await
             .map(|body| String::from_utf8_lossy(&body).into_owned())
+    }
+
+    /// The `Last-Modified` the page at `url` answered with.
+    fn last_modified(&self, url: &Url) -> Option<DateTime<Utc>> {
+        let mut key = url.clone();
+        key.set_fragment(None);
+        self.modified
+            .get(key.as_str())
+            .and_then(|raw| mapping::parse_time(raw))
     }
 
     /// `url`'s bytes (a feed decodes its own encoding), at most `max`, with
@@ -774,12 +891,22 @@ impl Visits<'_> {
     ) -> Option<Vec<u8>> {
         let mut key = url.clone();
         key.set_fragment(None);
-        if !self.seen.insert(key.to_string()) {
+        if self.seen.contains(key.as_str()) {
             return None;
         }
-        match self.reader.visit_with(self.db, &key, max, secret).await {
-            Ok(Some(body)) => Some(body),
-            Ok(None) => None,
+        if self.used >= self.budget {
+            self.exhausted = true;
+            return None;
+        }
+        self.seen.insert(key.to_string());
+        self.used += 1;
+        match self.reader.visit_noting(self.db, &key, max, secret).await {
+            Ok((body, validators)) => {
+                if let Some(modified) = validators.last_modified {
+                    self.modified.insert(key.to_string(), modified);
+                }
+                body
+            }
             Err(e) => {
                 tracing::info!(error = %e, "a page of a board's check could not be read");
                 None
@@ -958,21 +1085,58 @@ pub fn propose_json(endpoint: &Url, answer: &Value) -> Option<BoardConfig> {
     config.validate(Kind::JsonApi).is_ok().then_some(config)
 }
 
-/// A config reading the feed at `endpoint`, whose first item is `item`.
-pub fn propose_feed(endpoint: &Url, item: &rss::FeedItem) -> BoardConfig {
-    let has = |name: &str| item.0.contains_key(name);
+/// The date elements a feed item may carry, most usual first.
+const DATE_ELEMENTS: [&str; 5] = ["pubDate", "published", "dc:date", "updated", "published_at"];
+
+/// A config reading the feed at `endpoint`, whose items are `items` (the
+/// first ones). Dates are mapped by default: the date element most items
+/// carry, else the one the feed has, else `pubDate`.
+pub fn propose_feed(endpoint: &Url, items: &[rss::FeedItem]) -> BoardConfig {
+    let sample = &items[..items.len().min(SAMPLE)];
+    let has = |name: &str| sample.iter().any(|item| item.0.contains_key(name));
     let first = |names: &[&str]| names.iter().find(|n| has(n)).map(|n| (*n).to_owned());
+    let dated = |name: &str| {
+        sample
+            .iter()
+            .filter(|item| {
+                item.0
+                    .get(name)
+                    .is_some_and(|v| mapping::parse_time(v).is_some())
+            })
+            .count()
+    };
+    let mut best: Option<(&str, usize)> = None;
+    for name in DATE_ELEMENTS {
+        let n = dated(name);
+        if n > 0 && best.is_none_or(|(_, most)| n > most) {
+            best = Some((name, n));
+        }
+    }
+    let posted_at = best
+        .map(|(name, _)| name)
+        .or_else(|| DATE_ELEMENTS.into_iter().find(|name| has(name)))
+        .unwrap_or("pubDate")
+        .to_owned();
     BoardConfig {
         endpoint: Some(endpoint.clone()),
         poll_minutes: Some(60),
         fields: Fields {
-            reference: first(&["guid", "id", "link"]),
+            reference: first(&["guid", "id", "link", "url"]),
             title: Some("title".to_owned()),
-            url: Some("link".to_owned()),
-            company: first(&["company", "dc:creator", "author"]),
+            url: first(&["link", "url"]).or_else(|| Some("link".to_owned())),
+            apply_url: first(&["application_link", "apply_url"]),
+            company: first(&["company", "company_name", "dc:creator", "author"]),
             regions: first(&["region", "location"]),
-            description: first(&["description", "summary", "content", "content:encoded"]),
-            posted_at: first(&["pubDate", "published", "updated", "dc:date"]),
+            description: first(&[
+                "description",
+                "summary",
+                "content",
+                "content:encoded",
+                "plain_text_description",
+                "html_description",
+            ]),
+            posted_at: Some(posted_at),
+            expires_at: first(&["expires_at"]),
             ..Fields::default()
         },
         ..BoardConfig::default()
@@ -985,11 +1149,27 @@ struct Found {
     url: Url,
     config: BoardConfig,
     sample: Vec<crate::job::Job>,
+    /// The feed's own date (its `lastBuildDate` or `updated`, else the
+    /// `Last-Modified` it answered with).
+    fresh_at: Option<DateTime<Utc>>,
+}
+
+/// The feed's own date: what it says (`lastBuildDate`, `updated`), else what
+/// the site answered with (`Last-Modified`).
+fn fresh_at_of(body: &[u8], modified: Option<DateTime<Utc>>) -> Option<DateTime<Utc>> {
+    rss::feed_date(body)
+        .and_then(|raw| mapping::parse_time(&raw))
+        .or(modified)
 }
 
 /// Read `body` (from `url`) as an API or a feed, with a proposed config and
-/// its sample.
-fn read_feed(url: &Url, body: &[u8], board: &BoardRef) -> Option<Found> {
+/// its sample. `modified` is the page's `Last-Modified`.
+fn read_feed(
+    url: &Url,
+    body: &[u8],
+    board: &BoardRef,
+    modified: Option<DateTime<Utc>>,
+) -> Option<Found> {
     if let Ok(answer) = serde_json::from_slice::<Value>(body)
         && let Some(config) = propose_json(url, &answer)
     {
@@ -1005,25 +1185,47 @@ fn read_feed(url: &Url, body: &[u8], board: &BoardRef) -> Option<Found> {
             url: url.clone(),
             config,
             sample,
+            fresh_at: modified,
         });
     }
     let items = rss::items(body);
-    let config = propose_feed(url, items.first()?);
-    let sample: Vec<_> = items
+    let mut config = propose_feed(url, &items);
+    let mut sample: Vec<_> = items
         .iter()
         .filter_map(|item| mapping::job_of(item, &config, board))
         .take(SAMPLE)
         .collect();
+    // A feed with no company field: the company is in the titles, when one
+    // pattern is consistent across the sample.
+    if config.fields.company.is_none() {
+        let (_, split) = postings::with_companies(sample.clone());
+        if split.is_some() {
+            config.title_split = split;
+            sample = items
+                .iter()
+                .filter_map(|item| mapping::job_of(item, &config, board))
+                .take(SAMPLE)
+                .collect();
+        }
+    }
     (!sample.is_empty()).then(|| Found {
         kind: Kind::Rss,
         url: url.clone(),
         config,
         sample,
+        fresh_at: fresh_at_of(body, modified),
     })
 }
 
 /// Read `body` (from `url`) with the board's own `config`: its sample.
-fn read_own(kind: Kind, config: &BoardConfig, url: &Url, body: &[u8], board: &BoardRef) -> Found {
+fn read_own(
+    kind: Kind,
+    config: &BoardConfig,
+    url: &Url,
+    body: &[u8],
+    board: &BoardRef,
+    modified: Option<DateTime<Utc>>,
+) -> Found {
     let sample: Vec<_> = match kind {
         Kind::JsonApi => serde_json::from_slice::<Value>(body)
             .ok()
@@ -1056,11 +1258,56 @@ fn read_own(kind: Kind, config: &BoardConfig, url: &Url, body: &[u8], board: &Bo
         url: url.clone(),
         config: config.clone(),
         sample,
+        fresh_at: fresh_at_of(body, modified),
     }
 }
 
+/// A board of a feed that is read with its own config, improved for a board
+/// nobody edited (#108): dates and the company from the titles, when the
+/// config has none. `None` when there is nothing to improve.
+fn improved_feed_config(found: &Found, body: &[u8], url: &Url, board: &BoardRef) -> Option<Found> {
+    if found.kind != Kind::Rss {
+        return None;
+    }
+    let items = rss::items(body);
+    let proposed = propose_feed(url, &items);
+    let mut config = found.config.clone();
+    let mut changed = false;
+    if config.fields.posted_at.is_none() {
+        config.fields.posted_at = proposed.fields.posted_at;
+        changed = true;
+    }
+    if config.fields.company.is_none() && config.title_split.is_none() {
+        let sample: Vec<_> = items
+            .iter()
+            .filter_map(|item| mapping::job_of(item, &config, board))
+            .take(SAMPLE)
+            .collect();
+        let (_, split) = postings::with_companies(sample);
+        if split.is_some() {
+            config.title_split = split;
+            changed = true;
+        }
+    }
+    if !changed {
+        return None;
+    }
+    let sample: Vec<_> = items
+        .iter()
+        .filter_map(|item| mapping::job_of(item, &config, board))
+        .take(SAMPLE)
+        .collect();
+    Some(Found {
+        kind: found.kind,
+        url: found.url.clone(),
+        config,
+        sample,
+        fresh_at: found.fresh_at,
+    })
+}
+
 /// Posting pages a check reads through a sitemap, at most.
-pub const SITEMAP_SAMPLE: usize = 3;
+pub const SITEMAP_SAMPLE: usize = 5;
 
 /// The part of a posting's path its sitemap's postings share: `/jobs/` for
 /// `/jobs/123-engineer`.
@@ -1074,47 +1321,70 @@ fn job_path_of(url: &Url) -> String {
 
 /// JSON-LD postings through `sitemap` (its pages whose path names a job,
 /// on `home`'s site and allowed): a few read for the sample, and a config.
+/// `jobs_sitemap` says the sitemap itself is the site's list of jobs (its
+/// name says so), so its pages need not name a job. A page after two with no
+/// posting ends the read.
 async fn read_sitemap(
     visits: &mut Visits<'_>,
     sitemap: &Url,
     body: &[u8],
     job_path: Option<&str>,
+    jobs_sitemap: bool,
     allowed: &(dyn Fn(&Url) -> bool + Sync),
     board: &BoardRef,
 ) -> Option<Found> {
     let text = String::from_utf8_lossy(body);
-    let pages: Vec<Url> = jsonld::sitemap_urls(&text, job_path, 500)
+    let mut urls: Vec<Url> = jsonld::sitemap_urls(&text, job_path, 500)
         .into_iter()
         .filter(|url| host_of(url) == host_of(sitemap))
-        .filter(|url| job_path.is_some() || url.path().to_ascii_lowercase().contains("job"))
         .filter(|url| allowed(url))
-        .take(SITEMAP_SAMPLE)
         .collect();
+    let job_path = match job_path {
+        Some(path) => Some(path.to_owned()),
+        None if jobs_sitemap => finder::common_path(&urls),
+        None => None,
+    };
+    if let Some(path) = job_path.as_deref().filter(|_| jobs_sitemap) {
+        urls.retain(|url| url.path().starts_with(path));
+    } else if job_path.is_none() {
+        urls.retain(|url| finder::names_a_job(url.path()));
+    }
+    let pages: Vec<Url> = urls.into_iter().take(SITEMAP_SAMPLE).collect();
     let first = pages.first()?.clone();
     let config = BoardConfig {
         sitemap: Some(sitemap.clone()),
-        job_path: Some(job_path.map_or_else(|| job_path_of(&first), str::to_owned)),
+        job_path: Some(job_path.unwrap_or_else(|| job_path_of(&first))),
         max_jobs: Some(20),
         poll_minutes: Some(360),
         ..BoardConfig::default()
     };
     let fields = jsonld::config_with_fields(&config);
     let mut sample = Vec::new();
+    let mut empty_in_a_row = 0;
     for page in &pages {
         let Some(html) = visits.get(page).await else {
             continue;
         };
-        sample.extend(
-            jsonld::postings(&html, page)
-                .iter()
-                .filter_map(|posting| mapping::job_of(posting, &fields, board)),
-        );
+        let found: Vec<_> = jsonld::postings(&html, page)
+            .iter()
+            .filter_map(|posting| mapping::job_of(posting, &fields, board))
+            .collect();
+        if found.is_empty() {
+            empty_in_a_row += 1;
+            if empty_in_a_row >= 2 && sample.is_empty() {
+                break;
+            }
+        } else {
+            empty_in_a_row = 0;
+        }
+        sample.extend(found);
     }
     (!sample.is_empty()).then(|| Found {
         kind: Kind::JsonldSitemap,
         url: sitemap.clone(),
         config,
         sample,
+        fresh_at: visits.last_modified(sitemap),
     })
 }
 
@@ -1123,11 +1393,13 @@ fn share(part: usize, whole: usize) -> Option<f64> {
     (whole > 0).then(|| part as f64 / whole as f64)
 }
 
-/// Check `row`: robots rules, its site, its terms, its config's address
-/// (with its key) read with its own config, or, with no usable config,
-/// common feed and API paths and a sitemap; keep the report (with a
-/// proposed config when it has none that reads) and a line in `run`'s
-/// scans.
+/// Check `row`: robots rules, its site, its config's address (with its key)
+/// read with its own config, or, with no usable config, where its list of
+/// jobs may be (`finder`: the feeds its site links to, a job-board
+/// platform's address, its Jobs page, its sitemaps, common paths) within the
+/// check's request budget; then its terms page (linked, or at a usual path).
+/// Keep the report (with a proposed config when it has none that reads, and
+/// why it still waits when it does) and a line in `run`'s scans.
 #[allow(clippy::too_many_lines)]
 pub async fn check(
     deps: &SourcesDeps,
@@ -1138,11 +1410,7 @@ pub async fn check(
 ) -> Result<Checked> {
     let started = Instant::now();
     let now = deps.clock.now();
-    let mut visits = Visits {
-        reader,
-        db,
-        seen: HashSet::new(),
-    };
+    let mut visits = Visits::new(reader, db);
     let Ok(home) = Url::parse(&row.homepage) else {
         return Ok(Checked::Done);
     };
@@ -1157,46 +1425,44 @@ pub async fn check(
     let robots_text = robots_of(&mut visits, &robots_base).await;
     let mut robots = robots::report(robots_text.as_deref(), start.as_ref());
     robots.host = host_of(&robots_base);
+    let home_robots_text = if host_of(&home) == robots.host {
+        robots_text.clone()
+    } else {
+        robots_of(&mut visits, &home).await
+    };
     let home_rules = if host_of(&home) == robots.host {
         robots.rules.clone()
     } else {
-        let text = robots_of(&mut visits, &home).await;
-        robots::rules_for_us(text.as_deref().unwrap_or("")).0
+        robots::rules_for_us(home_robots_text.as_deref().unwrap_or("")).0
     };
     let allowed = |url: &Url| {
         host_of(url) != host_of(&home) || robots::allowed(&home_rules, &robots::path_of(url)).0
     };
 
-    // The site: its language, its feeds, its postings, its terms.
+    // The site: its language, its feeds, its postings.
     let html = if allowed(&home) {
         visits.get(&home).await
     } else {
         None
     };
     let html = html.unwrap_or_default();
+    // Everything after the homepage shares the check's request budget.
+    visits.limit(deps.config.discovery_max_requests());
     let language = HTML_LANG
         .captures(&html)
         .and_then(|c| c.get(1))
         .map(|m| m.as_str().to_ascii_lowercase());
-    let jsonld = jsonld::has_postings(&html);
-    let terms_url = terms_link(&html, &home);
-    let terms_html = match &terms_url {
-        Some(url) if allowed(url) => visits.get(url).await,
-        _ => None,
-    };
-    let terms_sentences = terms_html
-        .as_deref()
-        .map(terms_sentences)
-        .unwrap_or_default();
-
-    let contact = contact_email(&html, terms_html.as_deref());
+    let mut jsonld = jsonld::has_postings(&html);
     let board = BoardRef {
         id: row.id,
         slug: row.slug.clone(),
         name: row.name.clone(),
         drop_expired: false,
     };
+    let auto_apply = !row.config_edited && row.origin() != job_boards::Origin::Seed;
     let mut found: Option<Found> = None;
+    let mut platform: Option<finder::Platform> = None;
+    let mut jobs_page: Option<finder::JobsPage> = None;
     // Its own address, read with its own config when it reads (and with its
     // key, when it needs one: never asked without it).
     if let (Some(url), Ok(secret)) = (&start, &secret)
@@ -1204,6 +1470,7 @@ pub async fn check(
         && allowed(url)
         && let Some(body) = visits.get_with(url, MAX_BOARD_BODY, secret).await
     {
+        let modified = visits.last_modified(url);
         found = match &usable {
             Some(own) if kind == Kind::JsonldSitemap => {
                 let rules = robots.rules.clone();
@@ -1214,6 +1481,7 @@ pub async fn check(
                     url,
                     &body,
                     own.job_path.as_deref(),
+                    false,
                     &allowed_page,
                     &board,
                 )
@@ -1223,45 +1491,67 @@ pub async fn check(
                     ..f
                 })
             }
-            Some(own) => Some(read_own(kind, own, url, &body, &board)),
-            None => read_feed(url, &body, &board),
+            Some(own) => {
+                let read = read_own(kind, own, url, &body, &board, modified);
+                // A discovered board nobody edited gets the dates and the
+                // company-from-title its config lacked (#108).
+                let improved = auto_apply
+                    .then(|| improved_feed_config(&read, &body, url, &board))
+                    .flatten();
+                Some(improved.unwrap_or(read))
+            }
+            None => read_feed(url, &body, &board, modified),
         };
     }
-    // No usable config: the site's feeds, common feed and API paths, then
-    // JSON-LD postings through its sitemap.
-    if usable.is_none() && found.as_ref().is_none_or(|f| f.sample.is_empty()) {
-        let mut probes: Vec<Url> = Vec::new();
-        for link in rss::feed_links(&html).into_iter().take(2) {
-            if let Ok(url) = home.join(&link)
-                && host_of(&url) == host_of(&home)
-            {
-                probes.push(url);
-            }
+    // No usable config: where the site's list of jobs may be.
+    let looking = usable.is_none() && found.as_ref().is_none_or(|f| f.sample.is_empty());
+    if looking {
+        let evidence = finder::evidence(&mut visits, &home, &html, &allowed, &board).await;
+        found = evidence.found;
+        platform = evidence.platform;
+        jobs_page = evidence.jobs_page;
+    }
+
+    // The terms page: the homepage's link, the Jobs page's link, then the
+    // usual paths.
+    let mut terms_url = terms_link(&html, &home);
+    if terms_url.is_none()
+        && let Some(page) = &jobs_page
+    {
+        terms_url = terms_link(&page.html, &page.url);
+    }
+    let mut terms_html = match &terms_url {
+        Some(url) if allowed(url) => visits.get(url).await,
+        _ => None,
+    };
+    if terms_url.is_none()
+        && !html.is_empty()
+        && let Some((url, page)) = finder::terms_by_path(&mut visits, &home, &allowed).await
+    {
+        terms_url = Some(url);
+        terms_html = Some(page);
+    }
+    let terms_sentences = terms_html
+        .as_deref()
+        .map(terms_sentences)
+        .unwrap_or_default();
+    let contact = contact_email(&html, terms_html.as_deref());
+
+    if looking && found.is_none() {
+        // The sitemaps robots.txt lists (else /sitemap.xml), then the usual
+        // feed and API paths.
+        let mut listed = robots_sitemaps_of(home_robots_text.as_deref(), &home);
+        if listed.is_empty() {
+            listed.extend(home.join("/sitemap.xml").ok());
         }
-        for path in PROBES {
-            if let Ok(url) = home.join(path) {
-                probes.push(url);
-            }
+        let job_path = platform.and_then(finder::Platform::job_path);
+        found = finder::sitemaps(&mut visits, &listed, job_path, &allowed, &board).await;
+        if found.is_none() {
+            found = finder::blind(&mut visits, &home, &allowed, &board).await;
         }
-        for url in probes {
-            if !allowed(&url) {
-                continue;
-            }
-            let Some(body) = visits.get_with(&url, MAX_BOARD_BODY, &[]).await else {
-                continue;
-            };
-            if let Some(read) = read_feed(&url, &body, &board) {
-                found = Some(read);
-                break;
-            }
-        }
-        if found.is_none()
-            && let Ok(sitemap) = home.join("/sitemap.xml")
-            && allowed(&sitemap)
-            && let Some(body) = visits.get_with(&sitemap, MAX_PAGE, &[]).await
-        {
-            found = read_sitemap(&mut visits, &sitemap, &body, None, &allowed, &board).await;
-        }
+    }
+    if let Some(page) = &jobs_page {
+        jsonld = jsonld || jsonld::has_postings(&page.html);
     }
 
     // The sample's shares, salaries and the proposed priority.
@@ -1349,7 +1639,6 @@ pub async fn check(
     // A proposed config and kind: applied by itself to a discovered or
     // suggested board nobody edited, offered to the owner for any other
     // board without a usable config.
-    let auto_apply = !row.config_edited && row.origin() != job_boards::Origin::Seed;
     let proposed = found
         .as_ref()
         .filter(|f| !f.sample.is_empty() && (auto_apply || usable.is_none()))
@@ -1369,6 +1658,14 @@ pub async fn check(
         .content_signal
         .as_ref()
         .and_then(|signal| serde_json::to_value(signal).ok());
+    // What makes it a job site, and whether it is alive.
+    let hosts: Vec<String> = [host_of(&home), found.as_ref().and_then(|f| host_of(&f.url))]
+        .into_iter()
+        .flatten()
+        .collect();
+    let fresh_at = found.as_ref().and_then(|f| f.fresh_at);
+    let one_company = finder::one_hiring_system(sample);
+    let live = one_company.is_none() && is_a_live_job_board(sample, &hosts, now, fresh_at);
     let report = Report {
         checked_at: Some(now),
         robots,
@@ -1404,6 +1701,8 @@ pub async fn check(
         notes: old.notes,
         proposal,
         config_fingerprint: robots::fingerprint(&new_config.to_string()),
+        waiting_because: None,
+        rules: RULES,
     };
     let high = remote_share.unwrap_or(0.0) >= 0.5 && worldwide_share.unwrap_or(0.0) >= 0.5;
     let priority = if row.origin() == job_boards::Origin::Seed {
@@ -1437,21 +1736,55 @@ pub async fn check(
     .execute(db)
     .await?;
     job_boards::keep_listed(db, row.id, &crate::readers::listed(sample), true, now).await?;
-    // The sample's apply links may name company pages (#87).
+    // The sample's apply links may name company pages (#87). When every job
+    // applies on one company's hiring page, that page is registered and the
+    // site is not approved as a job site.
     crate::company_pages::note_links(db, sample, &row.name, now).await;
     let approved = reading_allows_and_approve(
         db,
         row,
-        sample,
+        live,
         reading.allows(&key),
         reading.budget_reached,
         now,
     )
     .await?;
+    if !approved {
+        let system = one_company
+            .as_ref()
+            .map(|link| hiring_systems::of(link.source).map_or(link.source.as_str(), |s| s.name));
+        let because = waiting::because(&waiting::Facts {
+            needs_key: secret.is_err(),
+            rules_forbid_list: report.robots.endpoint_allowed == Some(false),
+            found: found.is_some(),
+            sample: sample.len(),
+            postings: postings(sample, &hosts),
+            newest: sample.iter().filter_map(|job| job.posted_at).max(),
+            out_of_requests: visits.exhausted,
+            requests: visits.spent(),
+            one_system: system,
+            verdict: reading.verdict.as_deref(),
+            quote: reading.quote.as_deref(),
+            terms_fresh: reading.fresh(&key),
+            budget_reached: reading.budget_reached,
+            edited: row.config_edited,
+            proposal_waits: report.proposal.is_some(),
+            now: Some(now),
+        });
+        sqlx::query(
+            "UPDATE sources.job_boards
+                SET report = jsonb_set(report, '{waiting_because}', $2)
+              WHERE id = $1 AND status = 'candidate'",
+        )
+        .bind(row.id)
+        .bind(sqlx::types::Json(&because))
+        .execute(db)
+        .await?;
+    }
     let note = match &found {
         Some(f) if !f.sample.is_empty() => {
             format!(
-                "{} at {} · {} sample jobs · robots {}{}",
+                "{} at {} · {} sample jobs{} · robots {}{}",
                 match f.kind {
                     Kind::Rss => "Feed",
                     Kind::JsonldSitemap => "Sitemap",
@@ -1459,6 +1792,7 @@ pub async fn check(
                 },
                 f.url.path(),
                 f.sample.len(),
+                platform.map_or_else(String::new, |p| format!(" ({})", p.name())),
                 if report.robots.endpoint_allowed == Some(false) {
                     "disallow it"
                 } else {
@@ -1493,7 +1827,13 @@ pub async fn check(
         deps.clock.now(),
     )
     .await?;
-    tracing::info!(board = %row.slug, found = found.is_some(), approved, "job board checked");
+    tracing::info!(
+        board = %row.slug,
+        found = found.is_some(),
+        approved,
+        requests = visits.used,
+        "job board checked"
+    );
     Ok(if reading.budget_reached {
         Checked::BudgetReached
     } else {
@@ -1501,15 +1841,20 @@ pub async fn check(
     })
 }
 
+/// The sitemaps `robots` (the site's robots.txt, when it has one) lists.
+fn robots_sitemaps_of(robots: Option<&str>, home: &Url) -> Vec<Url> {
+    robots.map_or_else(Vec::new, |text| finder::robots_sitemaps(text, home))
+}
+
 /// Approve `row` by the app when its check is clean, as stored just now:
 /// still a candidate nobody edited, no blocker (the research's facts, what
 /// its terms and robots rules say, a key it needs, a config that reads), a
 /// config that reads its sample, terms that allow apps or say nothing as
-/// they are now, a live job board. Whether it was.
+/// they are now, a live job board (`live`). Whether it was.
 async fn reading_allows_and_approve(
     db: &PgPool,
     row: &BoardRow,
-    sample: &[crate::job::Job],
+    live: bool,
     terms_allow: bool,
     budget_reached: bool,
     now: DateTime<Utc>,
@@ -1518,7 +1863,7 @@ async fn reading_allows_and_approve(
         || !terms_allow
         || row.status() != Status::Candidate
         || row.config_edited
-        || !is_a_live_job_board(sample, now)
+        || !live
     {
         return Ok(false);
     }
@@ -1552,8 +1897,23 @@ async fn reading_allows_and_approve(
 }
 
 /// Paths a check probes for a feed or an API when the board has no usable
-/// config, after the feeds its site links to.
-pub const PROBES: [&str; 4] = ["/api", "/jobs/api", "/feed", "/rss"];
+/// config, after the feeds its site links to, a platform's address, its Jobs
+/// page and its sitemaps.
+pub const PROBES: [&str; 13] = [
+    "/jobs.rss",
+    "/jobs/feed",
+    "/feed/jobs",
+    "/jobs.xml",
+    "/feed",
+    "/rss",
+    "/feed.xml",
+    "/rss.xml",
+    "/jobs.json",
+    "/api",
+    "/jobs/api",
+    "/?feed=job_feed",
+    "/feed/?post_type=job_listing",
+];
 
 /// Re-check an approved board: its robots rules and terms, flagging what
 /// changed since the last check (never pausing it: the owner decides).
@@ -1566,11 +1926,7 @@ pub async fn recheck(
 ) -> Result<Checked> {
     let started = Instant::now();
     let now = deps.clock.now();
-    let mut visits = Visits {
-        reader,
-        db,
-        seen: HashSet::new(),
-    };
+    let mut visits = Visits::new(reader, db);
     let Ok(home) = Url::parse(&row.homepage) else {
         return Ok(Checked::Done);
     };

@@ -33,6 +33,15 @@
 //                         (the fake answers "silent") tags it (#75);
 //   ask-first-site.test   the same, but its terms ask for written consent
 //                         first: it waits, with that sentence quoted;
+//   title-site.test      a site with no config whose homepage links an RSS feed
+//                         of "Role at Company" titles with no company field and
+//                         a link to each job's own page: the check at start
+//                         reads the company from the titles and approves it
+//                         by itself (#108);
+//   title-suggested.test  the same, for a person to suggest (not in the seed list),
+//                         so the app approves it by itself (#108);
+//   blog-site.test        a site whose homepage links an RSS feed of blog posts:
+//                         it waits, saying it may not be a job site (#108);
 //   feed-site-<p>.test    a site with no config whose homepage links its RSS
 //                         feed: the check proposes a config (one per
 //                         Playwright project, desktop and phone).
@@ -1024,6 +1033,47 @@ function termsReading(user: string) {
   };
 }
 
+/** Five invented jobs titled "Role at Company", with no company field (#108). */
+const TITLE_JOBS = [
+  "Hotel Operations Lead at Harbour Stays",
+  "Backend Engineer at Northlight Labs",
+  "Travel Experience Designer at Wayfarer Co",
+  "Platform Engineer at Northlight Labs",
+  "Guest Services Manager at Harbour Stays",
+];
+
+/** The feed of title-site.test: dated, the job's own page as the link. */
+function titleFeed(site: string): string {
+  const items = TITLE_JOBS.map(
+    (title, index) =>
+      `<item><title>${title}</title><link>http://${site}:9020/jobs/${String(index + 1)}</link>` +
+      `<guid>${site}-${String(index + 1)}</guid>` +
+      `<pubDate>${new Date(Date.now() - (index + 1) * 86_400_000).toUTCString()}</pubDate>` +
+      `<description>Invented.</description></item>`,
+  ).join("");
+  return `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel>${items}</channel></rss>`;
+}
+
+/** The feed of blog-site.test: posts, not jobs. */
+function blogFeed(site: string): string {
+  const items = [
+    "Why we love working from anywhere",
+    "Notes from our spring offsite",
+    "Ten books the team read this year",
+    "How we plan a quiet release",
+    "A year of writing things down",
+  ]
+    .map(
+      (title, index) =>
+        `<item><title>${title}</title><link>http://${site}:9020/blog/post-${String(index + 1)}</link>` +
+        `<guid>${site}-post-${String(index + 1)}</guid>` +
+        `<pubDate>${new Date(Date.now() - (index + 1) * 86_400_000).toUTCString()}</pubDate>` +
+        `<description>Invented.</description></item>`,
+    )
+    .join("");
+  return `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel>${items}</channel></rss>`;
+}
+
 /** The same jobs as an RSS feed. */
 function waitingFeed(site: string): string {
   const items = waitingJobs(site)
@@ -1064,6 +1114,28 @@ function waitingBoard(site: string, url: URL, response: ServerResponse): boolean
     if (url.pathname === "/api/jobs") {
       console.log(`fake-jobs: listed ${site}`);
       json(response, 200, recentJobs(site));
+      return true;
+    }
+    return false;
+  }
+  const titled = site === "title-site.test" || site === "title-suggested.test";
+  if (titled || site === "blog-site.test") {
+    const feed = titled ? "/jobs.rss" : "/feed.xml";
+    if (url.pathname === "/") {
+      text(
+        response,
+        "text/html",
+        `<html lang="en"><head><link rel="alternate" type="application/rss+xml" href="${feed}"></head>` +
+          `<body>Invented. <a href="/terms">Terms of service</a></body></html>`,
+      );
+      return true;
+    }
+    if (url.pathname === "/terms") {
+      text(response, "text/html", termsPage(site));
+      return true;
+    }
+    if (url.pathname === feed) {
+      text(response, "application/rss+xml", titled ? titleFeed(site) : blogFeed(site));
       return true;
     }
     return false;

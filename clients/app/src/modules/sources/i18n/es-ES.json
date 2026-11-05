@@ -701,7 +701,26 @@
     "undo": "Deshacer",
     "declined": "Rechazado",
     "open": "Abrir",
-    "more": "Mostrar más"
+    "more": "Mostrar más",
+    "why": {
+      "needs_key": "Su lista de empleos necesita una clave del sitio. Añade una y vuelve a comprobar.",
+      "list_not_allowed": "Las reglas del sitio no dejan que las aplicaciones lean su lista de empleos.",
+      "no_job_list": "La aplicación no encontró ninguna lista de empleos en este sitio.",
+      "request_limit": "La comprobación usó sus {{detail}} peticiones antes de encontrar dónde están los empleos.",
+      "empty_list": "Se encontró una lista de empleos, pero no se pudo leer ningún empleo.",
+      "jobs_on_hiring_system": "Todos los empleos piden candidatura en la página de una sola empresa en {{detail}}, así que es una empresa y no un sitio de empleo. Esa página se añade como página de empresa.",
+      "not_a_job_board": "Pocos elementos parecen empleos, así que quizá no sea un sitio de empleo.",
+      "nothing_recent": "Su empleo más reciente es del {{detail}}, de hace más de 30 días.",
+      "undated": "Ningún empleo dice cuándo se publicó y el sitio no muestra cambios en los últimos 30 días.",
+      "terms_forbid": "Sus términos no permiten que las aplicaciones lo lean.",
+      "terms_ask_first": "Sus términos piden permiso primero.",
+      "terms_personal_only": "Sus términos solo permiten el uso personal, no el de una aplicación.",
+      "terms_unread": "La aplicación aún no ha leído sus términos.",
+      "owner_edited": "Cambiaste su configuración, así que espera por ti.",
+      "config_to_use": "La aplicación encontró cómo leerlo. Usa esa configuración para aprobarlo.",
+      "needs_approval": "Todas las revisiones se superaron. Solo falta tu aprobación.",
+      "unknown": "Espera por ti, por un motivo que la aplicación aún no sabe explicar."
+    }
   },
   "sites": {
     "loadFailed": "No se pudieron cargar los sitios de empleo.",

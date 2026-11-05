@@ -5,14 +5,17 @@
 //! cut, HTML becomes plain text, links must be http(s), times must be
 //! plausible, and an item without a title or a link is skipped.
 
+use std::sync::LazyLock;
+
 use chrono::{DateTime, Datelike as _, NaiveDate, NaiveDateTime, Utc};
+use regex::Regex;
 use serde_json::Value;
 use url::Url;
 use uuid::Uuid;
 
 use crate::{
     job::{BoardJob, Job, Source, SourceLink, WorkMode, html_to_text, one_line},
-    job_boards::{BoardConfig, BoardRow},
+    job_boards::{BoardConfig, BoardRow, TitleSplit},
     requirements::Salary,
 };
 
@@ -190,6 +193,51 @@ fn pay_text(pay: &Salary) -> String {
     format!("{currency} {range}{period}").trim().to_owned()
 }
 
+/// A trailing "(…)" of a title that holds money or numbers: `($145k-$180k)`.
+static TRAILING_PAY: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\s*\([^()]*[\d$€£][^()]*\)\s*$")
+        .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
+});
+
+/// `title` split by `split` into its company and role (both trimmed and not
+/// empty). "Company is hiring a Role" loses the article before the role, and
+/// a trailing pay in parentheses is not part of the company.
+pub fn split_title(title: &str, split: &TitleSplit) -> Option<(String, String)> {
+    let separator = split.separator.to_ascii_lowercase();
+    if separator.is_empty() {
+        return None;
+    }
+    // ASCII lower case keeps every byte offset.
+    let lower = title.to_ascii_lowercase();
+    let at = if split.last {
+        lower.rfind(&separator)?
+    } else {
+        lower.find(&separator)?
+    };
+    let left = title.get(..at)?.trim();
+    let right = title.get(at + separator.len()..)?.trim();
+    let (mut company, mut role) = if split.company_first {
+        (left, right)
+    } else {
+        (right, left)
+    };
+    if separator.trim().ends_with("hiring") {
+        let lowered = role.to_ascii_lowercase();
+        for article in ["a ", "an ", "the "] {
+            if lowered.starts_with(article) {
+                role = role.get(article.len()..)?.trim();
+                break;
+            }
+        }
+    }
+    let cleaned = TRAILING_PAY.replace(company, "");
+    company = cleaned.trim();
+    if company.is_empty() || role.is_empty() {
+        return None;
+    }
+    Some((company.to_owned(), role.to_owned()))
+}
+
 /// `item` as a job of `board`, read with `config`; `None` when it has no
 /// title or no link, or `config`'s filter leaves it out.
 pub fn job_of(item: &impl Item, config: &BoardConfig, board: &BoardRef) -> Option<Job> {
@@ -205,24 +253,26 @@ pub fn job_of(item: &impl Item, config: &BoardConfig, board: &BoardRef) -> Optio
     };
     let url = link_of(&get(&f.url)?)?;
     let mut title = short(get(&f.title))?;
-    let mut company = short(get(&f.company)).unwrap_or_default();
+    // A company field may hold a line break and more after the name
+    // (WP Job Manager: `Example Co<br>⚲ Germany`): the name is the first line.
+    let raw_company = get(&f.company);
+    let mut break_rest: Option<String> = None;
+    let mut company = raw_company
+        .as_deref()
+        .map(|raw| match raw.to_ascii_lowercase().find("<br") {
+            Some(at) => {
+                break_rest = raw.get(at..).map(html_to_text);
+                raw.get(..at).unwrap_or(raw).to_owned()
+            }
+            None => raw.to_owned(),
+        })
+        .and_then(|name| short(Some(name)))
+        .unwrap_or_default();
     if let Some(split) = &config.title_split
         && company.is_empty()
-        && !split.separator.is_empty()
-        && let Some((left, right)) = if split.last {
-            title.rsplit_once(split.separator.as_str())
-        } else {
-            title.split_once(split.separator.as_str())
-        }
+        && let Some((found, role)) = split_title(&title, split)
     {
-        let (left, right) = (left.trim().to_owned(), right.trim().to_owned());
-        if !left.is_empty() && !right.is_empty() {
-            (company, title) = if split.company_first {
-                (left, right)
-            } else {
-                (right, left)
-            };
-        }
+        (company, title) = (found.chars().take(SHORT).collect(), role);
     }
     let source_ref = short(get(&f.reference)).unwrap_or_else(|| url.clone());
     let regions: Vec<String> = f
@@ -234,9 +284,12 @@ pub fn job_of(item: &impl Item, config: &BoardConfig, board: &BoardRef) -> Optio
         .filter_map(|r| one_line(Some(&r)).map(|r| r.chars().take(REGIONS.1).collect()))
         .take(REGIONS.0)
         .collect();
-    let location = short(get(&f.location)).or_else(|| {
-        (!regions.is_empty()).then(|| regions.join(", ").chars().take(SHORT).collect())
-    });
+    let location = short(get(&f.location))
+        .or_else(|| (!regions.is_empty()).then(|| regions.join(", ").chars().take(SHORT).collect()))
+        .or_else(|| {
+            let rest = break_rest.as_deref()?.trim_start_matches(['\u{26b2}', ' ']);
+            short(Some(rest.to_owned())).filter(|r| !r.is_empty())
+        });
     let pay = {
         let divisor = config
             .salary_divisor

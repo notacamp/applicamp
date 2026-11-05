@@ -1,7 +1,7 @@
 {
   "appName": "Applicamp",
   "frame": {
-    "jump": "Pesquisar ou ir para",
+    "jump": "Pesquisar",
     "places": "Secções"
   },
   "commands": {
@@ -12,7 +12,7 @@
   },
   "today": {
     "title": "Hoje",
-    "lead": "O que espera por si, todos os dias. Os agentes trabalham em segundo plano; nada sai em seu nome sem a sua autorização.",
+    "lead": "Nada é enviado sem a sua aprovação.",
     "loading": "A carregar…",
     "loadFailed": "Não foi possível carregar o Hoje.",
     "retry": "Tentar de novo",
@@ -49,8 +49,7 @@
     "action": "Ir para as competências"
   },
   "pipeline": {
-    "title": "Oportunidades",
-    "lead": "Todas as oportunidades que os agentes encontram ou que acrescenta, da primeira correspondência à proposta."
+    "title": "Empregos"
   },
   "boards": {
     "title": "Sites de emprego",
@@ -59,16 +58,13 @@
     "eyebrow": "Você · Sites de emprego"
   },
   "companies": {
-    "title": "Empresas",
-    "lead": "Empresas cujas vagas continuam a combinar consigo. Vigie uma e o Applicamp consulta todos os dias a bolsa de emprego da própria empresa e avisa quando aparece algo que combina. Nada é vigiado sem o seu consentimento."
+    "title": "Empresas"
   },
   "agents": {
-    "title": "Agentes",
-    "lead": "Cada execução trabalha na sua própria sandbox, criada para uma tarefa e apagada no fim."
+    "title": "Agentes"
   },
   "profile": {
-    "title": "Perfil e objetivos",
-    "lead": "O que os agentes sabem sobre si. Usam apenas o que está escrito aqui, e cada afirmação num CV tem de ter origem aqui.",
+    "title": "Você",
     "signedInAs": "Sessão iniciada como",
     "waysIn": "Formas de entrar"
   },
@@ -78,7 +74,6 @@
     "home": "Ir para Hoje"
   },
   "cvs": {
-    "title": "CVs",
-    "lead": "Todos os CVs que fez: os PDFs que pode abrir e enviar, e os rascunhos ainda em revisão."
+    "title": "CVs"
   }
 }

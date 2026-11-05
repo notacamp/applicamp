@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { AppBrand, AppFrame, AppMark, Page, Placeholder, Tagged } from ".";
+import { AppBrand, AppMark, Page, Placeholder, Shell, Tagged } from ".";
 
 describe("the compositions", () => {
   it("draws the mark and the brand", () => {
@@ -19,7 +19,7 @@ describe("the compositions", () => {
 
   it("lays a page out with its title, eyebrow and lead", () => {
     render(
-      <AppFrame>
+      <Shell>
         <Page testId="page" eyebrow="Sunday" title="Today" lead="What waits on you.">
           <Placeholder
             testId="empty"
@@ -30,7 +30,7 @@ describe("the compositions", () => {
             Soon.
           </Placeholder>
         </Page>
-      </AppFrame>,
+      </Shell>,
     );
     const page = screen.getByTestId("page");
     expect(page.tagName).toBe("MAIN");

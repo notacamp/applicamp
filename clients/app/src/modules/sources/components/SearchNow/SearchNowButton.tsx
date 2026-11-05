@@ -101,7 +101,6 @@ export function SearchNowButton({
       <Button
         variant={variant}
         icon="search"
-        shortcut="sources.start"
         disabled={checking || start.isPending}
         data-testid={testId}
         onClick={request}

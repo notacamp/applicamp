@@ -17,7 +17,7 @@ export interface CvsProps {
 export function Cvs({ onReview, onReviewLetter, onOpportunity, onPipeline }: CvsProps) {
   const { t } = useTranslation();
   return (
-    <Page testId="cvs" title={t("cvs.title")} lead={t("cvs.lead")} wide>
+    <Page testId="cvs" title={t("cvs.title")} wide>
       <CvsPage
         onReview={onReview}
         onReviewLetter={onReviewLetter}

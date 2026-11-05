@@ -765,14 +765,14 @@ async fn a_page_that_fails_keeps_the_pages_read_before_it(db: PgPool) {
     // A first page that fails still fails the board.
     let down = MockServer::start().await;
     Mock::given(method("GET"))
-        .respond_with(ResponseTemplate::new(503))
+        .respond_with(ResponseTemplate::new(500))
         .mount(&down)
         .await;
     testkit::seed_fake_boards(&db, &down, &["himalayas"]).await;
     let row = approved_board(&db, "himalayas").await;
     let failed = reader.job_board(&db, &row, now, now).await;
     assert_eq!(failed.outcome, Outcome::Error);
-    assert_eq!(failed.error.as_deref(), Some("http_503"));
+    assert_eq!(failed.error.as_deref(), Some("http_500"));
     assert!(failed.jobs.is_empty() && failed.partial.is_none());
 }
 

@@ -2372,7 +2372,16 @@
             "description": "What to show; all sites when left out.",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/SitesShow"
+              "type": "string",
+              "description": "What the list shows.",
+              "enum": [
+                "all",
+                "on",
+                "remote",
+                "europe",
+                "country",
+                "trade"
+              ]
             }
           }
         ],
@@ -15352,6 +15361,15 @@
           "needs_key": {
             "type": "boolean",
             "description": "It needs an API key before it can be read: the owner adds it."
+          },
+          "new_this_week": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Jobs new on the site in the last 7 days, from the job store; none\nwhen the store has no count for it yet.",
+            "minimum": 0
           },
           "on": {
             "type": "boolean",

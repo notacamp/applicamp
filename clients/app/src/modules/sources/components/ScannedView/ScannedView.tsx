@@ -321,7 +321,7 @@ function SearchNowLine() {
         </Tagged>
       ) : null}
       <Cluster>
-        <SearchNowButton variant="secondary" showShortcut={false} testId="scanned-search" />
+        <SearchNowButton variant="secondary" testId="scanned-search" />
       </Cluster>
       {cost > 0 ? (
         <Tagged testId="scanned-search-cost">

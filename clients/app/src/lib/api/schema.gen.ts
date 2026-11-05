@@ -223,11 +223,14 @@ export interface paths {
         };
         /**
          * What was scanned.
-         * @description The person's searches and the discovery runs, newest first, ten a page,
-         *     each with what it scanned on every board: jobs read, passed their
-         *     requirements, scored by the AI, matched, the AI's cost, or why a board
-         *     was skipped (its polling limit) or failed; and what a discovery check
-         *     found. Filter by board or by search.
+         * @description The person's searches and the discovery runs, newest first, ten a page.
+         *     A search has its funnel: jobs read, given a quick look, read in full,
+         *     good matches, kept with a note, and why the others were left out (with
+         *     the matches, they add up to the jobs read). Each run has what it scanned
+         *     on every board: jobs read, passed their requirements, given a quick
+         *     look, read in full by the AI, matched, the AI's cost, or why a board was
+         *     skipped (its polling limit), failed or was read in part; and what a
+         *     discovery check found. Filter by board or by search.
          */
         get: operations["sources.scans"];
         put?: never;
@@ -2404,10 +2407,11 @@ export interface paths {
         };
         /**
          * About what a search would cost.
-         * @description The jobs it would likely score (the last search's, at most 40), times
-         *     what a batch of ten has cost this person on average, in euros; and what
-         *     they spent today and this month against their limits. Over €0.05 the
-         *     app asks before searching.
+         * @description The jobs it would likely look at (the last search's within the limits),
+         *     the model calls that takes (a quick look for 25, a full read for 10, at
+         *     most 100 read in full), times what a call has cost this person on
+         *     average, in euros; and what they spent today and this month against
+         *     their limits. Over €0.25 the app asks before searching.
          */
         get: operations["sources.estimate"];
         put?: never;
@@ -4554,6 +4558,59 @@ export interface components {
          * @enum {string}
          */
         JobWorkMode: "remote" | "hybrid" | "onsite";
+        /**
+         * @description Why the jobs a search read were left out, by reason. With the good
+         *     matches they add up to the jobs read.
+         */
+        JobsLeftOut: {
+            /**
+             * Format: int32
+             * @description Paying less than their floor.
+             */
+            below_floor?: number;
+            /**
+             * Format: int32
+             * @description In a language they don't work in.
+             */
+            language?: number;
+            /**
+             * Format: int32
+             * @description Read in full, not a good match.
+             */
+            not_good_enough?: number;
+            /**
+             * Format: int32
+             * @description Hiring only in other places.
+             */
+            not_open_to_location?: number;
+            /**
+             * Format: int32
+             * @description Not remote, or not where they can work.
+             */
+            not_remote?: number;
+            /**
+             * Format: int32
+             * @description Not among the best at the quick look.
+             */
+            quick_look?: number;
+            /**
+             * Format: int32
+             * @description Already in the person's jobs, judged by an earlier search, or a match
+             *     the pipeline already had.
+             */
+            seen_before?: number;
+            /**
+             * Format: int32
+             * @description Older than 30 days, or closed.
+             */
+            too_old?: number;
+            /**
+             * Format: int32
+             * @description Left for the next search: a spending limit, the time, a failed call,
+             *     or the most one search adds.
+             */
+            waiting?: number;
+        };
         /** @description What the person keeps. */
         KeepFactRequest: {
             /**
@@ -5838,7 +5895,10 @@ export interface components {
              * @description Good matches that meet every requirement.
              */
             matched: number;
-            /** @description What a discovery check found. */
+            /**
+             * @description What a discovery check found, or which page of a board did not
+             *     answer ("Read 2 pages. Page 3 did not answer.").
+             */
             note?: string | null;
             outcome: components["schemas"]["ScanOutcome"];
             /**
@@ -5848,7 +5908,12 @@ export interface components {
             passed_requirements: number;
             /**
              * Format: int32
-             * @description Scored by the AI (now, or before).
+             * @description Given a quick look by the AI.
+             */
+            quick_looked: number;
+            /**
+             * Format: int32
+             * @description Read in full by the AI.
              */
             scored_by_ai: number;
         };
@@ -5875,6 +5940,7 @@ export interface components {
              * @description What its AI calls cost, in euros (discovery uses none).
              */
             cost_eur: number;
+            funnel?: components["schemas"]["SearchFunnel"] | null;
             /** Format: uuid */
             id: string;
             kind: components["schemas"]["ScanRunKind"];
@@ -5944,6 +6010,38 @@ export interface components {
              */
             jobs: number;
             spend: components["schemas"]["Spend"];
+        };
+        /** @description What a search did with the jobs it read, for the Searches tab. */
+        SearchFunnel: {
+            /**
+             * Format: int32
+             * @description Good matches added to the person's jobs.
+             */
+            good_matches: number;
+            /**
+             * Format: int32
+             * @description Of the jobs read in full now, the good matches kept although their
+             *     posting does not say whether it hires where the person lives: they
+             *     carry a note saying so.
+             */
+            kept_with_note: number;
+            left_out?: components["schemas"]["JobsLeftOut"] | null;
+            /**
+             * Format: int32
+             * @description Jobs given a quick look.
+             */
+            quick_looked: number;
+            /**
+             * Format: int32
+             * @description Jobs read from the sites.
+             */
+            read: number;
+            /**
+             * Format: int32
+             * @description Jobs read in full.
+             */
+            read_in_full: number;
+            stopped?: components["schemas"]["SearchStop"] | null;
         };
         /**
          * @description Where a search is. The same as the search's own (`sources`).

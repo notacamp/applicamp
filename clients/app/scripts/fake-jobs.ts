@@ -100,6 +100,10 @@
 //   contoso-<p>.test    a company whose /careers holds schema.org JobPosting data;
 //   tailspin-<p>.test   a company with no job board anywhere.
 //
+// A search that finds more jobs than it reads in full first takes a quick look
+// at them (#74, "You take a quick look at job postings…"): the fake answers a
+// fit and a reason for each.
+//
 // Every list answers with four new jobs (new ids each time); a board keeps to
 // its polling interval, so a search within it reads the last answer. The
 // fourth is remote only from Germany or Austria, in the words of the posting
@@ -173,9 +177,10 @@ async function body(request: IncomingMessage): Promise<string> {
   return text;
 }
 
-/** A posting in the scoring request's `<jobs>` block. */
+/** A posting in the scoring request's (or the quick look's) `<jobs>` block. */
 interface Posting {
   ref?: string;
+  title?: string;
   posting?: string;
 }
 
@@ -207,6 +212,22 @@ function factsOf(posting: Posting) {
         working_languages: ["en"],
         salary: null,
       };
+}
+
+/**
+ * The quick look at every posting of the last user message (#74): a fit and a
+ * reason each, the roles' own words first. A posting that is not one job
+ * (no title) fits 0.
+ */
+function quickLooks(content: string) {
+  const jobs = postingsOf(content)
+    .filter((posting) => (posting.ref ?? "") !== "")
+    .map((posting, index) => ({
+      ref: posting.ref,
+      fit: (posting.title ?? "") === "" ? 0 : 80 - ((index * 7) % 21),
+      reason: "Your roles name this one",
+    }));
+  return { jobs };
 }
 
 /** The text between `<tag>` and `</tag>` in `content`. */
@@ -848,6 +869,10 @@ async function complete(request: IncomingMessage, response: ServerResponse) {
     }
     if (system.startsWith("You read a person's answer to one question about a job")) {
       json(response, 200, completion(jobAnswer(user?.content ?? "")));
+      return;
+    }
+    if (system.startsWith("You take a quick look at job postings")) {
+      json(response, 200, completion(quickLooks(user?.content ?? "")));
       return;
     }
     postings = postingsOf(user?.content ?? "").filter((posting) => (posting.ref ?? "") !== "");

@@ -518,4 +518,21 @@ Company: Example Co
     expect((await pageOf("tailspin-desktop.test", "/careers")).status).toBe(404);
     expect((await pageOf("tailspin-desktop.test", "/robots.txt")).body).toContain("User-agent");
   });
+
+  it("takes a quick look at every posting: a fit and a reason each, by its ref", async () => {
+    const postings = [
+      { ref: "j1", title: "Staff Engineer", company: "Example Co", posting: "Remote." },
+      { ref: "j2", title: "Platform Engineer", company: "Example Co", posting: "Remote." },
+      { ref: "j3", title: "", company: "", posting: "Not a job." },
+    ];
+    const looks = await model<{ jobs: { ref: string; fit: number; reason: string }[] }>(
+      "You take a quick look at job postings for one person's job search.",
+      `<profile>\n{}\n</profile>\n<goals>\n{}\n</goals>\n<jobs>\n${JSON.stringify(postings)}\n</jobs>`,
+    );
+    expect(looks.jobs.map((look) => look.ref)).toEqual(["j1", "j2", "j3"]);
+    expect(looks.jobs[0]?.fit).toBe(80);
+    expect(looks.jobs[1]?.fit).toBe(73);
+    expect(looks.jobs[2]?.fit).toBe(0);
+    expect(looks.jobs.every((look) => look.reason !== "")).toBe(true);
+  });
 });

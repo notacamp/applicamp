@@ -39,15 +39,19 @@
 //!   held), and each company with a job posted in the last 60 days becomes a
 //!   Workable company page of the registry, approved by the app with its
 //!   system. No model; the jobs themselves are not kept.
-//! - **The search** ([`features::search`]): the same job seen on several
-//!   boards merged into one ([`dedupe`]), crediting each; the goals' hard
-//!   limits on the boards' structured fields (a board's regions too:
-//!   [`regions`]), a pre-rank without the model, the
-//!   `complete` model's scores and eligibility facts in batches of ten
-//!   (cached per profile, goals and rules version), the requirement rules
-//!   ([`requirements`]) deciding pass or fail on those facts, and the good
-//!   matches that pass added to the pipeline as Found. "Search now" and a
-//!   nightly search, both within the spending limits of `applicamp-ai`.
+//! - **The search** ([`features::search`]): the boards asked for the
+//!   person's roles and top skills ([`matching::board_queries`]); the same
+//!   job seen on several boards merged into one ([`dedupe`]), crediting
+//!   each; the goals' hard limits on the boards' structured fields (a
+//!   board's regions too: [`regions`]); a quick look at every job left
+//!   ([`quick`], 25 a `complete` call) when there are more than one search
+//!   reads in full; the best read in full, with their eligibility facts, in
+//!   batches of ten ([`scoring`]; both cached per profile, goals and rules
+//!   version); the requirement rules ([`requirements`]) deciding pass or
+//!   fail on those facts, and the good matches that pass added to the
+//!   pipeline as Found. "Search now" and a nightly search, both within the
+//!   spending limits of `applicamp-ai`; what each did with every job read
+//!   is counted for the Searches tab.
 //! - **Company watchers** ([`features::watch`], #20): companies whose jobs
 //!   keep fitting the person are suggested from their matches (no model),
 //!   the person says Watch, the company's own job board is found (a posting's
@@ -57,7 +61,9 @@
 //!   the company's own board.
 //! - **The recheck** ([`features::recheck`]): at start, Found and
 //!   Shortlisted opportunities found before the rules get their facts once,
-//!   and the ones that fail are hidden (never deleted).
+//!   and the ones that fail are hidden (never deleted); the ones hidden only
+//!   because their posting did not say where it hires are shown again, with
+//!   that note.
 //! - **The reason check** ([`grounding`], [`features::reground`]): a match
 //!   reason may say only what the profile and goals say; the ones that
 //!   claim more are dropped. At start, Found and Shortlisted opportunities
@@ -93,6 +99,7 @@ pub mod pages;
 pub mod pay;
 pub mod places;
 pub mod ports;
+pub mod quick;
 pub mod readers;
 pub mod regions;
 pub mod requirements;

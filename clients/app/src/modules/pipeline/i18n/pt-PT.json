@@ -834,5 +834,10 @@
     "inPipeline": "nas Oportunidades como Encontrada",
     "open": "Abrir",
     "notForMe": "Não é para mim"
+  },
+  "gaps": {
+    "salaryNotStated": "Salário não indicado",
+    "whereUnclear": "Não diz onde contrata",
+    "hiresUnclear": "Não diz se contrata em {{country}}"
   }
 }

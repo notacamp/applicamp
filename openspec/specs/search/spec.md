@@ -15,16 +15,19 @@ limits, score the rest against the profile and goals, and add the good
 matches to the pipeline as Found with the reasons and gaps. It SHALL never
 read LinkedIn or Indeed. Hard limits SHALL be decided by code from facts
 read from each posting, never by the score: a job that is not confirmed
-remote and open to the person's location when they work remote only, that
+remote when they work remote only, that its posting limits to other places
+than where they live when they work remote only or would not move, that
 needs a language they did not list, or whose stated salary is below their
-floor SHALL NOT be added, and an unclear fact SHALL count as not met. A
-match reason SHALL cite only what the profile and goals say: every
-technology, framework, language, company, job title, place and number a
-reason attributes to the person SHALL appear in their profile or goals, a
+floor SHALL NOT be added. An unclear fact SHALL count as not met, except
+whether a remote job hires where they live: a remote job whose posting does
+not say SHALL be kept with the gap "Doesn't say if it hires in" their
+country. A match reason SHALL cite only what the profile and goals say:
+every technology, framework, language, company, job title, place and number
+a reason attributes to the person SHALL appear in their profile or goals, a
 reason that does not SHALL be dropped, and a job whose every reason was
-dropped SHALL NOT be added. The model SHALL be told what the profile does not
-contain and SHALL NOT infer a technology stack. Gaps MAY name the posting's
-requirements.
+dropped SHALL NOT be added. The model SHALL be told what the profile does
+not contain and SHALL NOT infer a technology stack. Gaps MAY name the
+posting's requirements.
 
 #### Scenario: Search now
 - **WHEN** someone with a profile and goals presses Search now
@@ -37,6 +40,10 @@ requirements.
 #### Scenario: Remote only from another country
 - **WHEN** someone in Lisbon who works remote only searches and a posting says "remote-first from Germany or Austria"
 - **THEN** that job is not added, whatever its score
+
+#### Scenario: Where it hires not stated
+- **WHEN** someone in Lisbon who works remote only searches and a remote posting does not say where it hires
+- **THEN** the job is kept, and when it is a good match it is added with the gap "Doesn't say if it hires in Portugal", shown in the person's language
 
 #### Scenario: Remote not stated
 - **WHEN** a posting does not say whether it is remote and the person works remote only
@@ -77,7 +84,9 @@ answer the goals, run a first search, or review new matches.
 ### Requirement: Spending stays within limits
 Every model call SHALL be metered in money and refused before it would cross
 the account's daily or monthly limit or the instance's monthly limit; the
-person SHALL see what they spent and an estimate before a search.
+person SHALL see what they spent and an estimate before a search. Unless the
+instance sets others, an account's limits SHALL be €1 a day and €10 a month,
+and the instance's €15 a month.
 
 #### Scenario: The monthly limit is reached
 - **WHEN** an account's monthly AI spend has reached its limit and a search runs
@@ -87,14 +96,24 @@ person SHALL see what they spent and an estimate before a search.
 - **WHEN** a job was already scored for the current profile and goals
 - **THEN** the next search reuses that score and makes no model call for it
 
+#### Scenario: The default limits
+- **WHEN** the instance sets no spending limits
+- **THEN** each account may spend €1 a day and €10 a month, and the instance €15 a month
+
 ### Requirement: Existing matches are checked again
 When the requirement rules change, opportunities still Found or Shortlisted
-SHALL be checked again and the ones that fail SHALL be hidden with the reason,
-never deleted, and SHALL stay viewable.
+SHALL be checked again: the ones that fail SHALL be hidden with the reason,
+never deleted, and SHALL stay viewable, and the ones hidden only because
+their posting did not say whether it hires where the person lives SHALL be
+shown again with that gap, without a model call.
 
 #### Scenario: A match from before the fix
 - **WHEN** the rules are deployed and a Found job turns out to be remote only within Germany
 - **THEN** it moves out of view into "Hidden: don't meet your requirements" with that reason
+
+#### Scenario: Hidden for not saying where it hires
+- **WHEN** the server starts and a Found remote job was hidden because its posting did not say whether it hires in Portugal
+- **THEN** it is back in view with the gap "Doesn't say if it hires in Portugal", unless it fails another requirement
 
 ### Requirement: Search reads approved job boards and credits them
 A search SHALL read only job boards the owner approved, honour each board's
@@ -130,28 +149,37 @@ for better matches", linking to Skills on Profile & goals.
 - **WHEN** someone whose profile lists no skills opens Today or the Pipeline
 - **THEN** they see that line, and its link opens Skills on Profile & goals
 
-### Requirement: Search reads approved boards by your top skills
-For a person whose profile lists skills, a search SHALL read each approved board that can filter by
-skill with one extra query per top skill (the first 3 skills, in the person's order), in addition
-to the board's plain read, merge and deduplicate the answers, and rank jobs that name a top skill
-higher before scoring. It SHALL stay within each board's polling limits and terms, add no model
-call, and leave the scorer's caps unchanged. With no skills, or on a board with no skill filter,
-it SHALL read as before.
+### Requirement: Search reads approved boards by your roles and top skills
+For a person whose goals name roles or whose profile lists skills, a search
+SHALL read each approved board that can search by keyword with one extra
+query for each of the first 3 wanted roles, without seniority words ("Senior
+Ruby Developer" is "ruby developer"), and for each of the first 3 skills in
+the person's order, without repeats and at most 6, in addition to the
+board's plain read, one page each; merge and deduplicate the answers, and
+rank jobs that name a top skill higher. At night a board SHALL be asked
+everyone's queries in turn, at most 6 in all, the same for the nightly
+reading and every nightly search. It SHALL stay within each board's polling
+limits and terms and add no model call. With no roles and no skills, or on
+a board with no keyword search, it SHALL read as before.
 
 #### Scenario: A Ruby on Rails developer
-- **WHEN** the profile's first skills are Ruby on Rails, React and PostgreSQL and a search runs
-- **THEN** RemoteOK is read for the tags `ruby`, `react` and `postgresql` as well as plainly, Jobicy for the keywords `ruby-on-rails`, `react` and `postgresql`, the jobs are merged without duplicates, and the ones naming those skills rank first
+- **WHEN** the goals want "Senior Ruby Developer" and the profile's first skills are Ruby on Rails, React and PostgreSQL, and a search runs
+- **THEN** Himalayas is asked for "ruby developer", "ruby on rails", "react" and "postgresql" as well as read plainly, Remote OK for the tags `ruby-developer`, `ruby`, `react` and `postgres`, the jobs are merged without duplicates, and the ones naming those skills rank first
 
 #### Scenario: A board with no skill filter
 - **WHEN** a search runs and Arbeitnow is approved
 - **THEN** Arbeitnow is read once, plainly
 
 #### Scenario: A board's fetch limit
-- **WHEN** a board allows 24 fetches a day and three stack queries are added
-- **THEN** each of its four addresses is reused for 4 hours, so it is fetched at most 24 times a day
+- **WHEN** a board allows 24 fetches a day and six queries are added
+- **THEN** each of its seven addresses is reused for 7 hours, so it is fetched at most 24 times a day
+
+#### Scenario: Several people at night
+- **WHEN** two people with goals each have four queries and the nightly search runs
+- **THEN** each board that searches is asked six of them, their first ones in turn, and no more that night
 
 #### Scenario: No skills
-- **WHEN** the profile lists no skills
+- **WHEN** the goals name no role and the profile lists no skills
 - **THEN** every board is read exactly as before
 
 ### Requirement: The nightly search recurs every night
@@ -168,11 +196,13 @@ discovery SHALL recur the same way.
 - **THEN** no second one is scheduled
 
 ### Requirement: One bad model answer never ends a search
-A search SHALL score a batch whose model answer is unusable (cut off, or not the JSON asked for)
-again as two halves, and SHALL leave the jobs of a half that fails again for the next search.
-Only four failed scoring calls in a row SHALL end a search's scoring (`ai_failed`), keeping what
-was scored. On OpenRouter, scoring calls SHALL ask for low reasoning effort and SHALL be routed
-only to providers that support every parameter sent.
+A search SHALL score a batch, of quick looks or of full reads, whose model
+answer is unusable (cut off, or not the JSON asked for) again as two halves,
+and SHALL leave the jobs of a half that fails again for the next search.
+Only four failed calls in a row SHALL end a search's scoring (`ai_failed`),
+keeping what was scored. On OpenRouter, scoring calls SHALL ask for low
+reasoning effort and SHALL be routed only to providers that support every
+parameter sent.
 
 #### Scenario: An answer is cut off
 - **WHEN** the answer for a batch of ten is cut off and the answers for five jobs are not
@@ -217,3 +247,65 @@ job board has anything new, and the nightly job SHALL still schedule the next ni
 #### Scenario: A due watch starts the nightly search
 - **WHEN** the nightly job runs for a person whose watched board is due and no job board has anything new
 - **THEN** it starts their search, and the next night's nightly job is scheduled
+
+### Requirement: Every job within your limits gets a quick look, and the best are read in full
+A search SHALL give every job within the hard limits that has no score for
+the current profile, goals and rules a quick look: one model call per 25
+jobs with each job's title, company, place, way of working and the first 400
+characters of its posting, answering a fit from 0 to 100 and one short
+reason, kept for later searches. It SHALL then read in full, as before, the
+jobs with the best quick fit, at most 100 a search (the setting
+`FULL_SCORES_PER_SEARCH`), and add the good matches. A job read in full SHALL
+never take a slot again while the profile, goals and rules are the same.
+When every job without a full read fits in the slots, the search SHALL read
+them all in full with no quick look. A job whose description is not read yet
+SHALL be judged from its title, company and place, and the model SHALL be
+told so. An answer that names no job of its batch SHALL count as a failed
+call. A watched company's new posting SHALL be
+read in full ahead of the cut. Every call SHALL stay within the spending
+limits, and the search SHALL stop looking and reading after ten minutes,
+keeping what it has. The nightly search SHALL start for a person when a job
+within their limits has neither a quick look nor a full read.
+
+#### Scenario: A night with many jobs
+- **WHEN** 958 jobs pass a person's hard limits and none was looked at before
+- **THEN** each gets a quick look, 25 a call, and the best 100 by fit are read in full
+
+#### Scenario: Few jobs
+- **WHEN** 30 jobs pass the hard limits and none was read in full
+- **THEN** all 30 are read in full, with no quick look
+
+#### Scenario: Read before
+- **WHEN** a job was read in full by an earlier search for the same profile, goals and rules
+- **THEN** it is not read again and takes no slot
+
+#### Scenario: Looked at before
+- **WHEN** a job had a quick look last night and was not among the best
+- **THEN** it gets no new quick look, and tonight its fit competes again for a full read
+
+#### Scenario: A limit during the quick looks
+- **WHEN** the account's daily limit is reached during the quick looks
+- **THEN** no further call is sent, what was looked at is kept, and the search ends saying the limit was reached
+
+#### Scenario: An answer about no job of the batch
+- **WHEN** the model answers every quick look with references that are not the batch's
+- **THEN** each answer counts as a failed call, it is asked again in halves once, and four in a row end the search with `ai_failed`
+
+#### Scenario: Nothing new for the nightly search
+- **WHEN** every job within a person's limits already has a quick look or a full read
+- **THEN** no nightly search starts for them
+
+### Requirement: A page that fails keeps the pages already read
+A search SHALL keep the jobs of the pages of a site it already read when a
+later page fails, and the site's line SHALL say which page did not answer. A
+first page that fails SHALL fail the site for that search, as before. A site
+that asks to slow down part way SHALL be asked nothing more then, and SHALL
+be left alone for at least its polling interval, or as long as it asked.
+
+#### Scenario: The third page answers 500
+- **WHEN** a site's first two pages answer and the third answers 500
+- **THEN** the jobs of the first two are used, and the site's line says page 3 did not answer
+
+#### Scenario: Asked to slow down on page 4
+- **WHEN** Himalayas answers its fourth page with 429 and `Retry-After: 600`
+- **THEN** its first three pages are used, its queries are not sent, and a search 15 minutes later does not ask it

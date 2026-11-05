@@ -632,7 +632,7 @@
           "sources"
         ],
         "summary": "What was scanned.",
-        "description": "The person's searches and the discovery runs, newest first, ten a page,\neach with what it scanned on every board: jobs read, passed their\nrequirements, scored by the AI, matched, the AI's cost, or why a board\nwas skipped (its polling limit) or failed; and what a discovery check\nfound. Filter by board or by search.",
+        "description": "The person's searches and the discovery runs, newest first, ten a page.\nA search has its funnel: jobs read, given a quick look, read in full,\ngood matches, kept with a note, and why the others were left out (with\nthe matches, they add up to the jobs read). Each run has what it scanned\non every board: jobs read, passed their requirements, given a quick\nlook, read in full by the AI, matched, the AI's cost, or why a board was\nskipped (its polling limit), failed or was read in part; and what a\ndiscovery check found. Filter by board or by search.",
         "operationId": "sources.scans",
         "parameters": [
           {
@@ -8481,7 +8481,7 @@
           "sources"
         ],
         "summary": "About what a search would cost.",
-        "description": "The jobs it would likely score (the last search's, at most 40), times\nwhat a batch of ten has cost this person on average, in euros; and what\nthey spent today and this month against their limits. Over €0.05 the\napp asks before searching.",
+        "description": "The jobs it would likely look at (the last search's within the limits),\nthe model calls that takes (a quick look for 25, a full read for 10, at\nmost 100 read in full), times what a call has cost this person on\naverage, in euros; and what they spent today and this month against\ntheir limits. Over €0.25 the app asks before searching.",
         "operationId": "sources.estimate",
         "responses": {
           "200": {
@@ -13605,6 +13605,66 @@
           "onsite"
         ]
       },
+      "JobsLeftOut": {
+        "type": "object",
+        "description": "Why the jobs a search read were left out, by reason. With the good\nmatches they add up to the jobs read.",
+        "properties": {
+          "below_floor": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Paying less than their floor.",
+            "minimum": 0
+          },
+          "language": {
+            "type": "integer",
+            "format": "int32",
+            "description": "In a language they don't work in.",
+            "minimum": 0
+          },
+          "not_good_enough": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Read in full, not a good match.",
+            "minimum": 0
+          },
+          "not_open_to_location": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Hiring only in other places.",
+            "minimum": 0
+          },
+          "not_remote": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Not remote, or not where they can work.",
+            "minimum": 0
+          },
+          "quick_look": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Not among the best at the quick look.",
+            "minimum": 0
+          },
+          "seen_before": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Already in the person's jobs, judged by an earlier search, or a match\nthe pipeline already had.",
+            "minimum": 0
+          },
+          "too_old": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Older than 30 days, or closed.",
+            "minimum": 0
+          },
+          "waiting": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Left for the next search: a spending limit, the time, a failed call,\nor the most one search adds.",
+            "minimum": 0
+          }
+        }
+      },
       "KeepFactRequest": {
         "type": "object",
         "description": "What the person keeps.",
@@ -16946,6 +17006,7 @@
           "outcome",
           "jobs_read",
           "passed_requirements",
+          "quick_looked",
           "scored_by_ai",
           "matched",
           "ai_cost_eur",
@@ -16993,7 +17054,7 @@
               "string",
               "null"
             ],
-            "description": "What a discovery check found."
+            "description": "What a discovery check found, or which page of a board did not\nanswer (\"Read 2 pages. Page 3 did not answer.\")."
           },
           "outcome": {
             "$ref": "#/components/schemas/ScanOutcome"
@@ -17004,10 +17065,16 @@
             "description": "Within the person's requirements on the boards' structured fields.",
             "minimum": 0
           },
+          "quick_looked": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Given a quick look by the AI.",
+            "minimum": 0
+          },
           "scored_by_ai": {
             "type": "integer",
             "format": "int32",
-            "description": "Scored by the AI (now, or before).",
+            "description": "Read in full by the AI.",
             "minimum": 0
           }
         }
@@ -17064,6 +17131,17 @@
             "type": "number",
             "format": "double",
             "description": "What its AI calls cost, in euros (discovery uses none)."
+          },
+          "funnel": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SearchFunnel",
+                "description": "What a search did with the jobs it read; none for discovery."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "id": {
             "type": "string",
@@ -17211,6 +17289,71 @@
           },
           "spend": {
             "$ref": "#/components/schemas/Spend"
+          }
+        }
+      },
+      "SearchFunnel": {
+        "type": "object",
+        "description": "What a search did with the jobs it read, for the Searches tab.",
+        "required": [
+          "read",
+          "quick_looked",
+          "read_in_full",
+          "good_matches",
+          "kept_with_note"
+        ],
+        "properties": {
+          "good_matches": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Good matches added to the person's jobs.",
+            "minimum": 0
+          },
+          "kept_with_note": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Of the jobs read in full now, the good matches kept although their\nposting does not say whether it hires where the person lives: they\ncarry a note saying so.",
+            "minimum": 0
+          },
+          "left_out": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/JobsLeftOut",
+                "description": "Why the others were left out; none for a search from before these\nwere counted."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "quick_looked": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Jobs given a quick look.",
+            "minimum": 0
+          },
+          "read": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Jobs read from the sites.",
+            "minimum": 0
+          },
+          "read_in_full": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Jobs read in full.",
+            "minimum": 0
+          },
+          "stopped": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SearchStop",
+                "description": "Why it stopped early, if it did."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },

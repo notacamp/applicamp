@@ -87,6 +87,64 @@ export function hiddenReasonText(
   return reason === "not_open_to_location" && note !== "" ? `${text} · ${note}` : text;
 }
 
+/** The gaps the server writes itself, in English (the model's own are shown as written). */
+const SALARY_NOT_STATED = "Salary not stated";
+const WHERE_UNCLEAR = "Doesn't say where it hires";
+const HIRES_UNCLEAR = "Doesn't say if it hires in ";
+
+/** Region codes by their English names ("Portugal" → "PT"), from the browser's own list. */
+let regionCodes: Map<string, string> | null = null;
+
+/** The code of the region named `name` in English; none when the browser doesn't know it. */
+function regionCode(name: string): string | null {
+  if (regionCodes === null) {
+    regionCodes = new Map();
+    try {
+      const english = new Intl.DisplayNames(["en"], { type: "region", fallback: "none" });
+      for (let first = 65; first <= 90; first += 1) {
+        for (let second = 65; second <= 90; second += 1) {
+          const code = String.fromCodePoint(first, second);
+          const known = english.of(code);
+          if (known !== undefined) {
+            regionCodes.set(known, code);
+          }
+        }
+      }
+    } catch {
+      // No region names in this browser: the English name is shown.
+    }
+  }
+  return regionCodes.get(name) ?? null;
+}
+
+/**
+ * A gap in the person's language when the server wrote it ("Doesn't say if
+ * it hires in Portugal", "Salary not stated"), the country named by the
+ * browser; any other gap as written.
+ */
+export function gapText(gap: string, locale: string, t: TFunction<"pipeline">): string {
+  if (gap === SALARY_NOT_STATED) {
+    return t("gaps.salaryNotStated");
+  }
+  if (gap === WHERE_UNCLEAR) {
+    return t("gaps.whereUnclear");
+  }
+  if (gap.startsWith(HIRES_UNCLEAR)) {
+    const name = gap.slice(HIRES_UNCLEAR.length);
+    const code = regionCode(name);
+    let country = name;
+    if (code !== null) {
+      try {
+        country = new Intl.DisplayNames([locale], { type: "region" }).of(code) ?? name;
+      } catch {
+        // An unknown locale: the English name.
+      }
+    }
+    return t("gaps.hiresUnclear", { country });
+  }
+  return gap;
+}
+
 /** The facts on one line: "Remote · Open to where you live (EU) · English". */
 export function factsText(facts: JobFacts, locale: string, t: TFunction<"pipeline">): string {
   const note = facts.region_note?.trim() ?? "";

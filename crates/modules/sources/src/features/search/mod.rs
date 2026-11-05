@@ -1,11 +1,16 @@
-//! A search: read the approved job boards (and the company boards, when
-//! they are on), merge the same job seen on several boards, credit the
-//! boards of a job already in the pipeline, drop what breaks the goals'
-//! hard limits on the boards' structured fields, pre-rank, score the rest
-//! with the model within the spending limits (the same call reads each
-//! posting's eligibility facts), drop what fails a requirement rule
-//! whatever its score, and add the good matches to the pipeline as Found.
-//! What it scanned on each board is kept for the Scanned view.
+//! A search: read the approved job boards (asked for the person's roles and
+//! top skills when they can search) and the company boards, when they are
+//! on; merge the same job seen on several boards, credit the boards of a job
+//! already in the pipeline, drop what breaks the goals' hard limits on the
+//! boards' structured fields; give every job left without a full read a
+//! quick look ([`crate::quick`], 25 a call) when there are more than one
+//! search reads in full, and read the best in full
+//! ([`crate::SourcesConfig::full_scores_per_search`], 100) with the model
+//! within the spending limits (the same call reads each posting's
+//! eligibility facts); drop what fails a requirement rule whatever its
+//! score, and add the good matches to the pipeline as Found. What it did
+//! with every job read (the funnel, [`JobsLeftOut`]) and on each board is kept
+//! for the Searches tab.
 //!
 //! - `POST /api/v1/searches` starts one ("Search now"): at most
 //!   [`SourcesConfig::manual_per_day`] a day, one every
@@ -39,23 +44,29 @@ use crate::{
     features::watch,
     job::{Job, WorkMode},
     job_boards, lisbon,
-    matching::{self, MatchInput, TOP},
+    matching::{self, MatchInput, Out},
     ports::{Attach, OwnBoard, Scored},
-    readers::{Outcome, Reader, mapping::BoardRef},
+    quick::{self, Look},
+    readers::{Outcome, PartialRead, Reader, mapping::BoardRef},
     requirements::{self, Answer, Excluded, Facts, RULES_VERSION, Salary},
     scans::{self, Scan},
     scoring::{self, BATCH, KEEP, MAX_ADDED, Read, Score},
 };
 
-/// How long a search may spend scoring before it keeps what it has.
+/// How long a search may spend on the model (quick looks and full reads
+/// together) before it keeps what it has.
 pub const SCORING_TIME: std::time::Duration = std::time::Duration::from_secs(10 * 60);
-/// Failed scoring calls in a row that end a search's scoring (the provider
+/// The quick looks stop after this much of [`SCORING_TIME`], so the full
+/// reads always get their turn.
+pub const QUICK_LOOK_TIME: std::time::Duration = std::time::Duration::from_secs(5 * 60);
+/// Failed model calls in a row that end a search's scoring (the provider
 /// is down, not one bad answer).
 pub const FAILED_IN_A_ROW: u32 = 4;
 /// A search queued or running for longer than this is taken as dead.
 pub const STALE: TimeDelta = TimeDelta::minutes(30);
-/// Above this estimate (in euros), the app asks before searching.
-pub const CONFIRM_ABOVE_EUR: f64 = 0.05;
+/// Above this estimate (in euros), the app asks before searching; below it
+/// the cost is only said on the line under Search now.
+pub const CONFIRM_ABOVE_EUR: f64 = 0.25;
 /// A nightly search reads the boards the nightly job read just before it:
 /// a board read this long before the search started counts as read by it.
 pub const NIGHTLY_READ: TimeDelta = TimeDelta::minutes(15);
@@ -173,6 +184,127 @@ pub struct SearchEstimate {
     /// Over €0.05: ask before searching.
     pub confirm: bool,
     pub spend: Spend,
+}
+
+/// Why the jobs a search read were left out, by reason. With the good
+/// matches they add up to the jobs read.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct JobsLeftOut {
+    /// Already in the person's jobs, judged by an earlier search, or a match
+    /// the pipeline already had.
+    #[serde(default)]
+    pub seen_before: u32,
+    /// Older than 30 days, or closed.
+    #[serde(default)]
+    pub too_old: u32,
+    /// Not remote, or not where they can work.
+    #[serde(default)]
+    pub not_remote: u32,
+    /// Not among the best at the quick look.
+    #[serde(default)]
+    pub quick_look: u32,
+    /// In a language they don't work in.
+    #[serde(default)]
+    pub language: u32,
+    /// Hiring only in other places.
+    #[serde(default)]
+    pub not_open_to_location: u32,
+    /// Paying less than their floor.
+    #[serde(default)]
+    pub below_floor: u32,
+    /// Read in full, not a good match.
+    #[serde(default)]
+    pub not_good_enough: u32,
+    /// Left for the next search: a spending limit, the time, a failed call,
+    /// or the most one search adds.
+    #[serde(default)]
+    pub waiting: u32,
+}
+
+impl JobsLeftOut {
+    /// Every job left out.
+    pub fn total(&self) -> u32 {
+        [
+            self.seen_before,
+            self.too_old,
+            self.not_remote,
+            self.quick_look,
+            self.language,
+            self.not_open_to_location,
+            self.below_floor,
+            self.not_good_enough,
+            self.waiting,
+        ]
+        .into_iter()
+        .fold(0_u32, u32::saturating_add)
+    }
+
+    /// A job left out by a hard limit.
+    fn hard_limit(&mut self, out: Out) {
+        let count = match out {
+            Out::Known => &mut self.seen_before,
+            Out::TooOld | Out::Expired => &mut self.too_old,
+            Out::WorkMode | Out::Place | Out::NotRemote => &mut self.not_remote,
+            Out::Region => &mut self.not_open_to_location,
+        };
+        add(count, 1);
+    }
+
+    /// A job read in full now that fails a requirement.
+    fn requirement(&mut self, reason: Excluded) {
+        let count = match reason {
+            Excluded::NotRemote => &mut self.not_remote,
+            Excluded::NotOpenToLocation => &mut self.not_open_to_location,
+            Excluded::Language => &mut self.language,
+            Excluded::BelowFloor => &mut self.below_floor,
+        };
+        add(count, 1);
+    }
+}
+
+/// `n` more in `count`.
+fn add(count: &mut u32, n: usize) {
+    *count = count.saturating_add(u32::try_from(n).unwrap_or(u32::MAX));
+}
+
+/// What a search did with the jobs it read, for the Searches tab.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct SearchFunnel {
+    /// Jobs read from the sites.
+    pub read: u32,
+    /// Jobs given a quick look.
+    pub quick_looked: u32,
+    /// Jobs read in full.
+    pub read_in_full: u32,
+    /// Good matches added to the person's jobs.
+    pub good_matches: u32,
+    /// Of the jobs read in full now, the good matches kept although their
+    /// posting does not say whether it hires where the person lives: they
+    /// carry a note saying so.
+    pub kept_with_note: u32,
+    /// Why the others were left out; none for a search from before these
+    /// were counted.
+    pub left_out: Option<JobsLeftOut>,
+    /// Why it stopped early, if it did.
+    pub stopped: Option<SearchStop>,
+}
+
+/// A search's funnel, from its row's counts.
+pub(crate) fn funnel_of(row: &scans::RunRow) -> SearchFunnel {
+    let n = |v: Option<i32>| v.and_then(|v| u32::try_from(v).ok()).unwrap_or(0);
+    SearchFunnel {
+        read: n(row.fetched),
+        quick_looked: n(row.quick_looked),
+        // A search from before the funnel: what it scored.
+        read_in_full: n(row.read_in_full.or(row.scored)),
+        good_matches: n(row.added),
+        kept_with_note: n(row.kept_with_gap),
+        left_out: row
+            .dropped_by_reason
+            .as_ref()
+            .and_then(|raw| serde_json::from_value(raw.0.clone()).ok()),
+        stopped: row.error_kind.as_deref().and_then(SearchStop::parse),
+    }
 }
 
 /// A search's row.
@@ -433,20 +565,31 @@ pub async fn latest(
     }))
 }
 
-/// What a typical batch of ten costs when there is no history: about 6 000
-/// tokens in and 2 500 out at the model's price.
+/// What a typical call costs when there is no history: about 6 000 tokens
+/// in and 2 500 out (ten full reads) at the model's price; a quick look at
+/// 25 costs about the same or less.
 fn typical_batch_usd(deps: &SourcesDeps) -> f64 {
     configured(deps)
         .and_then(|ai| ai.price(Role::Complete))
         .map_or(0.0, |price| price.cost(6_000, 2_500))
 }
 
+/// The model calls a search makes for `kept` jobs within the limits, reading
+/// at most `slots` in full, `quick_looked` of them looked at quickly first
+/// (`None`: all of them when they are more than `slots`).
+fn calls_for(kept: usize, slots: usize, quick_looked: Option<usize>) -> usize {
+    let full = kept.min(slots).div_ceil(BATCH);
+    let looks = quick_looked.unwrap_or(if kept > slots { kept } else { 0 });
+    full + looks.div_ceil(quick::BATCH)
+}
+
 /// About what a search would cost.
 ///
-/// The jobs it would likely score (the last search's, at most 40), times
-/// what a batch of ten has cost this person on average, in euros; and what
-/// they spent today and this month against their limits. Over €0.05 the
-/// app asks before searching.
+/// The jobs it would likely look at (the last search's within the limits),
+/// the model calls that takes (a quick look for 25, a full read for 10, at
+/// most 100 read in full), times what a call has cost this person on
+/// average, in euros; and what they spent today and this month against
+/// their limits. Over €0.25 the app asks before searching.
 #[utoipa::path(
     get,
     path = "/api/v1/searches/estimate",
@@ -466,11 +609,27 @@ pub async fn estimate(
 ) -> Result<Json<SearchEstimate>> {
     let account = principal.account_id;
     let now = state.clock.now();
-    let last = latest_row(&state.db, account).await?;
+    let slots = deps.config.full_scores_per_search();
+    let last = latest_row(&state.db, account)
+        .await?
+        .filter(|row| row.status == "finished");
     let jobs = last
         .as_ref()
-        .filter(|row| row.status == "finished")
-        .map_or(TOP, |row| usize::try_from(row.kept).unwrap_or(0).min(TOP));
+        .map_or(slots, |row| usize::try_from(row.kept).unwrap_or(0));
+    let quick_looked: Option<i32> = match &last {
+        Some(row) => {
+            sqlx::query_scalar("SELECT quick_looked FROM sources.searches WHERE id = $1")
+                .bind(row.id)
+                .fetch_one(&state.db)
+                .await?
+        }
+        None => None,
+    };
+    let calls = calls_for(
+        jobs,
+        slots,
+        quick_looked.and_then(|n| usize::try_from(n).ok()),
+    );
     let (cost, batches): (f64, i64) = sqlx::query_as(
         "SELECT coalesce(sum(cost_usd), 0)::float8, coalesce(sum(batches), 0)::bigint
            FROM sources.searches WHERE account_id = $1 AND batches > 0",
@@ -483,7 +642,8 @@ pub async fn estimate(
     } else {
         typical_batch_usd(&deps)
     };
-    let cost_eur = jobs.div_ceil(BATCH) as f64 * per_batch * usd_to_eur(&deps);
+    // A few dozen calls: exact as f64.
+    let cost_eur = calls as f64 * per_batch * usd_to_eur(&deps);
     Ok(Json(SearchEstimate {
         jobs: u32::try_from(jobs).unwrap_or(0),
         cost_eur,
@@ -534,20 +694,23 @@ impl applicamp_kernel::Job for RunSearch {
 
 /// The progress so far, on the search's row.
 async fn progress(db: &PgPool, id: Uuid, fields: &Progress) -> Result<()> {
+    let int = |n: usize| i32::try_from(n).unwrap_or(i32::MAX);
     sqlx::query(
         "UPDATE sources.searches
             SET fetched = $2, kept = $3, scored = $4, batches = $5, cost_usd = $6, dropped = $7,
-                not_grounded = $8
+                not_grounded = $8, quick_looked = $9, read_in_full = $10
           WHERE id = $1",
     )
     .bind(id)
-    .bind(i32::try_from(fields.fetched).unwrap_or(i32::MAX))
-    .bind(i32::try_from(fields.kept).unwrap_or(i32::MAX))
-    .bind(i32::try_from(fields.scored).unwrap_or(i32::MAX))
-    .bind(i32::try_from(fields.batches).unwrap_or(i32::MAX))
+    .bind(int(fields.fetched))
+    .bind(int(fields.kept))
+    .bind(int(fields.scored))
+    .bind(int(fields.batches))
     .bind(fields.cost_usd)
-    .bind(i32::try_from(fields.dropped).unwrap_or(i32::MAX))
-    .bind(i32::try_from(fields.not_grounded).unwrap_or(i32::MAX))
+    .bind(int(fields.dropped))
+    .bind(int(fields.not_grounded))
+    .bind(int(fields.quick_looked))
+    .bind(int(fields.read_in_full))
     .execute(db)
     .await?;
     Ok(())
@@ -557,12 +720,23 @@ async fn progress(db: &PgPool, id: Uuid, fields: &Progress) -> Result<()> {
 struct Progress {
     fetched: usize,
     kept: usize,
+    /// Jobs with a full read, now or by an earlier search.
     scored: usize,
+    /// Jobs read in full that fail a requirement (now or before).
     dropped: usize,
     /// Jobs whose every reason claimed something the profile does not say.
     not_grounded: usize,
     batches: usize,
     cost_usd: f64,
+    /// Jobs given a quick look now.
+    quick_looked: usize,
+    /// Jobs read in full now.
+    read_in_full: usize,
+    /// Of those, the good matches kept with the note that their posting does
+    /// not say where it hires.
+    kept_with_gap: usize,
+    /// Why the other jobs read were left out.
+    left: JobsLeftOut,
 }
 
 /// End the search: its counts, why it stopped, and `sources.search_finished`.
@@ -579,13 +753,16 @@ async fn finish(
     let mut tx = db.begin().await?;
     sqlx::query(
         "UPDATE sources.searches
-            SET status = 'finished', finished_at = $2, added = $3, error_kind = $4
+            SET status = 'finished', finished_at = $2, added = $3, error_kind = $4,
+                kept_with_gap = $5, dropped_by_reason = $6
           WHERE id = $1",
     )
     .bind(row.id)
     .bind(now)
     .bind(i32::try_from(added).unwrap_or(i32::MAX))
     .bind(stopped.map(SearchStop::as_str))
+    .bind(i32::try_from(fields.kept_with_gap).unwrap_or(i32::MAX))
+    .bind(sqlx::types::Json(&fields.left))
     .execute(&mut *tx)
     .await?;
     events
@@ -608,6 +785,10 @@ async fn finish(
         dropped = fields.dropped,
         not_grounded = fields.not_grounded,
         batches = fields.batches,
+        quick_looked = fields.quick_looked,
+        read_in_full = fields.read_in_full,
+        kept_with_gap = fields.kept_with_gap,
+        left_out = fields.left.total(),
         added,
         cost_usd = fields.cost_usd,
         stopped = stopped.map_or("no", SearchStop::as_str),
@@ -621,6 +802,7 @@ async fn finish(
 struct CachedRow {
     source: String,
     source_ref: String,
+    stage: String,
     match_score: i32,
     why: sqlx::types::Json<Vec<String>>,
     gaps: sqlx::types::Json<Vec<String>>,
@@ -633,16 +815,30 @@ struct CachedRow {
     ungrounded: bool,
 }
 
-/// Scores already given to `account` for these versions of the profile,
+/// What earlier searches gave `account` for these versions of the profile,
 /// the goals and the rules, by job key.
-async fn cached_scores(
-    db: &PgPool,
-    account: Uuid,
-    input: &MatchInput,
-) -> Result<HashMap<(String, String), Score>> {
+#[derive(Debug, Default)]
+struct Cache {
+    /// Full reads.
+    full: HashMap<(String, String), Score>,
+    /// Quick looks' fits.
+    quick: HashMap<(String, String), u8>,
+}
+
+impl Cache {
+    /// Whether `job` had a quick look or a full read.
+    fn seen(&self, job: &Job) -> bool {
+        let key = job.key();
+        self.full.contains_key(&key) || self.quick.contains_key(&key)
+    }
+}
+
+/// Scores already given to `account` for these versions of the profile,
+/// the goals and the rules.
+async fn cached_scores(db: &PgPool, account: Uuid, input: &MatchInput) -> Result<Cache> {
     let rows: Vec<CachedRow> = sqlx::query_as(
-        "SELECT source, source_ref, match_score, why, gaps, read, remote, open_to_candidate,
-                region_note, working_languages, salary, ungrounded
+        "SELECT source, source_ref, stage, match_score, why, gaps, read, remote,
+                open_to_candidate, region_note, working_languages, salary, ungrounded
            FROM sources.scores
           WHERE account_id = $1 AND profile_version = $2 AND goals_version = $3
             AND rules_version = $4",
@@ -653,29 +849,64 @@ async fn cached_scores(
     .bind(RULES_VERSION)
     .fetch_all(db)
     .await?;
-    Ok(rows
-        .into_iter()
-        .map(|row| {
-            let answer = |raw: Option<&str>| raw.map_or(Answer::Unclear, Answer::parse);
-            (
-                (row.source, row.source_ref),
-                Score {
-                    match_score: u8::try_from(row.match_score.clamp(0, 100)).unwrap_or(0),
-                    why: row.why.0,
-                    gaps: row.gaps.0,
-                    read: row.read.map(|r| r.0),
-                    facts: Facts {
-                        remote: answer(row.remote.as_deref()),
-                        open_to_candidate: answer(row.open_to_candidate.as_deref()),
-                        region_note: row.region_note,
-                        working_languages: row.working_languages.unwrap_or_default(),
-                        salary: row.salary.map(|s| s.0),
-                    },
-                    ungrounded: row.ungrounded,
+    let mut cache = Cache::default();
+    for row in rows {
+        let fit = u8::try_from(row.match_score.clamp(0, 100)).unwrap_or(0);
+        let key = (row.source, row.source_ref);
+        if row.stage == "quick" {
+            cache.quick.insert(key, fit);
+            continue;
+        }
+        let answer = |raw: Option<&str>| raw.map_or(Answer::Unclear, Answer::parse);
+        cache.full.insert(
+            key,
+            Score {
+                match_score: fit,
+                why: row.why.0,
+                gaps: row.gaps.0,
+                read: row.read.map(|r| r.0),
+                facts: Facts {
+                    remote: answer(row.remote.as_deref()),
+                    open_to_candidate: answer(row.open_to_candidate.as_deref()),
+                    region_note: row.region_note,
+                    working_languages: row.working_languages.unwrap_or_default(),
+                    salary: row.salary.map(|s| s.0),
                 },
-            )
-        })
-        .collect())
+                ungrounded: row.ungrounded,
+            },
+        );
+    }
+    Ok(cache)
+}
+
+/// Keep `look`, the quick look at `job`, for these versions.
+async fn save_quick(
+    db: &PgPool,
+    account: Uuid,
+    input: &MatchInput,
+    job: &Job,
+    look: &Look,
+    now: DateTime<Utc>,
+) -> Result<()> {
+    sqlx::query(
+        "INSERT INTO sources.scores
+            (account_id, source, source_ref, profile_version, goals_version, rules_version,
+             stage, match_score, why, gaps, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, 'quick', $7, $8, '[]'::jsonb, $9)
+         ON CONFLICT DO NOTHING",
+    )
+    .bind(account)
+    .bind(job.source_name())
+    .bind(&job.source_ref)
+    .bind(&input.profile_version)
+    .bind(input.goals_version)
+    .bind(RULES_VERSION)
+    .bind(i32::from(look.fit))
+    .bind(sqlx::types::Json(look.reason.iter().collect::<Vec<_>>()))
+    .bind(now)
+    .execute(db)
+    .await?;
+    Ok(())
 }
 
 /// Keep `score` (with its facts, and the reason `job` fails a requirement,
@@ -692,9 +923,10 @@ async fn save_score(
     sqlx::query(
         "INSERT INTO sources.scores
             (account_id, source, source_ref, profile_version, goals_version, rules_version,
-             match_score, why, gaps, read, remote, open_to_candidate, region_note,
+             stage, match_score, why, gaps, read, remote, open_to_candidate, region_note,
              working_languages, salary, excluded_reason, created_at, ungrounded)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+         VALUES ($1, $2, $3, $4, $5, $6, 'full', $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+                 $17, $18)
          ON CONFLICT DO NOTHING",
     )
     .bind(account)
@@ -764,6 +996,8 @@ pub(crate) struct Scanned {
     pub duration_ms: u32,
     /// Jobs it listed.
     pub read: u32,
+    /// A page after the first that failed: the pages before it were kept.
+    pub partial: Option<PartialRead>,
 }
 
 /// What the sources gave.
@@ -777,19 +1011,23 @@ pub(crate) struct Reading {
     pub failed: u32,
 }
 
-/// Read the approved job boards, and the company boards when they are on.
+/// Read the approved job boards (asking the ones that search by keyword for
+/// `queries`), and the company boards when they are on.
 pub(crate) async fn read_sources(
     deps: &SourcesDeps,
     reader: &Reader,
     db: &PgPool,
     now: DateTime<Utc>,
     fresh_since: DateTime<Utc>,
-    skills: &[String],
+    queries: &[String],
 ) -> Result<Reading> {
     let rows = job_boards::approved(db).await?;
     let mut reading = Reading::default();
     let mut jobs = Vec::new();
-    for read in reader.job_boards(db, &rows, now, fresh_since, skills).await {
+    for read in reader
+        .job_boards(db, &rows, now, fresh_since, queries)
+        .await
+    {
         if read.outcome == Outcome::Error {
             reading.failed += 1;
         }
@@ -799,6 +1037,7 @@ pub(crate) async fn read_sources(
             outcome: read.outcome,
             error: read.error,
             duration_ms: read.duration_ms,
+            partial: read.partial,
         });
         jobs.extend(read.jobs);
     }
@@ -816,6 +1055,9 @@ pub(crate) async fn read_sources(
 #[derive(Debug, Clone, Copy, Default)]
 struct Tally {
     passed: u32,
+    /// Given a quick look now.
+    quick_looked: u32,
+    /// Read in full now.
     scored: u32,
     matched: u32,
     cost_usd: f64,
@@ -887,12 +1129,13 @@ async fn record_scans(
                 outcome: scanned.outcome.as_str(),
                 jobs_read: scanned.read,
                 passed_requirements: t.passed,
+                quick_looked: t.quick_looked,
                 scored_by_ai: t.scored,
                 matched: t.matched,
                 ai_cost_eur: t.cost_usd * rate,
                 error_kind: scanned.error.clone(),
                 duration_ms: scanned.duration_ms,
-                note: None,
+                note: scanned.partial.map(PartialRead::note),
                 company: None,
             }
         })
@@ -909,6 +1152,7 @@ async fn record_scans(
             outcome: read.outcome.as_str(),
             jobs_read: read.listed,
             passed_requirements: t.passed,
+            quick_looked: t.quick_looked,
             scored_by_ai: t.scored,
             matched: t.matched,
             ai_cost_eur: t.cost_usd * rate,
@@ -929,6 +1173,117 @@ async fn record_scans(
     .await?;
     scans::prune(db, now).await?;
     Ok(())
+}
+
+/// `cost`, the price of one call about `jobs`, shared by them: each bears its
+/// share, split between the boards it was seen on.
+fn charge(tallies: &mut HashMap<String, Tally>, watched: &mut Watched, jobs: &[&Job], cost: f64) {
+    if jobs.is_empty() {
+        return;
+    }
+    // 25 at most: exact as f64.
+    let share = cost / jobs.len() as f64;
+    for job in jobs {
+        let boards = boards_of(job).len().max(1) as f64;
+        for t in tally(tallies, job) {
+            t.cost_usd += share / boards;
+        }
+        if let Some(t) = watched.tally(job) {
+            t.cost_usd += share;
+        }
+    }
+}
+
+/// What to do after a model call failed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AfterFailure {
+    /// Make no more calls: a spending limit, no model, or the provider is
+    /// down.
+    Stop,
+    /// Ask again for each half of the batch.
+    Split,
+    /// Leave the batch for the next search.
+    Skip,
+}
+
+/// The search's model calls so far: how many failed in a row, and why it
+/// stopped calling, if it did.
+#[derive(Debug, Default)]
+struct Calls {
+    failed_in_a_row: u32,
+    stopped: Option<SearchStop>,
+}
+
+impl Calls {
+    fn answered(&mut self) {
+        self.failed_in_a_row = 0;
+    }
+
+    /// A call about `jobs` jobs failed with `error`. A batch whose answer is
+    /// unusable (cut off, or not the JSON asked for) is asked again as two
+    /// halves, and a half that fails too is left for the next search: one
+    /// bad answer never ends the search. Only failed calls in a row (the
+    /// provider is down) stop it.
+    fn failed(
+        &mut self,
+        error: &applicamp_ai::Error,
+        done: &mut Progress,
+        jobs: usize,
+        may_split: bool,
+    ) -> AfterFailure {
+        match error {
+            applicamp_ai::Error::OverBudget { .. } | applicamp_ai::Error::OverDailyCap { .. } => {
+                self.stopped = Some(SearchStop::AiBudgetReached);
+                AfterFailure::Stop
+            }
+            applicamp_ai::Error::NotConfigured(_) => {
+                self.stopped = Some(SearchStop::AiUnavailable);
+                AfterFailure::Stop
+            }
+            e => self.unusable(e, done, jobs, may_split),
+        }
+    }
+
+    /// A call about `jobs` jobs was made and its answer is of no use (`why`):
+    /// cut off, not the JSON asked for, or about no job of the batch.
+    fn unusable(
+        &mut self,
+        why: &dyn std::fmt::Display,
+        done: &mut Progress,
+        jobs: usize,
+        may_split: bool,
+    ) -> AfterFailure {
+        // A call was made: count it.
+        done.batches += 1;
+        self.failed_in_a_row += 1;
+        if self.failed_in_a_row >= FAILED_IN_A_ROW {
+            tracing::warn!(error = %why, "model calls keep failing; the search keeps what it has");
+            self.stopped = Some(SearchStop::AiFailed);
+            AfterFailure::Stop
+        } else if may_split && jobs > 1 {
+            tracing::warn!(error = %why, jobs, "a model call failed; asking again in halves");
+            AfterFailure::Split
+        } else {
+            tracing::warn!(error = %why, jobs, "a model call failed again; these jobs wait for the next search");
+            AfterFailure::Skip
+        }
+    }
+}
+
+/// Why an answer that parsed is still of no use.
+const ABOUT_NO_JOB: &str = "the answer is about no job of the batch";
+
+/// A job read in full that is not a match: read now, or judged by an
+/// earlier search.
+fn not_a_match(left: &mut JobsLeftOut, read_now: bool) {
+    add(
+        if read_now {
+            &mut left.not_good_enough
+        } else {
+            &mut left.seen_before
+        },
+        1,
+    );
 }
 
 /// Run search `id` (idempotent: a finished one is left alone).
@@ -976,13 +1331,19 @@ pub(crate) async fn run(
         .await;
     };
 
-    // Read the boards.
-    let fresh_since = if row.trigger == "nightly" {
-        row.started_at - NIGHTLY_READ
+    // Read the boards, asking the ones that search for their roles and stack:
+    // at night, what the night asks for everyone (read just before, and
+    // never more than a board's share); else this person's own.
+    let (fresh_since, queries) = if row.trigger == "nightly" {
+        let accounts = neighbours.accounts_with_goals(db).await?;
+        (
+            row.started_at - NIGHTLY_READ,
+            night_queries(neighbours.as_ref(), db, &accounts, now).await?,
+        )
     } else {
-        row.started_at
+        (row.started_at, input.queries.clone())
     };
-    let reading = read_sources(deps, reader, db, now, fresh_since, &input.skills).await?;
+    let reading = read_sources(deps, reader, db, now, fresh_since, &queries).await?;
     let failed = reading.failed;
     let scanned = reading.boards;
     let mut jobs = reading.jobs;
@@ -1022,6 +1383,7 @@ pub(crate) async fn run(
         .known_links(db, account, now - DEDUPE_WINDOW)
         .await?;
     let mut attach: Vec<Attach> = Vec::new();
+    let read = jobs.len();
     jobs.retain(|job| {
         let same = known.contains(&job.key());
         let url = dedupe::job_url(job);
@@ -1040,17 +1402,21 @@ pub(crate) async fn run(
         }
         !(same || elsewhere)
     });
+    add(&mut done.left.seen_before, read - jobs.len());
     if !attach.is_empty() {
         neighbours
             .attach_sources(db, account, attach, deps.clock.now())
             .await?;
     }
 
-    // The hard limits, then the best 40.
-    let candidates: Vec<Job> = jobs
-        .into_iter()
-        .filter(|job| matching::hard_limit(job, &input, &known, now).is_none())
-        .collect();
+    // The hard limits.
+    let mut candidates: Vec<Job> = Vec::new();
+    for job in jobs {
+        match matching::hard_limit(&job, &input, &known, now) {
+            None => candidates.push(job),
+            Some(out) => done.left.hard_limit(out),
+        }
+    }
     for job in &candidates {
         for t in tally(&mut tallies, job) {
             t.passed += 1;
@@ -1060,154 +1426,248 @@ pub(crate) async fn run(
         }
     }
     done.kept = candidates.len();
-    // A watched company's new postings are all scored (up to a few), ahead
-    // of the pre-rank's cut.
+
+    // A job an earlier search read in full is not read again (for these
+    // versions of the profile, goals and rules): it never takes a slot. A
+    // watched company's new postings are read in full ahead of the cut; the
+    // rest wait in the pre-rank's order, the most promising first.
+    let cache = cached_scores(db, account, &input).await?;
+    let mut scored: Vec<(Job, Score, bool)> = Vec::new();
+    let mut to_read: Vec<Job> = Vec::new();
     let (mine, others): (Vec<Job>, Vec<Job>) = candidates
         .into_iter()
         .partition(|job| watched.reading.of.contains_key(&job.key()));
-    let mut top = matching::pre_rank(others, &input, now);
-    top.extend(mine);
-    let cached = cached_scores(db, account, &input).await?;
-    for job in top
-        .iter_mut()
-        .filter(|job| !cached.contains_key(&job.key()))
-    {
-        if let Err(e) = reader.describe(db, job).await {
-            tracing::info!(error = %e, "a job's description could not be read");
+    for job in mine {
+        match cache.full.get(&job.key()) {
+            Some(score) => scored.push((job, score.clone(), false)),
+            None => to_read.push(job),
         }
     }
-    let mut scored: Vec<(Job, Score)> = Vec::new();
-    let mut unscored: Vec<Job> = Vec::new();
-    for job in top {
-        match cached.get(&job.key()) {
-            Some(score) => scored.push((job, score.clone())),
-            None => unscored.push(job),
+    let mut unread: Vec<Job> = Vec::new();
+    for job in matching::pre_rank(others, &input, now) {
+        match cache.full.get(&job.key()) {
+            Some(score) => scored.push((job, score.clone(), false)),
+            None => unread.push(job),
         }
     }
     done.scored = scored.len();
     progress(db, id, &done).await?;
 
-    // Score the rest, ten at a time, within the limits. A batch whose answer
-    // is unusable (cut off, or not the JSON asked for) is scored again as two
-    // halves, and a half that fails too is left for the next search: one bad
-    // answer never ends the search. Only failed calls in a row (the provider
-    // is down) stop it.
-    let mut stopped = None;
-    let mut skipped = 0_usize;
-    let mut failed_in_a_row = 0_u32;
-    let deadline = std::time::Instant::now() + SCORING_TIME;
-    let mut queue: std::collections::VecDeque<(&[Job], bool)> =
-        unscored.chunks(BATCH).map(|batch| (batch, true)).collect();
-    while let Some((batch, may_split)) = queue.pop_front() {
-        if std::time::Instant::now() > deadline {
+    let started = std::time::Instant::now();
+    let mut calls = Calls::default();
+    let slots = deps.config.full_scores_per_search();
+    if unread.len() <= slots {
+        // Every one is read in full: a quick look would change nothing.
+        to_read.extend(unread);
+    } else {
+        // A quick look at every one without one, 25 a call, the most
+        // promising first; then the best by fit (ties by the pre-rank) are
+        // read in full, and the others compete again next time.
+        let mut fits: Vec<Option<(u8, bool)>> = unread
+            .iter()
+            .map(|job| cache.quick.get(&job.key()).map(|fit| (*fit, false)))
+            .collect();
+        let look_at: Vec<usize> = (0..unread.len()).filter(|i| fits[*i].is_none()).collect();
+        let mut queue: std::collections::VecDeque<(&[usize], bool)> = look_at
+            .chunks(quick::BATCH)
+            .map(|batch| (batch, true))
+            .collect();
+        while let Some((batch, may_split)) = queue.pop_front() {
+            if calls.stopped.is_some() || started.elapsed() > QUICK_LOOK_TIME {
+                break;
+            }
+            let jobs: Vec<&Job> = batch.iter().map(|i| &unread[*i]).collect();
+            let caller = Caller {
+                db,
+                account,
+                now: deps.clock.now(),
+            };
+            let after = match quick::look(ai, caller, &input, &jobs).await {
+                // Answered, but about no job of the batch (its refs as
+                // numbers, or names it made up): as unusable as a cut-off
+                // answer.
+                Ok((looks, cost)) if looks.is_empty() => {
+                    done.cost_usd += cost;
+                    charge(&mut tallies, &mut watched, &jobs, cost);
+                    Some(calls.unusable(&ABOUT_NO_JOB, &mut done, batch.len(), may_split))
+                }
+                Ok((looks, cost)) => {
+                    calls.answered();
+                    done.batches += 1;
+                    done.cost_usd += cost;
+                    charge(&mut tallies, &mut watched, &jobs, cost);
+                    for (index, look) in looks {
+                        let i = batch[index];
+                        let job = &unread[i];
+                        save_quick(db, account, &input, job, &look, deps.clock.now()).await?;
+                        fits[i] = Some((look.fit, true));
+                        done.quick_looked += 1;
+                        for t in tally(&mut tallies, job) {
+                            t.quick_looked += 1;
+                        }
+                        if let Some(t) = watched.tally(job) {
+                            t.quick_looked += 1;
+                        }
+                    }
+                    progress(db, id, &done).await?;
+                    None
+                }
+                Err(e) => Some(calls.failed(&e, &mut done, batch.len(), may_split)),
+            };
+            match after {
+                None | Some(AfterFailure::Skip) => {}
+                Some(AfterFailure::Stop) => break,
+                Some(AfterFailure::Split) => {
+                    let (first, second) = batch.split_at(batch.len() / 2);
+                    queue.push_front((second, false));
+                    queue.push_front((first, false));
+                }
+            }
+        }
+        let mut ranked: Vec<(u8, usize)> = fits
+            .iter()
+            .enumerate()
+            .filter_map(|(i, fit)| fit.map(|(fit, _)| (fit, i)))
+            .collect();
+        ranked.sort_by(|(fa, ia), (fb, ib)| fb.cmp(fa).then(ia.cmp(ib)));
+        let mut unread: Vec<Option<Job>> = unread.into_iter().map(Some).collect();
+        for (_, i) in ranked.iter().take(slots) {
+            if let Some(job) = unread[*i].take() {
+                to_read.push(job);
+            }
+        }
+        for (job, fit) in unread.iter().zip(&fits) {
+            if job.is_none() {
+                continue;
+            }
+            let count = match fit {
+                // Looked at now, not among the best.
+                Some((_, true)) => &mut done.left.quick_look,
+                // Looked at by an earlier search, and still not among them.
+                Some((_, false)) => &mut done.left.seen_before,
+                // Not looked at: a limit, the time or a failed call.
+                None => &mut done.left.waiting,
+            };
+            add(count, 1);
+        }
+        progress(db, id, &done).await?;
+    }
+
+    // Read the chosen ones in full, ten at a time, within the limits.
+    if calls.stopped.is_none() {
+        for job in &mut to_read {
+            if let Err(e) = reader.describe(db, job).await {
+                tracing::info!(error = %e, "a job's description could not be read");
+            }
+        }
+    }
+    let mut read_now = vec![false; to_read.len()];
+    let mut queue: std::collections::VecDeque<(std::ops::Range<usize>, bool)> = (0..to_read.len())
+        .step_by(BATCH)
+        .map(|start| (start..(start + BATCH).min(to_read.len()), true))
+        .collect();
+    while let Some((range, may_split)) = queue.pop_front() {
+        if calls.stopped.is_some() || started.elapsed() > SCORING_TIME {
             break;
         }
+        let batch = &to_read[range.clone()];
         let jobs: Vec<&Job> = batch.iter().collect();
         let caller = Caller {
             db,
             account,
             now: deps.clock.now(),
         };
-        match scoring::score(ai, caller, &input, &jobs).await {
+        let after = match scoring::score(ai, caller, &input, &jobs).await {
+            Ok((scores, cost)) if scores.is_empty() => {
+                done.cost_usd += cost;
+                charge(&mut tallies, &mut watched, &jobs, cost);
+                Some(calls.unusable(&ABOUT_NO_JOB, &mut done, range.len(), may_split))
+            }
             Ok((scores, cost)) => {
-                failed_in_a_row = 0;
+                calls.answered();
                 done.batches += 1;
                 done.cost_usd += cost;
-                // Each job of the batch bears its share, split between the
-                // boards it was seen on. Ten at most: exact as f64.
-                let share = cost / batch.len() as f64;
-                for job in batch {
-                    let boards = boards_of(job).len().max(1) as f64;
-                    for t in tally(&mut tallies, job) {
-                        t.cost_usd += share / boards;
-                    }
-                    if let Some(t) = watched.tally(job) {
-                        t.cost_usd += share;
-                    }
-                }
+                charge(&mut tallies, &mut watched, &jobs, cost);
                 for (index, score) in scores {
                     let job = &batch[index];
                     let excluded =
                         requirements::check(&input, &score.facts, place_of(job, &score)).excluded;
                     save_score(db, account, &input, job, &score, excluded, deps.clock.now())
                         .await?;
-                    scored.push((job.clone(), score));
+                    read_now[range.start + index] = true;
+                    done.read_in_full += 1;
+                    for t in tally(&mut tallies, job) {
+                        t.scored += 1;
+                    }
+                    if let Some(t) = watched.tally(job) {
+                        t.scored += 1;
+                    }
+                    scored.push((job.clone(), score, true));
                 }
                 done.scored = scored.len();
                 progress(db, id, &done).await?;
+                None
             }
-            Err(
-                applicamp_ai::Error::OverBudget { .. } | applicamp_ai::Error::OverDailyCap { .. },
-            ) => {
-                stopped = Some(SearchStop::AiBudgetReached);
-                break;
-            }
-            Err(applicamp_ai::Error::NotConfigured(_)) => {
-                stopped = Some(SearchStop::AiUnavailable);
-                break;
-            }
-            Err(e) => {
-                // A call was made: count it.
-                done.batches += 1;
-                failed_in_a_row += 1;
-                if failed_in_a_row >= FAILED_IN_A_ROW {
-                    tracing::warn!(error = %e, "scoring calls keep failing; the search keeps what it has");
-                    stopped = Some(SearchStop::AiFailed);
-                    break;
-                }
-                if may_split && batch.len() > 1 {
-                    tracing::warn!(error = %e, jobs = batch.len(), "a scoring call failed; scoring it again in halves");
-                    let (first, second) = batch.split_at(batch.len() / 2);
-                    queue.push_front((second, false));
-                    queue.push_front((first, false));
-                } else {
-                    tracing::warn!(error = %e, jobs = batch.len(), "a scoring call failed again; these jobs wait for the next search");
-                    skipped += batch.len();
-                }
+            Err(e) => Some(calls.failed(&e, &mut done, range.len(), may_split)),
+        };
+        match after {
+            None | Some(AfterFailure::Skip) => {}
+            Some(AfterFailure::Stop) => break,
+            Some(AfterFailure::Split) => {
+                let middle = range.start + range.len() / 2;
+                queue.push_front((middle..range.end, false));
+                queue.push_front((range.start..middle, false));
             }
         }
     }
-    if skipped > 0 {
-        tracing::info!(skipped, "jobs left unscored for the next search");
-    }
-
-    for (job, _) in &scored {
-        for t in tally(&mut tallies, job) {
-            t.scored += 1;
+    // What was chosen but not read waits for the next search; a watched
+    // posting among them is not noted as seen.
+    let mut waiting: HashSet<(String, String)> = HashSet::new();
+    for (job, read) in to_read.iter().zip(&read_now) {
+        if !read {
+            add(&mut done.left.waiting, 1);
+            if watched.reading.of.contains_key(&job.key()) {
+                waiting.insert(job.key());
+            }
         }
-        if let Some(t) = watched.tally(job) {
-            t.scored += 1;
-        }
     }
-    // The watched postings this search is done with (scored, or left out by
-    // a hard limit, or already in the pipeline) are seen; the ones it could
-    // not score (a spending limit) wait for the next search.
-    let scored_keys: HashSet<(String, String)> = scored.iter().map(|(job, _)| job.key()).collect();
-    let waiting: HashSet<(String, String)> = unscored
-        .iter()
-        .map(Job::key)
-        .filter(|key| watched.reading.of.contains_key(key) && !scored_keys.contains(key))
-        .collect();
+    if done.left.waiting > 0 {
+        tracing::info!(waiting = done.left.waiting, "jobs left for the next search");
+    }
+    let stopped = calls.stopped;
 
     // Keep the good ones that meet every requirement: the rules decide on
     // the facts, never the score.
-    let mut keep: Vec<Scored> = Vec::new();
-    for (job, mut score) in scored {
+    // Each with whether it was read now and kept with the note that its
+    // posting does not say where it hires.
+    let mut keep: Vec<(Scored, bool)> = Vec::new();
+    for (job, mut score, read_now) in scored {
         let verdict = requirements::check(&input, &score.facts, place_of(&job, &score));
-        if verdict.excluded.is_some() {
+        if let Some(reason) = verdict.excluded {
             done.dropped += 1;
+            if read_now {
+                done.left.requirement(reason);
+            } else {
+                add(&mut done.left.seen_before, 1);
+            }
             continue;
         }
         if score.ungrounded {
             done.not_grounded += 1;
         }
         if score.match_score < KEEP {
+            not_a_match(&mut done.left, read_now);
             continue;
         }
         let Some(job) = with_reading(job, &score) else {
+            not_a_match(&mut done.left, read_now);
             continue;
         };
-        score.gaps.extend(verdict.gaps);
+        // The rules' notes first ("Doesn't say if it hires in Portugal",
+        // "Salary not stated"): the pipeline keeps three gaps.
+        let mut gaps = verdict.gaps;
+        gaps.append(&mut score.gaps);
+        score.gaps = gaps;
         let own_board = watched
             .reading
             .of
@@ -1216,14 +1676,23 @@ pub(crate) async fn run(
             .map(|(_, company)| OwnBoard {
                 company: company.clone(),
             });
-        keep.push(Scored {
-            job,
-            score,
-            own_board,
-        });
+        keep.push((
+            Scored {
+                job,
+                score,
+                own_board,
+            },
+            read_now && verdict.hires_unclear,
+        ));
     }
-    keep.sort_by_key(|scored| std::cmp::Reverse(scored.score.match_score));
-    keep.truncate(MAX_ADDED);
+    keep.sort_by_key(|(scored, _)| std::cmp::Reverse(scored.score.match_score));
+    // The most one search adds; the rest are added by the next.
+    if keep.len() > MAX_ADDED {
+        add(&mut done.left.waiting, keep.len() - MAX_ADDED);
+        keep.truncate(MAX_ADDED);
+    }
+    done.kept_with_gap = keep.iter().filter(|(_, noted)| *noted).count();
+    let keep: Vec<Scored> = keep.into_iter().map(|(scored, _)| scored).collect();
     for scored in &keep {
         for t in tally(&mut tallies, &scored.job) {
             t.matched += 1;
@@ -1234,7 +1703,13 @@ pub(crate) async fn run(
     }
     let now = deps.clock.now();
     record_scans(deps, db, &row, &scanned, &tallies, &watched, now).await?;
+    let matched = keep.len();
     let added = neighbours.add_found(db, events, account, keep, now).await?;
+    // Matches the pipeline already had (the same job under another link).
+    add(
+        &mut done.left.seen_before,
+        matched.saturating_sub(usize::try_from(added).unwrap_or(0)),
+    );
     let mut seen: HashMap<Uuid, Vec<(String, String)>> = HashMap::new();
     for (key, watch) in &watched.reading.of {
         if !waiting.contains(key) {
@@ -1254,10 +1729,28 @@ pub(crate) async fn run(
     finished
 }
 
+/// What the boards are asked in a night ([`matching::shared_queries`]): every
+/// account's roles and top skills in turn, six at most, the same for the
+/// nightly reading and every nightly search it starts.
+async fn night_queries(
+    neighbours: &dyn crate::Neighbours,
+    db: &PgPool,
+    accounts: &[Uuid],
+    now: DateTime<Utc>,
+) -> Result<Vec<String>> {
+    let mut each: Vec<Vec<String>> = Vec::new();
+    for account in accounts {
+        if let Some(input) = neighbours.matching_input(db, *account, now).await? {
+            each.push(input.queries);
+        }
+    }
+    Ok(matching::shared_queries(&each))
+}
+
 /// The nightly search: every evening at 21:00 Lisbon time, for each account
-/// with goals, only when the boards have jobs within their limits that were
-/// never scored for them, and never for an account already at a spending
-/// limit. Schedules the next one first.
+/// with goals, only when the boards have jobs within their limits that no
+/// search looked at or read for them, and never for an account already at a
+/// spending limit. Schedules the next one first.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Nightly {}
 
@@ -1314,21 +1807,10 @@ pub(crate) async fn nightly(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
         return Ok(());
     }
     // Read once: the searches it starts read the same answers from the
-    // cache (within each board's polling interval).
+    // cache (within each board's polling interval), with the same queries.
     let now = deps.clock.now();
-    // Their top skills too, so the stack queries are among what is read
-    // once (everyone's, in order, without repeats).
-    let mut skills: Vec<String> = Vec::new();
-    for account in &accounts {
-        if let Some(input) = neighbours.matching_input(db, *account, now).await? {
-            for skill in matching::top_skills(&input.skills) {
-                if !skills.iter().any(|s| s.eq_ignore_ascii_case(skill)) {
-                    skills.push(skill.to_owned());
-                }
-            }
-        }
-    }
-    let jobs = read_sources(deps, reader, db, now, now, &skills)
+    let queries = night_queries(neighbours.as_ref(), db, &accounts, now).await?;
+    let jobs = read_sources(deps, reader, db, now, now, &queries)
         .await?
         .jobs;
     let mut started = 0_u32;
@@ -1341,10 +1823,10 @@ pub(crate) async fn nightly(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
             continue;
         }
         let known = neighbours.known_jobs(db, account).await?;
-        let cached = cached_scores(db, account, &input).await?;
+        let cache = cached_scores(db, account, &input).await?;
+        // A job within their limits that no search looked at yet.
         let unseen = jobs.iter().any(|job| {
-            matching::hard_limit(job, &input, &known, now).is_none()
-                && !cached.contains_key(&job.key())
+            matching::hard_limit(job, &input, &known, now).is_none() && !cache.seen(job)
         });
         // A watched company's job board is read once a day, with the search.
         let watch_due = watch::store::any_due(db, account, now - deps.config.watch_every()).await?;

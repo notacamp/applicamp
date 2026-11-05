@@ -28,6 +28,7 @@ import { cvPdfUrl, useCv } from "../../api/cv";
 import { letterPdfUrl, useLetter } from "../../api/letter";
 import {
   factsText,
+  gapText,
   formatCost,
   formatShortDate,
   hiddenReasonText,
@@ -504,7 +505,7 @@ function PeekBody({
       ) : null}
       {opportunity.gaps.length === 0 ? null : (
         <Section title={t("peek.gaps")} testId="peek-gaps">
-          <Bullets items={opportunity.gaps} />
+          <Bullets items={opportunity.gaps.map((gap) => gapText(gap, i18n.language, t))} />
         </Section>
       )}
       {onPrepare === undefined || !canPrepare(opportunity.stage) ? null : (

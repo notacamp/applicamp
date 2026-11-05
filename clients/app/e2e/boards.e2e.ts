@@ -26,13 +26,13 @@ const PROFILE = {
 // prepare-by-itself.e2e.ts), so nothing reads a found company's site.
 const GOALS = { roles: ["Staff engineer"], work_mode: ["remote"], autonomy: "find_only" };
 
-test("the boards searches read are ranked by salary, a candidate waits with its check, the Scanned view shows a search, and a match credits its board", async ({
+test("the boards searches read are ranked by salary, a candidate waits with its check, the Searches tab shows a search, and a match credits its board", async ({
   page,
 }) => {
   await signIn(page);
   expect(await callApi(page, "PUT", "/api/v1/profile", PROFILE)).toBe(200);
   expect(await callApi(page, "PUT", "/api/v1/goals", GOALS)).toBe(200);
-  // A search, so the Scanned view has something to show (the fake board).
+  // A search, so the Searches tab has something to show (the fake board).
   const started = await callApi(page, "POST", "/api/v1/searches");
   expect([202, 409]).toContain(started);
   await expect.poll(() => latestSearchStatus(page), { timeout: 60_000 }).toBe("finished");
@@ -62,11 +62,13 @@ test("the boards searches read are ranked by salary, a candidate waits with its 
   await expectAccessible(page);
   await page.getByTestId("board-peek-close").click();
 
-  // Scanned: the search, with the board's line.
+  // Searches: the search's numbers, and the board behind Show by site.
   await page.getByTestId("boards-tab-scanned").click();
   const run = page.getByTestId("scanned-run").first();
   await expect(run).toBeVisible();
-  await expect(run.getByTestId("scanned-line").first()).toContainText("Fake Remote Board");
+  await expect(run.getByTestId("scanned-read")).toContainText(/\d/);
+  await run.getByTestId("scanned-by-site").click();
+  await expect(run.getByTestId("scanned-sites")).toContainText("Fake Remote Board");
   await expectNoSidewaysScroll(page);
   await expectAccessible(page);
 

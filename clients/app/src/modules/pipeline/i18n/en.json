@@ -834,5 +834,10 @@
     "inPipeline": "in Pipeline as Found",
     "open": "Open it",
     "notForMe": "Not for me"
+  },
+  "gaps": {
+    "salaryNotStated": "Salary not stated",
+    "whereUnclear": "Doesn’t say where it hires",
+    "hiresUnclear": "Doesn’t say if it hires in {{country}}"
   }
 }

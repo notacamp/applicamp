@@ -138,21 +138,63 @@ export function leftOutLines(
   });
 }
 
+/** The most sources "Where the matches came from" names one by one. */
+export const MOST_SOURCES = 5;
+
+/** One source of matches: a site, or a company's own hiring page. */
+interface Source {
+  label: string;
+  count: number;
+  page: boolean;
+}
+
+/** The sources `rest` come to as lines: a lone one by name, several as one line. */
+function restLines(rest: readonly Source[], page: boolean, t: TFunction<"sources">): Source[] {
+  const same = rest.filter((source) => source.page === page);
+  const [first] = same;
+  if (first === undefined || same.length === 1) {
+    return same;
+  }
+  return [
+    {
+      label: t(page ? "scanned.companyPages" : "scanned.otherSites", { count: same.length }),
+      count: same.reduce((sum, source) => sum + source.count, 0),
+      page,
+    },
+  ];
+}
+
 /**
- * Where the matches came from, by site, the companies' own job pages
- * together: "Himalayas · 2", "Company sites · 1".
+ * Where the matches came from, each match under one source: a job site
+ * ("Himalayas · 2") or a company's own hiring page ("Wayfarer Co’s hiring
+ * page · 1"). The most come first, and after five the rest are one line
+ * each for pages and for sites ("12 company hiring pages · 14"), so the
+ * list stays short and still adds up to the good matches.
  */
 export function matchLines(lines: readonly ScanLine[], locale: string, t: TFunction<"sources">) {
-  const bySite = new Map<string, number>();
-  for (const line of lines) {
-    if (line.matched > 0) {
-      const name = line.board_slug === "watch" ? t("scanned.companySites") : line.board_name;
-      bySite.set(name, (bySite.get(name) ?? 0) + line.matched);
-    }
-  }
-  return [...bySite.entries()]
-    .toSorted(([, a], [, b]) => b - a)
-    .map(([label, count]) => t("scanned.count", { label, n: formatCount(count, locale) }));
+  const sources: Source[] = lines
+    .filter((line) => line.matched > 0)
+    .map((line) => ({
+      label: line.company_page
+        ? t("scanned.companyPage", { name: line.board_name })
+        : line.board_name,
+      count: line.matched,
+      page: line.company_page,
+    }))
+    .toSorted((a, b) => b.count - a.count);
+  const rest = sources.slice(MOST_SOURCES);
+  // One left over is named, not folded into "1 other".
+  const shown =
+    rest.length === 1
+      ? sources
+      : [
+          ...sources.slice(0, MOST_SOURCES),
+          ...restLines(rest, true, t),
+          ...restLines(rest, false, t),
+        ];
+  return shown.map(({ label, count }) =>
+    t("scanned.count", { label, n: formatCount(count, locale) }),
+  );
 }
 
 /** The words a site's failure is told in. */

@@ -18,8 +18,9 @@ function lastNight(): ScanRun {
       line({ matched: 1 }),
       line({
         board_id: "0190a1b2-0000-7000-8000-0000000000e1",
-        board_slug: "watch",
-        board_name: "Northwind Labs",
+        board_slug: "wayfarer-co-greenhouse",
+        board_name: "Wayfarer Co",
+        company_page: true,
         matched: 2,
         jobs_read: 4,
       }),
@@ -90,11 +91,11 @@ describe("The Searches tab", () => {
       "Read from 4 sites and 212 company pages.",
     );
 
-    // The companies' own pages together, the most first.
+    // Each match under one source, a company page by name, the most first.
     const from = within(latest).getByTestId("scanned-from");
     expect([...from.querySelectorAll("li")].map((li) => li.textContent)).toEqual([
       "Remote OK · 3",
-      "Company sites · 2",
+      "Wayfarer Co’s hiring page · 2",
       "Himalayas · 1",
     ]);
 
@@ -208,6 +209,37 @@ describe("The Searches tab", () => {
       "1 of the 3 read in full doesn’t say where it hires. It is kept, with a note.",
     );
     expect(screen.queryByTestId("scanned-left-out")).toBeNull();
+  });
+
+  it("adds up to the good matches, with the many company pages that gave one or two folded into one line", async () => {
+    // Himalayas gave 4, eight company pages gave 2, 2, 1, 1, 1, 1, 1, 1: 14 good matches.
+    const pages = [2, 2, 1, 1, 1, 1, 1, 1].map((matched, i) =>
+      line({
+        board_id: `0190a1b2-0000-7000-8000-0000000001${String(i).padStart(2, "0")}`,
+        board_slug: `page-${String(i)}`,
+        board_name: `Company ${String(i + 1)}`,
+        company_page: true,
+        matched,
+      }),
+    );
+    const search = run({
+      lines: [line({ matched: 4 }), ...pages],
+      funnel: { ...(lastNight().funnel as NonNullable<ScanRun["funnel"]>), good_matches: 14 },
+    });
+    renderSearches([search]);
+    const from = await screen.findByTestId("scanned-from");
+    const items = [...from.querySelectorAll("li")].map((li) => li.textContent);
+    expect(items).toEqual([
+      "Himalayas · 4",
+      "Company 1’s hiring page · 2",
+      "Company 2’s hiring page · 2",
+      "Company 3’s hiring page · 1",
+      "Company 4’s hiring page · 1",
+      "4 company hiring pages · 4",
+    ]);
+    // The counts add up to the good matches.
+    const total = items.reduce((sum, item) => sum + Number(item?.split(" · ")[1]), 0);
+    expect(total).toBe(14);
   });
 
   it("says when there is no search yet", async () => {

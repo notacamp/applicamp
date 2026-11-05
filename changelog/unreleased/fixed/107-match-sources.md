@@ -1,0 +1,1 @@
+- **"Where the matches came from" now adds up.** On the Searches tab every good match counts under exactly one source, a job site or a company's own hiring page shown by name ("Wayfarer Co’s hiring page"). When the same job came from both, the company page wins. Many pages that gave one or two matches each fold into one line, "N company hiring pages".

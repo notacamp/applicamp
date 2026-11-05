@@ -317,7 +317,11 @@
     "fromSites_other": "{{count}} sites",
     "fromPages_one": "{{count}} página de empresa",
     "fromPages_other": "{{count}} páginas de empresas",
-    "companySites": "Sites das empresas",
+    "companyPage": "Página de vagas de {{name}}",
+    "companyPages_one": "{{count}} página de vagas de empresa",
+    "companyPages_other": "{{count}} páginas de vagas de empresas",
+    "otherSites_one": "{{count}} outro site de emprego",
+    "otherSites_other": "{{count}} outros sites de emprego",
     "leftOut": "Porque ficaram de fora",
     "reasons": {
       "seen_before": "Já vistas antes",

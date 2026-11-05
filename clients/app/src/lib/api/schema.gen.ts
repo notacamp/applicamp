@@ -6073,6 +6073,8 @@ export interface components {
             board_id: string;
             board_name: string;
             board_slug: string;
+            /** @description A company's own hiring page, not a job site. */
+            company_page: boolean;
             /** Format: int32 */
             duration_ms: number;
             error_kind?: string | null;

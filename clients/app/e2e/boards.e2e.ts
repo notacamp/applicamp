@@ -228,3 +228,54 @@ test("the owner's Job sites page: totals, what waits for them, and a board's dec
   await page.getByTestId("boards-admin-search").fill("forbidding");
   await expect(page.getByTestId("boards-admin-row")).toHaveCount(1);
 });
+
+test("the Job sites page: the owner opens on All sites, Your sites lists the sites in groups, and a site is turned off and on again", async ({
+  page,
+}) => {
+  await signIn(page);
+  expect(await callApi(page, "PUT", "/api/v1/profile", PROFILE)).toBe(200);
+  expect(await callApi(page, "PUT", "/api/v1/goals", GOALS)).toBe(200);
+
+  // The demo person owns the boards: All sites first, Your sites beside it.
+  await page.goto("/boards");
+  await expect(page.getByTestId("boards-admin-totals")).toBeVisible();
+  await page.getByTestId("boards-view-mine").click();
+  await expect(page.getByTestId("sites-count")).toContainText(/\d+ available, \d+ on/);
+  await expectPageFillsTheScreen(page, "boards");
+
+  // One list, one search box, one select; the fake site is in a group, with its toggle.
+  await expect(page.getByTestId("sites-find")).toBeVisible();
+  await expect(page.getByTestId("sites-show")).toBeVisible();
+  const row = page.locator('[data-testid^="site-row-"]').filter({ hasText: "Fake Remote Board" });
+  await expect(row).toBeVisible();
+  const toggle = row.locator('[data-testid^="site-toggle-"]');
+  const before = await toggle.getAttribute("aria-pressed");
+  expect(["true", "false"]).toContain(before);
+  const after = before === "true" ? "false" : "true";
+  await expectNoSidewaysScroll(page);
+  await expectAccessible(page);
+
+  // Their own choice is kept, and the count follows it.
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", after);
+  await page.reload();
+  await expect(
+    page
+      .locator('[data-testid^="site-row-"]')
+      .filter({ hasText: "Fake Remote Board" })
+      .locator('[data-testid^="site-toggle-"]'),
+  ).toHaveAttribute("aria-pressed", after);
+
+  // Turned back, so the next project starts from the same list.
+  await page
+    .locator('[data-testid^="site-row-"]')
+    .filter({ hasText: "Fake Remote Board" })
+    .locator('[data-testid^="site-toggle-"]')
+    .click();
+  await expect(
+    page
+      .locator('[data-testid^="site-row-"]')
+      .filter({ hasText: "Fake Remote Board" })
+      .locator('[data-testid^="site-toggle-"]'),
+  ).toHaveAttribute("aria-pressed", before ?? "true");
+});

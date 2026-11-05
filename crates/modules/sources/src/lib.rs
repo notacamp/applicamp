@@ -203,8 +203,8 @@ impl SourcesDeps {
 /// The sources module, composed with `deps`.
 pub fn module(deps: SourcesDeps) -> Module {
     use features::{
-        board_requests as requests, boards as board, company_pages, discovery, recheck, reground,
-        search, store, watch, workable_list,
+        board_requests as requests, boards as board, company_pages, discovery, my_sites, recheck,
+        reground, search, store, watch, workable_list,
     };
     let router = OpenApiRouter::new()
         .routes(routes!(search::start))
@@ -231,6 +231,9 @@ pub fn module(deps: SourcesDeps) -> Module {
         .routes(routes!(watch::watch))
         .routes(routes!(watch::not_interested))
         .routes(routes!(watch::stop))
+        .routes(routes!(watch::undo_not_interested))
+        .routes(routes!(my_sites::list))
+        .routes(routes!(my_sites::set))
         .routes(routes!(watch::careers))
         .layer(Extension(deps.clone()));
     Module {

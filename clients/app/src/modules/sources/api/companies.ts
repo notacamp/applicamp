@@ -39,6 +39,7 @@ export function useCompanies() {
 export type CompanyAction =
   | { kind: "watch"; id: string }
   | { kind: "dismiss"; id: string }
+  | { kind: "undismiss"; id: string }
   | { kind: "stop"; id: string }
   | { kind: "careers"; id: string; url: string };
 
@@ -50,6 +51,9 @@ async function act(action: CompanyAction): Promise<CompanyList> {
     }
     case "dismiss": {
       return unwrap(await api.POST("/api/v1/companies/{id}/not-interested", path));
+    }
+    case "undismiss": {
+      return unwrap(await api.POST("/api/v1/companies/{id}/undo-not-interested", path));
     }
     case "stop": {
       return unwrap(await api.POST("/api/v1/companies/{id}/stop", path));
@@ -63,8 +67,8 @@ async function act(action: CompanyAction): Promise<CompanyList> {
 }
 
 /**
- * Watch a suggestion, say "Not interested", stop watching, or give a watch a
- * careers page. The answer is the whole list, which replaces the cached one.
+ * Watch a suggestion, say "Not interested" (and take it back), stop watching, or give a
+ * watch a careers page. The answer is the whole list, which replaces the cached one.
  */
 export function useCompanyAction() {
   const queryClient = useQueryClient();

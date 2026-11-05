@@ -223,15 +223,18 @@ const cvsRoute = createRoute({
 });
 
 /**
- * `?tab=scanned` shows what each search scanned, `?tab=list` the boards by status; none, the
- * owners' page (the list, for everyone else).
+ * `?tab=mine` shows the sites the person has On, `?tab=all` the owners' page, `?tab=scanned` what
+ * each search scanned and `?tab=list` the boards by status; none, the owners' page for the owners
+ * and the person's sites for everyone else.
  */
-const boardsSearch = z.object({ tab: z.enum(["scanned", "list"]) });
+const boardsSearch = z.object({ tab: z.enum(["mine", "all", "scanned", "list"]) });
 
 const boardsRoute = createRoute({
   getParentRoute: () => frameRoute,
   path: "/boards",
-  validateSearch: (search: Record<string, unknown>): { tab?: "scanned" | "list" | undefined } => {
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { tab?: "mine" | "all" | "scanned" | "list" | undefined } => {
     const parsed = boardsSearch.safeParse(search);
     return { tab: parsed.success ? parsed.data.tab : undefined };
   },
@@ -240,9 +243,9 @@ const boardsRoute = createRoute({
     const navigate = boardsRoute.useNavigate();
     return (
       <Boards
-        tab={search.tab === undefined ? "admin" : search.tab === "list" ? "boards" : search.tab}
+        tab={search.tab}
         onTab={(tab) => {
-          void navigate({ search: { tab: tab === "scanned" ? "scanned" : "list" }, replace: true });
+          void navigate({ search: { tab }, replace: true });
         }}
       />
     );

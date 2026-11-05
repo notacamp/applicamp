@@ -654,5 +654,111 @@
     "declined": "Declined",
     "open": "Open",
     "more": "Show more"
+  },
+  "sites": {
+    "loadFailed": "The job sites couldn’t be loaded.",
+    "retry": "Try again",
+    "views": {
+      "label": "Job sites view",
+      "mine": "Your sites",
+      "all": "All sites",
+      "scanned": "Searches"
+    },
+    "count": "{{available}} available, {{on}} on",
+    "find": "Find a site",
+    "show": {
+      "label": "Show",
+      "all": "All sites",
+      "on": "Sites that are on",
+      "remote": "Remote",
+      "europe": "Europe",
+      "country": "Your country",
+      "trade": "By trade"
+    },
+    "groups": {
+      "remote_worldwide": "Remote, worldwide",
+      "europe": "Europe",
+      "country": "Your country",
+      "trade": "By trade",
+      "everything": "Startups and all-jobs sites"
+    },
+    "on": "On",
+    "off": "Off",
+    "toggle": "{{state}}: {{name}}",
+    "addKey": "Add the key",
+    "adminAddsKey": "The admin adds this key",
+    "saveFailed": "That did not save. Try again.",
+    "noneYet": "No job sites are ready yet. They show up here as the app checks new ones.",
+    "noMatch": "No site matches. Try another word or show all sites.",
+    "salary": {
+      "listed": "Typical salary {{pay}} a year",
+      "country": "Pays about {{pay}} a year in its country"
+    },
+    "kinds": {
+      "tech": "tech",
+      "data": "data",
+      "design": "design",
+      "product": "product",
+      "marketing": "marketing",
+      "sales": "sales",
+      "finance": "finance",
+      "legal": "legal",
+      "people": "people and hiring",
+      "operations": "operations",
+      "support": "customer support",
+      "health-care": "health care",
+      "education": "education",
+      "hospitality-travel": "hospitality and travel",
+      "retail": "retail",
+      "logistics": "logistics",
+      "trades": "skilled trades",
+      "climate": "climate",
+      "nonprofit": "nonprofit",
+      "public-sector": "public sector",
+      "media": "media",
+      "science": "science"
+    },
+    "places": {
+      "worldwide": "Worldwide",
+      "europe": "Europe",
+      "north-america": "North America",
+      "latin-america": "Latin America",
+      "asia": "Asia",
+      "africa": "Africa",
+      "oceania": "Oceania"
+    },
+    "line": {
+      "trade": "Only {{what}} jobs.",
+      "allKinds": "All kinds of jobs.",
+      "mostly": "Mostly {{kinds}}.",
+      "remote": "Remote jobs, mostly {{kinds}}.",
+      "remoteAll": "Remote jobs, all kinds.",
+      "place": "{{place}}. {{what}}",
+      "someRemote": "Some jobs are remote.",
+      "needsKey": "Needs a free key from the site."
+    },
+    "blocked": {
+      "sentence_one": "{{names}} does not allow apps to read it, so it is not on the list.",
+      "sentence_other": "{{names}} do not allow apps to read them, so they are not on the list.",
+      "more": "{{names}} and {{rest}} more do not allow apps to read them, so they are not on the list."
+    },
+    "companyPages_one": "Also reads {{n}} company hiring page.",
+    "companyPages_other": "Also reads {{n}} company hiring pages.",
+    "companies": {
+      "title": "Companies",
+      "description": "{{followed}} followed, {{proposed}} proposed. Keep a company and the app checks its own job page every day.",
+      "checkedDaily": "Checked every day",
+      "following": "Following",
+      "stop": "Stop",
+      "keep": "Keep",
+      "drop": "Drop",
+      "dropped": "Dropped",
+      "stopped": "Stopped",
+      "undo": "Undo",
+      "more_one": "{{count}} more proposed",
+      "more_other": "{{count}} more proposed",
+      "show": "Show",
+      "empty": "No companies yet. They show up when jobs that fit you keep coming from the same company."
+    }
   }
 }

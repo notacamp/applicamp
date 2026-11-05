@@ -46,7 +46,7 @@ function fakeSites(extra: Record<string, Stub> = {}, initial: MySites = sites())
 /** The row of the site called `name`. */
 async function rowOf(name: string): Promise<HTMLElement> {
   const rows = await screen.findAllByTestId("site-row");
-  const row = rows.find((candidate) => (candidate.textContent ?? "").includes(name));
+  const row = rows.find((candidate) => candidate.textContent.includes(name));
   if (row === undefined) {
     throw new Error(`no row for ${name}`);
   }

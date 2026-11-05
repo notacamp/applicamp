@@ -209,3 +209,21 @@ company = "/company"
 url = "/url"
 location = "/location"
 posted_at = "/posted_at"
+
+# Two of #108: a site whose feed has "Role at Company" titles (the check reads
+# the company from them and the app approves it), and a blog (it waits).
+[[board]]
+slug = "fake-title-site"
+name = "Fake Title-Pattern Site"
+homepage = "http://title-site.test:9020"
+kind = "json_api"
+priority = "low"
+status = "candidate"
+
+[[board]]
+slug = "fake-blog-site"
+name = "Fake Blog Site"
+homepage = "http://blog-site.test:9020"
+kind = "json_api"
+priority = "low"
+status = "candidate"

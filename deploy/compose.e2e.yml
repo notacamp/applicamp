@@ -51,6 +51,9 @@ services:
           # Sites of #75: one the app approves by itself, one that asks first.
           - clean-site.test
           - ask-first-site.test
+          # Sites of #108: company read from titles, and a blog.
+          - title-site.test
+          - blog-site.test
           - feed-site-desktop.test
           - feed-site-phone.test
           # The hiring systems (#87), each at the address the server reads it

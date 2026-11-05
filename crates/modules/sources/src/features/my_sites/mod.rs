@@ -132,6 +132,9 @@ pub struct MySite {
     /// not known.
     pub salary_eur_year: Option<f64>,
     pub salary_basis: Option<SalaryBasis>,
+    /// Jobs new on the site in the last 7 days, from the job store; none
+    /// when the store has no count for it yet.
+    pub new_this_week: Option<u32>,
     /// It is On for the person.
     pub on: bool,
     /// Who set it.
@@ -372,6 +375,22 @@ async fn salaries(db: &PgPool, since: DateTime<Utc>) -> Result<HashMap<Uuid, (f6
         .collect())
 }
 
+/// Jobs first seen in the job store in the last 7 days, by site: one grouped
+/// query. A site with none is missing.
+async fn new_jobs(db: &PgPool, since: DateTime<Utc>) -> Result<HashMap<Uuid, u32>> {
+    let rows: Vec<(Uuid, i64)> = sqlx::query_as(
+        "SELECT board_id, count(*) FROM sources.store_jobs
+          WHERE first_seen_at > $1 GROUP BY board_id",
+    )
+    .bind(since)
+    .fetch_all(db)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|(board, n)| (board, u32::try_from(n).unwrap_or(u32::MAX)))
+        .collect())
+}
+
 /// A site's typical salary: its own jobs' average from enough salaries,
 /// else its country's typical pay; rounded to a thousand euros.
 fn typical_salary(row: &BoardRow, own: Option<&(f64, i64)>) -> (Option<f64>, Option<SalaryBasis>) {
@@ -426,6 +445,7 @@ async fn view(
         .collect();
     blocked.sort();
     let chosen = stored(&state.db, account).await?;
+    let fresh = new_jobs(&state.db, now - TimeDelta::days(7)).await?;
     let salary_by = salaries(&state.db, now - TimeDelta::days(30)).await?;
     let needle = query
         .q
@@ -452,6 +472,7 @@ async fn view(
                 specialities: e.offer.specialities.clone(),
                 salary_eur_year,
                 salary_basis,
+                new_this_week: fresh.get(&e.row.id).copied().filter(|n| *n > 0),
                 on: on && !e.needs_key,
                 set_by,
                 needs_key: e.needs_key,

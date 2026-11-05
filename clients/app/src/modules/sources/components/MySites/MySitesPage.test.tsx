@@ -62,7 +62,7 @@ describe("the job sites page", () => {
     expect(remote).toHaveTextContent("Remote, worldwide");
     const row = within(remote).getByTestId("site-row");
     expect(row).toHaveTextContent("Himalayas");
-    expect(row).toHaveTextContent("Remote jobs, mostly tech.");
+    expect(row).toHaveTextContent("Remote jobs, mostly tech. About 300 new a week.");
     expect(row).toHaveTextContent("Typical salary");
     expect(row).toHaveTextContent("96");
     // The group of their own country carries its name.

@@ -198,6 +198,10 @@ export function siteLine(site: MySite, locale: string, t: TFunction<"sources">):
       parts.push(t("sites.line.someRemote"));
     }
   }
+  const fresh = site.new_this_week ?? 0;
+  if (fresh > 0) {
+    parts.push(t("sites.line.newThisWeek", { n: new Intl.NumberFormat(locale).format(fresh) }));
+  }
   if (site.needs_key) {
     parts.push(t("sites.line.needsKey"));
   }

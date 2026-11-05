@@ -391,3 +391,31 @@ async fn the_list_is_searched_and_filtered(db: PgPool) {
     let (status, _) = h.get("/api/v1/my-sites?show=everything").await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_site_says_how_many_jobs_are_new_this_week(db: PgPool) {
+    let h = harness(db).await;
+    let busy = plain(&h.db, "busy", &["tech", "worldwide", "remote"], None).await;
+    plain(&h.db, "quiet", &["tech", "worldwide", "remote"], None).await;
+    // Two new in the week, one a month old: the count is of the new ones.
+    for (i, days) in [1, 3, 30].into_iter().enumerate() {
+        let seen = today() - chrono::TimeDelta::days(days);
+        sqlx::query(
+            "INSERT INTO sources.store_jobs (id, board_id, source_ref, title, url, content_hash,
+                first_seen_at, last_seen_at)
+             VALUES ($1, $2, $3, 'Engineer', 'https://busy.example/1', 'h', $4, $4)",
+        )
+        .bind(Uuid::now_v7())
+        .bind(busy)
+        .bind(format!("job-{i}"))
+        .bind(seen)
+        .execute(&h.db)
+        .await
+        .unwrap();
+    }
+    let (_, list) = h.get("/api/v1/my-sites").await;
+    let sites = list["groups"][0]["sites"].as_array().unwrap();
+    let get = |name: &str| sites.iter().find(|s| s["name"] == name).unwrap().clone();
+    assert_eq!(get("Site busy")["new_this_week"], 2);
+    assert!(get("Site quiet")["new_this_week"].is_null());
+}

@@ -735,7 +735,8 @@
       "remoteAll": "Vagas remotas, de todo o tipo.",
       "place": "{{place}}. {{what}}",
       "someRemote": "Algumas vagas são remotas.",
-      "needsKey": "Precisa de uma chave gratuita do site."
+      "needsKey": "Precisa de uma chave gratuita do site.",
+      "newThisWeek": "Cerca de {{n}} novas por semana."
     },
     "blocked": {
       "sentence_one": "{{names}} não permite que aplicações o leiam, por isso não está na lista.",

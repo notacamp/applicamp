@@ -735,7 +735,8 @@
       "remoteAll": "Offres à distance de tous types.",
       "place": "{{place}}. {{what}}",
       "someRemote": "Certaines offres sont à distance.",
-      "needsKey": "Demande une clé gratuite du site."
+      "needsKey": "Demande une clé gratuite du site.",
+      "newThisWeek": "Environ {{n}} nouvelles par semaine."
     },
     "blocked": {
       "sentence_one": "{{names}} n’autorise pas les applications à le lire, il n’est donc pas dans la liste.",

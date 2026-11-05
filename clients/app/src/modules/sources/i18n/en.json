@@ -735,7 +735,8 @@
       "remoteAll": "Remote jobs, all kinds.",
       "place": "{{place}}. {{what}}",
       "someRemote": "Some jobs are remote.",
-      "needsKey": "Needs a free key from the site."
+      "needsKey": "Needs a free key from the site.",
+      "newThisWeek": "About {{n}} new a week."
     },
     "blocked": {
       "sentence_one": "{{names}} does not allow apps to read it, so it is not on the list.",

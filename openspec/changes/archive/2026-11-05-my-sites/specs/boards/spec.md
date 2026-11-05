@@ -52,7 +52,7 @@ tech; Startups and all-jobs when it lists startups; the person's country; Europe
 when it is remote-first and open worldwide; else Startups and all-jobs. Each site SHALL say what it
 offers (its kinds of jobs, where, how remote, its speciality), its typical salary when known (the
 average of the salaries its jobs state when at least ten state one, else its country's typical pay),
-whether it is On, and whether it needs a key. The answer SHALL give how many sites are available and
+how many jobs are new on it in the last 7 days when the job store has a count, whether it is On, and whether it needs a key. The answer SHALL give how many sites are available and
 how many are On, whatever is searched or shown. A site is found by part of its name, and the list
 shows all sites, the ones that are On, remote ones, European ones, the person's country's or By trade.
 

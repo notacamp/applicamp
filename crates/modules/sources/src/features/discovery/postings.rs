@@ -128,7 +128,7 @@ pub fn with_companies(mut jobs: Vec<Job>) -> (Vec<Job>, Option<TitleSplit>) {
 fn own_link(job: &Job, hosts: &[String]) -> Option<Url> {
     let url = Url::parse(&job.url).ok()?;
     let host = host_of(&url)?;
-    hosts.iter().any(|h| *h == host).then_some(url)
+    hosts.contains(&host).then_some(url)
 }
 
 /// Whether `job`'s link is its own page on one of `hosts` (the site's, and

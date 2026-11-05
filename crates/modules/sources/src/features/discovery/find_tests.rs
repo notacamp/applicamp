@@ -250,8 +250,11 @@ async fn an_item_with_only_a_link_to_its_own_job_page_is_a_posting(db: PgPool) {
     );
 }
 
+/// A query parameter a mock requires.
+type Query = Option<(&'static str, &'static str)>;
+
 /// A site that serves a feed of 6 items at `route` only (with `query`).
-async fn feed_only_at(route: &str, query: Option<(&str, &str)>) -> MockServer {
+async fn feed_only_at(route: &str, query: Query) -> MockServer {
     let site = MockServer::start().await;
     // The feed first: a mock mounted earlier answers before a later one.
     let body = feed(&site, 6, Some("Sat, 24 Oct 2026 08:00:00 +0000"));
@@ -272,7 +275,7 @@ async fn feed_only_at(route: &str, query: Option<(&str, &str)>) -> MockServer {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn each_feed_path_is_probed_once(db: PgPool) {
     let h = harness(db).await;
-    let paths: [(&str, Option<(&str, &str)>, &str); 8] = [
+    let paths: [(&str, Query, &str); 8] = [
         ("/jobs.rss", None, "/jobs.rss"),
         ("/jobs/feed", None, "/jobs/feed"),
         ("/feed/jobs", None, "/feed/jobs"),

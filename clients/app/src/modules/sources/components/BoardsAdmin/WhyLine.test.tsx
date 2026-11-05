@@ -49,6 +49,9 @@ describe("why a site waits", () => {
     expect(why({ code: "terms_forbid", detail: "No apps." })?.textContent).toBe(
       "Its terms do not allow apps to read it. “No apps.”",
     );
+  });
+
+  it("has no quote to add when the terms gave none", () => {
     expect(why({ code: "terms_forbid" })?.textContent).toBe(
       "Its terms do not allow apps to read it.",
     );
@@ -75,9 +78,14 @@ describe("why a site waits", () => {
   it("has a sentence in every language for every code, in plain words", () => {
     for (const locale of SUPPORTED_LOCALES) {
       for (const code of CODES) {
-        const { unmount } = renderWithProviders(<WhyLine waiting={{ code, detail: "Lever" }} />, {
-          locale,
-        });
+        const { unmount } = renderWithProviders(
+          <WhyLine
+            waiting={{ code, detail: code === "nothing_recent" ? "2026-08-07" : "Lever" }}
+          />,
+          {
+            locale,
+          },
+        );
         const text = screen.getByTestId("boards-admin-why").textContent;
         expect(text, `${locale} ${code}`).not.toContain("admin.why");
         expect(text, `${locale} ${code}`).not.toMatch(/RSS|robots|API|[()]/);

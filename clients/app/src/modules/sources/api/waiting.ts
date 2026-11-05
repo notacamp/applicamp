@@ -37,7 +37,8 @@ const QUOTED: ReadonlySet<string> = new Set([
 export function whyText(waiting: Waiting, t: TFunction<"sources">, locale: string): string {
   const detail = waiting.detail ?? "";
   const key = KNOWN.has(waiting.code) ? waiting.code : "unknown";
-  const shown = key === "nothing_recent" && detail !== "" ? shortDate(detail, locale) : detail;
+  const dated = key === "nothing_recent" && !Number.isNaN(Date.parse(detail));
+  const shown = dated ? shortDate(detail, locale) : detail;
   const sentence = t(`admin.why.${key}`, { detail: shown });
   return QUOTED.has(key) && detail !== "" ? `${sentence} \u201C${detail}\u201D` : sentence;
 }

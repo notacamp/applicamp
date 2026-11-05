@@ -38,6 +38,8 @@
 //                         a link to each job's own page: the check at start
 //                         reads the company from the titles and approves it
 //                         by itself (#108);
+//   title-suggested.test  the same, for a person to suggest (not in the seed list),
+//                         so the app approves it by itself (#108);
 //   blog-site.test        a site whose homepage links an RSS feed of blog posts:
 //                         it waits, saying it may not be a job site (#108);
 //   feed-site-<p>.test    a site with no config whose homepage links its RSS
@@ -1116,8 +1118,9 @@ function waitingBoard(site: string, url: URL, response: ServerResponse): boolean
     }
     return false;
   }
-  if (site === "title-site.test" || site === "blog-site.test") {
-    const feed = site === "title-site.test" ? "/jobs.rss" : "/feed.xml";
+  const titled = site === "title-site.test" || site === "title-suggested.test";
+  if (titled || site === "blog-site.test") {
+    const feed = titled ? "/jobs.rss" : "/feed.xml";
     if (url.pathname === "/") {
       text(
         response,
@@ -1132,11 +1135,7 @@ function waitingBoard(site: string, url: URL, response: ServerResponse): boolean
       return true;
     }
     if (url.pathname === feed) {
-      text(
-        response,
-        "application/rss+xml",
-        site === "title-site.test" ? titleFeed(site) : blogFeed(site),
-      );
+      text(response, "application/rss+xml", titled ? titleFeed(site) : blogFeed(site));
       return true;
     }
     return false;

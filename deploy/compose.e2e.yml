@@ -53,6 +53,7 @@ services:
           - ask-first-site.test
           # Sites of #108: company read from titles, and a blog.
           - title-site.test
+          - title-suggested.test
           - blog-site.test
           - feed-site-desktop.test
           - feed-site-phone.test

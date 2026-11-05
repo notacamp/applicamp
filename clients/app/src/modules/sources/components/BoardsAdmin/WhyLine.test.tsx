@@ -27,7 +27,7 @@ const CODES = [
   "needs_approval",
 ] as const;
 
-function why(waiting: Waiting | null | undefined, locale: Locale = "en") {
+function why(waiting?: Waiting | null, locale: Locale = "en") {
   renderWithProviders(<WhyLine waiting={waiting} />, { locale });
   return screen.queryByTestId("boards-admin-why");
 }
@@ -69,7 +69,7 @@ describe("why a site waits", () => {
 
   it("shows nothing without a reason", () => {
     expect(why(null)).toBeNull();
-    expect(why(undefined)).toBeNull();
+    expect(why()).toBeNull();
   });
 
   it("has a sentence in every language for every code, in plain words", () => {
@@ -78,7 +78,7 @@ describe("why a site waits", () => {
         const { unmount } = renderWithProviders(<WhyLine waiting={{ code, detail: "Lever" }} />, {
           locale,
         });
-        const text = screen.getByTestId("boards-admin-why").textContent ?? "";
+        const text = screen.getByTestId("boards-admin-why").textContent;
         expect(text, `${locale} ${code}`).not.toContain("admin.why");
         expect(text, `${locale} ${code}`).not.toMatch(/RSS|robots|API|[()]/);
         unmount();

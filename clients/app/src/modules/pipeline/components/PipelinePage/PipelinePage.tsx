@@ -207,7 +207,6 @@ export function PipelinePage({
           <Button
             variant="secondary"
             icon="plus"
-            shortcut="pipeline.add"
             data-testid="pipeline-new"
             onClick={() => {
               onAdding(true);

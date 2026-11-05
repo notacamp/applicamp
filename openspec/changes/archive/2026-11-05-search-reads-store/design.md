@@ -1,15 +1,23 @@
 # Design
 
 ## The pool (`features::store::pool`)
-One SQL query returns the open, unexpired jobs of approved sites: the person's On sites
-(`b.id = ANY(sites)`) and every company page whose hiring system is approved, without their
-descriptions (they are up to 10,000 characters), plus a `rank` column: `ts_rank(search, query, 32)`
-(rescaled to 0..1) plus `0.3 / (1 + age_days / 7)`. The query is the person's terms or-ed, each term's
-words and-ed (`store::text_query`): each wanted role's key words (`matching::role_words`, the roles they
-had when they named none, at most 5) and the words of the top skills. No filter on the terms: a job
-that matches nothing ranks by age alone, so a person with no roles still gets the newest. The
-`first_seen_since` filter is the nightly's "new since the last search" (the person's last finished
-search, strictly after). The pool holds 100,000 jobs at most.
+One SQL query ranks and limits in the database, so the server never holds more than
+`APPLICAMP_SOURCES__SEARCH_POOL` (3,000) jobs of a search. It covers the open, unexpired jobs of
+approved sites: the person's On sites (`b.id = ANY(sites)`) and every company page whose hiring
+system is approved. The cheap hard limits that need only columns apply in SQL (not older than 30
+days, a way of working they want); region and remote-only limits stay in memory. Descriptions are
+left out (up to 10,000 characters each). Rows come `ORDER BY` "has a score of this person's for this
+profile, goals and rules" (unscored first, so new jobs are never crowded out), then `rank DESC`, then
+id, `LIMIT` the pool size. `rank` is `ts_rank(search, query, 32)` (0 to 1) plus
+`0.3 / (1 + age_days / 7)`; the query is the person's terms or-ed, each term's words and-ed
+(`store::text_query`): each wanted role's key words (`matching::role_words`, the roles they had when
+they named none, at most 5) and the words of the top skills. A job that matches nothing ranks by age.
+`first_seen_since` is the nightly's "new since the last search".
+
+A plain `count(*)` over the same filter (`pool_counts`) gives the jobs the pool left out: too old,
+not a way of working they want, and past the pool's limit. A search counts them under `too_old`,
+`not_remote` and `preselect` ("Not among the closest to your roles today") and adds them to the jobs
+read, so the funnel still adds up.
 
 ## A search (`features/search`)
 1. `read_sources`: the pool, plus the person's live queries (`Reader::job_board_queries`: one page

@@ -79,15 +79,11 @@ test("the boards searches read are ranked by salary, a candidate waits with its 
   await expect(row).toBeVisible();
   const phone = (page.viewportSize()?.width ?? 0) < 768;
   await (phone ? row.click() : row.getByTestId("pipeline-row-open").click());
-  // Which fake site's match is first depends on the store's order, not on the test.
-  await expect(page.getByTestId("peek-source-link").first()).toContainText(
-    /Fake (Remote Board|Clean Site)/,
-  );
-  await expect(page.getByTestId("peek-source-link").first()).toHaveAttribute(
-    "href",
-    /^https:\/\/example\.com\//,
-  );
-  await expect(page.getByTestId("peek-apply")).toHaveAttribute("href", /^https:\/\/example\.com\//);
+  // Which match is first depends on the store's order (job sites and company
+  // pages both feed a search): it credits where it came from, with a link.
+  await expect(page.getByTestId("peek-source-link").first()).toContainText(/^From /);
+  await expect(page.getByTestId("peek-source-link").first()).toHaveAttribute("href", /^https:\/\//);
+  await expect(page.getByTestId("peek-apply")).toHaveAttribute("href", /^https:\/\//);
 });
 
 test("every waiting board can be approved or says why: checked at start, a key set, terms that forbid it, a proposed config, a config error beside Save", async ({

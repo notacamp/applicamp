@@ -200,8 +200,18 @@ pub async fn find(
     .await?)
 }
 
-/// Jobs a search's pool holds, at most.
-pub const POOL_MAX: i64 = 100_000;
+/// Jobs a search's pool holds, at most, when the instance sets no other
+/// (`APPLICAMP_SOURCES__SEARCH_POOL`).
+pub const POOL_DEFAULT: i64 = 3_000;
+
+/// The scores a pool puts after the jobs a person has no score of.
+#[derive(Debug, Clone, Copy)]
+pub struct ScoredFor<'a> {
+    pub account: Uuid,
+    pub profile_version: &'a str,
+    pub goals_version: i32,
+    pub rules_version: i32,
+}
 
 /// What a search draws its candidates from.
 #[derive(Debug, Clone, Copy)]
@@ -212,8 +222,29 @@ pub struct PoolQuery<'a> {
     /// First stored since: a nightly search takes only the jobs the store
     /// first saw after the person's last search.
     pub first_seen_since: Option<DateTime<Utc>>,
-    /// Words of the person's roles and skills, for ranking only.
+    /// Words of the person's roles and skills, for ranking.
     pub text: &'a [String],
+    /// Jobs returned, at most, the highest rank first.
+    pub limit: i64,
+    /// The ways of working they want (none: any). A job that says none, and
+    /// a remote one, always pass.
+    pub work_modes: &'a [WorkMode],
+    /// Jobs this person already has a quick look or a full read of come
+    /// after the others, so a night's new jobs are never crowded out.
+    pub scored: Option<ScoredFor<'a>>,
+}
+
+impl Default for PoolQuery<'_> {
+    fn default() -> Self {
+        Self {
+            sites: &[],
+            first_seen_since: None,
+            text: &[],
+            limit: POOL_DEFAULT,
+            work_modes: &[],
+            scored: None,
+        }
+    }
 }
 
 /// A job of the pool, without its description, and how close it is to the
@@ -227,24 +258,12 @@ pub struct PoolJob {
     pub rank: f32,
 }
 
-/// The open jobs of the person's On sites and of every approved company
-/// page, with their rank. Descriptions are left out ([`descriptions`] reads
-/// them for the jobs a search goes on with).
-pub async fn pool(db: &PgPool, query: &PoolQuery<'_>, now: DateTime<Utc>) -> Result<Vec<PoolJob>> {
-    let text = text_query(query.text);
-    Ok(sqlx::query_as(
-        "SELECT j.id, j.board_id, j.source_ref, j.title, j.company, j.url, j.apply_url,
-                j.company_url, j.location, j.regions, j.work_mode, j.salary_min, j.salary_max,
-                j.salary_currency, j.salary_period, j.salary_text, j.posted_at, j.expires_at,
-                ''::text AS description, j.language, j.tags, j.url_key, j.dedupe_key,
-                j.first_seen_at, j.last_seen_at, b.slug AS board_slug, b.kind AS board_kind,
-                b.system AS board_system,
-                coalesce(nullif(btrim(b.terms->>'attribution'), ''), b.name) AS attribution,
-                (CASE WHEN $4::text IS NULL THEN 0::float8
-                      ELSE ts_rank(j.search, to_tsquery('simple', $4), 32)::float8 END
-                 + 0.3 / (1 + greatest(extract(epoch FROM ($1 - coalesce(j.posted_at, j.first_seen_at)))::float8
-                                       / 86400.0, 0) / 7.0))::float4 AS rank
-           FROM sources.store_jobs j
+/// The open, unexpired jobs of approved sites that the person reads: the
+/// On sites and every company page whose hiring system is approved.
+/// Parameters: `$1` now, `$2` sites, `$3` first stored since.
+macro_rules! pool_from {
+    () => {
+        "FROM sources.store_jobs j
            JOIN sources.job_boards b ON b.id = j.board_id
            LEFT JOIN sources.job_boards s ON s.id = b.system_id
           WHERE j.closed_at IS NULL
@@ -252,16 +271,127 @@ pub async fn pool(db: &PgPool, query: &PoolQuery<'_>, now: DateTime<Utc>) -> Res
             AND b.status = 'approved'
             AND ((b.kind <> 'company_page' AND b.id = ANY($2))
                  OR (b.kind = 'company_page' AND s.status = 'approved'))
-            AND ($3::timestamptz IS NULL OR j.first_seen_at > $3)
-          ORDER BY j.id
-          LIMIT $5",
-    )
+            AND ($3::timestamptz IS NULL OR j.first_seen_at > $3) "
+    };
+}
+
+/// Not older than 30 days. Parameter: `$5` oldest posted.
+macro_rules! age_ok {
+    () => {
+        "(j.posted_at IS NULL OR j.posted_at >= $5)"
+    };
+}
+
+/// A way of working they want (a remote one, and one that says none, always
+/// pass). Parameter: `$4` ways of working.
+macro_rules! mode_ok {
+    () => {
+        "(cardinality($4::text[]) = 0 OR j.work_mode IS NULL OR j.work_mode = 'remote'
+          OR j.work_mode = ANY($4))"
+    };
+}
+
+fn modes_of(query: &PoolQuery<'_>) -> Vec<&'static str> {
+    query.work_modes.iter().map(|m| m.as_str()).collect()
+}
+
+/// The jobs a search draws from, best rank first, at most `query.limit`:
+/// those of [`pool_from`] within the cheap hard limits, ranked in SQL by the
+/// full-text rank of the title, company and tags against the person's words
+/// plus how new they are, jobs the person has no score of first. A
+/// plain `ORDER BY ... LIMIT`, so the server holds only these rows. Descriptions are left
+/// out ([`descriptions`] reads them for the jobs a search goes on with).
+pub async fn pool(db: &PgPool, query: &PoolQuery<'_>, now: DateTime<Utc>) -> Result<Vec<PoolJob>> {
+    let text = text_query(query.text);
+    let scored = query.scored;
+    Ok(sqlx::query_as(concat!(
+        "SELECT j.id, j.board_id, j.source_ref, j.title, j.company, j.url, j.apply_url,
+                j.company_url, j.location, j.regions, j.work_mode, j.salary_min, j.salary_max,
+                j.salary_currency, j.salary_period, j.salary_text, j.posted_at, j.expires_at,
+                ''::text AS description, j.language, j.tags, j.url_key, j.dedupe_key,
+                j.first_seen_at, j.last_seen_at, b.slug AS board_slug, b.kind AS board_kind,
+                b.system AS board_system,
+                coalesce(nullif(btrim(b.terms->>'attribution'), ''), b.name) AS attribution,
+                (CASE WHEN $6::text IS NULL THEN 0::float8
+                      ELSE ts_rank(j.search, to_tsquery('simple', $6), 32)::float8 END
+                 + 0.3 / (1 + greatest(extract(epoch FROM ($1 - coalesce(j.posted_at, j.first_seen_at)))::float8
+                                       / 86400.0, 0) / 7.0))::float4 AS rank ",
+        pool_from!(),
+        " AND ",
+        age_ok!(),
+        " AND ",
+        mode_ok!(),
+        " ORDER BY EXISTS (
+                SELECT 1 FROM sources.scores c
+                 WHERE c.account_id = $8
+                   AND c.source = CASE WHEN b.kind = 'company_page' THEN b.system ELSE b.slug END
+                   AND c.source_ref = j.source_ref
+                   AND c.profile_version = $9 AND c.goals_version = $10
+                   AND c.rules_version = $11),
+                  rank DESC, j.id
+          LIMIT $7"
+    ))
     .bind(now)
     .bind(query.sites)
     .bind(query.first_seen_since)
+    .bind(modes_of(query))
+    .bind(now - crate::matching::MAX_AGE)
     .bind(text)
-    .bind(POOL_MAX)
+    .bind(query.limit.clamp(1, POOL_CEILING))
+    .bind(scored.map(|s| s.account))
+    .bind(scored.map(|s| s.profile_version))
+    .bind(scored.map_or(0, |s| s.goals_version))
+    .bind(scored.map_or(0, |s| s.rules_version))
     .fetch_all(db)
+    .await?)
+}
+
+/// The most a pool may be asked for.
+pub const POOL_CEILING: i64 = 50_000;
+
+/// How many jobs the pool's filter lets through and keeps out, with no
+/// limit: so a search can account for every job it did not load.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, sqlx::FromRow)]
+pub struct PoolCounts {
+    /// Every job of [`pool_from`].
+    pub total: i64,
+    /// Older than 30 days.
+    pub too_old: i64,
+    /// Not older, but not a way of working they want.
+    pub not_wanted: i64,
+}
+
+impl PoolCounts {
+    /// Jobs within the cheap hard limits: what the pool ranks.
+    pub fn passing(&self) -> i64 {
+        self.total - self.too_old - self.not_wanted
+    }
+}
+
+/// [`PoolCounts`] for `query`, by a plain `count(*)` over the same filter.
+pub async fn pool_counts(
+    db: &PgPool,
+    query: &PoolQuery<'_>,
+    now: DateTime<Utc>,
+) -> Result<PoolCounts> {
+    Ok(sqlx::query_as(concat!(
+        "SELECT count(*) AS total,
+                count(*) FILTER (WHERE NOT ",
+        age_ok!(),
+        ") AS too_old,
+                count(*) FILTER (WHERE ",
+        age_ok!(),
+        " AND NOT ",
+        mode_ok!(),
+        ") AS not_wanted ",
+        pool_from!()
+    ))
+    .bind(now)
+    .bind(query.sites)
+    .bind(query.first_seen_since)
+    .bind(modes_of(query))
+    .bind(now - crate::matching::MAX_AGE)
+    .fetch_one(db)
     .await?)
 }
 

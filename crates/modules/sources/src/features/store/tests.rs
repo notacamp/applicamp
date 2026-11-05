@@ -1144,8 +1144,8 @@ async fn a_searchs_pool_holds_the_on_sites_and_every_company_page_ranked_without
     let words = ["rust engineer".to_owned()];
     let query = PoolQuery {
         sites: &[alpha],
-        first_seen_since: None,
         text: &words,
+        ..PoolQuery::default()
     };
     let found = pool(&h.db, &query, now).await.unwrap();
     let mut titles: Vec<&str> = found.iter().map(|p| p.job.title.as_str()).collect();
@@ -1193,4 +1193,91 @@ async fn a_searchs_pool_holds_the_on_sites_and_every_company_page_ranked_without
     let texts = descriptions(&h.db, &ids).await.unwrap();
     assert_eq!(texts.len(), 3);
     assert!(texts.values().all(|t| t == "We build things"));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_pool_is_ranked_and_limited_in_sql_and_the_rest_is_counted(db: PgPool) {
+    let server = MockServer::start().await;
+    seed(&db, &[board("alpha", &server, "approved", "", "")]).await;
+    let h = harness(db, store_config()).await;
+    let alpha = id_of(&h.db, "alpha").await;
+    let now = today();
+    let mut old = job("5", "Rust Engineer Emeritus");
+    old.posted_at = Some(now - TimeDelta::days(40));
+    let mut office = job("6", "Rust Engineer on site");
+    office.work_mode = Some(WorkMode::Onsite);
+    keep::keep(
+        &h.db,
+        alpha,
+        &[
+            job("1", "Senior Rust Engineer"),
+            job("2", "Rust Engineer"),
+            job("3", "Office Manager"),
+            job("4", "Designer"),
+            old,
+            office,
+        ],
+        "tech",
+        true,
+        now,
+        &limits(),
+    )
+    .await
+    .unwrap();
+    let words = ["rust engineer".to_owned()];
+    let query = PoolQuery {
+        sites: &[alpha],
+        text: &words,
+        limit: 2,
+        work_modes: &[WorkMode::Remote],
+        ..PoolQuery::default()
+    };
+
+    // The limit holds, the two best by rank come first, and the old job and
+    // the one on site (they fail the cheap hard limits) never load.
+    let found = pool(&h.db, &query, now).await.unwrap();
+    let mut titles: Vec<&str> = found.iter().map(|p| p.job.title.as_str()).collect();
+    titles.sort_unstable();
+    assert_eq!(titles, ["Rust Engineer", "Senior Rust Engineer"]);
+    assert!(found[0].rank >= found[1].rank, "best rank first");
+    let counts = pool_counts(&h.db, &query, now).await.unwrap();
+    assert_eq!(
+        (
+            counts.total,
+            counts.too_old,
+            counts.not_wanted,
+            counts.passing()
+        ),
+        (6, 1, 1, 4),
+        "the rest is counted, so a search's funnel adds up"
+    );
+
+    // A job the person already has a score of comes after the others.
+    sqlx::query(
+        "INSERT INTO sources.scores
+            (account_id, source, source_ref, profile_version, goals_version, rules_version,
+             stage, match_score, why, gaps, created_at)
+         VALUES ($1, 'alpha', '2', 'p1', 1, 3, 'full', 80, '[]'::jsonb, '[]'::jsonb, $2)",
+    )
+    .bind(h.account)
+    .bind(now)
+    .execute(&h.db)
+    .await
+    .unwrap();
+    let scored = PoolQuery {
+        scored: Some(ScoredFor {
+            account: h.account,
+            profile_version: "p1",
+            goals_version: 1,
+            rules_version: 3,
+        }),
+        ..query
+    };
+    let found = pool(&h.db, &scored, now).await.unwrap();
+    assert_eq!(found.len(), 2);
+    assert_eq!(found[0].job.title, "Senior Rust Engineer");
+    assert!(
+        found.iter().all(|p| p.job.title != "Rust Engineer"),
+        "the scored one is last, so the limit leaves it out"
+    );
 }

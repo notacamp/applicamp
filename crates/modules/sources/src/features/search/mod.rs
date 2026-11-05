@@ -1081,6 +1081,31 @@ pub(crate) struct Reading {
     pub ids: HashMap<(String, String), Uuid>,
     /// How close each of those is to the person's roles and skills.
     pub ranks: HashMap<(String, String), f32>,
+    /// Jobs of the store the database left out, so the funnel adds up: too
+    /// old, not a way of working they want, and past the pool's limit.
+    pub outside: Outside,
+}
+
+/// Jobs of the store a search did not load, by why.
+#[derive(Debug, Default, Clone, Copy)]
+pub(crate) struct Outside {
+    pub too_old: u32,
+    pub not_remote: u32,
+    pub not_closest: u32,
+}
+
+impl Outside {
+    pub(crate) fn total(&self) -> usize {
+        [self.too_old, self.not_remote, self.not_closest]
+            .into_iter()
+            .map(|n| n as usize)
+            .sum()
+    }
+}
+
+/// `n` as a count that cannot be negative or overflow.
+fn clamp_u32(n: i64) -> u32 {
+    u32::try_from(n.max(0)).unwrap_or(u32::MAX)
 }
 
 /// The job sites a search draws from: the person's On sites (every approved
@@ -1195,7 +1220,7 @@ pub(crate) async fn read_sources(
     now: DateTime<Utc>,
     fresh_since: DateTime<Utc>,
     queries: &[String],
-    terms: &[String],
+    input: &MatchInput,
     first_seen_since: Option<DateTime<Utc>>,
 ) -> Result<Reading> {
     let rows = on_sites(deps, db, account).await?;
@@ -1203,16 +1228,17 @@ pub(crate) async fn read_sources(
     let mut jobs = std::mem::take(&mut reading.jobs);
     if deps.config.store() {
         let sites: Vec<Uuid> = rows.iter().map(|row| row.id).collect();
-        let pool = store::pool(
-            db,
-            &store::PoolQuery {
-                sites: &sites,
-                first_seen_since,
-                text: terms,
-            },
-            now,
-        )
-        .await?;
+        let terms = preselect_terms(input);
+        let query = pool_query(deps, input, account, &sites, first_seen_since, &terms);
+        // What the database leaves out is counted, not loaded: the pool is
+        // its best few thousand (`SEARCH_POOL`), ranked and limited in SQL.
+        let counts = store::pool_counts(db, &query, now).await?;
+        let pool = store::pool(db, &query, now).await?;
+        reading.outside = Outside {
+            too_old: clamp_u32(counts.too_old),
+            not_remote: clamp_u32(counts.not_wanted),
+            not_closest: clamp_u32(counts.passing() - i64::try_from(pool.len()).unwrap_or(0)),
+        };
         let mut per_site: HashMap<Uuid, u32> = HashMap::new();
         let mut pages: HashSet<Uuid> = HashSet::new();
         for stored in pool {
@@ -1254,6 +1280,30 @@ pub(crate) async fn read_sources(
     }
     reading.jobs = dedupe::merge(unique(jobs));
     Ok(reading)
+}
+
+/// What the pool asks the database for.
+fn pool_query<'a>(
+    deps: &SourcesDeps,
+    input: &'a MatchInput,
+    account: Uuid,
+    sites: &'a [Uuid],
+    first_seen_since: Option<DateTime<Utc>>,
+    terms: &'a [String],
+) -> store::PoolQuery<'a> {
+    store::PoolQuery {
+        sites,
+        first_seen_since,
+        text: terms,
+        limit: deps.config.search_pool(),
+        work_modes: &input.work_modes,
+        scored: Some(store::ScoredFor {
+            account,
+            profile_version: &input.profile_version,
+            goals_version: input.goals_version,
+            rules_version: RULES_VERSION,
+        }),
+    }
 }
 
 fn add_one(count: &mut u32) {
@@ -1585,7 +1635,6 @@ pub(crate) async fn run(
     } else {
         None
     };
-    let terms = preselect_terms(&input);
     let reading = read_sources(
         deps,
         reader,
@@ -1594,7 +1643,7 @@ pub(crate) async fn run(
         now,
         fresh_since,
         &queries,
-        &terms,
+        &input,
         first_seen_since,
     )
     .await?;
@@ -1603,6 +1652,10 @@ pub(crate) async fn run(
     let (store_ids, store_ranks) = (reading.ids, reading.ranks);
     done.from_sites = reading.from_sites;
     done.from_company_pages = reading.from_company_pages;
+    let outside = reading.outside;
+    done.left.too_old = done.left.too_old.saturating_add(outside.too_old);
+    done.left.not_remote = done.left.not_remote.saturating_add(outside.not_remote);
+    done.left.preselect = done.left.preselect.saturating_add(outside.not_closest);
     let mut jobs = reading.jobs;
     let mut tallies: HashMap<String, Tally> = scanned
         .iter()
@@ -1614,7 +1667,7 @@ pub(crate) async fn run(
     if !spent_out(&spend(deps, db, account, now).await?) {
         watched.reading = watch::check::read_due(deps, reader, db, account, now).await?;
     }
-    done.fetched = jobs.len() + watched.reading.jobs.len();
+    done.fetched = jobs.len() + outside.total() + watched.reading.jobs.len();
     progress(db, id, &done).await?;
     if jobs.is_empty() && watched.reading.jobs.is_empty() && failed > 0 {
         let now = deps.clock.now();
@@ -2142,19 +2195,13 @@ pub(crate) async fn nightly(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
         // search looks at no others), and what their queries found.
         let new: Vec<Job> = if deps.config.store() {
             let since = last_search(db, account, now).await?;
-            store::pool(
-                db,
-                &store::PoolQuery {
-                    sites: &site_ids,
-                    first_seen_since: since,
-                    text: &[],
-                },
-                now,
-            )
-            .await?
-            .into_iter()
-            .map(|stored| stored.job.into_job())
-            .collect()
+            let terms = preselect_terms(&input);
+            let query = pool_query(deps, &input, account, &site_ids, since, &terms);
+            store::pool(db, &query, now)
+                .await?
+                .into_iter()
+                .map(|stored| stored.job.into_job())
+                .collect()
         } else {
             Vec::new()
         };

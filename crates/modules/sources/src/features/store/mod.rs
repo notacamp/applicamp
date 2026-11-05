@@ -69,8 +69,8 @@ use crate::{
 
 pub use keep::{Cleaned, Kept, Limits, clean};
 pub use read::{
-    MAX_LIMIT, POOL_MAX, PoolJob, PoolQuery, StoreQuery, StoredJob, descriptions, find, pool,
-    text_query, unscored,
+    MAX_LIMIT, POOL_CEILING, POOL_DEFAULT, PoolCounts, PoolJob, PoolQuery, ScoredFor, StoreQuery,
+    StoredJob, descriptions, find, pool, pool_counts, text_query, unscored,
 };
 
 /// The time between two ticks.

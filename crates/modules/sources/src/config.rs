@@ -50,6 +50,7 @@
 //! | `APPLICAMP_SOURCES__NIGHTLY` | `true` (21:00 Europe/Lisbon) |
 //! | `APPLICAMP_SOURCES__WATCH_EVERY_SECS` | `72000` (a watched company's board is read at most this often; `0` reads it in every search) |
 //! | `APPLICAMP_SOURCES__FULL_SCORES_PER_SEARCH` | `100` (jobs one search reads in full, at most, the best of its quick looks) |
+//! | `APPLICAMP_SOURCES__SEARCH_POOL` | `3000` (jobs of the store one search loads into memory, at most: the highest ranked by the database, with the cheap hard limits applied there; the rest count as not among the closest) |
 //! | `APPLICAMP_SOURCES__QUICK_LOOK_PER_SEARCH` | `400` (jobs from the store one search gives a quick look, at most: the closest to the person's roles and skills, found without a model; a nightly search looks only at jobs the store first saw since the person's last search) |
 
 use std::path::PathBuf;
@@ -130,6 +131,9 @@ pub struct SourcesConfig {
     /// Jobs one search reads in full, at most.
     #[serde(default, deserialize_with = "number")]
     pub full_scores_per_search: Option<u64>,
+    /// Jobs of the store one search loads, at most.
+    #[serde(default, deserialize_with = "number")]
+    pub search_pool: Option<u64>,
     /// Jobs of the store one search gives a quick look, at most.
     #[serde(default, deserialize_with = "number")]
     pub quick_look_per_search: Option<u64>,
@@ -269,6 +273,7 @@ impl Default for SourcesConfig {
             nightly: None,
             watch_every_secs: None,
             full_scores_per_search: None,
+            search_pool: None,
             quick_look_per_search: None,
             workable_url: workable_url(),
             recruitee_url: recruitee_url(),
@@ -606,6 +611,11 @@ impl SourcesConfig {
         usize::try_from(self.full_scores_per_search.unwrap_or(100).max(1)).unwrap_or(100)
     }
 
+    /// Jobs of the store one search loads into memory, at most (at least one).
+    pub fn search_pool(&self) -> i64 {
+        i64::try_from(self.search_pool.unwrap_or(3_000).max(1)).unwrap_or(3_000)
+    }
+
     /// Jobs of the store one search gives a quick look, at most: the ones
     /// closest to the person's roles and skills (at least one).
     pub fn quick_look_per_search(&self) -> usize {
@@ -710,6 +720,7 @@ mod tests {
         assert!(config.nightly());
         assert_eq!(config.full_scores_per_search(), 100);
         assert_eq!(config.quick_look_per_search(), 400);
+        assert_eq!(config.search_pool(), 3_000);
         assert!(config.store());
         assert_eq!(config.store_reads_per_minute(), 60);
         assert_eq!(config.store_parallel(), 8);
@@ -756,6 +767,7 @@ mod tests {
             "nightly": "false",
             "full_scores_per_search": "20",
             "quick_look_per_search": "50",
+            "search_pool": "500",
         }}))
         .unwrap();
         assert!(config.is_enabled("greenhouse"));
@@ -771,6 +783,7 @@ mod tests {
         assert!(!config.nightly());
         assert_eq!(config.full_scores_per_search(), 20);
         assert_eq!(config.quick_look_per_search(), 50);
+        assert_eq!(config.search_pool(), 500);
         let err = load(serde_json::json!({ "sources": { "enabled": "Linked In" } })).unwrap_err();
         assert!(err.contains("linked in"), "{err}");
     }

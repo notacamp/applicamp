@@ -1184,6 +1184,135 @@ impl Reader {
         reads
     }
 
+    /// What the person's own queries (their roles and top skills) find on
+    /// the boards of `rows` that search by keyword: one page for each query,
+    /// and nothing else, since the job store already reads every board's
+    /// default feed. A board that cannot search is not read. Reads are kept
+    /// for the board's polling interval, stretched to its daily limit, and
+    /// leave `last_fetch_at` alone (the store's schedule is not touched).
+    pub async fn job_board_queries(
+        &self,
+        db: &PgPool,
+        rows: &[BoardRow],
+        now: DateTime<Utc>,
+        queries: &[String],
+    ) -> Vec<BoardRead> {
+        let mut reads = Vec::new();
+        for row in rows
+            .iter()
+            .filter(|r| self.inner.config.is_enabled(&r.slug))
+        {
+            let Ok(config) = row.config() else { continue };
+            if row.kind() != Some(Kind::JsonApi) {
+                continue;
+            }
+            let asked = query_values(&config, queries);
+            if asked.is_empty() {
+                continue;
+            }
+            let started = Instant::now();
+            let board = BoardRef::of(row);
+            let result = self
+                .queries_only(db, row, &config, &board, now, &asked)
+                .await;
+            let duration_ms = u32::try_from(started.elapsed().as_millis()).unwrap_or(u32::MAX);
+            let (jobs, outcome, error, partial) = match result {
+                Ok(read) => {
+                    if let Some(secs) = read.slow_down {
+                        let wait = secs
+                            .map_or(BACKOFF.0, Duration::from_secs)
+                            .max(config.poll().to_std().unwrap_or(BACKOFF.0))
+                            .min(BACKOFF.1);
+                        let until = chrono::TimeDelta::from_std(wait).ok().map(|d| now + d);
+                        if let Err(e) =
+                            job_boards::record_fetch(db, row.id, now, None, None, until).await
+                        {
+                            tracing::warn!(board = %row.slug, error = %e, "a job board's backoff could not be kept");
+                        }
+                    }
+                    (read.jobs, Outcome::Read, None, read.partial)
+                }
+                Err(e) => {
+                    let kind = e.kind();
+                    tracing::info!(board = %row.slug, error = %kind, "a job board's queries could not be read");
+                    (Vec::new(), Outcome::Error, Some(kind), None)
+                }
+            };
+            reads.push(BoardRead {
+                board,
+                jobs,
+                outcome,
+                error,
+                duration_ms,
+                partial,
+            });
+        }
+        reads
+    }
+
+    /// The jobs the queries `asked` find on `row`, each as its own address.
+    async fn queries_only(
+        &self,
+        db: &PgPool,
+        row: &BoardRow,
+        config: &BoardConfig,
+        board: &BoardRef,
+        now: DateTime<Utc>,
+        asked: &[String],
+    ) -> Result<ApiRead, FetchError> {
+        if row.backoff_until.is_some_and(|until| until > now) {
+            return Err(FetchError::BackingOff);
+        }
+        let kind = row.kind().ok_or(FetchError::BadConfig)?;
+        config.validate(kind).map_err(|_| FetchError::BadConfig)?;
+        let secret =
+            board_keys::query(self.keys(), row, config).map_err(|_| FetchError::NeedsKey)?;
+        let mut ttl = config.poll().to_std().unwrap_or(Duration::from_secs(3_600));
+        if let Some(per_day) = row.terms().max_fetches_per_day.filter(|n| *n > 0) {
+            ttl = stack_ttl(ttl, per_day, asked.len());
+        }
+        let mut read = ApiRead {
+            jobs: Vec::new(),
+            cached: true,
+            partial: None,
+            slow_down: None,
+        };
+        let mut first = true;
+        for value in asked {
+            let Some(extra) = config.for_skill(value) else {
+                break;
+            };
+            match self
+                .json_api(db, &extra, board, ttl, &secret, None, &row.slug)
+                .await
+            {
+                Ok(more) => {
+                    read.cached &= more.cached;
+                    read.jobs.extend(more.jobs);
+                    first = false;
+                    if more.slow_down.is_some() {
+                        read.slow_down = more.slow_down;
+                        break;
+                    }
+                }
+                Err(FetchError::RateLimited(secs)) => {
+                    read.slow_down = Some(secs);
+                    break;
+                }
+                // The first query failing fails the read; later ones keep
+                // what was found.
+                Err(e) if first => return Err(e),
+                Err(e) => {
+                    tracing::info!(board = %row.slug, error = %e.kind(), "a board query failed");
+                    break;
+                }
+            }
+        }
+        let mut seen = std::collections::HashSet::new();
+        read.jobs.retain(|job| seen.insert(job.source_ref.clone()));
+        Ok(read)
+    }
+
     /// The jobs `row` lists now, for the job store: never from the cache,
     /// the first request conditional on `probe`'s validators, no search by
     /// skill, and every apply link noted for the company pages by the

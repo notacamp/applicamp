@@ -13886,6 +13886,12 @@
             "description": "Not remote, or not where they can work.",
             "minimum": 0
           },
+          "preselect": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Not among the closest to their roles and skills today, so not given\na quick look (found without a model, from the words of the title,\nthe company and the site's tags, and how new it is).",
+            "minimum": 0
+          },
           "quick_look": {
             "type": "integer",
             "format": "int32",
@@ -17742,6 +17748,24 @@
           "kept_with_note"
         ],
         "properties": {
+          "from_company_pages": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Company pages the job store gave this search jobs from.",
+            "minimum": 0
+          },
+          "from_sites": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Job sites the job store gave this search jobs from; none for a search\nfrom before searches read the store.",
+            "minimum": 0
+          },
           "good_matches": {
             "type": "integer",
             "format": "int32",

@@ -4670,6 +4670,13 @@ export interface components {
             not_remote?: number;
             /**
              * Format: int32
+             * @description Not among the closest to their roles and skills today, so not given
+             *     a quick look (found without a model, from the words of the title,
+             *     the company and the site's tags, and how new it is).
+             */
+            preselect?: number;
+            /**
+             * Format: int32
              * @description Not among the best at the quick look.
              */
             quick_look?: number;
@@ -6172,6 +6179,17 @@ export interface components {
         };
         /** @description What a search did with the jobs it read, for the Searches tab. */
         SearchFunnel: {
+            /**
+             * Format: int32
+             * @description Company pages the job store gave this search jobs from.
+             */
+            from_company_pages?: number | null;
+            /**
+             * Format: int32
+             * @description Job sites the job store gave this search jobs from; none for a search
+             *     from before searches read the store.
+             */
+            from_sites?: number | null;
             /**
              * Format: int32
              * @description Good matches added to the person's jobs.

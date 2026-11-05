@@ -1,0 +1,11 @@
+# Tasks
+- [x] 1 migration: sites and company pages read, expected cost on the search
+- [x] 2 store pool query with full-text rank and the nightly "new since" filter; descriptions read apart
+- [x] 3 live reads reduced to the person's queries (`Reader::job_board_queries`)
+- [x] 4 search: candidates from the store, preselect, expected cost, funnel reason, scan lines per On site
+- [x] 5 nightly: new store jobs without a score always start a search
+- [x] 6 estimate counts the store's unscored jobs
+- [x] 7 settings: `QUICK_LOOK_PER_SEARCH` added, `SEARCH_COMPANY_PAGES` removed; docs
+- [x] 8 Searches tab: the new reason and the "read from" line in four languages
+- [x] 9 tests: the pool, the funnel from the store, the nightly rule; the e2e waits for the store
+- [x] 10 OpenAPI and client types, changelog, gates green in CI, recording

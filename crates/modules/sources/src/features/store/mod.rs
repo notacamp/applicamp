@@ -68,7 +68,10 @@ use crate::{
 };
 
 pub use keep::{Cleaned, Kept, Limits, clean};
-pub use read::{MAX_LIMIT, StoreQuery, StoredJob, find, text_query};
+pub use read::{
+    MAX_LIMIT, POOL_CEILING, POOL_DEFAULT, PoolCounts, PoolJob, PoolQuery, ScoredFor, StoreQuery,
+    StoredJob, descriptions, find, pool, pool_counts, text_query, unscored,
+};
 
 /// The time between two ticks.
 pub const TICK_EVERY: TimeDelta = TimeDelta::seconds(60);
@@ -474,6 +477,16 @@ async fn read_one(
             };
             let status = if full { "ok" } else { "partial" };
             job_boards::record_fetch(db, row.id, now, Some(jobs.len()), None, None).await?;
+            // What a site lists (its average pay, how well its jobs fit the
+            // skills asked for) is kept by the store's read, since searches
+            // no longer read the site.
+            if !page
+                && let Err(e) =
+                    job_boards::keep_listed(db, row.id, &crate::readers::listed(&jobs), false, now)
+                        .await
+            {
+                tracing::warn!(error = %e, "a site's listing could not be kept");
+            }
             record(
                 db,
                 row.id,

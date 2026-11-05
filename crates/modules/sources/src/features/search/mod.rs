@@ -41,9 +41,10 @@ use uuid::Uuid;
 use crate::{
     SourcesDeps, boards, dedupe,
     events::SearchFinished,
-    features::watch,
+    features::{my_sites, store, watch},
     job::{Job, WorkMode},
-    job_boards, lisbon,
+    job_boards::{self, BoardRow},
+    lisbon,
     matching::{self, MatchInput, Out},
     ports::{Attach, OwnBoard, Scored},
     quick::{self, Look},
@@ -203,6 +204,11 @@ pub struct JobsLeftOut {
     /// Not among the best at the quick look.
     #[serde(default)]
     pub quick_look: u32,
+    /// Not among the closest to their roles and skills today, so not given
+    /// a quick look (found without a model, from the words of the title,
+    /// the company and the site's tags, and how new it is).
+    #[serde(default)]
+    pub preselect: u32,
     /// In a language they don't work in.
     #[serde(default)]
     pub language: u32,
@@ -229,6 +235,7 @@ impl JobsLeftOut {
             self.too_old,
             self.not_remote,
             self.quick_look,
+            self.preselect,
             self.language,
             self.not_open_to_location,
             self.below_floor,
@@ -272,6 +279,11 @@ fn add(count: &mut u32, n: usize) {
 pub struct SearchFunnel {
     /// Jobs read from the sites.
     pub read: u32,
+    /// Job sites the job store gave this search jobs from; none for a search
+    /// from before searches read the store.
+    pub from_sites: Option<u32>,
+    /// Company pages the job store gave this search jobs from.
+    pub from_company_pages: Option<u32>,
     /// Jobs given a quick look.
     pub quick_looked: u32,
     /// Jobs read in full.
@@ -294,6 +306,8 @@ pub(crate) fn funnel_of(row: &scans::RunRow) -> SearchFunnel {
     let n = |v: Option<i32>| v.and_then(|v| u32::try_from(v).ok()).unwrap_or(0);
     SearchFunnel {
         read: n(row.fetched),
+        from_sites: row.from_sites.and_then(|v| u32::try_from(v).ok()),
+        from_company_pages: row.from_company_pages.and_then(|v| u32::try_from(v).ok()),
         quick_looked: n(row.quick_looked),
         // A search from before the funnel: what it scored.
         read_in_full: n(row.read_in_full.or(row.scored)),
@@ -613,7 +627,7 @@ pub async fn estimate(
     let last = latest_row(&state.db, account)
         .await?
         .filter(|row| row.status == "finished");
-    let jobs = last
+    let previous = last
         .as_ref()
         .map_or(slots, |row| usize::try_from(row.kept).unwrap_or(0));
     let quick_looked: Option<i32> = match &last {
@@ -625,31 +639,72 @@ pub async fn estimate(
         }
         None => None,
     };
-    let calls = calls_for(
-        jobs,
-        slots,
-        quick_looked.and_then(|n| usize::try_from(n).ok()),
-    );
+    // The jobs of the store that have no score for this person yet: what a
+    // search would give a quick look, the closest first, at most
+    // `QUICK_LOOK_PER_SEARCH`.
+    let mut looks = 0_usize;
+    if deps.config.store()
+        && let Some(neighbours) = &deps.neighbours
+        && let Some(input) = neighbours.matching_input(&state.db, account, now).await?
+    {
+        let sites: Vec<Uuid> = on_sites(&deps, &state.db, account, &input, now)
+            .await?
+            .iter()
+            .map(|row| row.id)
+            .collect();
+        let unscored = store::unscored(
+            &state.db,
+            account,
+            &sites,
+            (&input.profile_version, input.goals_version, RULES_VERSION),
+            now,
+        )
+        .await?;
+        looks = usize::try_from(unscored)
+            .unwrap_or(usize::MAX)
+            .min(deps.config.quick_look_per_search());
+    }
+    let (jobs, calls) = if looks > 0 {
+        (
+            looks,
+            calls_for(looks.max(previous.min(slots)), slots, Some(looks)),
+        )
+    } else {
+        (
+            previous,
+            calls_for(
+                previous,
+                slots,
+                quick_looked.and_then(|n| usize::try_from(n).ok()),
+            ),
+        )
+    };
+    let per_batch = per_batch_usd(&deps, &state.db, account).await?;
+    // A few dozen calls: exact as f64.
+    let cost_eur = calls as f64 * per_batch * usd_to_eur(&deps);
+    Ok(Json(SearchEstimate {
+        jobs: u32::try_from(jobs).unwrap_or(u32::MAX),
+        cost_eur,
+        confirm: cost_eur > CONFIRM_ABOVE_EUR,
+        spend: spend(&deps, &state.db, account, now).await?,
+    }))
+}
+
+/// What one model call has cost `account` on average, in dollars (a typical
+/// call's price before there is any history).
+async fn per_batch_usd(deps: &SourcesDeps, db: &PgPool, account: Uuid) -> Result<f64> {
     let (cost, batches): (f64, i64) = sqlx::query_as(
         "SELECT coalesce(sum(cost_usd), 0)::float8, coalesce(sum(batches), 0)::bigint
            FROM sources.searches WHERE account_id = $1 AND batches > 0",
     )
     .bind(account)
-    .fetch_one(&state.db)
+    .fetch_one(db)
     .await?;
-    let per_batch = if batches > 0 {
+    Ok(if batches > 0 {
         cost / batches as f64
     } else {
-        typical_batch_usd(&deps)
-    };
-    // A few dozen calls: exact as f64.
-    let cost_eur = calls as f64 * per_batch * usd_to_eur(&deps);
-    Ok(Json(SearchEstimate {
-        jobs: u32::try_from(jobs).unwrap_or(0),
-        cost_eur,
-        confirm: cost_eur > CONFIRM_ABOVE_EUR,
-        spend: spend(&deps, &state.db, account, now).await?,
-    }))
+        typical_batch_usd(deps)
+    })
 }
 
 /// Runs one search. Enqueued by "Search now" and by the nightly search.
@@ -698,7 +753,8 @@ async fn progress(db: &PgPool, id: Uuid, fields: &Progress) -> Result<()> {
     sqlx::query(
         "UPDATE sources.searches
             SET fetched = $2, kept = $3, scored = $4, batches = $5, cost_usd = $6, dropped = $7,
-                not_grounded = $8, quick_looked = $9, read_in_full = $10
+                not_grounded = $8, quick_looked = $9, read_in_full = $10, from_sites = $11,
+                from_company_pages = $12, expected_cost_usd = $13
           WHERE id = $1",
     )
     .bind(id)
@@ -711,6 +767,9 @@ async fn progress(db: &PgPool, id: Uuid, fields: &Progress) -> Result<()> {
     .bind(int(fields.not_grounded))
     .bind(int(fields.quick_looked))
     .bind(int(fields.read_in_full))
+    .bind(int(fields.from_sites))
+    .bind(int(fields.from_company_pages))
+    .bind(fields.expected_cost_usd)
     .execute(db)
     .await?;
     Ok(())
@@ -737,6 +796,11 @@ struct Progress {
     kept_with_gap: usize,
     /// Why the other jobs read were left out.
     left: JobsLeftOut,
+    /// Job sites and company pages the store gave jobs from.
+    from_sites: usize,
+    from_company_pages: usize,
+    /// What the quick looks and full reads were expected to cost, in dollars.
+    expected_cost_usd: Option<f64>,
 }
 
 /// End the search: its counts, why it stopped, and `sources.search_finished`.
@@ -1009,25 +1073,130 @@ pub(crate) struct Reading {
     pub boards: Vec<Scanned>,
     /// Boards (and pages) that could not be read.
     pub failed: u32,
+    /// Job sites the store gave jobs from.
+    pub from_sites: usize,
+    /// Company pages the store gave jobs from.
+    pub from_company_pages: usize,
+    /// The store's row of each job that came from it, by job key.
+    pub ids: HashMap<(String, String), Uuid>,
+    /// How close each of those is to the person's roles and skills.
+    pub ranks: HashMap<(String, String), f32>,
+    /// Jobs of the store the database left out, so the funnel adds up: too
+    /// old, not a way of working they want, and past the pool's limit.
+    pub outside: Outside,
 }
 
-/// Read the approved job boards (asking the ones that search by keyword for
-/// `queries`), and the company boards when they are on.
-pub(crate) async fn read_sources(
+/// Jobs of the store a search did not load, by why.
+#[derive(Debug, Default, Clone, Copy)]
+pub(crate) struct Outside {
+    pub too_old: u32,
+    pub not_remote: u32,
+    pub not_closest: u32,
+}
+
+impl Outside {
+    pub(crate) fn total(&self) -> usize {
+        [self.too_old, self.not_remote, self.not_closest]
+            .into_iter()
+            .map(|n| n as usize)
+            .sum()
+    }
+}
+
+/// `n` as a count that cannot be negative or overflow.
+fn clamp_u32(n: i64) -> u32 {
+    u32::try_from(n.max(0)).unwrap_or(u32::MAX)
+}
+
+/// Every approved job site the instance reads.
+pub(crate) async fn all_sites(deps: &SourcesDeps, db: &PgPool) -> Result<Vec<BoardRow>> {
+    Ok(job_boards::approved(db)
+        .await?
+        .into_iter()
+        .filter(|row| deps.config.is_enabled(&row.slug))
+        .collect())
+}
+
+/// The job sites `account` has On: the app's defaults are set from their
+/// profile and goals first (never over a choice of theirs), then the sites
+/// they have On, in the registry's order.
+pub(crate) async fn on_sites(
+    deps: &SourcesDeps,
+    db: &PgPool,
+    account: Uuid,
+    input: &MatchInput,
+    now: DateTime<Utc>,
+) -> Result<Vec<BoardRow>> {
+    my_sites::ensure_defaults(db, account, input, now).await?;
+    let on: HashSet<Uuid> = my_sites::on_sites(db, account).await?.into_iter().collect();
+    Ok(all_sites(deps, db)
+        .await?
+        .into_iter()
+        .filter(|row| on.contains(&row.id))
+        .collect())
+}
+
+/// The words of the person's roles and skills the store's full-text rank
+/// looks for in a title, a company and a site's tags: each wanted role's key
+/// words (the roles they had when they named none), then the top skills.
+pub(crate) fn preselect_terms(input: &MatchInput) -> Vec<String> {
+    let wanted = if input.roles.is_empty() {
+        &input.titles
+    } else {
+        &input.roles
+    };
+    let mut terms: Vec<String> = wanted
+        .iter()
+        .filter_map(|role| matching::role_words(role))
+        .take(5)
+        .collect();
+    for skill in matching::top_skills(&input.skills) {
+        let mut words: Vec<String> = matching::words(skill).into_iter().collect();
+        words.sort();
+        if !words.is_empty() {
+            terms.push(words.join(" "));
+        }
+    }
+    terms
+}
+
+/// When `account`'s last finished search before `before` started.
+pub(crate) async fn last_search(
+    db: &PgPool,
+    account: Uuid,
+    before: DateTime<Utc>,
+) -> Result<Option<DateTime<Utc>>> {
+    Ok(sqlx::query_scalar(
+        "SELECT max(started_at) FROM sources.searches
+          WHERE account_id = $1 AND status = 'finished' AND started_at < $2",
+    )
+    .bind(account)
+    .bind(before)
+    .fetch_one(db)
+    .await?)
+}
+
+/// Read what the store does not hold: the person's own queries (their roles
+/// and top skills) on the sites that search by keyword, and the company
+/// boards when they are on. With the store off, the sites are read live in
+/// full, as before the store.
+pub(crate) async fn read_live(
     deps: &SourcesDeps,
     reader: &Reader,
     db: &PgPool,
+    rows: &[BoardRow],
     now: DateTime<Utc>,
     fresh_since: DateTime<Utc>,
     queries: &[String],
 ) -> Result<Reading> {
-    let rows = job_boards::approved(db).await?;
     let mut reading = Reading::default();
     let mut jobs = Vec::new();
-    for read in reader
-        .job_boards(db, &rows, now, fresh_since, queries)
-        .await
-    {
+    let reads = if deps.config.store() {
+        reader.job_board_queries(db, rows, now, queries).await
+    } else {
+        reader.job_boards(db, rows, now, fresh_since, queries).await
+    };
+    for read in reads {
         if read.outcome == Outcome::Error {
             reading.failed += 1;
         }
@@ -1047,8 +1216,137 @@ pub(crate) async fn read_sources(
         reading.failed += fetched.failed;
         jobs.extend(fetched.jobs);
     }
+    reading.jobs = jobs;
+    Ok(reading)
+}
+
+/// The jobs a search draws from: the store's (the person's On sites and every
+/// company page; with `first_seen_since`, only jobs the store first saw
+/// after it) and what their own queries find live, once each, the same job
+/// on several sites merged. One line per On site for the Scanned view.
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn read_sources(
+    deps: &SourcesDeps,
+    reader: &Reader,
+    db: &PgPool,
+    account: Uuid,
+    now: DateTime<Utc>,
+    fresh_since: DateTime<Utc>,
+    queries: &[String],
+    input: &MatchInput,
+    first_seen_since: Option<DateTime<Utc>>,
+) -> Result<Reading> {
+    let rows = on_sites(deps, db, account, input, now).await?;
+    let mut reading = read_live(deps, reader, db, &rows, now, fresh_since, queries).await?;
+    let mut jobs = std::mem::take(&mut reading.jobs);
+    if deps.config.store() {
+        let sites: Vec<Uuid> = rows.iter().map(|row| row.id).collect();
+        let terms = preselect_terms(input);
+        let query = pool_query(deps, input, account, &sites, first_seen_since, &terms);
+        // What the database leaves out is counted, not loaded: the pool is
+        // its best few thousand (`SEARCH_POOL`), ranked and limited in SQL.
+        let counts = store::pool_counts(db, &query, now).await?;
+        let pool = store::pool(db, &query, now).await?;
+        reading.outside = Outside {
+            too_old: clamp_u32(counts.too_old),
+            not_remote: clamp_u32(counts.not_wanted),
+            not_closest: clamp_u32(counts.passing() - i64::try_from(pool.len()).unwrap_or(0)),
+        };
+        let mut per_site: HashMap<Uuid, u32> = HashMap::new();
+        let mut pages: HashSet<Uuid> = HashSet::new();
+        for stored in pool {
+            if stored.job.board_kind == "company_page" {
+                pages.insert(stored.job.board_id);
+            } else {
+                add_one(per_site.entry(stored.job.board_id).or_default());
+            }
+            let (id, rank) = (stored.job.id, stored.rank);
+            let job = stored.job.into_job();
+            reading.ids.insert(job.key(), id);
+            reading.ranks.insert(job.key(), rank);
+            jobs.push(job);
+        }
+        reading.from_sites = per_site.len();
+        reading.from_company_pages = pages.len();
+        // One line for every On site: what the store gave, and what its own
+        // queries gave live.
+        let mut lines: Vec<Scanned> = Vec::with_capacity(rows.len());
+        for row in &rows {
+            let from_store = per_site.get(&row.id).copied().unwrap_or(0);
+            match reading.boards.iter().position(|s| s.board.id == row.id) {
+                Some(at) => {
+                    let mut line = reading.boards.swap_remove(at);
+                    line.read = line.read.saturating_add(from_store);
+                    lines.push(line);
+                }
+                None => lines.push(Scanned {
+                    board: crate::readers::mapping::BoardRef::of(row),
+                    outcome: Outcome::Read,
+                    error: None,
+                    duration_ms: 0,
+                    read: from_store,
+                    partial: None,
+                }),
+            }
+        }
+        reading.boards = lines;
+    }
     reading.jobs = dedupe::merge(unique(jobs));
     Ok(reading)
+}
+
+/// What the pool asks the database for.
+fn pool_query<'a>(
+    deps: &SourcesDeps,
+    input: &'a MatchInput,
+    account: Uuid,
+    sites: &'a [Uuid],
+    first_seen_since: Option<DateTime<Utc>>,
+    terms: &'a [String],
+) -> store::PoolQuery<'a> {
+    store::PoolQuery {
+        sites,
+        first_seen_since,
+        text: terms,
+        limit: deps.config.search_pool(),
+        work_modes: &input.work_modes,
+        scored: Some(store::ScoredFor {
+            account,
+            profile_version: &input.profile_version,
+            goals_version: input.goals_version,
+            rules_version: RULES_VERSION,
+        }),
+    }
+}
+
+fn add_one(count: &mut u32) {
+    *count = count.saturating_add(1);
+}
+
+/// Fill in the description of every job of `jobs` that came from the store
+/// and does not carry it yet (a pool leaves them out).
+async fn hydrate<'a>(
+    db: &PgPool,
+    ids: &HashMap<(String, String), Uuid>,
+    jobs: impl Iterator<Item = &'a mut Job>,
+) -> Result<()> {
+    let jobs: Vec<&mut Job> = jobs
+        .filter(|job| job.description.is_empty() && ids.contains_key(&job.key()))
+        .collect();
+    let wanted: Vec<Uuid> = jobs
+        .iter()
+        .filter_map(|job| ids.get(&job.key()).copied())
+        .collect();
+    if wanted.is_empty() {
+        return Ok(());
+    }
+    let found = store::descriptions(db, &wanted).await?;
+    for job in jobs {
+        if let Some(text) = ids.get(&job.key()).and_then(|id| found.get(id)) {
+            job.description.clone_from(text);
+        }
+    }
+    Ok(())
 }
 
 /// What one search did on one board.
@@ -1343,9 +1641,34 @@ pub(crate) async fn run(
     } else {
         (row.started_at, input.queries.clone())
     };
-    let reading = read_sources(deps, reader, db, now, fresh_since, &queries).await?;
+    // A nightly search looks only at jobs the store first saw since this
+    // person's last search; "Search now" at every job it holds.
+    let first_seen_since = if row.trigger == "nightly" {
+        last_search(db, account, row.started_at).await?
+    } else {
+        None
+    };
+    let reading = read_sources(
+        deps,
+        reader,
+        db,
+        account,
+        now,
+        fresh_since,
+        &queries,
+        &input,
+        first_seen_since,
+    )
+    .await?;
     let failed = reading.failed;
     let scanned = reading.boards;
+    let (store_ids, store_ranks) = (reading.ids, reading.ranks);
+    done.from_sites = reading.from_sites;
+    done.from_company_pages = reading.from_company_pages;
+    let outside = reading.outside;
+    done.left.too_old = done.left.too_old.saturating_add(outside.too_old);
+    done.left.not_remote = done.left.not_remote.saturating_add(outside.not_remote);
+    done.left.preselect = done.left.preselect.saturating_add(outside.not_closest);
     let mut jobs = reading.jobs;
     let mut tallies: HashMap<String, Tally> = scanned
         .iter()
@@ -1357,7 +1680,7 @@ pub(crate) async fn run(
     if !spent_out(&spend(deps, db, account, now).await?) {
         watched.reading = watch::check::read_due(deps, reader, db, account, now).await?;
     }
-    done.fetched = jobs.len() + watched.reading.jobs.len();
+    done.fetched = jobs.len() + outside.total() + watched.reading.jobs.len();
     progress(db, id, &done).await?;
     if jobs.is_empty() && watched.reading.jobs.is_empty() && failed > 0 {
         let now = deps.clock.now();
@@ -1451,13 +1774,47 @@ pub(crate) async fn run(
         }
     }
     done.scored = scored.len();
+
+    // The store can hold tens of thousands of jobs: before any model call,
+    // only the closest to the person's roles and skills that have no look
+    // yet go on to a quick look (the words of the title, the company and the
+    // site's tags, then how new), at most `QUICK_LOOK_PER_SEARCH`. The rest
+    // are left for a later search; a job already looked at keeps competing
+    // for a full read at no cost.
+    let cap = deps.config.quick_look_per_search();
+    let mut fresh: Vec<((String, String), f32)> = unread
+        .iter()
+        .map(Job::key)
+        .filter(|key| !cache.quick.contains_key(key))
+        .filter_map(|key| store_ranks.get(&key).map(|rank| (key, *rank)))
+        .collect();
+    fresh.sort_by(|(ka, a), (kb, b)| b.total_cmp(a).then_with(|| ka.cmp(kb)));
+    let cut: HashSet<(String, String)> = fresh
+        .split_off(fresh.len().min(cap))
+        .into_iter()
+        .map(|(key, _)| key)
+        .collect();
+    if !cut.is_empty() {
+        unread.retain(|job| !cut.contains(&job.key()));
+        add(&mut done.left.preselect, cut.len());
+    }
+    let chosen: HashSet<(String, String)> = fresh.into_iter().map(|(key, _)| key).collect();
+    hydrate(
+        db,
+        &store_ids,
+        unread.iter_mut().filter(|job| chosen.contains(&job.key())),
+    )
+    .await?;
     progress(db, id, &done).await?;
 
     let started = std::time::Instant::now();
     let mut calls = Calls::default();
     let slots = deps.config.full_scores_per_search();
+    let per_batch = per_batch_usd(deps, db, account).await?;
     if unread.len() <= slots {
         // Every one is read in full: a quick look would change nothing.
+        let expected = calls_for(unread.len() + to_read.len(), slots, Some(0)) as f64 * per_batch;
+        done.expected_cost_usd = Some(expected);
         to_read.extend(unread);
     } else {
         // A quick look at every one without one, 25 a call, the most
@@ -1468,6 +1825,16 @@ pub(crate) async fn run(
             .map(|job| cache.quick.get(&job.key()).map(|fit| (*fit, false)))
             .collect();
         let look_at: Vec<usize> = (0..unread.len()).filter(|i| fits[*i].is_none()).collect();
+        // What the quick looks and the full reads are expected to cost, from
+        // what a call has cost this person on average.
+        let expected =
+            calls_for(unread.len() + to_read.len(), slots, Some(look_at.len())) as f64 * per_batch;
+        done.expected_cost_usd = Some(expected);
+        tracing::info!(
+            quick_looks = look_at.len(),
+            expected_cost_usd = expected,
+            "a search's expected cost"
+        );
         let mut queue: std::collections::VecDeque<(&[usize], bool)> = look_at
             .chunks(quick::BATCH)
             .map(|batch| (batch, true))
@@ -1554,6 +1921,7 @@ pub(crate) async fn run(
     }
 
     // Read the chosen ones in full, ten at a time, within the limits.
+    hydrate(db, &store_ids, to_read.iter_mut()).await?;
     if calls.stopped.is_none() {
         for job in &mut to_read {
             if let Err(e) = reader.describe(db, job).await {
@@ -1692,7 +2060,13 @@ pub(crate) async fn run(
         keep.truncate(MAX_ADDED);
     }
     done.kept_with_gap = keep.iter().filter(|(_, noted)| *noted).count();
-    let keep: Vec<Scored> = keep.into_iter().map(|(scored, _)| scored).collect();
+    let mut keep: Vec<Scored> = keep.into_iter().map(|(scored, _)| scored).collect();
+    hydrate(
+        db,
+        &store_ids,
+        keep.iter_mut().map(|scored| &mut scored.job),
+    )
+    .await?;
     for scored in &keep {
         for t in tally(&mut tallies, &scored.job) {
             t.matched += 1;
@@ -1810,9 +2184,16 @@ pub(crate) async fn nightly(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
     // cache (within each board's polling interval), with the same queries.
     let now = deps.clock.now();
     let queries = night_queries(neighbours.as_ref(), db, &accounts, now).await?;
-    let jobs = read_sources(deps, reader, db, now, now, &queries)
-        .await?
-        .jobs;
+    // The store has the sites' own feeds already; what is read here is the
+    // night's queries, so each search finds them in the cache.
+    // The night's queries are asked of every site: each person's own On
+    // sites use the cached answers.
+    let sites = all_sites(deps, db).await?;
+    let jobs = dedupe::merge(unique(
+        read_live(deps, reader, db, &sites, now, now, &queries)
+            .await?
+            .jobs,
+    ));
     let mut started = 0_u32;
     for account in accounts {
         let now = deps.clock.now();
@@ -1824,8 +2205,28 @@ pub(crate) async fn nightly(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
         }
         let known = neighbours.known_jobs(db, account).await?;
         let cache = cached_scores(db, account, &input).await?;
-        // A job within their limits that no search looked at yet.
-        let unseen = jobs.iter().any(|job| {
+        // Jobs the store first saw since their last search (the night's
+        // search looks at no others), and what their queries found.
+        let new: Vec<Job> = if deps.config.store() {
+            let site_ids: Vec<Uuid> = on_sites(deps, db, account, &input, now)
+                .await?
+                .iter()
+                .map(|row| row.id)
+                .collect();
+            let since = last_search(db, account, now).await?;
+            let terms = preselect_terms(&input);
+            let query = pool_query(deps, &input, account, &site_ids, since, &terms);
+            store::pool(db, &query, now)
+                .await?
+                .into_iter()
+                .map(|stored| stored.job.into_job())
+                .collect()
+        } else {
+            Vec::new()
+        };
+        // A job within their limits that no search looked at yet: with no
+        // quick look or full read, it always makes the search run.
+        let unseen = jobs.iter().chain(&new).any(|job| {
             matching::hard_limit(job, &input, &known, now).is_none() && !cache.seen(job)
         });
         // A watched company's job board is read once a day, with the search.

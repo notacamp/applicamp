@@ -85,6 +85,11 @@ describe("The Searches tab", () => {
     expect(within(latest).getByTestId("scanned-good-matches")).toHaveTextContent("good matches6");
     expect(within(latest).getByTestId("scanned-cost")).toHaveTextContent("cost€0.09");
 
+    // Where the jobs came from: the store's sites and company pages.
+    expect(within(latest).getByTestId("scanned-from-store")).toHaveTextContent(
+      "Read from 4 sites and 212 company pages.",
+    );
+
     // The companies' own pages together, the most first.
     const from = within(latest).getByTestId("scanned-from");
     expect([...from.querySelectorAll("li")].map((li) => li.textContent)).toEqual([
@@ -99,7 +104,8 @@ describe("The Searches tab", () => {
     expect(reasons).toEqual([
       "Seen before · 431",
       "Not remote, or not where you can work · 245",
-      "Not a fit, from the title and summary · 305",
+      "Not a fit, from the title and summary · 205",
+      "Not among the closest to your roles today · 100",
       "In a language you don’t work in · 12",
       "Hire only in other countries · 4",
       "Pay less than you asked · 2",
@@ -219,7 +225,7 @@ describe("The Searches tab", () => {
     const latest = await screen.findByTestId("scanned-run");
     expect(latest).toHaveTextContent(/^Ontem à noite · /);
     expect(within(latest).getByTestId("scanned-left-out")).toHaveTextContent(
-      "Não servem, pelo título e pelo resumo · 305",
+      "Não servem, pelo título e pelo resumo · 205",
     );
   });
 });

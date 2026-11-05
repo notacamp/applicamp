@@ -30,7 +30,6 @@
 //! | `APPLICAMP_SOURCES__WORKABLE_LIST_TIMEOUT_SECS` | `3600` (the whole download; an idle connection is cut after 60 s) |
 //! | `APPLICAMP_SOURCES__WORKABLE_LIST_LOOKUPS` | `500` (companies whose address on Workable is looked up a day, one request each) |
 //! | `APPLICAMP_SOURCES__WORKABLE_LIST_EXCLUDE` | none: names or sites of boards Workable already integrates with, never added from the list |
-//! | `APPLICAMP_SOURCES__SEARCH_COMPANY_PAGES` | `false`: a search reads only the company pages of companies the person watches |
 //! | `APPLICAMP_SOURCES__STORE` | `true`: every approved site and company page is read on its own schedule into the job store (#89) |
 //! | `APPLICAMP_SOURCES__STORE_READS_PER_MINUTE` | `60` (reads the store starts a minute, at most, over every host; a site's own polling limit and a host's one read at a time still apply) |
 //! | `APPLICAMP_SOURCES__STORE_PARALLEL` | `8` (hosts read at once; one read at a time on each) |
@@ -51,6 +50,8 @@
 //! | `APPLICAMP_SOURCES__NIGHTLY` | `true` (21:00 Europe/Lisbon) |
 //! | `APPLICAMP_SOURCES__WATCH_EVERY_SECS` | `72000` (a watched company's board is read at most this often; `0` reads it in every search) |
 //! | `APPLICAMP_SOURCES__FULL_SCORES_PER_SEARCH` | `100` (jobs one search reads in full, at most, the best of its quick looks) |
+//! | `APPLICAMP_SOURCES__SEARCH_POOL` | `3000` (jobs of the store one search loads into memory, at most: the highest ranked by the database, with the cheap hard limits applied there; the rest count as not among the closest) |
+//! | `APPLICAMP_SOURCES__QUICK_LOOK_PER_SEARCH` | `400` (jobs from the store one search gives a quick look, at most: the closest to the person's roles and skills, found without a model; a nightly search looks only at jobs the store first saw since the person's last search) |
 
 use std::path::PathBuf;
 
@@ -130,6 +131,12 @@ pub struct SourcesConfig {
     /// Jobs one search reads in full, at most.
     #[serde(default, deserialize_with = "number")]
     pub full_scores_per_search: Option<u64>,
+    /// Jobs of the store one search loads, at most.
+    #[serde(default, deserialize_with = "number")]
+    pub search_pool: Option<u64>,
+    /// Jobs of the store one search gives a quick look, at most.
+    #[serde(default, deserialize_with = "number")]
+    pub quick_look_per_search: Option<u64>,
     /// Workable's widget API.
     #[serde(default = "workable_url")]
     pub workable_url: Url,
@@ -149,9 +156,6 @@ pub struct SourcesConfig {
     /// New company pages one daily run checks, at most.
     #[serde(default, deserialize_with = "number")]
     pub company_page_checks: Option<u64>,
-    /// A search reads the company pages of the companies the person watches.
-    #[serde(default, deserialize_with = "flag")]
-    pub search_company_pages: Option<bool>,
     /// Read every approved site and company page into the job store.
     #[serde(default, deserialize_with = "flag")]
     pub store: Option<bool>,
@@ -269,13 +273,14 @@ impl Default for SourcesConfig {
             nightly: None,
             watch_every_secs: None,
             full_scores_per_search: None,
+            search_pool: None,
+            quick_look_per_search: None,
             workable_url: workable_url(),
             recruitee_url: recruitee_url(),
             teamtailor_url: teamtailor_url(),
             personio_url: personio_url(),
             company_pages: None,
             company_page_checks: None,
-            search_company_pages: None,
             store: None,
             store_reads_per_minute: None,
             store_parallel: None,
@@ -462,12 +467,6 @@ impl SourcesConfig {
         })
     }
 
-    /// Whether a search reads the company pages of the companies the person
-    /// watches (off by default: a job store comes first).
-    pub fn search_company_pages(&self) -> bool {
-        self.search_company_pages.unwrap_or(false)
-    }
-
     /// Whether every approved site and company page is read into the job
     /// store (on by default).
     pub fn store(&self) -> bool {
@@ -611,6 +610,17 @@ impl SourcesConfig {
     pub fn full_scores_per_search(&self) -> usize {
         usize::try_from(self.full_scores_per_search.unwrap_or(100).max(1)).unwrap_or(100)
     }
+
+    /// Jobs of the store one search loads into memory, at most (at least one).
+    pub fn search_pool(&self) -> i64 {
+        i64::try_from(self.search_pool.unwrap_or(3_000).max(1)).unwrap_or(3_000)
+    }
+
+    /// Jobs of the store one search gives a quick look, at most: the ones
+    /// closest to the person's roles and skills (at least one).
+    pub fn quick_look_per_search(&self) -> usize {
+        usize::try_from(self.quick_look_per_search.unwrap_or(400).max(1)).unwrap_or(400)
+    }
 }
 
 /// Comma-separated names; blank is unset.
@@ -709,6 +719,8 @@ mod tests {
         );
         assert!(config.nightly());
         assert_eq!(config.full_scores_per_search(), 100);
+        assert_eq!(config.quick_look_per_search(), 400);
+        assert_eq!(config.search_pool(), 3_000);
         assert!(config.store());
         assert_eq!(config.store_reads_per_minute(), 60);
         assert_eq!(config.store_parallel(), 8);
@@ -754,6 +766,8 @@ mod tests {
             "manual_every_secs": "0",
             "nightly": "false",
             "full_scores_per_search": "20",
+            "quick_look_per_search": "50",
+            "search_pool": "500",
         }}))
         .unwrap();
         assert!(config.is_enabled("greenhouse"));
@@ -768,6 +782,8 @@ mod tests {
         assert_eq!(config.manual_every(), None);
         assert!(!config.nightly());
         assert_eq!(config.full_scores_per_search(), 20);
+        assert_eq!(config.quick_look_per_search(), 50);
+        assert_eq!(config.search_pool(), 500);
         let err = load(serde_json::json!({ "sources": { "enabled": "Linked In" } })).unwrap_err();
         assert!(err.contains("linked in"), "{err}");
     }

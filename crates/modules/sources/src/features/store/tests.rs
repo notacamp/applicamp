@@ -1054,3 +1054,230 @@ async fn the_owner_sees_how_the_store_does_and_nobody_else_does(db: PgPool) {
     assert_eq!(body["sites_failing"], 1);
     assert!(body["last_read_at"].is_string());
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_searchs_pool_holds_the_on_sites_and_every_company_page_ranked_without_a_model(
+    db: PgPool,
+) {
+    let server = MockServer::start().await;
+    seed(
+        &db,
+        &[
+            board("alpha", &server, "approved", "", ""),
+            board("beta", &server, "approved", "", ""),
+        ],
+    )
+    .await;
+    let h = harness(db, store_config()).await;
+    registry::ensure_systems(&h.db, today()).await.unwrap();
+    registry::register(
+        &h.db,
+        &[CompanyLink {
+            source: Source::Greenhouse,
+            token: "acme".to_owned(),
+            eu: false,
+        }],
+        "an apply link on Board alpha",
+        today(),
+    )
+    .await
+    .unwrap();
+    sqlx::query(
+        "UPDATE sources.job_boards SET status = 'approved', approved_by = 'app',
+                approved_at = now() WHERE system = 'greenhouse'",
+    )
+    .execute(&h.db)
+    .await
+    .unwrap();
+    let alpha = id_of(&h.db, "alpha").await;
+    let beta = id_of(&h.db, "beta").await;
+    let page: Uuid = sqlx::query_scalar(
+        "SELECT id FROM sources.job_boards WHERE kind = 'company_page' AND system = 'greenhouse'",
+    )
+    .fetch_one(&h.db)
+    .await
+    .unwrap();
+    let now = today();
+    // Alpha: an old job and a new one. Beta: one job, but beta is not On.
+    keep::keep(
+        &h.db,
+        alpha,
+        &[job("1", "Senior Rust Engineer")],
+        "tech",
+        true,
+        now - TimeDelta::days(2),
+        &limits(),
+    )
+    .await
+    .unwrap();
+    keep::keep(
+        &h.db,
+        alpha,
+        &[job("1", "Senior Rust Engineer"), job("2", "Office Manager")],
+        "tech",
+        true,
+        now,
+        &limits(),
+    )
+    .await
+    .unwrap();
+    keep::keep(
+        &h.db,
+        beta,
+        &[job("9", "Rust Engineer")],
+        "tech",
+        true,
+        now,
+        &limits(),
+    )
+    .await
+    .unwrap();
+    let company_job = Job {
+        source: Source::Greenhouse,
+        board: None,
+        ..job("p1", "Backend Developer")
+    };
+    keep::keep(&h.db, page, &[company_job], "", true, now, &limits())
+        .await
+        .unwrap();
+
+    let words = ["rust engineer".to_owned()];
+    let query = PoolQuery {
+        sites: &[alpha],
+        text: &words,
+        ..PoolQuery::default()
+    };
+    let found = pool(&h.db, &query, now).await.unwrap();
+    let mut titles: Vec<&str> = found.iter().map(|p| p.job.title.as_str()).collect();
+    titles.sort_unstable();
+    assert_eq!(
+        titles,
+        [
+            "Backend Developer",
+            "Office Manager",
+            "Senior Rust Engineer"
+        ],
+        "the On site and the company page; beta is not On"
+    );
+    assert!(found.iter().all(|p| p.job.description.is_empty()));
+    let rank = |title: &str| found.iter().find(|p| p.job.title == title).unwrap().rank;
+    assert!(
+        rank("Senior Rust Engineer") > rank("Office Manager")
+            && rank("Senior Rust Engineer") > rank("Backend Developer"),
+        "the words of the person's roles rank first"
+    );
+
+    // A nightly search takes only what the store first saw after the last one.
+    let new = PoolQuery {
+        first_seen_since: Some(now - TimeDelta::days(1)),
+        ..query
+    };
+    let mut titles: Vec<String> = pool(&h.db, &new, now)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|p| p.job.title)
+        .collect();
+    titles.sort();
+    assert_eq!(titles, ["Backend Developer", "Office Manager"]);
+
+    // A company page whose hiring system waits is not in it.
+    sqlx::query("UPDATE sources.job_boards SET status = 'paused' WHERE kind = 'hiring_system'")
+        .execute(&h.db)
+        .await
+        .unwrap();
+    assert_eq!(pool(&h.db, &query, now).await.unwrap().len(), 2);
+
+    // The descriptions come apart from the pool.
+    let ids: Vec<Uuid> = found.iter().map(|p| p.job.id).collect();
+    let texts = descriptions(&h.db, &ids).await.unwrap();
+    assert_eq!(texts.len(), 3);
+    assert!(texts.values().all(|t| t == "We build things"));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_pool_is_ranked_and_limited_in_sql_and_the_rest_is_counted(db: PgPool) {
+    let server = MockServer::start().await;
+    seed(&db, &[board("alpha", &server, "approved", "", "")]).await;
+    let h = harness(db, store_config()).await;
+    let alpha = id_of(&h.db, "alpha").await;
+    let now = today();
+    let mut old = job("5", "Rust Engineer Emeritus");
+    old.posted_at = Some(now - TimeDelta::days(40));
+    let mut office = job("6", "Rust Engineer on site");
+    office.work_mode = Some(WorkMode::Onsite);
+    keep::keep(
+        &h.db,
+        alpha,
+        &[
+            job("1", "Senior Rust Engineer"),
+            job("2", "Rust Engineer"),
+            job("3", "Office Manager"),
+            job("4", "Designer"),
+            old,
+            office,
+        ],
+        "tech",
+        true,
+        now,
+        &limits(),
+    )
+    .await
+    .unwrap();
+    let words = ["rust engineer".to_owned()];
+    let query = PoolQuery {
+        sites: &[alpha],
+        text: &words,
+        limit: 2,
+        work_modes: &[WorkMode::Remote],
+        ..PoolQuery::default()
+    };
+
+    // The limit holds, the two best by rank come first, and the old job and
+    // the one on site (they fail the cheap hard limits) never load.
+    let found = pool(&h.db, &query, now).await.unwrap();
+    let mut titles: Vec<&str> = found.iter().map(|p| p.job.title.as_str()).collect();
+    titles.sort_unstable();
+    assert_eq!(titles, ["Rust Engineer", "Senior Rust Engineer"]);
+    assert!(found[0].rank >= found[1].rank, "best rank first");
+    let counts = pool_counts(&h.db, &query, now).await.unwrap();
+    assert_eq!(
+        (
+            counts.total,
+            counts.too_old,
+            counts.not_wanted,
+            counts.passing()
+        ),
+        (6, 1, 1, 4),
+        "the rest is counted, so a search's funnel adds up"
+    );
+
+    // A job the person already has a score of comes after the others.
+    sqlx::query(
+        "INSERT INTO sources.scores
+            (account_id, source, source_ref, profile_version, goals_version, rules_version,
+             stage, match_score, why, gaps, created_at)
+         VALUES ($1, 'alpha', '2', 'p1', 1, 3, 'full', 80, '[]'::jsonb, '[]'::jsonb, $2)",
+    )
+    .bind(h.account)
+    .bind(now)
+    .execute(&h.db)
+    .await
+    .unwrap();
+    let scored = PoolQuery {
+        scored: Some(ScoredFor {
+            account: h.account,
+            profile_version: "p1",
+            goals_version: 1,
+            rules_version: 3,
+        }),
+        ..query
+    };
+    let found = pool(&h.db, &scored, now).await.unwrap();
+    assert_eq!(found.len(), 2);
+    assert_eq!(found[0].job.title, "Senior Rust Engineer");
+    assert!(
+        found.iter().all(|p| p.job.title != "Rust Engineer"),
+        "the scored one is last, so the limit leaves it out"
+    );
+}

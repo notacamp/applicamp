@@ -89,7 +89,7 @@ async fn search_now_scores_the_jobs_and_adds_the_matches(db: PgPool) {
         estimate["spend"]["today_eur"].as_f64().unwrap() > 0.0,
         "{estimate}"
     );
-    assert_eq!(estimate["spend"]["month_limit_eur"], 3.0);
+    assert_eq!(estimate["spend"]["month_limit_eur"], 10.0);
     assert_eq!(estimate["jobs"], 2);
     assert_eq!(estimate["confirm"], false);
 }
@@ -475,7 +475,10 @@ async fn without_a_profile_or_a_model_there_is_no_search(db: PgPool) {
     assert_eq!(body["code"], "ai_unavailable");
     let (status, estimate) = h.get("/api/v1/searches/estimate").await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(estimate["jobs"], 40);
+    assert_eq!(
+        estimate["jobs"], 100,
+        "no search yet: the most read in full"
+    );
     assert_eq!(estimate["cost_eur"], 0.0);
 }
 
@@ -800,6 +803,17 @@ async fn the_same_job_on_two_boards_is_one_opportunity_crediting_both(db: PgPool
     let remoteok = line("remoteok");
     assert_eq!(remoteok["jobs_read"], 2);
     assert_eq!(remoteok["matched"], 2);
+    // What the search did with the five jobs it read: none needed a quick
+    // look (four fit in what one search reads in full), the expired one is
+    // out, and the counts add up.
+    let funnel = &run["funnel"];
+    assert_eq!(funnel["read"], 5, "{funnel}");
+    assert_eq!(funnel["quick_looked"], 0);
+    assert_eq!(funnel["read_in_full"], 4);
+    assert_eq!(funnel["good_matches"], 4);
+    assert_eq!(funnel["left_out"]["too_old"], 1);
+    assert_eq!(left_out_total(&funnel["left_out"]), 1);
+    assert_eq!(himalayas["quick_looked"], 0);
 
     // The next search finds Example Co on Jobicy too: it is credited on the
     // opportunity already there, never added twice.
@@ -1064,4 +1078,298 @@ async fn a_nightly_search_schedules_the_next_night_while_it_runs(db: PgPool) {
         "once"
     );
     assert_eq!(pending().await, 1);
+}
+
+/// The jobs a search's funnel says were left out, every reason together.
+fn left_out_total(left_out: &Value) -> u64 {
+    left_out
+        .as_object()
+        .map(|reasons| reasons.values().filter_map(Value::as_u64).sum())
+        .unwrap_or(0)
+}
+
+/// The latest search's funnel counts, as kept on its row.
+async fn funnel_row(h: &Harness) -> (i32, i32, i32, Value) {
+    let (quick, full, gap, reasons): (Option<i32>, Option<i32>, Option<i32>, Option<Value>) =
+        sqlx::query_as(
+            "SELECT quick_looked, read_in_full, kept_with_gap, dropped_by_reason
+               FROM sources.searches ORDER BY started_at DESC, id DESC LIMIT 1",
+        )
+        .fetch_one(&h.db)
+        .await
+        .unwrap();
+    (
+        quick.unwrap(),
+        full.unwrap(),
+        gap.unwrap(),
+        reasons.unwrap(),
+    )
+}
+
+/// A fake model for both stages: a quick look gives each job the fit of its
+/// number ("Senior Backend Engineer 27" fits 27); a full read gives 80 and
+/// the facts of a remote job open to anyone in Europe. Each call costs
+/// `cost` dollars.
+async fn model_by_number(cost: f64) -> MockServer {
+    let model = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(move |request: &wiremock::Request| {
+            let body: Value = serde_json::from_slice(&request.body).unwrap_or(Value::Null);
+            let system = body["messages"][0]["content"].as_str().unwrap_or("");
+            let postings = crate::testkit::postings(request);
+            let jobs: Vec<Value> = if system.starts_with("You take a quick look") {
+                postings
+                    .iter()
+                    .map(|posting| {
+                        let number: u64 = posting["title"]
+                            .as_str()
+                            .and_then(|t| t.rsplit(' ').next())
+                            .and_then(|n| n.parse().ok())
+                            .unwrap_or(0);
+                        json!({ "ref": posting["ref"], "fit": number, "reason": "Backend work" })
+                    })
+                    .collect()
+            } else {
+                postings
+                    .iter()
+                    .map(|posting| {
+                        answer_for(posting["ref"].as_str().unwrap_or(""), 80, &open_facts())
+                    })
+                    .collect()
+            };
+            ResponseTemplate::new(200).set_body_json(completion(&json!({ "jobs": jobs }), cost))
+        })
+        .mount(&model)
+        .await;
+    model
+}
+
+/// The numbers of the jobs added so far ("Senior Backend Engineer 27" is 27).
+fn added_numbers(h: &Harness) -> Vec<u64> {
+    let mut numbers: Vec<u64> = h
+        .fake
+        .added()
+        .iter()
+        .filter_map(|s| s.job.title.rsplit(' ').next().and_then(|n| n.parse().ok()))
+        .collect();
+    numbers.sort_unstable();
+    numbers
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn more_jobs_than_a_search_reads_in_full_get_a_quick_look_and_the_best_are_read(db: PgPool) {
+    let boards = board_of(30).await;
+    let model = model_by_number(0.000_4).await;
+    let mut settings = config(&boards);
+    // Four read in full a search, so thirty need a quick look first.
+    settings.full_scores_per_search = Some(4);
+    let fake = Fake::ready();
+    let h = Harness::new(
+        db,
+        settings,
+        Some(gateway(&model, BudgetConfig::default())),
+        fake.clone(),
+    )
+    .await;
+    let (status, _) = h.post("/api/v1/searches").await;
+    assert_eq!(status, StatusCode::ACCEPTED);
+    h.work().await;
+
+    let search = latest(&h).await;
+    assert_eq!(search["status"], "finished", "{search}");
+    assert_eq!(search["stopped"], Value::Null);
+    assert_eq!(search["fetched"], 30);
+    assert_eq!(search["kept"], 30);
+    assert_eq!(search["scored"], 4, "only the best four are read in full");
+    assert_eq!(search["added"], 4);
+    assert_eq!(added_numbers(&h), [27, 28, 29, 30], "the best fits");
+    // 25 and 5 quick looks, then one full read of four.
+    assert_eq!(model_calls(&model).await, 3);
+    let requests = model.received_requests().await.unwrap();
+    let first: Value = serde_json::from_slice(&requests[0].body).unwrap();
+    assert!(
+        first["messages"][0]["content"]
+            .as_str()
+            .unwrap()
+            .starts_with("You take a quick look"),
+        "{first}"
+    );
+    let (quick, full, gap, reasons) = funnel_row(&h).await;
+    assert_eq!((quick, full, gap), (30, 4, 0));
+    assert_eq!(reasons["quick_look"], 26, "{reasons}");
+    assert_eq!(left_out_total(&reasons) + 4, 30, "{reasons}");
+    let stages: Vec<(String, i64)> =
+        sqlx::query_as("SELECT stage, count(*) FROM sources.scores GROUP BY stage ORDER BY stage")
+            .fetch_all(&h.db)
+            .await
+            .unwrap();
+    assert_eq!(stages, [("full".to_owned(), 4), ("quick".to_owned(), 30)]);
+
+    // The next search looks at nothing again: the next four by fit are read
+    // in full, and the ones read before take no slot.
+    h.clock.advance(TimeDelta::hours(1));
+    h.post("/api/v1/searches").await;
+    h.work().await;
+    assert_eq!(model_calls(&model).await, 4, "one full read, no quick look");
+    assert_eq!(added_numbers(&h), [23, 24, 25, 26, 27, 28, 29, 30]);
+    let (quick, full, _, reasons) = funnel_row(&h).await;
+    assert_eq!((quick, full), (0, 4));
+    assert_eq!(
+        reasons["seen_before"], 26,
+        "four already in their jobs, 22 looked at before: {reasons}"
+    );
+    assert_eq!(left_out_total(&reasons) + 4, 30, "{reasons}");
+
+    // Every job had a quick look: no nightly search starts.
+    fake.accounts.lock().unwrap().push(h.account);
+    let before = latest(&h).await["id"].clone();
+    super::nightly(&h.deps, &h.db).await.unwrap();
+    h.work().await;
+    assert_eq!(latest(&h).await["id"], before);
+    assert_eq!(model_calls(&model).await, 4);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_limit_during_the_quick_looks_keeps_what_was_looked_at(db: PgPool) {
+    let boards = board_of(30).await;
+    // Each call costs $0.05: the month's $0.05 is spent by the first.
+    let model = model_by_number(0.05).await;
+    let mut settings = config(&boards);
+    settings.full_scores_per_search = Some(4);
+    let budget = BudgetConfig {
+        account_monthly_eur: Some(0.05),
+        usd_to_eur: Some(1.0),
+        ..BudgetConfig::default()
+    };
+    let h = Harness::new(db, settings, Some(gateway(&model, budget)), Fake::ready()).await;
+    h.post("/api/v1/searches").await;
+    h.work().await;
+    let search = latest(&h).await;
+    assert_eq!(search["status"], "finished", "{search}");
+    assert_eq!(search["stopped"], "ai_budget_reached");
+    assert_eq!(search["added"], 0);
+    assert_eq!(
+        model_calls(&model).await,
+        1,
+        "the second call was never sent"
+    );
+    let (quick, full, _, reasons) = funnel_row(&h).await;
+    assert_eq!((quick, full), (25, 0));
+    assert_eq!(reasons["quick_look"], 21, "{reasons}");
+    assert_eq!(
+        reasons["waiting"], 9,
+        "five never looked at, four chosen but not read: {reasons}"
+    );
+    assert_eq!(left_out_total(&reasons), 30);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_remote_job_that_does_not_say_where_it_hires_is_kept_with_a_note(db: PgPool) {
+    let boards = board_of(3).await;
+    let model = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(|request: &wiremock::Request| {
+            let jobs: Vec<Value> = crate::testkit::postings(request)
+                .iter()
+                .map(|posting| {
+                    let reference = posting["ref"].as_str().unwrap_or("");
+                    let mut facts = open_facts();
+                    let mut score = 85;
+                    if reference == "j2" {
+                        facts["open_to_candidate"] = json!("no");
+                        facts["region_note"] = json!("US only");
+                    } else {
+                        facts["open_to_candidate"] = json!("unclear");
+                        facts["region_note"] = json!("");
+                    }
+                    if reference == "j3" {
+                        // Says nothing about where it hires, and is no match.
+                        score = 30;
+                    }
+                    answer_for(reference, score, &facts)
+                })
+                .collect();
+            ResponseTemplate::new(200).set_body_json(completion(&json!({ "jobs": jobs }), 0.0004))
+        })
+        .mount(&model)
+        .await;
+    // Someone in Lisbon who works remote only and would not move.
+    let h = Harness::new(
+        db,
+        config(&boards),
+        Some(gateway(&model, BudgetConfig::default())),
+        Fake::lisbon_remote_only(),
+    )
+    .await;
+    h.post("/api/v1/searches").await;
+    h.work().await;
+    let search = latest(&h).await;
+    assert_eq!(search["added"], 1, "{search}");
+    assert_eq!(search["dropped"], 1, "open only to the US: still out");
+    let added = h.fake.added();
+    assert_eq!(
+        added[0].score.gaps[0], "Doesn't say if it hires in Portugal",
+        "the note comes first: {:?}",
+        added[0].score.gaps
+    );
+    let (_, full, gap, reasons) = funnel_row(&h).await;
+    assert_eq!(
+        (full, gap),
+        (3, 1),
+        "only the match kept is counted with the note"
+    );
+    assert_eq!(reasons["not_open_to_location"], 1, "{reasons}");
+    assert_eq!(reasons["not_good_enough"], 1, "{reasons}");
+    assert_eq!(left_out_total(&reasons) + 1, 3);
+    let excluded: Vec<Option<String>> =
+        sqlx::query_scalar("SELECT excluded_reason FROM sources.scores ORDER BY source_ref")
+            .fetch_all(&h.db)
+            .await
+            .unwrap();
+    assert_eq!(
+        excluded,
+        [None, Some("not_open_to_location".to_owned()), None]
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn quick_looks_about_no_job_of_the_batch_count_as_failed_calls(db: PgPool) {
+    let boards = board_of(30).await;
+    // The model answers every quick look with its refs as numbers: it parses,
+    // and names no job of the batch.
+    let model = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(|request: &wiremock::Request| {
+            let jobs: Vec<Value> = crate::testkit::postings(request)
+                .iter()
+                .enumerate()
+                .map(|(i, _)| json!({ "ref": i + 1, "fit": 90, "reason": "Backend work" }))
+                .collect();
+            ResponseTemplate::new(200).set_body_json(completion(&json!({ "jobs": jobs }), 0.0004))
+        })
+        .mount(&model)
+        .await;
+    let mut settings = config(&boards);
+    settings.full_scores_per_search = Some(4);
+    let h = Harness::new(
+        db,
+        settings,
+        Some(gateway(&model, BudgetConfig::default())),
+        Fake::ready(),
+    )
+    .await;
+    h.post("/api/v1/searches").await;
+    h.work().await;
+    let search = latest(&h).await;
+    assert_eq!(search["status"], "finished", "{search}");
+    assert_eq!(search["stopped"], "ai_failed", "{search}");
+    // 25 (unusable, split), 12 and 13 (unusable again), then 5: four in a row.
+    assert_eq!(
+        model_calls(&model).await,
+        usize::try_from(super::FAILED_IN_A_ROW).unwrap()
+    );
+    let (quick, full, _, reasons) = funnel_row(&h).await;
+    assert_eq!((quick, full), (0, 0));
+    assert_eq!(reasons["waiting"], 30, "{reasons}");
+    assert_eq!(search["added"], 0);
 }

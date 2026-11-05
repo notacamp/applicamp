@@ -7,16 +7,22 @@
 //!
 //! | Goal | Passes when |
 //! |---|---|
-//! | `work_mode` = only remote | `remote = yes` and `open_to_candidate = yes` |
-//! | `work_mode` includes hybrid or on site | `remote = yes` and `open_to_candidate = yes`, or the job's place is one of `locations` (or within `relocate`'s reach) |
-//! | `relocate` = no | `open_to_candidate = yes`, or the job's place is one of `locations` |
+//! | `work_mode` = only remote | `remote = yes` and `open_to_candidate` is not `no` |
+//! | `work_mode` includes hybrid or on site | `remote = yes` and `open_to_candidate` is not `no`, or the job's place is one of `locations` (or within `relocate`'s reach) |
+//! | `relocate` = no | `open_to_candidate = yes`, a remote job whose `open_to_candidate` is not `no`, or the job's place is one of `locations` |
 //! | languages to work in | every language the job needs is one of them |
 //! | `cash_floor` | the stated pay's top, converted, is at least the floor; none stated passes with the gap "Salary not stated" |
 //!
-//! - **Unclear is not met**: a fact the posting does not state fails the
-//!   requirement it is for. A requirement the person did not set is not
-//!   checked. When where they live is unknown, `open_to_candidate` is not
-//!   asked of a remote job (nobody could answer it).
+//! - **Unclear is not met**, with one exception: a fact the posting does not
+//!   state fails the requirement it is for. A requirement the person did not
+//!   set is not checked. When where they live is unknown, `open_to_candidate`
+//!   is not asked of a remote job (nobody could answer it).
+//! - **The exception** (#74): a remote job whose posting does not say whether
+//!   it hires where they live (`open_to_candidate = unclear`) passes, with
+//!   the gap "Doesn't say if it hires in Portugal" (their country,
+//!   [`hires_unclear`]). Most remote postings never say; dropping them
+//!   dropped a third of the good matches. A posting that limits it to other
+//!   places (`no`) still fails.
 //! - **Where they live** is the first of `goals.locations`, else the
 //!   profile's location; **their places** are `goals.locations`, else that
 //!   one ([`crate::places`] says whether a job's place is one of them).
@@ -31,16 +37,39 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{job::WorkMode, matching::MatchInput, places};
+use crate::{job::WorkMode, matching::MatchInput, places, regions};
 
 /// The rules' version. Scores are cached per version: a change to what the
 /// model is asked re-asks it, once per job. 2: reasons must be grounded in
 /// the profile (#27): scores cached with reasons the profile never
-/// supported are asked again.
-pub const RULES_VERSION: i32 = 2;
+/// supported are asked again. 3: a remote job that does not say where it
+/// hires is kept with a note (#74), and a search reads in two stages.
+pub const RULES_VERSION: i32 = 3;
 
 /// The gap a job without a stated salary gets, when there is a floor.
 pub const SALARY_NOT_STATED: &str = "Salary not stated";
+
+/// The start of the gap a remote job gets when its posting does not say
+/// whether it hires where the person lives; their country's English name
+/// follows ("Doesn't say if it hires in Portugal").
+pub const HIRES_UNCLEAR: &str = "Doesn't say if it hires in ";
+
+/// That gap when the person's country is not known.
+pub const WHERE_UNCLEAR: &str = "Doesn't say where it hires";
+
+/// The gap of a remote job whose posting does not say whether it hires
+/// where `input`'s person lives: "Doesn't say if it hires in Portugal".
+pub fn hires_unclear(input: &MatchInput) -> String {
+    input
+        .home
+        .as_deref()
+        .and_then(regions::country_of)
+        .and_then(places::country_name)
+        .map_or_else(
+            || WHERE_UNCLEAR.to_owned(),
+            |country| format!("{HIRES_UNCLEAR}{country}"),
+        )
+}
 
 /// Euros per unit of each currency the floor is compared in. Fixed, so a
 /// decision never moves with a rate feed; close to the 2026 averages.
@@ -189,6 +218,9 @@ pub struct Verdict {
     /// What the person should know about a job that passes ("Salary not
     /// stated").
     pub gaps: Vec<String>,
+    /// It passes although its posting does not say whether it hires where
+    /// they live: one of `gaps` says so ([`hires_unclear`]).
+    pub hires_unclear: bool,
 }
 
 /// A language tag (`pt-PT`, `EN`, `nb`) as the ISO 639-1 code the rules
@@ -250,21 +282,44 @@ fn in_reach(input: &MatchInput, job_location: Option<&str>) -> bool {
     }
 }
 
+/// What the place rule decided.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Place {
+    /// It can be done from where they live, or is where they can be.
+    In,
+    /// Remote, and its posting does not say whether it hires where they
+    /// live: kept, with a note.
+    Unclear,
+    /// Left out.
+    Out(Excluded),
+}
+
 /// How they want to work, and where.
-fn place_rule(input: &MatchInput, facts: &Facts, job_location: Option<&str>) -> Option<Excluded> {
+fn place_rule(input: &MatchInput, facts: &Facts, job_location: Option<&str>) -> Place {
+    let remote = facts.remote == Answer::Yes;
     // Doable from where they live: remote, and open to it (when known).
-    let from_home = facts.remote == Answer::Yes
-        && (input.home.is_none() || facts.open_to_candidate == Answer::Yes);
+    let from_home = remote && (input.home.is_none() || facts.open_to_candidate == Answer::Yes);
+    // Remote, and the posting does not say whether it hires where they live
+    // (most do not): kept, with a note, never a reason to leave it out.
+    let maybe_from_home =
+        remote && input.home.is_some() && facts.open_to_candidate == Answer::Unclear;
+    let mut unclear = false;
     let office = input.work_modes.iter().any(|m| *m != WorkMode::Remote);
     if input.remote_only() {
-        if facts.remote != Answer::Yes {
-            return Some(Excluded::NotRemote);
+        if !remote {
+            return Place::Out(Excluded::NotRemote);
         }
         if !from_home {
-            return Some(Excluded::NotOpenToLocation);
+            if !maybe_from_home {
+                return Place::Out(Excluded::NotOpenToLocation);
+            }
+            unclear = true;
         }
     } else if office && !from_home && !in_reach(input, job_location) {
-        return Some(Excluded::NotOpenToLocation);
+        if !maybe_from_home {
+            return Place::Out(Excluded::NotOpenToLocation);
+        }
+        unclear = true;
     }
     if input.relocate == Some(Reach::No) {
         let places = places_of(input);
@@ -272,10 +327,13 @@ fn place_rule(input: &MatchInput, facts: &Facts, job_location: Option<&str>) -> 
             && facts.open_to_candidate != Answer::Yes
             && !at_their_places(&places, job_location)
         {
-            return Some(Excluded::NotOpenToLocation);
+            if !maybe_from_home {
+                return Place::Out(Excluded::NotOpenToLocation);
+            }
+            unclear = true;
         }
     }
-    None
+    if unclear { Place::Unclear } else { Place::In }
 }
 
 /// The languages it needs, against theirs.
@@ -359,13 +417,24 @@ fn floor_rule(input: &MatchInput, facts: &Facts, gaps: &mut Vec<String>) -> Opti
 /// wrote it).
 pub fn check(input: &MatchInput, facts: &Facts, job_location: Option<&str>) -> Verdict {
     let mut gaps = Vec::new();
-    let excluded = place_rule(input, facts, job_location)
-        .or_else(|| language_rule(input, facts))
-        .or_else(|| floor_rule(input, facts, &mut gaps));
+    let place = place_rule(input, facts, job_location);
+    if place == Place::Unclear {
+        gaps.push(hires_unclear(input));
+    }
+    let excluded = match place {
+        Place::Out(reason) => Some(reason),
+        Place::In | Place::Unclear => None,
+    }
+    .or_else(|| language_rule(input, facts))
+    .or_else(|| floor_rule(input, facts, &mut gaps));
     if excluded.is_some() {
         gaps.clear();
     }
-    Verdict { excluded, gaps }
+    Verdict {
+        hires_unclear: excluded.is_none() && place == Place::Unclear,
+        excluded,
+        gaps,
+    }
 }
 
 #[cfg(test)]
@@ -414,11 +483,16 @@ mod tests {
             excluded(&input, &facts(Yes, No, &["en"]), Some("Berlin")),
             Some("not_open_to_location")
         );
-        assert_eq!(
-            excluded(&input, &facts(Yes, Unclear, &["en"]), Some("Remote")),
-            Some("not_open_to_location"),
-            "unclear is not met"
-        );
+        // Remote, and it does not say whether it hires in Portugal: kept,
+        // with a note naming their country.
+        let unclear = check(&input, &facts(Yes, Unclear, &["en"]), Some("Remote"));
+        assert_eq!(unclear.excluded, None);
+        assert_eq!(unclear.gaps, ["Doesn't say if it hires in Portugal"]);
+        assert!(unclear.hires_unclear);
+        // "Open to the US only" still drops.
+        let only_us = check(&input, &facts(Yes, No, &["en"]), Some("Remote - US"));
+        assert_eq!(only_us.excluded, Some(Excluded::NotOpenToLocation));
+        assert!(only_us.gaps.is_empty() && !only_us.hires_unclear);
         // A Portugal role that never says remote.
         assert_eq!(
             excluded(&input, &facts(Unclear, Yes, &["en"]), Some("Portugal")),
@@ -474,6 +548,14 @@ mod tests {
             Some("not_open_to_location"),
             "no place to judge is not met"
         );
+        // A remote job that does not say where it hires: kept, with the note.
+        let unclear = check(&input, &facts(Yes, Unclear, &["en"]), Some("Remote"));
+        assert_eq!(unclear.excluded, None);
+        assert!(unclear.hires_unclear);
+        // In their own city, it needs no note.
+        let home = check(&input, &facts(Yes, Unclear, &["en"]), Some("Lisbon"));
+        assert_eq!(home.excluded, None);
+        assert!(!home.hires_unclear && home.gaps.is_empty());
         // Within their reach when they would move.
         let within_country = MatchInput {
             relocate: Some(Reach::WithinCountry),
@@ -525,6 +607,15 @@ mod tests {
         );
         assert_eq!(
             excluded(&input, &facts(No, Unclear, &["en"]), Some("Berlin")),
+            Some("not_open_to_location")
+        );
+        // Remote, and it does not say where it hires: kept, with the note;
+        // limited to other places: still out.
+        let unclear = check(&input, &facts(Yes, Unclear, &["en"]), Some("Remote"));
+        assert_eq!(unclear.excluded, None);
+        assert_eq!(unclear.gaps, ["Doesn't say if it hires in Portugal"]);
+        assert_eq!(
+            excluded(&input, &facts(Yes, No, &["en"]), Some("Remote")),
             Some("not_open_to_location")
         );
         // No answer to "how": no work-mode rule; no answer to "move": none.
@@ -652,6 +743,37 @@ mod tests {
             check(&sek, &paid(None, Some(90_000.0), "EUR", "year"), None).excluded,
             None
         );
+    }
+
+    #[test]
+    fn the_note_names_their_country_or_says_where_is_unknown() {
+        assert_eq!(
+            hires_unclear(&lisbon_remote_only()),
+            "Doesn't say if it hires in Portugal"
+        );
+        let nowhere_known = MatchInput {
+            home: Some("Atlantis".into()),
+            ..lisbon_remote_only()
+        };
+        assert_eq!(hires_unclear(&nowhere_known), WHERE_UNCLEAR);
+        // The note comes with the other gaps; a language they don't work in
+        // still drops it.
+        let floor = MatchInput {
+            cash_floor: Some(Floor {
+                amount: 1.0,
+                currency: "EUR".into(),
+                per: Per::Year,
+            }),
+            ..lisbon_remote_only()
+        };
+        let both = check(&floor, &facts(Yes, Unclear, &["en"]), Some("Remote"));
+        assert_eq!(
+            both.gaps,
+            ["Doesn't say if it hires in Portugal", SALARY_NOT_STATED]
+        );
+        let german = check(&floor, &facts(Yes, Unclear, &["de"]), Some("Remote"));
+        assert_eq!(german.excluded, Some(Excluded::Language));
+        assert!(german.gaps.is_empty() && !german.hires_unclear);
     }
 
     #[test]

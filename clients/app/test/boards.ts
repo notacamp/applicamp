@@ -195,15 +195,16 @@ export function line(overrides: Partial<ScanLine> = {}): ScanLine {
     outcome: "read",
     jobs_read: 412,
     passed_requirements: 30,
-    scored_by_ai: 30,
-    matched: 9,
+    quick_looked: 30,
+    scored_by_ai: 12,
+    matched: 4,
     ai_cost_eur: 0.004,
     duration_ms: 1200,
     ...overrides,
   };
 }
 
-/** A nightly search and what it scanned. */
+/** A nightly search, what it did with the jobs it read, and what it scanned. */
 export function run(overrides: Partial<ScanRun> = {}): ScanRun {
   return {
     kind: "search",
@@ -211,6 +212,26 @@ export function run(overrides: Partial<ScanRun> = {}): ScanRun {
     at: "2026-10-25T21:00:00Z",
     trigger: "nightly",
     cost_eur: 0.012,
+    // 1,112 read: 6 good matches and 1,106 left out (the reasons add up).
+    funnel: {
+      read: 1112,
+      quick_looked: 681,
+      read_in_full: 131,
+      good_matches: 6,
+      kept_with_note: 12,
+      left_out: {
+        seen_before: 431,
+        too_old: 0,
+        not_remote: 245,
+        quick_look: 305,
+        language: 12,
+        not_open_to_location: 4,
+        below_floor: 2,
+        not_good_enough: 107,
+        waiting: 0,
+      },
+      stopped: null,
+    },
     lines: [
       line(),
       line({
@@ -220,6 +241,7 @@ export function run(overrides: Partial<ScanRun> = {}): ScanRun {
         outcome: "skipped_poll_limit",
         jobs_read: 1,
         passed_requirements: 1,
+        quick_looked: 0,
         scored_by_ai: 1,
         matched: 0,
         ai_cost_eur: 0,
@@ -231,6 +253,7 @@ export function run(overrides: Partial<ScanRun> = {}): ScanRun {
         outcome: "error",
         jobs_read: 0,
         passed_requirements: 0,
+        quick_looked: 0,
         scored_by_ai: 0,
         matched: 0,
         ai_cost_eur: 0,
@@ -249,6 +272,7 @@ export function discoveryRun(): ScanRun {
     at: "2026-10-26T04:00:00Z",
     trigger: null,
     cost_eur: 0,
+    funnel: null,
     lines: [
       line({
         board_id: WAITING,
@@ -257,6 +281,7 @@ export function discoveryRun(): ScanRun {
         outcome: "checked",
         jobs_read: 3,
         passed_requirements: 0,
+        quick_looked: 0,
         scored_by_ai: 0,
         matched: 0,
         ai_cost_eur: 0,

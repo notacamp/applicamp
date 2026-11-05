@@ -1,6 +1,7 @@
 //! What was scanned (`sources.board_scans`): one row per board per search
-//! (jobs read, passed the person's requirements, scored by the AI,
-//! matched, the AI's cost, a skip or an error) and per discovery check.
+//! (jobs read, passed the person's requirements, given a quick look, read in
+//! full by the AI, matched, the AI's cost, a skip, an error or a part read)
+//! and per discovery check.
 //! Kept 90 days. A person sees their own searches' rows and every
 //! discovery run's.
 
@@ -26,12 +27,15 @@ pub struct Scan {
     pub outcome: &'static str,
     pub jobs_read: u32,
     pub passed_requirements: u32,
+    /// Given a quick look.
+    pub quick_looked: u32,
+    /// Read in full by the AI.
     pub scored_by_ai: u32,
     pub matched: u32,
     pub ai_cost_eur: f64,
     pub error_kind: Option<String>,
     pub duration_ms: u32,
-    /// What a check found, in a few words.
+    /// What a check found, or a page that failed, in a few words.
     pub note: Option<String>,
 }
 
@@ -59,8 +63,8 @@ pub async fn record(db: &PgPool, run: Run, scans: &[Scan], at: DateTime<Utc>) ->
             "INSERT INTO sources.board_scans
                 (id, account_id, search_id, discovery_run_id, board_id, at, outcome, jobs_read,
                  passed_requirements, scored_by_ai, matched, ai_cost_eur, error_kind, duration_ms,
-                 note, company_id)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)",
+                 note, company_id, quick_looked)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)",
         )
         .bind(Uuid::now_v7())
         .bind(account)
@@ -82,6 +86,7 @@ pub async fn record(db: &PgPool, run: Run, scans: &[Scan], at: DateTime<Utc>) ->
                 .map(|n| n.chars().take(300).collect::<String>()),
         )
         .bind(scan.company)
+        .bind(int(scan.quick_looked))
         .execute(db)
         .await?;
     }
@@ -151,7 +156,7 @@ pub async fn totals(
         .collect())
 }
 
-/// A run, as the Scanned view lists it.
+/// A run, as the Searches tab lists it.
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct RunRow {
     /// `search` or `discovery`.
@@ -161,6 +166,17 @@ pub struct RunRow {
     /// A search's `manual` or `nightly`; `weekly` for discovery.
     pub trigger: String,
     pub cost_usd: f64,
+    /// A search's counts (none for discovery): jobs read, added, scored,
+    /// and, from #74, given a quick look, read in full, kept with a note,
+    /// and why the others were left out.
+    pub fetched: Option<i32>,
+    pub added: Option<i32>,
+    pub scored: Option<i32>,
+    pub quick_looked: Option<i32>,
+    pub read_in_full: Option<i32>,
+    pub kept_with_gap: Option<i32>,
+    pub dropped_by_reason: Option<sqlx::types::Json<serde_json::Value>>,
+    pub error_kind: Option<String>,
 }
 
 /// One board's line of a run.
@@ -175,6 +191,7 @@ pub struct ScanRow {
     pub outcome: String,
     pub jobs_read: i32,
     pub passed_requirements: i32,
+    pub quick_looked: i32,
     pub scored_by_ai: i32,
     pub matched: i32,
     pub ai_cost_eur: f64,
@@ -194,8 +211,11 @@ pub async fn runs(
     most: i64,
 ) -> Result<(Vec<RunRow>, Vec<ScanRow>)> {
     let runs: Vec<RunRow> = sqlx::query_as(
-        "SELECT kind, id, at, trigger, cost_usd FROM (
-            SELECT 'search' AS kind, s.id, s.started_at AS at, s.trigger, s.cost_usd
+        "SELECT kind, id, at, trigger, cost_usd, fetched, added, scored, quick_looked,
+                read_in_full, kept_with_gap, dropped_by_reason, error_kind FROM (
+            SELECT 'search' AS kind, s.id, s.started_at AS at, s.trigger, s.cost_usd,
+                   s.fetched, s.added, s.scored, s.quick_looked, s.read_in_full,
+                   s.kept_with_gap, s.dropped_by_reason, s.error_kind
               FROM sources.searches s
              WHERE s.account_id = $1
                AND EXISTS (SELECT 1 FROM sources.board_scans b
@@ -203,7 +223,8 @@ pub async fn runs(
                               AND ($2::uuid IS NULL OR coalesce(b.board_id, b.company_id) = $2))
             UNION ALL
             SELECT 'discovery' AS kind, d.id, d.started_at AS at, 'weekly' AS trigger,
-                   0::float8 AS cost_usd
+                   0::float8 AS cost_usd, NULL::integer, NULL::integer, NULL::integer,
+                   NULL::integer, NULL::integer, NULL::integer, NULL::jsonb, NULL::text
               FROM sources.discovery_runs d
              WHERE EXISTS (SELECT 1 FROM sources.board_scans b
                             WHERE b.discovery_run_id = d.id
@@ -226,8 +247,8 @@ pub async fn runs(
                 coalesce(b.board_id, b.company_id) AS board_id,
                 coalesce(j.slug, 'watch') AS board_slug, coalesce(j.name, c.name) AS board_name,
                 b.outcome, b.jobs_read,
-                b.passed_requirements, b.scored_by_ai, b.matched, b.ai_cost_eur, b.error_kind,
-                b.duration_ms, b.note
+                b.passed_requirements, b.quick_looked, b.scored_by_ai, b.matched, b.ai_cost_eur,
+                b.error_kind, b.duration_ms, b.note
            FROM sources.board_scans b
            LEFT JOIN sources.job_boards j ON j.id = b.board_id
            LEFT JOIN sources.companies c ON c.id = b.company_id

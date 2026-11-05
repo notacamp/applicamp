@@ -1,0 +1,1 @@
+- Job sites whose pages are large, such as Arbeitnow, are read again: a page of up to 16 MB is read, up from 4 MB.

@@ -23,9 +23,10 @@ use applicamp_sources::{
     job::{BoardJob, Job, Source, SourceLink, WorkMode},
     matching::MatchInput,
     ports::{
-        Attach, CompanyFact, KnownLinks, MatchedPosting, OWN_BOARD, Scored, Unchecked, Unreasoned,
+        Attach, CompanyFact, HiddenUnclear, KnownLinks, MatchedPosting, OWN_BOARD, Scored,
+        Unchecked, Unreasoned,
     },
-    requirements::{self, Excluded, Facts, Floor, Per, Reach},
+    requirements::{self, Answer, Excluded, Facts, Floor, Per, Reach},
 };
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
@@ -184,7 +185,18 @@ fn match_input(m: matching::Matching, now: DateTime<Utc>) -> MatchInput {
         .chain(m.profile.work.iter().filter_map(|w| w.position.clone()))
         .take(6)
         .collect();
+    let skills: Vec<String> = m
+        .profile
+        .skills
+        .iter()
+        .map(|skill| skill.name.trim().to_owned())
+        .filter(|name| !name.is_empty())
+        .take(40)
+        .collect();
     MatchInput {
+        // What the job boards that search are asked for: the wanted roles'
+        // key words and the top skills.
+        queries: applicamp_sources::matching::board_queries(&m.goals.roles, &skills),
         profile_version: m.profile_updated_at.to_rfc3339(),
         goals_version: m.goals_version,
         profile: matching::summary(&m.profile, now),
@@ -226,14 +238,7 @@ fn match_input(m: matching::Matching, now: DateTime<Utc>) -> MatchInput {
             }
             codes
         },
-        skills: m
-            .profile
-            .skills
-            .iter()
-            .map(|skill| skill.name.trim().to_owned())
-            .filter(|name| !name.is_empty())
-            .take(40)
-            .collect(),
+        skills,
         cash_floor: m.goals.cash_floor.as_ref().map(|floor| Floor {
             amount: f64::from(floor.amount),
             currency: floor.currency.clone(),
@@ -499,6 +504,47 @@ impl applicamp_sources::Neighbours for SourcesWiring {
                 })
                 .collect())
         })
+    }
+
+    fn hidden_unclear<'a>(
+        &'a self,
+        db: &'a PgPool,
+        after: Uuid,
+        most: usize,
+    ) -> BoxFuture<'a, Result<Vec<HiddenUnclear>>> {
+        Box::pin(async move {
+            let answer = |raw: Option<&str>| raw.map_or(Answer::Unclear, Answer::parse);
+            Ok(pipeline_store::hidden_unclear(db, after, most)
+                .await?
+                .into_iter()
+                .map(|row| HiddenUnclear {
+                    account: row.account_id,
+                    opportunity: row.id,
+                    source: row.source,
+                    source_ref: row.source_ref,
+                    location: row.location,
+                    facts: Facts {
+                        remote: answer(row.remote.as_deref()),
+                        open_to_candidate: answer(row.open_to_candidate.as_deref()),
+                        region_note: row.region_note,
+                        working_languages: row.working_languages.unwrap_or_default(),
+                        salary: None,
+                    },
+                })
+                .collect())
+        })
+    }
+
+    fn show_with_gaps<'a>(
+        &'a self,
+        db: &'a PgPool,
+        account: Uuid,
+        opportunity: Uuid,
+        gaps: Vec<String>,
+    ) -> BoxFuture<'a, Result<bool>> {
+        Box::pin(
+            async move { pipeline_store::unhide_with_gaps(db, account, opportunity, &gaps).await },
+        )
     }
 
     fn unreasoned<'a>(

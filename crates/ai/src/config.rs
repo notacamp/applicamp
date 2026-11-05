@@ -10,7 +10,8 @@
 //!   `APPLICAMP_AI__COMPLETE__API_KEY`: the bearer key, if the provider needs
 //!   one.
 //! - `APPLICAMP_AI__DAILY_TOKENS`: tokens (in + out) one account may use per
-//!   UTC day; default [`DEFAULT_DAILY_TOKENS`], `0` for no cap.
+//!   UTC day; default [`DEFAULT_DAILY_TOKENS`] (3,000,000), `0` for no cap.
+//!   A safety net above the spending limits, which are the real guard.
 //! - `APPLICAMP_AI__COMPLETE__INCLUDE_USAGE`: ask the provider for each
 //!   call's cost (`"usage": {"include": true}`, OpenRouter); default `true`,
 //!   `false` for a provider that refuses unknown fields.
@@ -35,8 +36,8 @@
 //!   whenever the built-in table does not know the model: an unknown model is
 //!   priced high, so a CV's estimate and its reservations are high too.
 //! - Spending limits in euros ([`BudgetConfig`]):
-//!   `APPLICAMP_AI__BUDGET__ACCOUNT_DAILY_EUR` (default 0.30),
-//!   `…__ACCOUNT_MONTHLY_EUR` (3), `…__INSTANCE_MONTHLY_EUR` (15), each `0`
+//!   `APPLICAMP_AI__BUDGET__ACCOUNT_DAILY_EUR` (default 1),
+//!   `…__ACCOUNT_MONTHLY_EUR` (10), `…__INSTANCE_MONTHLY_EUR` (15), each `0`
 //!   for no limit, and `…__USD_TO_EUR` (0.92), the fixed rate dollars are
 //!   converted at.
 //!
@@ -57,15 +58,21 @@ use url::Url;
 
 use crate::Error;
 
-/// Tokens one account may use per UTC day when nothing else is set.
-pub const DEFAULT_DAILY_TOKENS: u64 = 200_000;
+/// Tokens one account may use per UTC day when nothing else is set: a safety
+/// net well above what the spending limits allow at a cheap model's price
+/// (the euro limits are the real guard). A first night's search alone, a
+/// quick look at about a thousand jobs and a hundred read in full, takes
+/// about 400,000 (#74).
+pub const DEFAULT_DAILY_TOKENS: u64 = 3_000_000;
 /// The reasoning effort sent to OpenRouter unless configured: enough to
 /// answer well, short enough to leave room for the answer.
 pub const DEFAULT_REASONING_EFFORT: &str = "low";
-/// What one account may spend per UTC day, in euros, by default.
-pub const DEFAULT_ACCOUNT_DAILY_EUR: f64 = 0.30;
+/// What one account may spend per UTC day, in euros, by default: a night's
+/// search (a quick look at every job within the limits, the best 100 read
+/// in full) costs a few cents, a tailored CV a few more (#74).
+pub const DEFAULT_ACCOUNT_DAILY_EUR: f64 = 1.0;
 /// What one account may spend per calendar month (UTC), in euros, by default.
-pub const DEFAULT_ACCOUNT_MONTHLY_EUR: f64 = 3.0;
+pub const DEFAULT_ACCOUNT_MONTHLY_EUR: f64 = 10.0;
 /// What the whole instance may spend per calendar month (UTC), in euros, by
 /// default: every account and every role together.
 pub const DEFAULT_INSTANCE_MONTHLY_EUR: f64 = 15.0;
@@ -447,6 +454,20 @@ mod tests {
     }
 
     #[test]
+    fn a_first_nights_search_fits_in_the_daily_tokens() {
+        // A first night for someone with about a thousand jobs within their
+        // limits: 40 quick looks of 25 jobs and 10 full reads of 10, each at
+        // its worst (a prompt of 8,000 tokens and the whole answer it may
+        // give: 5,000 for a quick look, 8,000 for a full read).
+        let quick_looks = 40 * (8_000 + 5_000);
+        let full_reads = 10 * (8_000 + 8_000);
+        assert!(
+            DEFAULT_DAILY_TOKENS >= 2 * (quick_looks + full_reads),
+            "with room for the day's other work"
+        );
+    }
+
+    #[test]
     fn nothing_set_is_nothing_configured() {
         let config = load(serde_json::json!({})).unwrap();
         assert!(!config.is_configured(Role::Complete));
@@ -580,14 +601,9 @@ mod tests {
     #[test]
     fn the_budget_has_defaults_and_zero_is_no_limit() {
         let config = load(serde_json::json!({})).unwrap();
-        assert_eq!(
-            config.budget.account_daily_eur(),
-            Some(DEFAULT_ACCOUNT_DAILY_EUR)
-        );
-        assert_eq!(
-            config.budget.account_monthly_eur(),
-            Some(DEFAULT_ACCOUNT_MONTHLY_EUR)
-        );
+        // €1 a day and €10 a month per account (#74), €15 a month for all.
+        assert_eq!(config.budget.account_daily_eur(), Some(1.0));
+        assert_eq!(config.budget.account_monthly_eur(), Some(10.0));
         assert_eq!(
             config.budget.instance_monthly_eur(),
             Some(DEFAULT_INSTANCE_MONTHLY_EUR)

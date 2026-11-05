@@ -99,6 +99,24 @@ pub struct Unchecked {
     pub job: Job,
 }
 
+/// An opportunity hidden for `not_open_to_location` whose posting did not
+/// say whether it is open to where the person lives: the facts kept on it,
+/// to apply the rules again (#74).
+#[derive(Debug, Clone)]
+pub struct HiddenUnclear {
+    /// Whose.
+    pub account: Uuid,
+    /// The opportunity.
+    pub opportunity: Uuid,
+    /// The job's source and its ref there, to find the pay last read for it.
+    pub source: String,
+    pub source_ref: String,
+    /// Where it is, as the posting writes it.
+    pub location: Option<String>,
+    /// The facts kept on it (no pay: the pipeline keeps none).
+    pub facts: Facts,
+}
+
 /// A job already in a person's pipeline under another board: the boards
 /// it was seen on now, to add to its sources.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -208,6 +226,27 @@ pub trait Neighbours: Send + Sync + 'static {
         opportunity: Uuid,
         facts: Facts,
         hidden: Option<Excluded>,
+    ) -> BoxFuture<'a, Result<bool>>;
+
+    /// Up to `most` Found or Shortlisted opportunities hidden for
+    /// `not_open_to_location` whose posting said `open_to_candidate =
+    /// unclear`, with an id after `after`, by id.
+    fn hidden_unclear<'a>(
+        &'a self,
+        db: &'a PgPool,
+        after: Uuid,
+        most: usize,
+    ) -> BoxFuture<'a, Result<Vec<HiddenUnclear>>>;
+
+    /// Show `account`'s `opportunity` again with `gaps` added to its gaps,
+    /// only while it is still Found or Shortlisted and hidden for
+    /// `not_open_to_location`. Nothing else changes. Whether it was.
+    fn show_with_gaps<'a>(
+        &'a self,
+        db: &'a PgPool,
+        account: Uuid,
+        opportunity: Uuid,
+        gaps: Vec<String>,
     ) -> BoxFuture<'a, Result<bool>>;
 
     /// Up to `most` Found or Shortlisted opportunities a search found whose

@@ -12,7 +12,12 @@
 //! 2. **Pre-rank** by how much of a wanted role's words the title has, how
 //!    recent the job is, and whether its structured location names
 //!    somewhere they can work from (remote, Europe, their places, their
-//!    country); the top [`TOP`] are scored.
+//!    country): the order the quick looks go in, so a search stopped by a
+//!    limit has looked at the most promising, and the tie-break of the
+//!    quick looks' fit.
+//!
+//! The words the job boards are asked for ([`board_queries`]) are chosen
+//! here too: the roles they want and their top skills.
 
 use std::collections::HashSet;
 
@@ -24,13 +29,142 @@ use crate::{
     requirements::{Floor, Reach},
 };
 
-/// Jobs scored per search, at most.
-pub const TOP: usize = 40;
 /// Jobs older than this are left out.
 pub const MAX_AGE: TimeDelta = TimeDelta::days(30);
 
 /// Skills that drive the stack queries, the pre-rank and the fit label.
 pub const TOP_SKILLS: usize = 3;
+/// Wanted roles a job board is asked for.
+pub const TOP_ROLES: usize = 3;
+/// Queries one job board is asked, at most, besides its plain read.
+pub const MAX_QUERIES: usize = 6;
+
+/// Words that say how senior a role is, not what it is: left out of the
+/// words a board is asked for ("Senior Ruby Developer" is "ruby developer"),
+/// in the app's languages too ("Engenheira Sénior").
+const LEVEL_WORDS: [&str; 30] = [
+    "senior",
+    "sr",
+    "junior",
+    "jr",
+    "mid",
+    "middle",
+    "intermediate",
+    "staff",
+    "principal",
+    "entry",
+    "level",
+    "graduate",
+    "intern",
+    "i",
+    "ii",
+    "iii",
+    "iv",
+    "experienced",
+    "associate",
+    "sénior",
+    "sênior",
+    "júnior",
+    "pleno",
+    "estagiário",
+    "estagiária",
+    "becario",
+    "becaria",
+    "stagiaire",
+    "confirmé",
+    "confirmée",
+];
+
+/// Words that name a role only together with the next or the one before:
+/// "Tech Lead", "Head of Engineering", "Chief of Staff" stay whole, but
+/// "Lead Engineer" is "engineer".
+fn kept_with_neighbour(words: &[String], i: usize) -> bool {
+    let word = words[i].as_str();
+    let before = i.checked_sub(1).map(|j| words[j].as_str());
+    let after = words.get(i + 1).map(String::as_str);
+    match word {
+        "lead" => matches!(before, Some("tech" | "team")),
+        "head" | "chief" => after == Some("of"),
+        "of" => matches!(before, Some("head" | "chief")),
+        // What follows "head of" or "chief of" ("staff" in "Chief of Staff").
+        _ => before == Some("of") && i >= 2 && matches!(words[i - 2].as_str(), "head" | "chief"),
+    }
+}
+
+/// A wanted role's key words for a job board's search: lower case, without
+/// how senior it is or little words ("a", "de"), without what follows a
+/// comma, a bracket or a dash ("Senior Software Engineer, Platform (Remote)"
+/// is "software engineer"); "Tech Lead", "Team Lead", "Head of …" and "Chief
+/// of Staff" stay whole. `None` when nothing is left.
+pub fn role_words(role: &str) -> Option<String> {
+    let head = role
+        .split([',', '(', '[', '|', '–', '—'])
+        .next()
+        .unwrap_or_default()
+        .split(" - ")
+        .next()
+        .unwrap_or_default();
+    let all: Vec<String> = head
+        .split(|c: char| c.is_whitespace() || c == '/')
+        .map(|w| {
+            w.trim_matches(|c: char| !c.is_alphanumeric() && !matches!(c, '+' | '#'))
+                .to_lowercase()
+        })
+        .filter(|w| !w.is_empty())
+        .collect();
+    let words: Vec<&str> = (0..all.len())
+        .filter(|&i| {
+            let word = all[i].as_str();
+            kept_with_neighbour(&all, i)
+                || !(matches!(word, "lead" | "head" | "chief")
+                    || LEVEL_WORDS.contains(&word)
+                    || NOISE.contains(&word))
+        })
+        .map(|i| all[i].as_str())
+        .collect();
+    let text = words.join(" ");
+    (!text.is_empty() && text.chars().count() <= 60).then_some(text)
+}
+
+/// What the job boards that search by keyword are asked for, one query
+/// each: the key words of the first [`TOP_ROLES`] wanted roles, then the top
+/// skills ([`top_skills`]), without repeats (ignoring case), at most
+/// [`MAX_QUERIES`].
+pub fn board_queries(roles: &[String], skills: &[String]) -> Vec<String> {
+    let mut queries: Vec<String> = Vec::new();
+    let roles = roles.iter().filter_map(|r| role_words(r)).take(TOP_ROLES);
+    let skills = top_skills(skills).into_iter().map(str::to_owned);
+    for query in roles.chain(skills) {
+        if queries.len() == MAX_QUERIES {
+            break;
+        }
+        if !queries.iter().any(|q| q.eq_ignore_ascii_case(&query)) {
+            queries.push(query);
+        }
+    }
+    queries
+}
+
+/// What the job boards are asked in a night for everyone at once, from each
+/// person's [`board_queries`]: their first queries in turn, then their
+/// second, and so on, without repeats (ignoring case), at most
+/// [`MAX_QUERIES`] in all, so a board's daily fetches stay within its terms
+/// however many people search.
+pub fn shared_queries(each: &[Vec<String>]) -> Vec<String> {
+    let mut shared: Vec<String> = Vec::new();
+    let longest = each.iter().map(Vec::len).max().unwrap_or(0);
+    for turn in 0..longest {
+        for query in each.iter().filter_map(|queries| queries.get(turn)) {
+            if shared.len() == MAX_QUERIES {
+                return shared;
+            }
+            if !shared.iter().any(|q| q.eq_ignore_ascii_case(query)) {
+                shared.push(query.clone());
+            }
+        }
+    }
+    shared
+}
 
 /// The person's top skills: the first [`TOP_SKILLS`] non-blank entries, in
 /// their order, without repeats (ignoring case).
@@ -111,6 +245,9 @@ pub struct MatchInput {
     pub cash_floor: Option<Floor>,
     /// The skills on their profile, in their own order (at most 40).
     pub skills: Vec<String>,
+    /// What the job boards that search by keyword are asked for
+    /// ([`board_queries`]).
+    pub queries: Vec<String>,
 }
 
 impl MatchInput {
@@ -278,7 +415,7 @@ fn skill_fit(job: &Job, top: &[HashSet<String>]) -> f64 {
     SKILL_FIT * hits as f64 / top.len() as f64
 }
 
-/// The best [`TOP`] of `jobs` for `input`, best first.
+/// Every one of `jobs`, the most promising for `input` first.
 pub fn pre_rank(jobs: Vec<Job>, input: &MatchInput, now: DateTime<Utc>) -> Vec<Job> {
     let wanted = if input.roles.is_empty() {
         &input.titles
@@ -304,7 +441,7 @@ pub fn pre_rank(jobs: Vec<Job>, input: &MatchInput, now: DateTime<Utc>) -> Vec<J
             .then_with(|| jb.posted_at.cmp(&ja.posted_at))
             .then_with(|| ja.source_ref.cmp(&jb.source_ref))
     });
-    ranked.into_iter().take(TOP).map(|(_, job)| job).collect()
+    ranked.into_iter().map(|(_, job)| job).collect()
 }
 
 #[cfg(test)]
@@ -511,11 +648,120 @@ mod tests {
     }
 
     #[test]
-    fn only_the_top_forty_are_kept() {
+    fn every_job_is_ranked_none_is_cut() {
         let jobs = (0..100)
             .map(|i| job(&format!("Engineer {i}"), None, None, 1))
             .collect();
-        assert_eq!(pre_rank(jobs, &remote_in_portugal(), now()).len(), TOP);
+        assert_eq!(pre_rank(jobs, &remote_in_portugal(), now()).len(), 100);
+    }
+
+    #[test]
+    fn a_wanted_role_is_asked_for_without_how_senior_it_is() {
+        let words = |role: &str| role_words(role);
+        assert_eq!(
+            words("Senior Ruby Developer").as_deref(),
+            Some("ruby developer")
+        );
+        assert_eq!(
+            words("Staff Software Engineer, Platform (Remote)").as_deref(),
+            Some("software engineer")
+        );
+        assert_eq!(
+            words("Lead Engineer - Payments").as_deref(),
+            Some("engineer")
+        );
+        assert_eq!(words("C++ developer II").as_deref(), Some("c++ developer"));
+        assert_eq!(
+            words("Ruby/Rails developer").as_deref(),
+            Some("ruby rails developer")
+        );
+        // Lead, head and chief name a role with their neighbour.
+        assert_eq!(words("Tech Lead").as_deref(), Some("tech lead"));
+        assert_eq!(words("Senior Team Lead").as_deref(), Some("team lead"));
+        assert_eq!(words("Chief of Staff").as_deref(), Some("chief of staff"));
+        assert_eq!(
+            words("Head of Engineering").as_deref(),
+            Some("head of engineering")
+        );
+        // In the app's other languages.
+        assert_eq!(
+            words("Engenheira de Software Sénior").as_deref(),
+            Some("engenheira software")
+        );
+        assert_eq!(
+            words("Desarrollador Júnior").as_deref(),
+            Some("desarrollador")
+        );
+        assert_eq!(
+            words("Développeur Senior confirmé").as_deref(),
+            Some("développeur")
+        );
+        assert_eq!(words("Senior Staff"), None);
+        assert_eq!(words("  "), None);
+    }
+
+    #[test]
+    fn a_nights_queries_take_turns_and_stop_at_six() {
+        let ana: Vec<String> = ["ruby developer", "Rails", "React", "PostgreSQL"]
+            .map(String::from)
+            .into();
+        let bo: Vec<String> = ["data scientist", "Python", "rails", "SQL", "Spark"]
+            .map(String::from)
+            .into();
+        assert_eq!(
+            shared_queries(&[ana.clone(), bo]),
+            [
+                "ruby developer",
+                "data scientist",
+                "Rails",
+                "Python",
+                "React",
+                "PostgreSQL"
+            ],
+            "each in turn, \"rails\" once, six in all"
+        );
+        assert_eq!(shared_queries(std::slice::from_ref(&ana)), ana);
+        assert!(shared_queries(&[]).is_empty());
+    }
+
+    #[test]
+    fn boards_are_asked_for_the_roles_then_the_top_skills() {
+        let roles: Vec<String> = [
+            "Senior Ruby Developer",
+            "Software Engineer",
+            "Lead software engineer",
+            "Platform Engineer",
+        ]
+        .map(String::from)
+        .into();
+        let skills: Vec<String> = ["Ruby on Rails", "React", "PostgreSQL", "Go"]
+            .map(String::from)
+            .into();
+        assert_eq!(
+            board_queries(&roles, &skills),
+            [
+                "ruby developer",
+                "software engineer",
+                "Ruby on Rails",
+                "React",
+                "PostgreSQL"
+            ],
+            "the third role repeats the second; the fourth is past three"
+        );
+        // Six at most.
+        let many: Vec<String> = ["Data Scientist", "Product Designer", "Analyst"]
+            .map(String::from)
+            .into();
+        assert_eq!(board_queries(&many, &skills).len(), MAX_QUERIES);
+        // A skill that is a role's words is asked once.
+        let same: Vec<String> = vec!["Rust".into()];
+        assert_eq!(board_queries(&same, &same), ["rust"]);
+        assert!(board_queries(&[], &[]).is_empty());
+        // Skills only: as before.
+        assert_eq!(
+            board_queries(&[], &skills),
+            ["Ruby on Rails", "React", "PostgreSQL"]
+        );
     }
 
     #[test]

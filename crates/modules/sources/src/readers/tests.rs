@@ -642,7 +642,7 @@ async fn a_keyed_board_is_read_only_with_its_key_and_the_key_is_kept_nowhere(db:
     assert_eq!(read.error.as_deref(), Some("needs_key"));
 }
 
-fn queries(requests: &[wiremock::Request], prefix: &str, param: &str) -> Vec<Option<String>> {
+fn queries_of(requests: &[wiremock::Request], prefix: &str, param: &str) -> Vec<Option<String>> {
     requests
         .iter()
         .filter(|r| r.url.path().starts_with(prefix))
@@ -656,7 +656,7 @@ fn queries(requests: &[wiremock::Request], prefix: &str, param: &str) -> Vec<Opt
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn boards_that_search_by_skill_are_asked_for_the_top_three_skills(db: PgPool) {
+async fn boards_that_search_by_keyword_are_asked_for_the_roles_and_top_skills(db: PgPool) {
     let server = testkit::fake_job_boards().await;
     testkit::seed_fake_boards(
         &db,
@@ -666,61 +666,186 @@ async fn boards_that_search_by_skill_are_asked_for_the_top_three_skills(db: PgPo
     .await;
     let reader = board_reader(true);
     let now = testkit::today();
+    let roles: Vec<String> = vec!["Senior Ruby Developer".into()];
     let skills: Vec<String> = ["Ruby on Rails", "React", "PostgreSQL", "Rust"]
         .map(String::from)
         .into();
+    let queries = crate::matching::board_queries(&roles, &skills);
+    assert_eq!(
+        queries,
+        ["ruby developer", "Ruby on Rails", "React", "PostgreSQL"]
+    );
     for slug in ["himalayas", "jobicy", "remoteok", "arbeitnow"] {
         let row = approved_board(&db, slug).await;
         let plain = reader.job_board(&db, &row, now, now).await;
-        let stacked = reader.job_board_for(&db, &row, now, now, &skills).await;
-        assert_ne!(
-            stacked.outcome,
-            Outcome::Error,
-            "{slug}: {:?}",
-            stacked.error
-        );
+        let asked = reader.job_board_for(&db, &row, now, now, &queries).await;
+        assert_ne!(asked.outcome, Outcome::Error, "{slug}: {:?}", asked.error);
         // The same fake answers every query: merged without duplicates.
-        assert_eq!(stacked.jobs.len(), plain.jobs.len(), "{slug}");
+        assert_eq!(asked.jobs.len(), plain.jobs.len(), "{slug}");
     }
     let seen = server.received_requests().await.unwrap();
     // Remote OK: its plain read, then its tags (its own spellings).
-    let tags = queries(&seen, "/remoteok", "tag");
+    let tags = queries_of(&seen, "/remoteok", "tag");
     assert_eq!(
         tags,
         [
             None,
+            Some("ruby-developer".into()),
             Some("ruby".into()),
             Some("react".into()),
             Some("postgres".into())
         ]
     );
     // Jobicy: a keyword search; the plain read asks for `engineer`.
-    let tags = queries(&seen, "/jobicy", "tag");
+    let tags = queries_of(&seen, "/jobicy", "tag");
     assert_eq!(
         tags,
         [
             Some("engineer".into()),
+            Some("ruby developer".into()),
             Some("rails".into()),
             Some("react".into()),
             Some("postgresql".into())
         ]
     );
-    // Himalayas: its search address, once per skill, one page each.
-    let search: Vec<_> = queries(&seen, "/himalayas/jobs/api/search", "q");
+    // Himalayas: its search address, once per query, one page each.
+    let search: Vec<_> = queries_of(&seen, "/himalayas/jobs/api/search", "q");
     assert_eq!(
         search,
         [
+            Some("ruby developer".into()),
             Some("ruby on rails".into()),
             Some("react".into()),
             Some("postgresql".into())
         ]
     );
-    // Arbeitnow cannot search by skill: its two pages, as before.
+    // Arbeitnow cannot search by keyword: its two pages, as before.
     assert_eq!(testkit::requests_to(&server, "/arbeitnow").await, 2);
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn a_board_is_read_as_before_without_skills(db: PgPool) {
+async fn a_page_that_fails_keeps_the_pages_read_before_it(db: PgPool) {
+    // Himalayas by cursor: pages 1 and 2 answer, page 3 answers 500.
+    let server = MockServer::start().await;
+    let mut second: serde_json::Value = serde_json::from_str(testkit::HIMALAYAS_PAGE2).unwrap();
+    second["nextCursor"] = serde_json::json!("cursor-page-3");
+    Mock::given(method("GET"))
+        .and(path("/himalayas/jobs/api"))
+        .and(wiremock::matchers::query_param_is_missing("cursor"))
+        .respond_with(json(testkit::HIMALAYAS))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/himalayas/jobs/api"))
+        .and(query_param("cursor", "Y3Vyc29yLXBhZ2UtMg"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(second))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/himalayas/jobs/api"))
+        .and(query_param("cursor", "cursor-page-3"))
+        .respond_with(ResponseTemplate::new(500))
+        .mount(&server)
+        .await;
+    testkit::seed_fake_boards(&db, &server, &["himalayas"]).await;
+    let reader = board_reader(true);
+    let now = testkit::today();
+    let row = approved_board(&db, "himalayas").await;
+    let read = reader.job_board(&db, &row, now, now).await;
+    assert_eq!(read.outcome, Outcome::Read, "{:?}", read.error);
+    assert_eq!(read.error, None);
+    assert_eq!(read.jobs.len(), 4, "the jobs of pages 1 and 2");
+    assert_eq!(read.partial, Some(PartialRead { failed_page: 3 }));
+    assert_eq!(
+        read.partial.unwrap().note(),
+        "Read 2 pages. Page 3 did not answer."
+    );
+    assert_eq!(testkit::requests_to(&server, "/himalayas").await, 3);
+
+    // A first page that fails still fails the board.
+    let down = MockServer::start().await;
+    Mock::given(method("GET"))
+        .respond_with(ResponseTemplate::new(500))
+        .mount(&down)
+        .await;
+    testkit::seed_fake_boards(&db, &down, &["himalayas"]).await;
+    let row = approved_board(&db, "himalayas").await;
+    let failed = reader.job_board(&db, &row, now, now).await;
+    assert_eq!(failed.outcome, Outcome::Error);
+    assert_eq!(failed.error.as_deref(), Some("http_500"));
+    assert!(failed.jobs.is_empty() && failed.partial.is_none());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_board_that_asks_to_slow_down_part_way_is_asked_nothing_more_and_left_alone(db: PgPool) {
+    // Himalayas by cursor: pages 1 to 3 answer, page 4 answers 429 with
+    // `Retry-After: 600`.
+    let server = MockServer::start().await;
+    let page = |next: &str| {
+        let mut answer: serde_json::Value = serde_json::from_str(testkit::HIMALAYAS_PAGE2).unwrap();
+        answer["nextCursor"] = serde_json::json!(next);
+        answer
+    };
+    Mock::given(method("GET"))
+        .and(path("/himalayas/jobs/api"))
+        .and(wiremock::matchers::query_param_is_missing("cursor"))
+        .respond_with(json(testkit::HIMALAYAS))
+        .mount(&server)
+        .await;
+    for (cursor, next) in [("Y3Vyc29yLXBhZ2UtMg", "page-3"), ("page-3", "page-4")] {
+        Mock::given(method("GET"))
+            .and(path("/himalayas/jobs/api"))
+            .and(query_param("cursor", cursor))
+            .respond_with(ResponseTemplate::new(200).set_body_json(page(next)))
+            .mount(&server)
+            .await;
+    }
+    Mock::given(method("GET"))
+        .and(path("/himalayas/jobs/api"))
+        .and(query_param("cursor", "page-4"))
+        .respond_with(ResponseTemplate::new(429).insert_header("Retry-After", "600"))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/himalayas/jobs/api/search"))
+        .respond_with(json(testkit::HIMALAYAS))
+        .mount(&server)
+        .await;
+    testkit::seed_fake_boards(&db, &server, &["himalayas"]).await;
+    let reader = board_reader(true);
+    let now = testkit::today();
+    let row = approved_board(&db, "himalayas").await;
+    let queries: Vec<String> = vec!["ruby developer".into(), "rails".into()];
+    let read = reader.job_board_for(&db, &row, now, now, &queries).await;
+    assert_eq!(read.outcome, Outcome::Read, "{:?}", read.error);
+    assert_eq!(read.partial, Some(PartialRead { failed_page: 4 }));
+    assert!(read.jobs.len() >= 4, "the first three pages are kept");
+    assert_eq!(
+        testkit::requests_to(&server, "/himalayas/jobs/api/search").await,
+        0,
+        "no query once it asked to slow down"
+    );
+    let row = approved_board(&db, "himalayas").await;
+    assert!(
+        row.backoff_until
+            .is_some_and(|until| until >= now + chrono::TimeDelta::minutes(60)),
+        "left alone for its polling interval at least: {:?}",
+        row.backoff_until
+    );
+
+    // The next search, 15 minutes later, does not ask it.
+    let before = server.received_requests().await.unwrap().len();
+    let later = now + chrono::TimeDelta::minutes(15);
+    let again = reader
+        .job_board_for(&db, &row, later, later, &queries)
+        .await;
+    assert_eq!(again.outcome, Outcome::Error);
+    assert_eq!(again.error.as_deref(), Some("backing_off"));
+    assert_eq!(server.received_requests().await.unwrap().len(), before);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_board_is_read_as_before_without_queries(db: PgPool) {
     let server = testkit::fake_job_boards().await;
     testkit::seed_fake_boards(&db, &server, &["remoteok"]).await;
     let reader = board_reader(true);
@@ -736,6 +861,8 @@ fn a_board_with_a_daily_limit_spreads_its_addresses_over_the_day() {
     let hour = Duration::from_secs(3_600);
     // Jobicy: 24 fetches a day, the plain read and three queries.
     assert_eq!(stack_ttl(hour, 24, 3), Duration::from_secs(4 * 3_600));
+    // ... and six queries: each of its seven addresses every 7 hours.
+    assert_eq!(stack_ttl(hour, 24, 6), Duration::from_secs(7 * 3_600));
     // A roomy limit keeps the polling interval.
     assert_eq!(stack_ttl(hour, 1_000, 3), hour);
 }

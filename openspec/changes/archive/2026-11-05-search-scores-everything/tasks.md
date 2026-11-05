@@ -1,0 +1,11 @@
+# Tasks
+- [x] 1 migration: `scores.stage` in the key, the search's funnel counts and reasons, `board_scans.quick_looked`
+- [x] 2 quick look (`quick.rs`): request, strict parse, retry in halves, cache as `stage = 'quick'`
+- [x] 3 search: two stages within one time budget, the cut by quick fit (`FULL_SCORES_PER_SEARCH`), the funnel, per-site quick looks, the nightly check on any score
+- [x] 4 rules: "unclear" kept with the gap for remote only and no relocation, `RULES_VERSION` 3; the recheck shows again what was hidden only for that
+- [x] 5 queries: roles' key words and top skills (at most 6) through each site's keyword search; Himalayas 10 pages; a failed page keeps the pages read
+- [x] 6 spending limits €1 a day and €10 a month by default; the estimate and its confirm threshold
+- [x] 7 API: the funnel on each search run, `quick_looked` per line
+- [x] 8 Searches tab: four numbers, where the matches came from, why jobs were left out, kept with a note, Show by site, earlier runs, Search now with its cost; the gap in four languages
+- [x] 9 tests: quick look batching and cache, the rule change, the query builder, the partial page, the funnel counts; the fake model's quick look; the filmed spec
+- [x] 10 OpenAPI regenerated, client types regenerated, changelog entry, gates green in CI, recording (375px and desktop)

@@ -121,3 +121,41 @@ describe("The peek's cover letter line", () => {
     expect(screen.queryByTestId("peek-letter")).toBeNull();
   });
 });
+
+describe("The peek's gaps", () => {
+  const GAPS = [
+    "Doesn't say if it hires in Portugal",
+    "Salary not stated",
+    "On-call duty is not on your profile",
+  ];
+
+  function renderGaps(locale: "en" | "pt-PT" | "fr") {
+    stubApi({
+      [`GET /api/v1/opportunities/${ID}`]: {
+        body: opportunity({ id: ID, stage: "found", gaps: GAPS }),
+      },
+      [`GET /api/v1/opportunities/${ID}/cv`]: { status: 404 },
+    });
+    renderWithProviders(
+      <UndoProvider>
+        <OpportunityPeek id={ID} onPrepare={vi.fn()} onReview={vi.fn()} onClose={vi.fn()} />
+      </UndoProvider>,
+      { locale },
+    );
+  }
+
+  it("say in the person's language what the app noted, and the model's as written", async () => {
+    renderGaps("en");
+    const gaps = await screen.findByTestId("peek-gaps");
+    expect(gaps).toHaveTextContent("Doesn’t say if it hires in Portugal");
+    expect(gaps).toHaveTextContent("Salary not stated");
+    expect(gaps).toHaveTextContent("On-call duty is not on your profile");
+  });
+
+  it("name the country in the person's language", async () => {
+    renderGaps("fr");
+    const gaps = await screen.findByTestId("peek-gaps");
+    expect(gaps).toHaveTextContent("Ne dit pas si elle recrute dans votre pays : Portugal");
+    expect(gaps).toHaveTextContent("Salaire non indiqué");
+  });
+});

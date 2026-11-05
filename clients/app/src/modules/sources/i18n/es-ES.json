@@ -3,7 +3,7 @@
   "starting": "Empezando…",
   "confirm": {
     "title": "¿Buscar ahora en los portales de empleo?",
-    "body": "Esta búsqueda costará unos {{cost}} de IA para valorar unas {{jobs}} ofertas. ¿Seguimos?",
+    "body": "Esta búsqueda costará unos {{cost}} de IA para ver unas {{jobs}} ofertas. ¿Seguimos?",
     "go": "Buscar",
     "cancel": "Ahora no"
   },
@@ -47,7 +47,7 @@
     "tabs": {
       "label": "Vista de los portales",
       "boards": "Portales",
-      "scanned": "Analizado"
+      "scanned": "Búsquedas"
     },
     "loading": "Cargando los portales de empleo…",
     "loadFailed": "No se pudieron cargar los portales de empleo.",
@@ -291,25 +291,67 @@
     }
   },
   "scanned": {
-    "lead": "Qué analizó cada búsqueda y el descubrimiento semanal, portal por portal.",
-    "filter": "Portal",
-    "allBoards": "Todos los portales",
-    "loading": "Cargando lo analizado…",
-    "loadFailed": "No se pudo cargar lo analizado.",
-    "emptyTitle": "Todavía no se ha analizado nada",
-    "emptyBody": "Tras una búsqueda, cada portal leído aparece aquí: ofertas leídas, que cumplen tus requisitos, puntuadas por la IA, coincidencias y lo que costó la IA.",
-    "more": "Mostrar anteriores",
+    "lead": "Lo que encontró cada búsqueda.",
+    "loading": "Cargando las búsquedas…",
+    "loadFailed": "No se pudieron cargar las búsquedas.",
+    "emptyTitle": "Aún no hay búsquedas",
+    "emptyBody": "Cada búsqueda aparece aquí: las ofertas que leyó, las que leyó enteras, las buenas coincidencias y lo que costó.",
+    "lastNight": "Anoche · {{date}}",
     "today": "Hoy {{time}}",
-    "discovery": "{{at}} · descubrimiento",
-    "search": "{{at}} · {{kind}} · {{cost}}",
-    "nightlySearch": "búsqueda nocturna",
-    "manualSearch": "búsqueda",
-    "line": {
-      "read": "{{name}}: {{read}} leídas → {{passed}} cumplen tus requisitos → {{scored}} puntuadas por la IA → {{matched}} coincidencias · IA {{cost}}",
-      "skipped": "{{name}}: omitido (límite de lecturas), se usó su última respuesta: {{read}} leídas → {{passed}} cumplen → {{scored}} puntuadas → {{matched}} coincidencias",
-      "error": "{{name}}: no se pudo leer ({{error}})",
-      "checked": "{{name}}: revisado · {{note}}"
-    }
+    "manual": "Buscaste · {{at}}",
+    "discovery": "Buscó nuevos portales de empleo · {{date}}",
+    "sitesChecked_one": "{{count}} portal revisado",
+    "sitesChecked_other": "{{count}} portales revisados",
+    "figures": {
+      "read_one": "oferta leída",
+      "read_other": "ofertas leídas",
+      "readInFull": "leídas enteras",
+      "goodMatches_one": "buena coincidencia",
+      "goodMatches_other": "buenas coincidencias",
+      "cost": "coste"
+    },
+    "from": "De dónde vinieron las coincidencias",
+    "noMatches": "Esta vez no hubo buenas coincidencias.",
+    "companySites": "Webs de las empresas",
+    "leftOut": "Por qué se quedaron fuera",
+    "reasons": {
+      "seen_before": "Vistas antes",
+      "too_old": "Antiguas, o ya cerradas",
+      "not_remote": "No son en remoto, o no son donde puedes trabajar",
+      "quick_look": "No encajan, por el título y el resumen",
+      "language": "En un idioma en el que no trabajas",
+      "not_open_to_location": "Solo contratan en otros países",
+      "below_floor": "Pagan menos de lo que pediste",
+      "not_good_enough": "Leídas enteras, no son buenas coincidencias",
+      "waiting": "Quedan para la próxima búsqueda"
+    },
+    "count": "{{label}} · {{n}}",
+    "keptWithNote_one": "{{count}} de las {{total}} leídas enteras no dice dónde contrata. Se queda, con una nota.",
+    "keptWithNote_other": "{{count}} de las {{total}} leídas enteras no dicen dónde contratan. Se quedan, con una nota.",
+    "bySite": "Ver por portal",
+    "hideBySite": "Ocultar por portal",
+    "site": {
+      "read": "Leídas: {{read}} · Por encima: {{quick}} · Leídas enteras: {{full}} · Buenas coincidencias: {{matched}} · Coste: {{cost}}",
+      "skipped": "No se volvió a leer tan pronto: se usaron sus últimas ofertas.",
+      "partial_one": "Se leyó {{count}} página. La página {{page}} no respondió.",
+      "partial_other": "Se leyeron {{count}} páginas. La página {{page}} no respondió.",
+      "error": "No se pudo leer: {{error}}",
+      "checked": "Revisado · {{note}}"
+    },
+    "errors": {
+      "noAnswer": "el portal no respondió.",
+      "slowDown": "el portal pidió a la app que fuera más despacio.",
+      "needsKey": "necesita una clave.",
+      "badConfig": "sus ajustes no funcionan."
+    },
+    "earlier": "Búsquedas anteriores",
+    "details": "Detalles",
+    "more": "Ver más antiguas",
+    "nightlyLine": "La app busca cada noche a las 21:00.",
+    "about": "Unos {{cost}}.",
+    "aboutUnder": "Menos de {{cost}}.",
+    "costUnder": "menos de {{cost}}",
+    "running": "Buscando ahora. Puedes salir de esta página."
   },
   "companies": {
     "loading": "Cargando las empresas…",
@@ -447,7 +489,7 @@
           "price": "Puntuadas con la búsqueda nocturna · unos 0,0003 € cada una"
         }
       },
-      "limits": "Hasta {{max}} empresas vigiladas. Cuenta para tus límites (0,30 € al día, 5 € al mes), y nada se reintenta pasado un límite."
+      "limits": "Hasta {{max}} empresas vigiladas. Cuenta para tus límites de 1 € al día y 10 € al mes, y nada se reintenta pasado un límite."
     }
   },
   "admin": {

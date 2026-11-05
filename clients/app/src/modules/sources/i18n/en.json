@@ -3,7 +3,7 @@
   "starting": "Starting…",
   "confirm": {
     "title": "Search the job boards now?",
-    "body": "This search will cost about {{cost}} of AI to score about {{jobs}} jobs. Go ahead?",
+    "body": "This search will cost about {{cost}} of AI to look at about {{jobs}} jobs. Go ahead?",
     "go": "Search",
     "cancel": "Not now"
   },
@@ -47,7 +47,7 @@
     "tabs": {
       "label": "Boards view",
       "boards": "Boards",
-      "scanned": "Scanned"
+      "scanned": "Searches"
     },
     "loading": "Loading the job boards…",
     "loadFailed": "The job boards couldn’t be loaded.",
@@ -291,25 +291,67 @@
     }
   },
   "scanned": {
-    "lead": "What each search and the weekly discovery scanned, board by board.",
-    "filter": "Board",
-    "allBoards": "All boards",
-    "loading": "Loading what was scanned…",
-    "loadFailed": "What was scanned couldn’t be loaded.",
-    "emptyTitle": "Nothing scanned yet",
-    "emptyBody": "After a search, each board it read shows here: jobs read, passed your requirements, scored by AI, matched, and what the AI cost.",
-    "more": "Show older",
+    "lead": "What each search found.",
+    "loading": "Loading the searches…",
+    "loadFailed": "The searches couldn’t be loaded.",
+    "emptyTitle": "No searches yet",
+    "emptyBody": "Each search shows here: the jobs it read, the ones it read in full, the good matches and what it cost.",
+    "lastNight": "Last night · {{date}}",
     "today": "Today {{time}}",
-    "discovery": "{{at}} · discovery",
-    "search": "{{at}} · {{kind}} · {{cost}}",
-    "nightlySearch": "nightly search",
-    "manualSearch": "search",
-    "line": {
-      "read": "{{name}}: {{read}} read → {{passed}} passed your requirements → {{scored}} scored by AI → {{matched}} matched · AI {{cost}}",
-      "skipped": "{{name}}: skipped (polling limit), its last answer used: {{read}} read → {{passed}} passed → {{scored}} scored → {{matched}} matched",
-      "error": "{{name}}: couldn’t be read ({{error}})",
-      "checked": "{{name}}: checked · {{note}}"
-    }
+    "manual": "You searched · {{at}}",
+    "discovery": "Looked for new job sites · {{date}}",
+    "sitesChecked_one": "{{count}} site checked",
+    "sitesChecked_other": "{{count}} sites checked",
+    "figures": {
+      "read_one": "job read",
+      "read_other": "jobs read",
+      "readInFull": "read in full",
+      "goodMatches_one": "good match",
+      "goodMatches_other": "good matches",
+      "cost": "cost"
+    },
+    "from": "Where the matches came from",
+    "noMatches": "No good matches this time.",
+    "companySites": "Company sites",
+    "leftOut": "Why jobs were left out",
+    "reasons": {
+      "seen_before": "Seen before",
+      "too_old": "Too old, or no longer open",
+      "not_remote": "Not remote, or not where you can work",
+      "quick_look": "Not a fit, from the title and summary",
+      "language": "In a language you don’t work in",
+      "not_open_to_location": "Hire only in other countries",
+      "below_floor": "Pay less than you asked",
+      "not_good_enough": "Read in full, not a good match",
+      "waiting": "Left for the next search"
+    },
+    "count": "{{label}} · {{n}}",
+    "keptWithNote_one": "{{count}} of the {{total}} read in full doesn’t say where it hires. It is kept, with a note.",
+    "keptWithNote_other": "{{count}} of the {{total}} read in full don’t say where they hire. They are kept, with a note.",
+    "bySite": "Show by site",
+    "hideBySite": "Hide by site",
+    "site": {
+      "read": "Read: {{read}} · Quick look: {{quick}} · Read in full: {{full}} · Good matches: {{matched}} · Cost: {{cost}}",
+      "skipped": "Not read again so soon: its last jobs were used.",
+      "partial_one": "Read {{count}} page. Page {{page}} did not answer.",
+      "partial_other": "Read {{count}} pages. Page {{page}} did not answer.",
+      "error": "Could not be read: {{error}}",
+      "checked": "Checked · {{note}}"
+    },
+    "errors": {
+      "noAnswer": "the site did not answer.",
+      "slowDown": "the site asked the app to slow down.",
+      "needsKey": "it needs a key.",
+      "badConfig": "its settings do not work."
+    },
+    "earlier": "Earlier searches",
+    "details": "Details",
+    "more": "Show older",
+    "nightlyLine": "The app searches every night at 21:00.",
+    "about": "About {{cost}}.",
+    "aboutUnder": "Under {{cost}}.",
+    "costUnder": "under {{cost}}",
+    "running": "Searching now. You can leave this page."
   },
   "companies": {
     "loading": "Loading the companies…",
@@ -447,7 +489,7 @@
           "price": "Scored with the nightly search · about €0.0003 each"
         }
       },
-      "limits": "Up to {{max}} watched companies. It counts against your limits (€0.30 a day, €5 a month), and nothing is retried past a limit."
+      "limits": "Up to {{max}} watched companies. It counts against your limits of €1 a day and €10 a month, and nothing is retried past a limit."
     }
   },
   "admin": {

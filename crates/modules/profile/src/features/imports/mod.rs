@@ -534,10 +534,14 @@ pub async fn apply(
     .bind(now)
     .execute(&mut *tx)
     .await?;
-    sqlx::query("UPDATE profile.imports SET status = 'applied' WHERE id = $1")
+    sqlx::query("UPDATE profile.imports SET status = 'applied', applied_at = $2 WHERE id = $1")
         .bind(id)
+        .bind(now)
         .execute(&mut *tx)
         .await?;
+    // What the app knows that this profile now lacks, proposed to keep or
+    // drop: Complete your profile.
+    crate::features::facts::queue(&mut tx, principal.account_id).await?;
     state
         .events
         .publish(

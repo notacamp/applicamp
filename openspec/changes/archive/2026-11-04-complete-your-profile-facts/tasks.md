@@ -1,0 +1,11 @@
+# Tasks
+- [x] 1 Migration: `profile.fact_proposals` (with origin and batch), `profile.markers`, `profile.imports.applied_at`
+- [x] 2 `features/facts/propose.rs`: candidates from Tell me about you, the own website and a CV read again (no model); only quotes that are the person's words; known sentences only from a job or the person's words; unit tests
+- [x] 3 Store, de-duplicate by place and words, close what the profile holds and what was taken back; the `profile.propose_facts` job on every change of Tell me about you's state; Save proposes in its transaction and never writes a dropped fact
+- [x] 4 `profile.backfill_facts` at start, guarded by a marker; one failing account does not stop it
+- [x] 5 Endpoints: list, keep, keep all, drop, undo, undo a Keep all within a day; HTTP tests
+- [x] 6 Client: the "Complete your profile" page, the nudge on Profile & goals and on Tell me about you's saved screen, `DecisionCard`; four languages; vitest
+- [x] 7 Route `/profile/complete` (route file, its registration, one callback each from Profile & goals and Tell me about you)
+- [x] 8 Filmed e2e `profile-complete.e2e.ts` (desktop and 375px): Undo on kept and dropped, the CV banner, button sizes
+- [x] 9 OpenAPI regenerated, client types regenerated, changelog entry file, OpenSpec change archived
+- [x] 10 Gates green in CI; recording at 375px and desktop in the PR

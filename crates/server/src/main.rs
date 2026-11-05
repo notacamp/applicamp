@@ -158,6 +158,8 @@ async fn run(
         tracing::info!("migrations applied");
     }
     applicamp_sources::start(&db, &composition.sources).await?;
+    let facts_backfill = applicamp_profile::start(&db).await?;
+    tracing::info!(facts_backfill, "profile ready");
     let events = EventBus::new(Arc::clone(&registry));
     let (stop, stopped) = watch::channel(false);
     let runs = applicamp_server::runs_with(composition);

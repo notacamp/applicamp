@@ -1704,6 +1704,137 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/profile/facts/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The facts proposed for the profile.
+         * @description What the app already knows that the profile does not hold: what the person
+         *     told and confirmed in Tell me about you, what their own website says, what
+         *     a CV read again says. Open ones, and those kept or dropped in the last day
+         *     (still undoable), grouped by position, newest first, then skills and
+         *     background. Never calls a model.
+         */
+        get: operations["profile.fact_proposals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/facts/proposals/batches/{id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo a Keep all, within a day.
+         * @description Every fact it kept is taken back, in one profile write, and waits again.
+         */
+        post: operations["profile.fact_undo_batch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/facts/proposals/keep-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Keep every open fact.
+         * @description One profile write, one new version, and one Undo for all of them for a day
+         *     (`…/batches/{id}/undo`). Facts whose job is no longer on the profile are
+         *     left as they are.
+         */
+        post: operations["profile.fact_keep_all"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/facts/proposals/{id}/drop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Drop a fact: it is not written, not proposed again, and never written by
+         *     Tell me about you's Save. Can be undone for a day.
+         */
+        post: operations["profile.fact_drop"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/facts/proposals/{id}/keep": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Keep a fact.
+         * @description Writes it on its position (with its quote; a confirmed assumption keeps
+         *     what it was based on), adds the skill or adds to the background: one new
+         *     profile version. Can be undone for a day. A fact the profile already holds
+         *     is closed, and nothing is written.
+         */
+        post: operations["profile.fact_keep"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profile/facts/proposals/{id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo a Keep or a Drop, within a day.
+         * @description A kept fact is taken off its position again (the skill it added out of the
+         *     skills, its words out of the background while it still ends with them):
+         *     one new profile version. A dropped one is open again.
+         */
+        post: operations["profile.fact_undo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/profile/grill/proposals/{id}/drop": {
         parameters: {
             query?: never;
@@ -3585,6 +3716,25 @@ export interface components {
             stale: boolean;
             template?: components["schemas"]["Template"] | null;
         };
+        /** @description What an import applied in the last day found, part by part. */
+        CvRead: {
+            /** Format: int32 */
+            achievements: number;
+            /** Format: date-time */
+            applied_at: string;
+            /** Format: int32 */
+            certificates: number;
+            /** Format: int32 */
+            degrees: number;
+            /** Format: int32 */
+            jobs: number;
+            /** Format: int32 */
+            languages: number;
+            /** Format: int32 */
+            projects: number;
+            /** Format: int32 */
+            skills: number;
+        };
         /** @description An approved version: the approved text as a PDF. */
         CvVersion: {
             /**
@@ -3723,6 +3873,22 @@ export interface components {
          * @enum {string}
          */
         Fact: "yes" | "no" | "unclear";
+        /** @description The proposals for one place of the profile. */
+        FactGroup: {
+            company?: string | null;
+            end_date?: string | null;
+            /**
+             * Format: int32
+             * @description For a position: its place in `work` now.
+             */
+            position?: number | null;
+            proposals: components["schemas"]["FactProposalView"][];
+            /** @description `YYYY`, `YYYY-MM` or `YYYY-MM-DD`; no end while it is current. */
+            start_date?: string | null;
+            target: components["schemas"]["FactTarget"];
+            /** @description For a position: its title and company. */
+            title?: string | null;
+        };
         /** @description A fact taken from an answer. */
         FactProposal: {
             /** @description What it is about. */
@@ -3750,15 +3916,91 @@ export interface components {
             turn_seq: number;
         };
         /**
+         * @description Where a proposal is.
+         * @enum {string}
+         */
+        FactProposalState: "open" | "kept" | "dropped";
+        /**
          * @description Where a fact taken from an answer is.
          * @enum {string}
          */
         FactProposalStatus: "ready" | "kept" | "dropped";
+        /** @description A fact proposed for the profile. */
+        FactProposalView: {
+            /** @description What it is about. */
+            area: components["schemas"]["Area"];
+            /**
+             * @description For a confirmed assumption: what it was based on (its reason, or the
+             *     page it was read on).
+             */
+            basis?: string | null;
+            /**
+             * Format: date-time
+             * @description When it was kept or dropped.
+             */
+            decided_at?: string | null;
+            /** Format: uuid */
+            id: string;
+            /**
+             * @description The words it comes from: the person's, the confirmed assumption, the
+             *     website's or the CV's.
+             */
+            quote: string;
+            /**
+             * @description An assumption the person marked *That's right* in Tell me about you
+             *     (not one left unanswered, nor a sentence taken from the profile).
+             */
+            said_right: boolean;
+            source: components["schemas"]["FactSource"];
+            state: components["schemas"]["FactProposalState"];
+            /** @description The fact (for a skill, its name). */
+            text: string;
+            /**
+             * Format: date-time
+             * @description Until when that can be undone.
+             */
+            undo_until?: string | null;
+        };
+        /**
+         * @description The facts proposed for the profile: open ones, and those decided in the
+         *     last day (they can still be undone).
+         */
+        FactProposalsView: {
+            batch?: components["schemas"]["KeptBatch"] | null;
+            cv_read?: components["schemas"]["CvRead"] | null;
+            /**
+             * Format: int32
+             * @description Dropped in the last day.
+             */
+            dropped: number;
+            /** @description By position, newest position first; then the skills and the background. */
+            groups: components["schemas"]["FactGroup"][];
+            /**
+             * Format: int32
+             * @description Kept in the last day.
+             */
+            kept: number;
+            /**
+             * Format: int32
+             * @description Waiting for Keep or Drop.
+             */
+            open: number;
+        };
+        /**
+         * @description Where a proposed fact comes from.
+         * @enum {string}
+         */
+        FactSource: "you_said" | "you_confirmed" | "your_website" | "your_cv";
         /**
          * @description How a fact became the person's.
          * @enum {string}
          */
         FactStatus: "told" | "confirmed_assumption";
+        /**
+         * @description Where a proposed fact goes.
+         * @enum {string}
+         */
+        FactTarget: "position" | "skills" | "background";
         /**
          * @description What a change is about.
          * @enum {string}
@@ -4046,6 +4288,21 @@ export interface components {
              *     itself never changes.
              */
             text?: string | null;
+        };
+        /** @description A Keep all: the facts it kept, undone together. */
+        KeptBatch: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * Format: int32
+             * @description Facts it added to the profile, still there.
+             */
+            kept: number;
+            /**
+             * Format: date-time
+             * @description Until when it can be undone.
+             */
+            undo_until: string;
         };
         /** @description A keyword of the job. */
         Keyword: {
@@ -10229,6 +10486,300 @@ export interface operations {
             };
             /** @description `not_found`: no such assumption */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.fact_proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The proposals. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactProposalsView"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.fact_undo_batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The Keep all (`batch.id`). */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The proposals, after the undo. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactProposalsView"];
+                };
+            };
+            /** @description `invalid_profile`: the profile would break a limit */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found`: no such Keep all */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `undo_expired`: kept more than a day ago */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.fact_keep_all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The proposals, after they were kept. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactProposalsView"];
+                };
+            };
+            /** @description `invalid_profile`: the profile would break a limit */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.fact_drop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The proposal. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The proposals, after it was dropped. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactProposalsView"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `proposal_not_open`: already kept */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.fact_keep": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The proposal. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The proposals, after it was kept. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactProposalsView"];
+                };
+            };
+            /** @description `invalid_profile`: the profile would break a limit */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `proposal_not_open`: already kept or dropped; `profile_changed`: its job is no longer on the profile */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "profile.fact_undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The proposal. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The proposals, after the undo. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactProposalsView"];
+                };
+            };
+            /** @description `invalid_profile`: the profile would break a limit */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `session_required` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `proposal_not_decided`: nothing to undo; `undo_expired`: decided more than a day ago */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -26,6 +26,7 @@ import { PipelineLetter } from "./routes/pipeline-letter";
 import { PipelinePrepare } from "./routes/pipeline-prepare";
 import { Profile } from "./routes/profile";
 import { ProfileAbout } from "./routes/profile-about";
+import { ProfileComplete } from "./routes/profile-complete";
 import { ProfileLinkedIn } from "./routes/profile-linkedin";
 import { Today } from "./routes/today";
 
@@ -318,6 +319,9 @@ const profileRoute = createRoute({
         onLinkedIn={() => {
           void navigate({ to: "/profile/linkedin" });
         }}
+        onComplete={() => {
+          void navigate({ to: "/profile/complete" });
+        }}
         onAction={(action) => {
           switch (action.kind) {
             // What a part of the strength still needs is asked in Tell me about
@@ -364,6 +368,9 @@ const profileAboutRoute = createRoute({
         onBack={() => {
           void navigate({ to: "/profile" });
         }}
+        onComplete={() => {
+          void navigate({ to: "/profile/complete" });
+        }}
       />
     );
   },
@@ -377,6 +384,22 @@ const profileLinkedInRoute = createRoute({
     const navigate = profileLinkedInRoute.useNavigate();
     return (
       <ProfileLinkedIn
+        onBack={() => {
+          void navigate({ to: "/profile" });
+        }}
+      />
+    );
+  },
+});
+
+/** Complete your profile: the facts the app found, to keep or drop, in the app frame. */
+const profileCompleteRoute = createRoute({
+  getParentRoute: () => frameRoute,
+  path: "/profile/complete",
+  component: function ProfileCompleteRoute() {
+    const navigate = profileCompleteRoute.useNavigate();
+    return (
+      <ProfileComplete
         onBack={() => {
           void navigate({ to: "/profile" });
         }}
@@ -461,6 +484,7 @@ const routeTree = rootRoute.addChildren([
     profileSkillsRoute,
     profileAboutRoute,
     profileLinkedInRoute,
+    profileCompleteRoute,
     profileGrillRoute,
     profileGrillRoleRoute,
   ]),

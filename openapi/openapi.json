@@ -6212,6 +6212,395 @@
         ]
       }
     },
+    "/api/v1/profile/facts/proposals": {
+      "get": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "The facts proposed for the profile.",
+        "description": "What the app already knows that the profile does not hold: what the person\ntold and confirmed in Tell me about you, what their own website says, what\na CV read again says. Open ones, and those kept or dropped in the last day\n(still undoable), grouped by position, newest first, then skills and\nbackground. Never calls a model.",
+        "operationId": "profile.fact_proposals",
+        "responses": {
+          "200": {
+            "description": "The proposals.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactProposalsView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/facts/proposals/batches/{id}/undo": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Undo a Keep all, within a day.",
+        "description": "Every fact it kept is taken back, in one profile write, and waits again.",
+        "operationId": "profile.fact_undo_batch",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The Keep all (`batch.id`).",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The proposals, after the undo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactProposalsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_profile`: the profile would break a limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`: no such Keep all",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`undo_expired`: kept more than a day ago",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/facts/proposals/keep-all": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Keep every open fact.",
+        "description": "One profile write, one new version, and one Undo for all of them for a day\n(`…/batches/{id}/undo`). Facts whose job is no longer on the profile are\nleft as they are.",
+        "operationId": "profile.fact_keep_all",
+        "responses": {
+          "200": {
+            "description": "The proposals, after they were kept.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactProposalsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_profile`: the profile would break a limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/facts/proposals/{id}/drop": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Drop a fact: it is not written, not proposed again, and never written by\nTell me about you's Save. Can be undone for a day.",
+        "operationId": "profile.fact_drop",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The proposal.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The proposals, after it was dropped.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactProposalsView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`proposal_not_open`: already kept",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/facts/proposals/{id}/keep": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Keep a fact.",
+        "description": "Writes it on its position (with its quote; a confirmed assumption keeps\nwhat it was based on), adds the skill or adds to the background: one new\nprofile version. Can be undone for a day. A fact the profile already holds\nis closed, and nothing is written.",
+        "operationId": "profile.fact_keep",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The proposal.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The proposals, after it was kept.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactProposalsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_profile`: the profile would break a limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`proposal_not_open`: already kept or dropped; `profile_changed`: its job is no longer on the profile",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile/facts/proposals/{id}/undo": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Undo a Keep or a Drop, within a day.",
+        "description": "A kept fact is taken off its position again (the skill it added out of the\nskills, its words out of the background while it still ends with them):\none new profile version. A dropped one is open again.",
+        "operationId": "profile.fact_undo",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The proposal.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The proposals, after the undo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactProposalsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_profile`: the profile would break a limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`session_required`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`proposal_not_decided`: nothing to undo; `undo_expired`: decided more than a day ago",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/api/v1/profile/grill/proposals/{id}/drop": {
       "post": {
         "tags": [
@@ -11176,6 +11565,61 @@
           }
         }
       },
+      "CvRead": {
+        "type": "object",
+        "description": "What an import applied in the last day found, part by part.",
+        "required": [
+          "applied_at",
+          "jobs",
+          "achievements",
+          "skills",
+          "degrees",
+          "languages",
+          "certificates",
+          "projects"
+        ],
+        "properties": {
+          "achievements": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "applied_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "certificates": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "degrees": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "jobs": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "languages": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "projects": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "skills": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
       "CvVersion": {
         "type": "object",
         "description": "An approved version: the approved text as a PDF.",
@@ -11481,6 +11925,60 @@
           "unclear"
         ]
       },
+      "FactGroup": {
+        "type": "object",
+        "description": "The proposals for one place of the profile.",
+        "required": [
+          "target",
+          "proposals"
+        ],
+        "properties": {
+          "company": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "end_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "For a position: its place in `work` now.",
+            "minimum": 0
+          },
+          "proposals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FactProposalView"
+            }
+          },
+          "start_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`YYYY`, `YYYY-MM` or `YYYY-MM-DD`; no end while it is current."
+          },
+          "target": {
+            "$ref": "#/components/schemas/FactTarget"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For a position: its title and company."
+          }
+        }
+      },
       "FactProposal": {
         "type": "object",
         "description": "A fact taken from an answer.",
@@ -11527,6 +12025,15 @@
           }
         }
       },
+      "FactProposalState": {
+        "type": "string",
+        "description": "Where a proposal is.",
+        "enum": [
+          "open",
+          "kept",
+          "dropped"
+        ]
+      },
       "FactProposalStatus": {
         "type": "string",
         "description": "Where a fact taken from an answer is.",
@@ -11536,12 +12043,154 @@
           "dropped"
         ]
       },
+      "FactProposalView": {
+        "type": "object",
+        "description": "A fact proposed for the profile.",
+        "required": [
+          "id",
+          "text",
+          "quote",
+          "source",
+          "area",
+          "state",
+          "said_right"
+        ],
+        "properties": {
+          "area": {
+            "$ref": "#/components/schemas/Area",
+            "description": "What it is about."
+          },
+          "basis": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For a confirmed assumption: what it was based on (its reason, or the\npage it was read on)."
+          },
+          "decided_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it was kept or dropped."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quote": {
+            "type": "string",
+            "description": "The words it comes from: the person's, the confirmed assumption, the\nwebsite's or the CV's."
+          },
+          "said_right": {
+            "type": "boolean",
+            "description": "An assumption the person marked *That's right* in Tell me about you\n(not one left unanswered, nor a sentence taken from the profile)."
+          },
+          "source": {
+            "$ref": "#/components/schemas/FactSource"
+          },
+          "state": {
+            "$ref": "#/components/schemas/FactProposalState"
+          },
+          "text": {
+            "type": "string",
+            "description": "The fact (for a skill, its name)."
+          },
+          "undo_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Until when that can be undone."
+          }
+        }
+      },
+      "FactProposalsView": {
+        "type": "object",
+        "description": "The facts proposed for the profile: open ones, and those decided in the\nlast day (they can still be undone).",
+        "required": [
+          "groups",
+          "open",
+          "kept",
+          "dropped"
+        ],
+        "properties": {
+          "batch": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/KeptBatch",
+                "description": "The last Keep all, while it can be undone in one go."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cv_read": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CvRead",
+                "description": "An import applied in the last day, and what it found."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dropped": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Dropped in the last day.",
+            "minimum": 0
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FactGroup"
+            },
+            "description": "By position, newest position first; then the skills and the background."
+          },
+          "kept": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Kept in the last day.",
+            "minimum": 0
+          },
+          "open": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Waiting for Keep or Drop.",
+            "minimum": 0
+          }
+        }
+      },
+      "FactSource": {
+        "type": "string",
+        "description": "Where a proposed fact comes from.",
+        "enum": [
+          "you_said",
+          "you_confirmed",
+          "your_website",
+          "your_cv"
+        ]
+      },
       "FactStatus": {
         "type": "string",
         "description": "How a fact became the person's.",
         "enum": [
           "told",
           "confirmed_assumption"
+        ]
+      },
+      "FactTarget": {
+        "type": "string",
+        "description": "Where a proposed fact goes.",
+        "enum": [
+          "position",
+          "skills",
+          "background"
         ]
       },
       "Field": {
@@ -12207,6 +12856,32 @@
               "null"
             ],
             "description": "The fact, fixed. Left out, the fact is kept as it is. Whatever is\nwritten must still be said by the quote or the profile; the quote\nitself never changes."
+          }
+        }
+      },
+      "KeptBatch": {
+        "type": "object",
+        "description": "A Keep all: the facts it kept, undone together.",
+        "required": [
+          "id",
+          "kept",
+          "undo_until"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kept": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Facts it added to the profile, still there.",
+            "minimum": 0
+          },
+          "undo_until": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Until when it can be undone."
           }
         }
       },

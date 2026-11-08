@@ -347,7 +347,7 @@ pub async fn check_seeded(deps: &SourcesDeps, db: &PgPool) -> Result<usize> {
             break;
         }
     }
-    finish_run(db, run, (0, checked, 0), stopped, deps.clock.now()).await?;
+    finish_run(db, run, (0, checked, 0, 0), stopped, deps.clock.now()).await?;
     // The apply links of their samples may name company pages (#87).
     super::company_pages::schedule_soon(db, deps).await?;
     tracing::info!(checked, "seeded job boards checked");

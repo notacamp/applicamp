@@ -949,7 +949,8 @@ async fn candidates_checked_under_older_rules_are_checked_again_oldest_first(db:
     robots(&site, "User-agent: *\nDisallow: /private\n").await;
     mount(&site, "/", HOME, "text/html").await;
     let settings = crate::SourcesConfig {
-        discovery_max_checks: Some(2),
+        // Half of it, two, is what the waiting candidates get (#113).
+        discovery_max_checks: Some(4),
         discovery_list_url: format!("{}/missing.md", site.uri()).parse().unwrap(),
         ..boards_config()
     };
@@ -1010,4 +1011,131 @@ async fn candidates_checked_under_older_rules_are_checked_again_oldest_first(db:
     discover(&h.deps, &h.db).await.unwrap();
     let after = site.received_requests().await.unwrap().len();
     assert_eq!(before, after - 1, "only the list was asked for");
+}
+
+/// A list offering `n` new sites, each at its own loopback address (nothing
+/// listens there, so a check ends at once), served by `site`.
+async fn list_of_new_sites(site: &MockServer, n: usize) {
+    let items: String = (2..2 + n)
+        .map(|i| format!("- [New site {i}](http://127.0.0.{i}:1/) - Jobs.\n"))
+        .collect();
+    mount(
+        site,
+        "/list.md",
+        &format!("## Remote\n\n{items}"),
+        "text/markdown",
+    )
+    .await;
+}
+
+async fn run_of_discovery(h: &Harness) -> (i32, i32, i32) {
+    sqlx::query_as("SELECT found, checked, rechecked_candidates FROM sources.discovery_runs")
+        .fetch_one(&h.db)
+        .await
+        .unwrap()
+}
+
+/// `n` candidates checked under old rules, the check dates a day apart from
+/// 1 September (slugs `old-1`, `old-2`...).
+async fn old_candidates(h: &Harness, site: &MockServer, n: usize) {
+    for i in 1..=n {
+        let id = candidate(&h.db, site, i, "discovery").await;
+        sqlx::query("UPDATE sources.job_boards SET slug = $2, report = $3 WHERE id = $1")
+            .bind(id)
+            .bind(format!("old-{i}"))
+            .bind(sqlx::types::Json(
+                serde_json::json!({ "checked_at": format!("2026-09-{i:02}T00:00:00Z"), "rules": 0 }),
+            ))
+            .execute(&h.db)
+            .await
+            .unwrap();
+    }
+}
+
+async fn report_of(h: &Harness, slug: &str) -> serde_json::Value {
+    let row: (Option<serde_json::Value>,) =
+        sqlx::query_as("SELECT report FROM sources.job_boards WHERE slug = $1")
+            .bind(slug)
+            .fetch_one(&h.db)
+            .await
+            .unwrap();
+    row.0.unwrap_or_default()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn old_checks_take_half_the_day_and_new_finds_the_rest(db: PgPool) {
+    let site = MockServer::start().await;
+    robots(&site, "User-agent: *\nDisallow: /private\n").await;
+    mount(&site, "/", HOME, "text/html").await;
+    list_of_new_sites(&site, 10).await;
+    let settings = crate::SourcesConfig {
+        discovery_max_checks: Some(6),
+        discovery_list_url: format!("{}/list.md", site.uri()).parse().unwrap(),
+        ..boards_config()
+    };
+    let h = Harness::new(db, settings, None, Fake::ready()).await;
+    old_candidates(&h, &site, 5).await;
+    discover(&h.deps, &h.db).await.unwrap();
+
+    for slug in ["old-1", "old-2", "old-3"] {
+        assert_eq!(report_of(&h, slug).await["rules"], RULES, "{slug}");
+    }
+    for slug in ["old-4", "old-5"] {
+        assert_eq!(report_of(&h, slug).await["rules"], 0, "{slug}: next day");
+    }
+    // Three old ones (half of six) and the other three for new finds.
+    assert_eq!(run_of_discovery(&h).await, (3, 6, 3));
+    let new: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM sources.job_boards WHERE host LIKE '127.%'")
+            .fetch_one(&h.db)
+            .await
+            .unwrap();
+    assert_eq!(new, 3);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn with_no_old_work_new_finds_get_every_check(db: PgPool) {
+    let site = MockServer::start().await;
+    robots(&site, "User-agent: *\nDisallow: /private\n").await;
+    list_of_new_sites(&site, 10).await;
+    let settings = crate::SourcesConfig {
+        discovery_max_checks: Some(4),
+        discovery_list_url: format!("{}/list.md", site.uri()).parse().unwrap(),
+        ..boards_config()
+    };
+    let h = Harness::new(db, settings, None, Fake::ready()).await;
+    discover(&h.deps, &h.db).await.unwrap();
+    assert_eq!(run_of_discovery(&h).await, (4, 4, 0));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn never_checked_candidates_come_before_older_rules(db: PgPool) {
+    let site = MockServer::start().await;
+    robots(&site, "User-agent: *\nDisallow: /private\n").await;
+    mount(&site, "/", HOME, "text/html").await;
+    let settings = crate::SourcesConfig {
+        discovery_max_checks: Some(4),
+        discovery_list_url: format!("{}/missing.md", site.uri()).parse().unwrap(),
+        ..boards_config()
+    };
+    let h = Harness::new(db, settings, None, Fake::ready()).await;
+    old_candidates(&h, &site, 2).await;
+    // One never checked, with a config of its own.
+    let fresh = candidate(&h.db, &site, 3, "suggested").await;
+    sqlx::query("UPDATE sources.job_boards SET slug = 'fresh', config = $2 WHERE id = $1")
+        .bind(fresh)
+        .bind(sqlx::types::Json(
+            serde_json::json!({ "endpoint": format!("{}/feed.xml", site.uri()), "fields": {} }),
+        ))
+        .execute(&h.db)
+        .await
+        .unwrap();
+    discover(&h.deps, &h.db).await.unwrap();
+
+    // Half of four is two: the never-checked one, then the oldest old one.
+    assert!(report_of(&h, "fresh").await["checked_at"].is_string());
+    assert_eq!(report_of(&h, "old-1").await["rules"], RULES);
+    assert_eq!(report_of(&h, "old-2").await["rules"], 0);
+    // `rechecked_candidates` counts only the older-rules ones.
+    assert_eq!(run_of_discovery(&h).await, (0, 2, 1));
 }

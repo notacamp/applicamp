@@ -313,7 +313,7 @@ pub async fn run_all(deps: &SourcesDeps, db: &PgPool) -> Result<Summary> {
     discovery::finish_run(
         db,
         run,
-        (0, summary.systems + summary.pages, 0),
+        (0, summary.systems + summary.pages, 0, 0),
         stopped.then_some("ai_budget_reached"),
         deps.clock.now(),
     )
@@ -340,7 +340,7 @@ pub async fn check_row(deps: &SourcesDeps, db: &PgPool, row: &BoardRow) -> Resul
             discovery::finish_run(
                 db,
                 run,
-                (0, 1, 0),
+                (0, 1, 0, 0),
                 (outcome == Checked::BudgetReached).then_some("ai_budget_reached"),
                 deps.clock.now(),
             )

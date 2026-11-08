@@ -1,0 +1,1 @@
+- **The daily search for new job sites re-checks the sites already waiting before new finds use up the day's checks.** The sites waiting for a first check, and those checked under older rules, take up to half of the day's checks, oldest first; new finds from the public lists take the rest. The run now counts the re-checked sites on their own.

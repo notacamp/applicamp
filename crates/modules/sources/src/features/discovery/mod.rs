@@ -6,8 +6,11 @@
 //! - **Candidates**: the public lists in [`lists`] (names and links only,
 //!   CC0 and MIT; never LinkedIn, Indeed or Glassdoor, ADR 0006), and boards
 //!   someone suggested or the seed list holds that were never checked. At
-//!   most `APPLICAMP_SOURCES__DISCOVERY_MAX_CHECKS` a run (100); each board
-//!   records the list it was found through.
+//!   most `APPLICAMP_SOURCES__DISCOVERY_MAX_CHECKS` a run (100): the waiting
+//!   candidates first (never checked, then checked under older rules), at
+//!   most half of them, so the lists' new finds always get the other half
+//!   and whatever the waiting ones leave (#113); each board records the list
+//!   it was found through.
 //! - **The check** (one request per path, robots respected, at most
 //!   `APPLICAMP_SOURCES__DISCOVERY_MAX_REQUESTS` requests after robots.txt and
 //!   the homepage, 25): robots.txt of the feed's host (else the site's); the
@@ -46,8 +49,9 @@
 //!   (`approved_by = 'app'`). Anything else waits for the owner, with the
 //!   reason in one plain sentence in its report (`waiting`).
 //! - **Re-checks under new rules**: a candidate checked under older rules
-//!   ([`RULES`]) is checked once more, oldest check first, within the day's
-//!   checks.
+//!   ([`RULES`]) is checked once more, oldest check first, after the
+//!   never-checked ones and within the same half of the day's checks; the
+//!   run counts them as `rechecked_candidates`.
 //! - **Seeded boards at start** (`sources.check_seeded_boards`): every seeded
 //!   board waiting for the owner that was never checked with its current
 //!   config is checked once, unless the research found its terms or robots
@@ -390,14 +394,15 @@ pub(crate) async fn start_run(db: &PgPool, now: DateTime<Utc>) -> Result<Uuid> {
 pub(crate) async fn finish_run(
     db: &PgPool,
     id: Uuid,
-    counts: (usize, usize, usize),
+    counts: (usize, usize, usize, usize),
     error: Option<&str>,
     now: DateTime<Utc>,
 ) -> Result<()> {
     let n = |v: usize| i32::try_from(v).unwrap_or(i32::MAX);
     sqlx::query(
         "UPDATE sources.discovery_runs
-            SET finished_at = $2, found = $3, checked = $4, rechecked = $5, error_kind = $6
+            SET finished_at = $2, found = $3, checked = $4, rechecked = $5,
+                rechecked_candidates = $6, error_kind = $7
           WHERE id = $1",
     )
     .bind(id)
@@ -405,6 +410,7 @@ pub(crate) async fn finish_run(
     .bind(n(counts.0))
     .bind(n(counts.1))
     .bind(n(counts.2))
+    .bind(n(counts.3))
     .bind(error)
     .execute(db)
     .await?;
@@ -417,8 +423,10 @@ fn reader(deps: &SourcesDeps) -> Result<&Reader> {
         .ok_or_else(|| Error::internal("the sources module is not composed"))
 }
 
-/// One discovery run: new candidates from the public lists, never-checked
-/// candidates, re-checks due; then old scans forgotten. It stops, cleanly,
+/// One discovery run: never-checked candidates, then candidates checked
+/// under older rules (together at most half the day's checks), then new
+/// candidates from the public lists with the rest; approved boards' re-checks
+/// due; then old scans forgotten. It stops, cleanly,
 /// when an AI spending limit is reached: the rest waits for the next run.
 pub async fn discover(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
     let reader = reader(deps)?;
@@ -430,7 +438,8 @@ pub async fn discover(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
     let mut error = None;
     let mut stopped = false;
 
-    // New candidates from the lists.
+    // The public lists, read first (no check yet): what they offer is added
+    // and checked after the candidates already waiting.
     let mut listed: Vec<(ListEntry, String)> = Vec::new();
     let mut read_any = false;
     let mut asked_any = false;
@@ -466,7 +475,62 @@ pub async fn discover(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
             .await?
             .into_iter()
             .collect();
+    // Candidates never checked (suggested, or from the seed list). This pass
+    // and the next share half the day's checks (#113), so the lists' new
+    // finds always have the other half.
+    let waiting_max = max / 2;
+    if !stopped {
+        let waiting: Vec<BoardRow> = sqlx::query_as(concat!(
+            "SELECT ",
+            board_columns!(),
+            " FROM sources.job_boards
+              WHERE status = 'candidate' AND (report IS NULL OR report->>'checked_at' IS NULL)
+                AND kind NOT IN ('hiring_system', 'company_page')
+                AND config ? 'endpoint' AND blockers = '[]'::jsonb
+              ORDER BY created_at LIMIT $1"
+        ))
+        .bind(i64::try_from(waiting_max).unwrap_or(0))
+        .fetch_all(db)
+        .await?;
+        for row in &waiting {
+            checked += 1;
+            if check(deps, reader, db, row, run).await? == Checked::BudgetReached {
+                stopped = true;
+                break;
+            }
+        }
+    }
+
+    // Candidates checked under older rules (#108): once each, oldest check
+    // first, within what is left of that half.
+    let mut rechecked_candidates = 0;
+    if !stopped && checked < waiting_max {
+        let older: Vec<BoardRow> = sqlx::query_as(concat!(
+            "SELECT ",
+            board_columns!(),
+            " FROM sources.job_boards
+              WHERE status = 'candidate' AND kind NOT IN ('hiring_system', 'company_page')
+                AND report->>'checked_at' IS NOT NULL AND blockers = '[]'::jsonb
+                AND coalesce((report->>'rules')::int, 0) < $1
+              ORDER BY (report->>'checked_at')::timestamptz, created_at LIMIT $2"
+        ))
+        .bind(i32::try_from(RULES).unwrap_or(i32::MAX))
+        .bind(i64::try_from(waiting_max - checked).unwrap_or(0))
+        .fetch_all(db)
+        .await?;
+        for row in &older {
+            checked += 1;
+            rechecked_candidates += 1;
+            if check(deps, reader, db, row, run).await? == Checked::BudgetReached {
+                stopped = true;
+                break;
+            }
+        }
+    }
+
     let mut seen = known;
+    // New candidates from the lists, with all the checks the first two
+    // passes left.
     for (entry, through) in listed {
         if checked >= max || stopped {
             break;
@@ -485,54 +549,6 @@ pub async fn discover(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
             checked += 1;
             if check(deps, reader, db, &row, run).await? == Checked::BudgetReached {
                 stopped = true;
-            }
-        }
-    }
-
-    // Candidates never checked (suggested, or from the seed list).
-    if !stopped {
-        let waiting: Vec<BoardRow> = sqlx::query_as(concat!(
-            "SELECT ",
-            board_columns!(),
-            " FROM sources.job_boards
-              WHERE status = 'candidate' AND (report IS NULL OR report->>'checked_at' IS NULL)
-                AND kind NOT IN ('hiring_system', 'company_page')
-                AND config ? 'endpoint' AND blockers = '[]'::jsonb
-              ORDER BY created_at LIMIT $1"
-        ))
-        .bind(i64::try_from(max.saturating_sub(checked)).unwrap_or(0))
-        .fetch_all(db)
-        .await?;
-        for row in &waiting {
-            checked += 1;
-            if check(deps, reader, db, row, run).await? == Checked::BudgetReached {
-                stopped = true;
-                break;
-            }
-        }
-    }
-
-    // Candidates checked under older rules (#108): once each, oldest check
-    // first, within what is left of the day's checks.
-    if !stopped && checked < max {
-        let older: Vec<BoardRow> = sqlx::query_as(concat!(
-            "SELECT ",
-            board_columns!(),
-            " FROM sources.job_boards
-              WHERE status = 'candidate' AND kind NOT IN ('hiring_system', 'company_page')
-                AND report->>'checked_at' IS NOT NULL AND blockers = '[]'::jsonb
-                AND coalesce((report->>'rules')::int, 0) < $1
-              ORDER BY (report->>'checked_at')::timestamptz, created_at LIMIT $2"
-        ))
-        .bind(i32::try_from(RULES).unwrap_or(i32::MAX))
-        .bind(i64::try_from(max - checked).unwrap_or(0))
-        .fetch_all(db)
-        .await?;
-        for row in &older {
-            checked += 1;
-            if check(deps, reader, db, row, run).await? == Checked::BudgetReached {
-                stopped = true;
-                break;
             }
         }
     }
@@ -565,7 +581,7 @@ pub async fn discover(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
     finish_run(
         db,
         run,
-        (found, checked, due.len()),
+        (found, checked, due.len(), rechecked_candidates),
         error,
         deps.clock.now(),
     )
@@ -574,6 +590,7 @@ pub async fn discover(deps: &SourcesDeps, db: &PgPool) -> Result<()> {
         found,
         checked,
         rechecked = due.len(),
+        rechecked_candidates,
         stopped,
         "job board discovery finished"
     );
@@ -593,9 +610,9 @@ pub async fn check_one(deps: &SourcesDeps, db: &PgPool, id: Uuid) -> Result<()> 
     let now = deps.clock.now();
     let run = start_run(db, now).await?;
     let (counts, outcome) = if row.status() == Status::Approved {
-        ((0, 0, 1), recheck(deps, reader, db, &row, run).await?)
+        ((0, 0, 1, 0), recheck(deps, reader, db, &row, run).await?)
     } else {
-        ((0, 1, 0), check(deps, reader, db, &row, run).await?)
+        ((0, 1, 0, 0), check(deps, reader, db, &row, run).await?)
     };
     let stopped = (outcome == Checked::BudgetReached).then_some("ai_budget_reached");
     finish_run(db, run, counts, stopped, deps.clock.now()).await

@@ -982,7 +982,7 @@ impl<'a> Visits<'a> {
                     return body.map(|body| (at, body));
                 }
                 Err(FetchError::Redirect { status, location }) => {
-                    let mut next = without_secret(&location, secret);
+                    let mut next = with_no_key(&location, secret);
                     next.set_fragment(None);
                     if !same_site(&at, &next) {
                         self.moved.insert(first.to_string(), next);
@@ -1021,15 +1021,15 @@ fn log_unread(url: &Url, status: Option<u16>, why: &str) {
     );
 }
 
-/// `url` without the query parameters named in `secret`: a redirect that
+/// `url` without the query parameters named in `names`: a redirect that
 /// keeps the query would otherwise put a board's key into a stored address.
-fn without_secret(url: &Url, secret: &[(String, String)]) -> Url {
-    if secret.is_empty() || url.query().is_none() {
+fn with_no_key(url: &Url, names: &[(String, String)]) -> Url {
+    if names.is_empty() || url.query().is_none() {
         return url.clone();
     }
     let kept: Vec<(String, String)> = url
         .query_pairs()
-        .filter(|(key, _)| !secret.iter().any(|(name, _)| name == key.as_ref()))
+        .filter(|(key, _)| !names.iter().any(|(name, _)| name == key.as_ref()))
         .map(|(k, v)| (k.into_owned(), v.into_owned()))
         .collect();
     let mut clean = url.clone();

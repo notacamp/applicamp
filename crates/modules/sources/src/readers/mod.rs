@@ -588,15 +588,14 @@ impl Reader {
                 given
             };
             probe.note(status.as_u16(), Some(validators));
-            if status.is_redirection() {
-                if let Some(to) = response
+            if status.is_redirection()
+                && let Some(to) = response
                     .headers()
                     .get(reqwest::header::LOCATION)
                     .and_then(|v| v.to_str().ok())
                     .and_then(|v| url.join(v).ok())
-                {
-                    probe.note_moved(to);
-                }
+            {
+                probe.note_moved(to);
             }
             if status == reqwest::StatusCode::NOT_MODIFIED {
                 return Err(FetchError::NotModified);

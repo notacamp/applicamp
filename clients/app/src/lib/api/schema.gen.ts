@@ -3228,6 +3228,8 @@ export interface components {
             jsonld?: boolean;
             /** @description The site's language (its `<html lang>`). */
             language?: string | null;
+            /** @description The other site (a host) its homepage sends visitors to, when it does. */
+            moved_to?: string | null;
             /** @description For the owner, in a sentence (the seed list's notes). */
             notes?: string;
             proposal?: components["schemas"]["BoardProposal"] | null;

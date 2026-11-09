@@ -129,6 +129,10 @@ pub enum FetchError {
     Refused,
     /// Its config does not read.
     BadConfig,
+    /// It sent us elsewhere (a 3xx with a `Location`). Only a check's read
+    /// ([`Reader::visit_noting`]) gives this; every other read treats a
+    /// redirect as a failed read ([`FetchError::Status`]).
+    Redirect { status: u16, location: Url },
     /// Its API needs a key, and none is set (or it cannot be opened).
     NeedsKey,
     /// It answered 304 to a conditional request: nothing changed since the
@@ -150,6 +154,7 @@ impl FetchError {
             Self::BackingOff => "backing_off".to_owned(),
             Self::Refused => "refused_host".to_owned(),
             Self::BadConfig => "bad_config".to_owned(),
+            Self::Redirect { status, .. } => format!("http_{status}"),
             Self::NeedsKey => "needs_key".to_owned(),
             Self::NotModified => "not_modified".to_owned(),
         }
@@ -169,6 +174,7 @@ impl std::fmt::Display for FetchError {
             Self::BackingOff => f.write_str("the board asked to slow down earlier"),
             Self::Refused => f.write_str("the board's address is not a public https one"),
             Self::BadConfig => f.write_str("the board's config does not read"),
+            Self::Redirect { status, .. } => write!(f, "the board answered {status}"),
             Self::NeedsKey => f.write_str("the board's API key is not set"),
             Self::NotModified => f.write_str("the board says nothing changed"),
         }
@@ -214,6 +220,8 @@ pub struct Probe {
     send: Validators,
     seen: std::sync::Mutex<Seen>,
     partial: std::sync::atomic::AtomicBool,
+    /// Where the first request was sent, when it answered a redirect.
+    moved: std::sync::Mutex<Option<Url>>,
 }
 
 impl Probe {
@@ -237,6 +245,20 @@ impl Probe {
     /// was reached): what it did not list is not closed.
     pub fn partial(&self) -> bool {
         self.partial.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    fn note_moved(&self, to: Url) {
+        *self
+            .moved
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(to);
+    }
+
+    fn moved(&self) -> Option<Url> {
+        self.moved
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
     }
 
     fn set_partial(&self) {
@@ -566,6 +588,16 @@ impl Reader {
                 given
             };
             probe.note(status.as_u16(), Some(validators));
+            if status.is_redirection() {
+                if let Some(to) = response
+                    .headers()
+                    .get(reqwest::header::LOCATION)
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(|v| url.join(v).ok())
+                {
+                    probe.note_moved(to);
+                }
+            }
             if status == reqwest::StatusCode::NOT_MODIFIED {
                 return Err(FetchError::NotModified);
             }
@@ -753,7 +785,16 @@ impl Reader {
                 secret,
                 Some(&probe),
             )
-            .await?;
+            .await;
+        let got = match got {
+            Err(FetchError::Status(status)) if (300..400).contains(&status) => {
+                return Err(match probe.moved() {
+                    Some(location) => FetchError::Redirect { status, location },
+                    None => FetchError::Status(status),
+                });
+            }
+            other => other?,
+        };
         Ok((got.map(|got| got.body), probe.seen().validators))
     }
 

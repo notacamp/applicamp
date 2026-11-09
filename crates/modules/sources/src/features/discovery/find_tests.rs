@@ -1139,3 +1139,208 @@ async fn never_checked_candidates_come_before_older_rules(db: PgPool) {
     // `rechecked_candidates` counts only the older-rules ones.
     assert_eq!(run_of_discovery(&h).await, (0, 2, 1));
 }
+
+// Redirects within the site (#115).
+
+async fn moved(server: &MockServer, from: &str, to: &str, status: u16) {
+    Mock::given(method("GET"))
+        .and(path(from))
+        .respond_with(ResponseTemplate::new(status).insert_header("Location", to))
+        .mount(server)
+        .await;
+}
+
+fn dated_feed(server: &MockServer) -> String {
+    feed(server, 6, Some("Sat, 24 Oct 2026 08:00:00 +0000"))
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_homepage_that_moves_is_read_where_it_went_and_the_check_goes_on_from_there(db: PgPool) {
+    let site = MockServer::start().await;
+    robots(&site, "User-agent: *\nDisallow: /private\n").await;
+    moved(&site, "/", "/en/", 301).await;
+    // Its feed link is relative: it only reads against the final address.
+    mount(
+        &site,
+        "/en/",
+        "<html lang=\"en\"><head><link rel=\"alternate\" type=\"application/rss+xml\" \
+         href=\"jobs-feed.xml\"></head><body>Jobs for people.</body></html>",
+        "text/html",
+    )
+    .await;
+    mount(
+        &site,
+        "/en/jobs-feed.xml",
+        &dated_feed(&site),
+        "application/rss+xml",
+    )
+    .await;
+    let h = harness(db).await;
+    let id = candidate(&h.db, &site, 1, "discovery").await;
+    let row = checked(&h, id).await;
+    let report = row.report().unwrap();
+    assert!(
+        report
+            .found_url
+            .as_deref()
+            .is_some_and(|u| u.ends_with("/en/jobs-feed.xml")),
+        "{:?} / {:?}",
+        report.found_url,
+        report.waiting_because
+    );
+    assert_eq!(report.language.as_deref(), Some("en"));
+    assert!(report.moved_to.is_none());
+    assert_eq!(asked(&site, "/").await, 1);
+    assert_eq!(asked(&site, "/en/").await, 1);
+    assert_eq!(row.status(), Status::Approved);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_feed_that_moves_is_read_and_the_proposed_config_names_where_it_is(db: PgPool) {
+    let h = harness(db).await;
+    for (n, origin) in [(1, "seed"), (2, "discovery")] {
+        let site = MockServer::start().await;
+        robots(&site, "User-agent: *\nDisallow: /private\n").await;
+        mount(&site, "/", HOME, "text/html").await;
+        moved(&site, "/feed", "/feed/", 301).await;
+        mount(&site, "/feed/", &dated_feed(&site), "application/rss+xml").await;
+        let id = candidate(&h.db, &site, n, origin).await;
+        let row = checked(&h, id).await;
+        let report = row.report().unwrap();
+        let final_url = format!("{}/feed/", site.uri());
+        assert_eq!(report.found_url.as_deref(), Some(final_url.as_str()));
+        assert_eq!(report.sample.len(), 6, "{origin}");
+        assert_eq!(asked(&site, "/feed").await, 1);
+        assert_eq!(asked(&site, "/feed/").await, 1);
+        // Offered to the owner for a seeded board, applied for a discovered one:
+        // either way the address is the final one.
+        let endpoint = if origin == "seed" {
+            report.proposal.unwrap().config["endpoint"]
+                .as_str()
+                .map(str::to_owned)
+        } else {
+            row.config().unwrap().endpoint.map(|u| u.to_string())
+        };
+        assert_eq!(endpoint.as_deref(), Some(final_url.as_str()), "{origin}");
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn three_hops_are_followed_and_a_fourth_is_not(db: PgPool) {
+    let h = harness(db).await;
+    // /jobs.rss -> /h1 -> /h2 -> /h3 reads; one more hop does not.
+    for (n, last_hop) in [(1, "/h3"), (2, "/h4")] {
+        let site = MockServer::start().await;
+        robots(&site, "User-agent: *\nDisallow: /private\n").await;
+        mount(&site, "/", HOME, "text/html").await;
+        moved(&site, "/jobs.rss", "/h1", 302).await;
+        moved(&site, "/h1", "/h2", 307).await;
+        moved(&site, "/h2", "/h3", 308).await;
+        if last_hop == "/h4" {
+            moved(&site, "/h3", "/h4", 301).await;
+        }
+        mount(&site, last_hop, &dated_feed(&site), "application/rss+xml").await;
+        let id = candidate(&h.db, &site, n, "discovery").await;
+        let report = checked(&h, id).await.report().unwrap();
+        if last_hop == "/h3" {
+            assert!(
+                report
+                    .found_url
+                    .as_deref()
+                    .is_some_and(|u| u.ends_with("/h3")),
+                "{:?}",
+                report.found_url
+            );
+        } else {
+            assert!(report.found_url.is_none(), "{:?}", report.found_url);
+            assert_eq!(asked(&site, "/h3").await, 1);
+            assert_eq!(asked(&site, "/h4").await, 0, "the fourth hop is not asked");
+        }
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_redirect_to_another_site_is_not_followed_and_the_homepages_is_recorded(db: PgPool) {
+    let elsewhere = MockServer::start().await;
+    mount(&elsewhere, "/", HOME, "text/html").await;
+    mount(
+        &elsewhere,
+        "/jobs.rss",
+        &dated_feed(&elsewhere),
+        "application/rss+xml",
+    )
+    .await;
+    // The same machine under another name: another site.
+    let other = elsewhere.uri().replace("127.0.0.1", "localhost");
+    let site = MockServer::start().await;
+    robots(&site, "User-agent: *\nDisallow: /private\n").await;
+    moved(&site, "/", &format!("{other}/"), 301).await;
+    moved(&site, "/jobs.rss", &format!("{other}/jobs.rss"), 301).await;
+    let h = harness(db).await;
+    let id = candidate(&h.db, &site, 1, "discovery").await;
+    let row = checked(&h, id).await;
+    let report = row.report().unwrap();
+    assert_eq!(report.moved_to.as_deref(), Some("localhost"));
+    assert!(report.found_url.is_none());
+    assert_eq!(
+        elsewhere.received_requests().await.unwrap().len(),
+        0,
+        "nothing is asked of the other site"
+    );
+    assert_ne!(row.status(), Status::Approved);
+    assert_eq!(
+        report.waiting_because.unwrap().code,
+        WaitingCode::NoJobList,
+        "the waiting reason is the same as for any site with no list"
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_hop_the_sites_rules_disallow_is_not_read(db: PgPool) {
+    let site = MockServer::start().await;
+    robots(&site, "User-agent: *\nDisallow: /moved/\n").await;
+    mount(&site, "/", HOME, "text/html").await;
+    moved(&site, "/jobs.rss", "/moved/jobs.rss", 301).await;
+    mount(
+        &site,
+        "/moved/jobs.rss",
+        &dated_feed(&site),
+        "application/rss+xml",
+    )
+    .await;
+    let h = harness(db).await;
+    let id = candidate(&h.db, &site, 1, "discovery").await;
+    let report = checked(&h, id).await.report().unwrap();
+    assert_eq!(asked(&site, "/jobs.rss").await, 1);
+    assert_eq!(asked(&site, "/moved/jobs.rss").await, 0);
+    assert!(report.found_url.is_none());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn every_hop_counts_against_the_request_budget(db: PgPool) {
+    let site = MockServer::start().await;
+    robots(&site, "User-agent: *\nDisallow: /private\n").await;
+    // The homepage links to no terms: the usual paths are tried, and the
+    // first one goes round three hops.
+    mount(&site, "/", HOME, "text/html").await;
+    moved(&site, "/terms", "/t1", 301).await;
+    moved(&site, "/t1", "/t2", 301).await;
+    moved(&site, "/t2", "/t3", 301).await;
+    let settings = crate::SourcesConfig {
+        discovery_max_requests: Some(5),
+        ..boards_config()
+    };
+    let h = Harness::new(db, settings, None, Fake::ready()).await;
+    let id = candidate(&h.db, &site, 1, "discovery").await;
+    let report = checked(&h, id).await.report().unwrap();
+    // robots.txt and the homepage, then 5: /terms and its three hops, and
+    // the next usual path. No more.
+    assert_eq!(site.received_requests().await.unwrap().len(), 2 + 5);
+    assert_eq!(asked(&site, "/t3").await, 1);
+    assert_eq!(asked(&site, "/terms-of-service").await, 1);
+    assert_eq!(asked(&site, "/tos").await, 0);
+    assert_eq!(
+        report.waiting_because.unwrap().code,
+        WaitingCode::RequestLimit
+    );
+}

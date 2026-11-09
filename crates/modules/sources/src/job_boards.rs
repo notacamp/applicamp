@@ -906,6 +906,9 @@ pub struct Report {
     /// person's language; none once the app approved it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub waiting_because: Option<Waiting>,
+    /// The other site (a host) its homepage sends visitors to, when it does.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub moved_to: Option<String>,
     /// The version of the check's rules this report is from (a candidate
     /// checked under older rules is checked again, once).
     #[serde(default, skip_serializing_if = "is_zero")]

@@ -1,0 +1,1 @@
+- **The check of a new job site follows the site's own redirects, so sites whose address or feed moved are found.** A homepage that moved to `www.` or a language path, or a feed that moved to a slash, is read where it is now, within the check's request limit and the site's robots rules; a move to another site is only noted.

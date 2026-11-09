@@ -258,9 +258,11 @@ pub(super) async fn try_feed(
     if !allowed(url) {
         return None;
     }
-    let body = visits.get_with(url, MAX_BOARD_BODY, &[]).await?;
-    let modified = visits.last_modified(url);
-    read_feed(url, &body, board, modified)
+    // The config proposed is for where the feed answers, not for the address
+    // that sent us there.
+    let (url, body) = visits.get_final(url, MAX_BOARD_BODY, &[]).await?;
+    let modified = visits.last_modified(&url);
+    read_feed(&url, &body, board, modified)
 }
 
 /// The feeds a page links to, on `home`'s site, tried in turn.
@@ -322,7 +324,7 @@ pub(super) async fn evidence(
     if found.is_none()
         && let Some(url) = jobs_page_link(html, home)
         && allowed(&url)
-        && let Some(page) = visits.get(&url).await
+        && let Some((url, page)) = visits.get_page(&url).await
     {
         found = linked_feeds(visits, &url, &page, allowed, board).await;
         jobs_page = Some(JobsPage { url, html: page });
@@ -347,7 +349,7 @@ pub(super) async fn terms_by_path(
         if !allowed(&url) {
             continue;
         }
-        if let Some(html) = visits.get(&url).await
+        if let Some((url, html)) = visits.get_page(&url).await
             && looks_like_terms(&html)
         {
             return Some((url, html));
@@ -369,9 +371,10 @@ pub(super) async fn sitemaps(
         if !allowed(sitemap) {
             continue;
         }
-        let Some(body) = visits.get_with(sitemap, MAX_PAGE, &[]).await else {
+        let Some((sitemap, body)) = visits.get_final(sitemap, MAX_PAGE, &[]).await else {
             continue;
         };
+        let sitemap = &sitemap;
         let text = String::from_utf8_lossy(&body).into_owned();
         if text.contains("<sitemapindex") {
             let kids: Vec<Url> = jsonld::sitemap_urls(&text, None, 200)
@@ -381,7 +384,7 @@ pub(super) async fn sitemaps(
                 .take(INDEX_CHILDREN)
                 .collect();
             for kid in kids {
-                let Some(kid_body) = visits.get_with(&kid, MAX_PAGE, &[]).await else {
+                let Some((kid, kid_body)) = visits.get_final(&kid, MAX_PAGE, &[]).await else {
                     continue;
                 };
                 if let Some(found) =

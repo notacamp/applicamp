@@ -866,3 +866,37 @@ fn a_board_with_a_daily_limit_spreads_its_addresses_over_the_day() {
     // A roomy limit keeps the polling interval.
     assert_eq!(stack_ttl(hour, 1_000, 3), hour);
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_redirect_is_seen_by_a_checks_read_and_never_followed_by_the_others(db: PgPool) {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/old"))
+        .respond_with(ResponseTemplate::new(301).insert_header("Location", "/new"))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/new"))
+        .respond_with(json("[]"))
+        .mount(&server)
+        .await;
+    let reader = board_reader(true);
+    let old: Url = format!("{}/old", server.uri()).parse().unwrap();
+    let new: Url = format!("{}/new", server.uri()).parse().unwrap();
+    // A job store read or a search's: a failed read, the target not asked.
+    let plain = reader.visit(&db, &old).await;
+    assert_eq!(plain, Err(FetchError::Status(301)));
+    let cached = reader.get_json::<serde_json::Value>(&db, &old).await;
+    assert_eq!(cached, Err(FetchError::Status(301)));
+    assert_eq!(testkit::requests_to(&server, "/new").await, 0);
+    // A check's read says where it was sent, and does not go there.
+    let noted = reader.visit_noting(&db, &old, 1_000, &[]).await;
+    assert_eq!(
+        noted.map(|_| ()),
+        Err(FetchError::Redirect {
+            status: 301,
+            location: new
+        })
+    );
+    assert_eq!(testkit::requests_to(&server, "/new").await, 0);
+}

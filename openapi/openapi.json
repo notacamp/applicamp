@@ -10423,6 +10423,13 @@
             ],
             "description": "The site's language (its `<html lang>`)."
           },
+          "moved_to": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The other site (a host) its homepage sends visitors to, when it does."
+          },
           "notes": {
             "type": "string",
             "description": "For the owner, in a sentence (the seed list's notes)."

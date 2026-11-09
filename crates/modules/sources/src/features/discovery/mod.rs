@@ -11,7 +11,11 @@
 //!   most half of them, so the lists' new finds always get the other half
 //!   and whatever the waiting ones leave (#113); each board records the list
 //!   it was found through.
-//! - **The check** (one request per path, robots respected, at most
+//! - **The check** (one request per path, robots respected, redirects
+//!   followed within the site: three hops at most, each one a request of the
+//!   budget, an address check and a robots check, and the check goes on from
+//!   where the homepage ended up; a move to another site is only recorded as
+//!   `moved_to`, #115; at most
 //!   `APPLICAMP_SOURCES__DISCOVERY_MAX_REQUESTS` requests after robots.txt and
 //!   the homepage, 25): robots.txt of the feed's host (else the site's); the
 //!   site (its language, its feeds, JSON-LD postings, a link to its terms);
@@ -89,14 +93,14 @@ use crate::{
     hiring_systems,
     job::html_to_text,
     job_boards::{
-        self, BoardConfig, BoardRow, Fields, Kind, Proposal, Report, SampleJob, Status,
+        self, BoardConfig, BoardRow, Fields, Kind, Proposal, Report, RobotsRule, SampleJob, Status,
         board_columns, host_of,
     },
     places,
     readers::{
-        MAX_BOARD_BODY, MAX_PAGE, Reader, jsonld,
+        FetchError, MAX_BOARD_BODY, MAX_PAGE, Reader, jsonld,
         mapping::{self, BoardRef},
-        rss,
+        rss, same_site,
     },
     regions, robots,
     scans::{self, Scan},
@@ -116,7 +120,9 @@ pub const SENTENCES: (usize, usize) = (10, 300);
 pub const RECHECK: TimeDelta = TimeDelta::days(182);
 /// The version of the check's rules. A candidate checked under older rules
 /// is checked again once, oldest first, within the day's checks (#108).
-pub const RULES: u32 = 1;
+/// 2: the check follows a site's own redirects (#115), so a site whose
+/// address or feed moved is read where it is now.
+pub const RULES: u32 = 2;
 
 static LIST_ENTRY: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^\s*(?:[-*]|\d+\.)\s*\[([^\]]{1,100})\]\((https?://[^)\s]{1,300})\)")
@@ -853,7 +859,15 @@ struct Visits<'a> {
     exhausted: bool,
     /// What each page answered for `Last-Modified`.
     modified: HashMap<String, String>,
+    /// robots.txt rules by host, once known: a redirect's next hop must be
+    /// allowed by them.
+    rules: Vec<(String, Vec<RobotsRule>)>,
+    /// Where a page that redirected to another site was sent (not followed).
+    moved: HashMap<String, Url>,
 }
+
+/// Redirects followed for one page at most.
+const MAX_HOPS: usize = 3;
 
 impl<'a> Visits<'a> {
     fn new(reader: &'a Reader, db: &'a PgPool) -> Self {
@@ -866,7 +880,33 @@ impl<'a> Visits<'a> {
             base: 0,
             exhausted: false,
             modified: HashMap::new(),
+            rules: Vec::new(),
+            moved: HashMap::new(),
         }
+    }
+
+    /// From now on, a redirect to a page on `host` must be allowed by
+    /// `rules`. (Until a host's rules are known, being on the same site is
+    /// enough: robots.txt itself, and the first hop of the homepage.)
+    fn set_rules(&mut self, host: Option<String>, rules: Vec<RobotsRule>) {
+        let Some(host) = host else { return };
+        self.rules.retain(|(h, _)| *h != host);
+        self.rules.push((host, rules));
+    }
+
+    /// Where `url`, when asked for, sent us to another site.
+    fn moved_from(&self, url: &Url) -> Option<&Url> {
+        let mut key = url.clone();
+        key.set_fragment(None);
+        self.moved.get(key.as_str())
+    }
+
+    fn hop_allowed(&self, url: &Url) -> bool {
+        let host = host_of(url);
+        self.rules
+            .iter()
+            .find(|(h, _)| Some(h) == host.as_ref())
+            .is_none_or(|(_, rules)| robots::allowed(rules, &robots::path_of(url)).0)
     }
 
     /// From now on, at most `requests` more requests (robots.txt and the
@@ -884,9 +924,15 @@ impl<'a> Visits<'a> {
     /// `url`'s body, unless this check already asked for it, it is not
     /// found, it failed, or the budget is used up.
     async fn get(&mut self, url: &Url) -> Option<String> {
-        self.get_with(url, MAX_PAGE, &[])
+        self.get_page(url).await.map(|(_, body)| body)
+    }
+
+    /// [`get`](Self::get), also giving where the page was read after the
+    /// site's own redirects.
+    async fn get_page(&mut self, url: &Url) -> Option<(Url, String)> {
+        self.get_final(url, MAX_PAGE, &[])
             .await
-            .map(|body| String::from_utf8_lossy(&body).into_owned())
+            .map(|(at, body)| (at, String::from_utf8_lossy(&body).into_owned()))
     }
 
     /// The `Last-Modified` the page at `url` answered with.
@@ -899,37 +945,100 @@ impl<'a> Visits<'a> {
     }
 
     /// `url`'s bytes (a feed decodes its own encoding), at most `max`, with
-    /// a board's API key (`secret`) in the request's query only.
-    async fn get_with(
+    /// a board's API key (`secret`) in the request's query only, and the
+    /// address they were read at: a redirect inside the site is followed
+    /// (three hops at most), each hop one request of the budget, through the
+    /// same address check, and only to a page the site's robots rules allow.
+    /// A redirect to
+    /// another site is not followed, but remembered ([`moved_from`]).
+    ///
+    /// [`moved_from`]: Self::moved_from
+    async fn get_final(
         &mut self,
         url: &Url,
         max: usize,
         secret: &[(String, String)],
-    ) -> Option<Vec<u8>> {
-        let mut key = url.clone();
-        key.set_fragment(None);
-        if self.seen.contains(key.as_str()) {
-            return None;
-        }
-        if self.used >= self.budget {
-            self.exhausted = true;
-            return None;
-        }
-        self.seen.insert(key.to_string());
-        self.used += 1;
-        match self.reader.visit_noting(self.db, &key, max, secret).await {
-            Ok((body, validators)) => {
-                if let Some(modified) = validators.last_modified {
-                    self.modified.insert(key.to_string(), modified);
-                }
-                body
+    ) -> Option<(Url, Vec<u8>)> {
+        let mut first = url.clone();
+        first.set_fragment(None);
+        let mut at = first.clone();
+        let mut hops = 0;
+        loop {
+            if self.seen.contains(at.as_str()) {
+                return None;
             }
-            Err(e) => {
-                tracing::info!(error = %e, "a page of a board's check could not be read");
-                None
+            if self.used >= self.budget {
+                self.exhausted = true;
+                return None;
+            }
+            self.seen.insert(at.to_string());
+            self.used += 1;
+            match self.reader.visit_noting(self.db, &at, max, secret).await {
+                Ok((body, validators)) => {
+                    if let Some(modified) = validators.last_modified {
+                        self.modified.insert(first.to_string(), modified.clone());
+                        self.modified.insert(at.to_string(), modified);
+                    }
+                    return body.map(|body| (at, body));
+                }
+                Err(FetchError::Redirect { status, location }) => {
+                    let mut next = with_no_key(&location, secret);
+                    next.set_fragment(None);
+                    if !same_site(&at, &next) {
+                        self.moved.insert(first.to_string(), next);
+                        log_unread(&at, Some(status), "it moved to another site");
+                        return None;
+                    }
+                    if hops >= MAX_HOPS || !self.hop_allowed(&next) {
+                        log_unread(&at, Some(status), "its redirect is not followed");
+                        return None;
+                    }
+                    hops += 1;
+                    at = next;
+                }
+                Err(e) => {
+                    let status = match e {
+                        FetchError::Status(status) => Some(status),
+                        _ => None,
+                    };
+                    log_unread(&at, status, &e.to_string());
+                    return None;
+                }
             }
         }
     }
+}
+
+/// Say a page of a check could not be read: its host and path and the
+/// status, never its query (it may hold a board's key).
+fn log_unread(url: &Url, status: Option<u16>, why: &str) {
+    tracing::info!(
+        host = url.host_str().unwrap_or_default(),
+        path = url.path(),
+        status,
+        error = why,
+        "a page of a board's check could not be read"
+    );
+}
+
+/// `url` without the query parameters named in `names`: a redirect that
+/// keeps the query would otherwise put a board's key into a stored address.
+fn with_no_key(url: &Url, names: &[(String, String)]) -> Url {
+    if names.is_empty() || url.query().is_none() {
+        return url.clone();
+    }
+    let kept: Vec<(String, String)> = url
+        .query_pairs()
+        .filter(|(key, _)| !names.iter().any(|(name, _)| name == key.as_ref()))
+        .map(|(k, v)| (k.into_owned(), v.into_owned()))
+        .collect();
+    let mut clean = url.clone();
+    if kept.is_empty() {
+        clean.set_query(None);
+    } else {
+        clean.query_pairs_mut().clear().extend_pairs(kept);
+    }
+    clean
 }
 
 /// The robots.txt of `base`'s host.
@@ -1435,6 +1544,7 @@ pub async fn check(
     let kind = row.kind().unwrap_or(Kind::JsonApi);
     let usable = row.usable_config();
     let start = config.start(kind).cloned();
+    let first_home = home.clone();
     let robots_base = start.clone().unwrap_or_else(|| home.clone());
     let secret = board_keys::query(reader.keys(), row, &config);
 
@@ -1452,17 +1562,44 @@ pub async fn check(
     } else {
         robots::rules_for_us(home_robots_text.as_deref().unwrap_or("")).0
     };
-    let allowed = |url: &Url| {
+    visits.set_rules(host_of(&home), home_rules.clone());
+    visits.set_rules(robots.host.clone(), robots.rules.clone());
+    let allowed_first = |url: &Url| {
         host_of(url) != host_of(&home) || robots::allowed(&home_rules, &robots::path_of(url)).0
     };
 
-    // The site: its language, its feeds, its postings.
-    let html = if allowed(&home) {
-        visits.get(&home).await
+    // The site: its language, its feeds, its postings. Its own redirects are
+    // followed (a move to `www.`, to a language path), and the rest of the
+    // check goes on from where the homepage ended up (#115).
+    let first = if allowed_first(&home) {
+        visits.get_page(&home).await
     } else {
         None
     };
-    let html = html.unwrap_or_default();
+    let moved_to = visits.moved_from(&home).and_then(host_of);
+    let (home, html) = match first {
+        Some((at, html)) => (at, html),
+        None => (home.clone(), String::new()),
+    };
+    // robots.txt is per host (`www.` too): read the final host's when it is
+    // not one already read.
+    let same_origin = |a: &Url, b: &Url| a.host_str() == b.host_str() && a.port() == b.port();
+    let (home_rules, home_robots_text) = if same_origin(&home, &robots_base) {
+        (robots.rules.clone(), robots_text.clone())
+    } else if same_origin(&home, &first_home) {
+        (home_rules, home_robots_text)
+    } else {
+        // Another host than the one robots.txt was read for: its own rules.
+        let text = robots_of(&mut visits, &home).await;
+        let rules = robots::rules_for_us(text.as_deref().unwrap_or("")).0;
+        (rules, text)
+    };
+    visits.set_rules(host_of(&home), home_rules.clone());
+    let allowed = |url: &Url| {
+        host_of(url) != host_of(&home) || robots::allowed(&home_rules, &robots::path_of(url)).0
+    };
+    // The page it ended up on must be one the rules of its host allow.
+    let html = if allowed(&home) { html } else { String::new() };
     // Everything after the homepage shares the check's request budget.
     visits.limit(deps.config.discovery_max_requests());
     let language = HTML_LANG
@@ -1485,8 +1622,11 @@ pub async fn check(
     if let (Some(url), Ok(secret)) = (&start, &secret)
         && robots.endpoint_allowed != Some(false)
         && allowed(url)
-        && let Some(body) = visits.get_with(url, MAX_BOARD_BODY, secret).await
+        && let Some((url, body)) = visits.get_final(url, MAX_BOARD_BODY, secret).await
     {
+        // From here on `url` is where the board's address answered, after
+        // the site's own redirects.
+        let url = &url;
         let modified = visits.last_modified(url);
         found = match &usable {
             Some(own) if kind == Kind::JsonldSitemap => {
@@ -1515,7 +1655,16 @@ pub async fn check(
                 let improved = auto_apply
                     .then(|| improved_feed_config(&read, &body, url, &board))
                     .flatten();
-                Some(improved.unwrap_or(read))
+                let mut found = improved.unwrap_or(read);
+                // A board nobody edited is read directly from now on; an
+                // owner's config is never rewritten (#115).
+                if auto_apply
+                    && matches!(kind, Kind::JsonApi | Kind::Rss)
+                    && found.config.endpoint.as_ref() != Some(url)
+                {
+                    found.config.endpoint = Some(url.clone());
+                }
+                Some(found)
             }
             None => read_feed(url, &body, &board, modified),
         };
@@ -1537,8 +1686,14 @@ pub async fn check(
     {
         terms_url = terms_link(&page.html, &page.url);
     }
-    let mut terms_html = match &terms_url {
-        Some(url) if allowed(url) => visits.get(url).await,
+    let mut terms_html = match terms_url.clone() {
+        Some(url) if allowed(&url) => match visits.get_page(&url).await {
+            Some((at, page)) => {
+                terms_url = Some(at);
+                Some(page)
+            }
+            None => None,
+        },
         _ => None,
     };
     if terms_url.is_none()
@@ -1719,6 +1874,7 @@ pub async fn check(
         proposal,
         config_fingerprint: robots::fingerprint(&new_config.to_string()),
         waiting_because: None,
+        moved_to,
         rules: RULES,
     };
     let high = remote_share.unwrap_or(0.0) >= 0.5 && worldwide_share.unwrap_or(0.0) >= 0.5;

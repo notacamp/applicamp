@@ -1013,14 +1013,14 @@ impl<'a> Visits<'a> {
                 }
                 Err(e) => {
                     if matches!(e, FetchError::RateLimited(_) | FetchError::BackingOff) {
-                        if let Some(host) = host_of(&at) {
-                            if self.slowed.insert(host) {
-                                log_unread(
-                                    &at,
-                                    None,
-                                    "the site asked to slow down, so it is not asked again in this check",
-                                );
-                            }
+                        if let Some(host) = host_of(&at)
+                            && self.slowed.insert(host)
+                        {
+                            log_unread(
+                                &at,
+                                None,
+                                "the site asked to slow down, so it is not asked again in this check",
+                            );
                         }
                         return None;
                     }

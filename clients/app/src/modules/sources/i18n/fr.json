@@ -711,6 +711,7 @@
       "list_not_allowed": "Les règles du site ne laissent pas les applications lire sa liste d'offres.",
       "no_job_list": "L'application n'a trouvé aucune liste d'offres sur ce site.",
       "request_limit": "La vérification a utilisé ses {{detail}} requêtes avant de trouver où sont les offres.",
+      "asked_to_slow_down": "Le site a demandé à l'application de ralentir, alors la vérification s'est arrêtée.",
       "empty_list": "Une liste d'offres a été trouvée, mais aucune offre n'a pu être lue.",
       "jobs_on_hiring_system": "Toutes les offres demandent de postuler sur la page d'une seule entreprise chez {{detail}}, c'est donc une entreprise et non un site d'offres. Cette page est ajoutée comme page d'entreprise.",
       "not_a_job_board": "Trop peu d'éléments ressemblent à des offres, ce n'est peut-être pas un site d'offres.",

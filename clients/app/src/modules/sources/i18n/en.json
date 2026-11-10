@@ -711,6 +711,7 @@
       "list_not_allowed": "The site's rules do not let apps read its list of jobs.",
       "no_job_list": "The app found no list of jobs on this site.",
       "request_limit": "The check used its {{detail}} requests before it found where the jobs are.",
+      "asked_to_slow_down": "The site asked the app to slow down, so the check stopped.",
       "empty_list": "A list of jobs was found, but no job could be read from it.",
       "jobs_on_hiring_system": "Every job on it applies on one company's page on {{detail}}, so it is one company and not a job site. That page is added as a company page.",
       "not_a_job_board": "Too few of its items look like jobs, so it may not be a job site.",

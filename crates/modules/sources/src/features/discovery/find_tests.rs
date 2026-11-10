@@ -1344,3 +1344,101 @@ async fn every_hop_counts_against_the_request_budget(db: PgPool) {
         WaitingCode::RequestLimit
     );
 }
+
+async fn answering(server: &MockServer, route: &str, status: u16) {
+    Mock::given(method("GET"))
+        .and(path(route))
+        .respond_with(ResponseTemplate::new(status))
+        .mount(server)
+        .await;
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_429_on_robots_stops_every_later_request_to_the_host(db: PgPool) {
+    let site = MockServer::start().await;
+    answering(&site, "/robots.txt", 429).await;
+    mount(&site, "/", HOME, "text/html").await;
+    let h = harness(db).await;
+    let id = candidate(&h.db, &site, 1, "discovery").await;
+    let report = checked(&h, id).await.report().unwrap();
+    assert_eq!(site.received_requests().await.unwrap().len(), 1);
+    assert_eq!(asked(&site, "/").await, 0);
+    assert_eq!(
+        report.waiting_because.unwrap().code,
+        WaitingCode::AskedToSlowDown
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_503_on_the_homepage_stops_the_rest(db: PgPool) {
+    let site = MockServer::start().await;
+    robots(&site, "User-agent: *\nDisallow: /private\n").await;
+    answering(&site, "/", 503).await;
+    let h = harness(db).await;
+    let id = candidate(&h.db, &site, 1, "discovery").await;
+    let report = checked(&h, id).await.report().unwrap();
+    // robots.txt and the homepage only.
+    assert_eq!(site.received_requests().await.unwrap().len(), 2);
+    assert_eq!(
+        report.waiting_because.unwrap().code,
+        WaitingCode::AskedToSlowDown
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn slowed_down_pages_do_not_spend_the_request_budget(db: PgPool) {
+    let site = MockServer::start().await;
+    robots(&site, "User-agent: *\nDisallow: /private\n").await;
+    mount(&site, "/", HOME, "text/html").await;
+    Mock::given(method("GET"))
+        .and(path_regex(".*"))
+        .respond_with(ResponseTemplate::new(429))
+        .mount(&site)
+        .await;
+    let settings = crate::SourcesConfig {
+        discovery_max_requests: Some(7),
+        ..boards_config()
+    };
+    let h = Harness::new(db, settings, None, Fake::ready()).await;
+    let id = candidate(&h.db, &site, 1, "discovery").await;
+    let report = checked(&h, id).await.report().unwrap();
+    // robots.txt, the homepage, and the one page that said slow down.
+    assert_eq!(site.received_requests().await.unwrap().len(), 3);
+    assert_eq!(
+        report.waiting_because.unwrap().code,
+        WaitingCode::AskedToSlowDown,
+        "not the request limit"
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn another_host_is_still_read_and_a_list_found_keeps_its_usual_reason(db: PgPool) {
+    let elsewhere = MockServer::start().await;
+    mount(
+        &elsewhere,
+        "/jobs.rss",
+        &dated_feed(&elsewhere),
+        "application/rss+xml",
+    )
+    .await;
+    // The same machine under another name: another host.
+    let other = elsewhere.uri().replace("127.0.0.1", "localhost");
+    let site = MockServer::start().await;
+    robots(&site, "User-agent: *\nDisallow: /private\n").await;
+    let home = format!(
+        "<html lang=\"en\"><head><link rel=\"alternate\" type=\"application/rss+xml\" \
+         href=\"{other}/jobs.rss\"></head><body><a href=\"/terms\">Terms</a></body></html>"
+    );
+    mount(&site, "/", &home, "text/html").await;
+    answering(&site, "/terms", 429).await;
+    let h = harness(db).await;
+    let id = candidate(&h.db, &site, 1, "discovery").await;
+    let report = checked(&h, id).await.report().unwrap();
+    assert_eq!(asked(&site, "/terms").await, 1);
+    assert_eq!(asked(&elsewhere, "/jobs.rss").await, 1);
+    assert!(report.found_url.is_some());
+    assert_ne!(
+        report.waiting_because.map(|w| w.code),
+        Some(WaitingCode::AskedToSlowDown)
+    );
+}

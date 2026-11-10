@@ -934,6 +934,8 @@ pub enum WaitingCode {
     /// The check used its requests before it found the list; the detail is
     /// how many.
     RequestLimit,
+    /// The site said slow down (429 or 503), so the check stopped asking it.
+    AskedToSlowDown,
     /// A list was found but no job could be read from it.
     EmptyList,
     /// Every job applies on one company's page of a hiring system; the

@@ -25,6 +25,8 @@ pub struct Facts<'a> {
     /// The check used up its requests before it found the list.
     pub out_of_requests: bool,
     pub requests: usize,
+    /// A host said slow down (429, 503) and the check stopped asking it.
+    pub slowed_down: bool,
     /// The hiring system every job applies on, when it is one company's page.
     pub one_system: Option<&'a str>,
     /// The terms' verdict, the sentence that decided it, and whether it is of
@@ -50,7 +52,11 @@ pub fn because(f: &Facts<'_>) -> Waiting {
         return Waiting::new(C::ListNotAllowed);
     }
     if !f.found {
-        return if f.out_of_requests {
+        // Slowed down comes first: when the site said slow down, that is the
+        // truer reason, even if the budget also ran out.
+        return if f.slowed_down {
+            Waiting::new(C::AskedToSlowDown)
+        } else if f.out_of_requests {
             Waiting::with(C::RequestLimit, f.requests.to_string())
         } else {
             Waiting::new(C::NoJobList)
@@ -122,6 +128,31 @@ mod tests {
     }
 
     #[test]
+    fn a_slow_down_is_the_reason_before_the_request_limit() {
+        assert_eq!(
+            code(Facts {
+                found: false,
+                slowed_down: true,
+                out_of_requests: true,
+                requests: 25,
+                ..clean()
+            }),
+            WaitingCode::AskedToSlowDown
+        );
+    }
+
+    #[test]
+    fn a_list_found_keeps_its_usual_reason_after_a_slow_down() {
+        assert_eq!(
+            code(Facts {
+                slowed_down: true,
+                ..clean()
+            }),
+            WaitingCode::NeedsApproval
+        );
+    }
+
+    #[test]
     fn each_reason_is_a_code() {
         use WaitingCode as C;
         assert_eq!(
@@ -140,6 +171,14 @@ mod tests {
         assert_eq!(
             (limit.code, limit.detail.as_deref()),
             (C::RequestLimit, Some("25"))
+        );
+        assert_eq!(
+            code(Facts {
+                found: false,
+                slowed_down: true,
+                ..clean()
+            }),
+            C::AskedToSlowDown
         );
         assert_eq!(
             code(Facts {

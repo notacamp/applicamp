@@ -15,7 +15,8 @@
 //!   followed within the site: three hops at most, each one a request of the
 //!   budget, an address check and a robots check, and the check goes on from
 //!   where the homepage ended up; a move to another site is only recorded as
-//!   `moved_to`, #115; at most
+//!   `moved_to`, #115; a host that says slow down is not asked again in that
+//!   check, #117; at most
 //!   `APPLICAMP_SOURCES__DISCOVERY_MAX_REQUESTS` requests after robots.txt and
 //!   the homepage, 25): robots.txt of the feed's host (else the site's); the
 //!   site (its language, its feeds, JSON-LD postings, a link to its terms);
@@ -864,6 +865,9 @@ struct Visits<'a> {
     rules: Vec<(String, Vec<RobotsRule>)>,
     /// Where a page that redirected to another site was sent (not followed).
     moved: HashMap<String, Url>,
+    /// Hosts that said slow down (429, 503, or the reader's own back-off):
+    /// nothing more is asked of them in this check (#117).
+    slowed: HashSet<String>,
 }
 
 /// Redirects followed for one page at most.
@@ -882,7 +886,13 @@ impl<'a> Visits<'a> {
             modified: HashMap::new(),
             rules: Vec::new(),
             moved: HashMap::new(),
+            slowed: HashSet::new(),
         }
+    }
+
+    /// Some host said slow down during this check.
+    fn slowed_down(&self) -> bool {
+        !self.slowed.is_empty()
     }
 
     /// From now on, a redirect to a page on `host` must be allowed by
@@ -964,6 +974,11 @@ impl<'a> Visits<'a> {
         let mut at = first.clone();
         let mut hops = 0;
         loop {
+            // A host that said slow down is not asked again, and the page
+            // costs no request of the budget.
+            if host_of(&at).is_some_and(|host| self.slowed.contains(&host)) {
+                return None;
+            }
             if self.seen.contains(at.as_str()) {
                 return None;
             }
@@ -997,6 +1012,18 @@ impl<'a> Visits<'a> {
                     at = next;
                 }
                 Err(e) => {
+                    if matches!(e, FetchError::RateLimited(_) | FetchError::BackingOff) {
+                        if let Some(host) = host_of(&at) {
+                            if self.slowed.insert(host) {
+                                log_unread(
+                                    &at,
+                                    None,
+                                    "the site asked to slow down, so it is not asked again in this check",
+                                );
+                            }
+                        }
+                        return None;
+                    }
                     let status = match e {
                         FetchError::Status(status) => Some(status),
                         _ => None,
@@ -1934,6 +1961,7 @@ pub async fn check(
             postings: postings(sample, &hosts),
             newest: sample.iter().filter_map(|job| job.posted_at).max(),
             out_of_requests: visits.exhausted,
+            slowed_down: visits.slowed_down(),
             requests: visits.spent(),
             one_system: system,
             verdict: reading.verdict.as_deref(),

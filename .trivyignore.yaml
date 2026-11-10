@@ -7,5 +7,5 @@ vulnerabilities:
       libssl3 3.0.20 ships in gcr.io/distroless/cc-debian12 but Applicamp never
       loads it: TLS is rustls only (no openssl, openssl-sys or native-tls in
       Cargo.lock). Fixed upstream in 3.0.22; drop this entry when distroless
-      publishes it.
-    expired_at: 2026-11-10
+      publishes it. Extended on 2026-11-10: distroless still ships 3.0.20.
+    expired_at: 2026-11-24

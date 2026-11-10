@@ -1,0 +1,1 @@
+- **The check of a new job site stops asking a site that says slow down, and the admin page says why it waits.** After a 429 or 503 the check sends that site no more requests, without spending its request limit; other sites are still read. The sites that waited only because of this are recoded.

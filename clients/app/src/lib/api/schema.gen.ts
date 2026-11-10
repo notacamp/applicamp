@@ -3404,7 +3404,7 @@ export interface components {
          *     the person's language; one it does not know gets a generic sentence.
          * @enum {string}
          */
-        BoardWaitingCode: "needs_key" | "list_not_allowed" | "no_job_list" | "request_limit" | "empty_list" | "jobs_on_hiring_system" | "not_a_job_board" | "nothing_recent" | "undated" | "terms_forbid" | "terms_ask_first" | "terms_personal_only" | "terms_unread" | "owner_edited" | "config_to_use" | "needs_approval";
+        BoardWaitingCode: "needs_key" | "list_not_allowed" | "no_job_list" | "request_limit" | "asked_to_slow_down" | "empty_list" | "jobs_on_hiring_system" | "not_a_job_board" | "nothing_recent" | "undated" | "terms_forbid" | "terms_ask_first" | "terms_personal_only" | "terms_unread" | "owner_edited" | "config_to_use" | "needs_approval";
         /** @description The brief of an opportunity. */
         Brief: {
             /** @description The company, as the opportunity names it. */

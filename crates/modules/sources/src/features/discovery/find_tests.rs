@@ -1344,3 +1344,107 @@ async fn every_hop_counts_against_the_request_budget(db: PgPool) {
         WaitingCode::RequestLimit
     );
 }
+
+async fn answering(server: &MockServer, route: &str, status: u16) {
+    Mock::given(method("GET"))
+        .and(path(route))
+        .respond_with(ResponseTemplate::new(status))
+        .mount(server)
+        .await;
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_429_on_robots_stops_every_later_request_to_the_host(db: PgPool) {
+    let site = MockServer::start().await;
+    answering(&site, "/robots.txt", 429).await;
+    mount(&site, "/", HOME, "text/html").await;
+    let h = harness(db).await;
+    let id = candidate(&h.db, &site, 1, "discovery").await;
+    let report = checked(&h, id).await.report().unwrap();
+    assert_eq!(site.received_requests().await.unwrap().len(), 1);
+    assert_eq!(asked(&site, "/").await, 0);
+    assert_eq!(
+        report.waiting_because.unwrap().code,
+        WaitingCode::AskedToSlowDown
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_503_on_the_homepage_stops_the_rest(db: PgPool) {
+    let site = MockServer::start().await;
+    robots(&site, "User-agent: *\nDisallow: /private\n").await;
+    answering(&site, "/", 503).await;
+    let h = harness(db).await;
+    let id = candidate(&h.db, &site, 1, "discovery").await;
+    let report = checked(&h, id).await.report().unwrap();
+    // robots.txt and the homepage only.
+    assert_eq!(site.received_requests().await.unwrap().len(), 2);
+    assert_eq!(
+        report.waiting_because.unwrap().code,
+        WaitingCode::AskedToSlowDown
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn slowed_down_pages_do_not_spend_the_request_budget(db: PgPool) {
+    let site = MockServer::start().await;
+    robots(&site, "User-agent: *\nDisallow: /private\n").await;
+    mount(&site, "/", HOME, "text/html").await;
+    Mock::given(method("GET"))
+        .and(path_regex(".*"))
+        .respond_with(ResponseTemplate::new(429))
+        .mount(&site)
+        .await;
+    let settings = crate::SourcesConfig {
+        discovery_max_requests: Some(7),
+        ..boards_config()
+    };
+    let h = Harness::new(db, settings, None, Fake::ready()).await;
+    let id = candidate(&h.db, &site, 1, "discovery").await;
+    let report = checked(&h, id).await.report().unwrap();
+    // robots.txt, the homepage, and the one page that said slow down.
+    assert_eq!(site.received_requests().await.unwrap().len(), 3);
+    assert_eq!(
+        report.waiting_because.unwrap().code,
+        WaitingCode::AskedToSlowDown,
+        "not the request limit"
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn another_host_is_still_read_after_one_said_slow_down(db: PgPool) {
+    let elsewhere = MockServer::start().await;
+    mount(&elsewhere, "/jobs.rss", "<rss/>", "application/rss+xml").await;
+    // The same machine under another name: another host.
+    let other = elsewhere.uri().replace("127.0.0.1", "localhost");
+    let site = MockServer::start().await;
+    answering(&site, "/terms", 429).await;
+    mount(&site, "/jobs", "jobs", "text/html").await;
+    let h = harness(db).await;
+    let reader = reader(&h.deps).unwrap();
+    let mut visits = Visits::new(reader, &h.db);
+    let url = |base: &str, route: &str| Url::parse(&format!("{base}{route}")).unwrap();
+    assert!(!visits.slowed_down());
+    assert!(visits.get(&url(&site.uri(), "/terms")).await.is_none());
+    assert!(visits.slowed_down());
+    assert!(visits.get(&url(&site.uri(), "/jobs")).await.is_none());
+    assert_eq!(
+        asked(&site, "/jobs").await,
+        0,
+        "the host is not asked again"
+    );
+    assert!(visits.get(&url(&other, "/jobs.rss")).await.is_some());
+    assert_eq!(asked(&elsewhere, "/jobs.rss").await, 1);
+}
+
+#[test]
+fn a_list_found_keeps_its_usual_reason_after_a_slow_down() {
+    // The reason of a found list does not look at the slow down.
+    let facts = waiting::Facts {
+        found: true,
+        slowed_down: true,
+        sample: 0,
+        ..waiting::Facts::default()
+    };
+    assert_eq!(waiting::because(&facts).code, WaitingCode::EmptyList);
+}

@@ -10865,6 +10865,7 @@
           "list_not_allowed",
           "no_job_list",
           "request_limit",
+          "asked_to_slow_down",
           "empty_list",
           "jobs_on_hiring_system",
           "not_a_job_board",

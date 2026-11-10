@@ -13,6 +13,7 @@ const CODES = [
   "list_not_allowed",
   "no_job_list",
   "request_limit",
+  "asked_to_slow_down",
   "empty_list",
   "jobs_on_hiring_system",
   "not_a_job_board",
@@ -37,6 +38,18 @@ describe("why a site waits", () => {
     expect(why({ code: "request_limit", detail: "25" })?.textContent).toBe(
       "The check used its 25 requests before it found where the jobs are.",
     );
+  });
+
+  it.each([
+    ["en", "The site asked the app to slow down, so the check stopped."],
+    ["pt-PT", "O site pediu à aplicação para abrandar, por isso a verificação parou."],
+    [
+      "es-ES",
+      "El sitio pidió a la aplicación que fuera más despacio, así que la comprobación se detuvo.",
+    ],
+    ["fr", "Le site a demandé à l'application de ralentir, alors la vérification s'est arrêtée."],
+  ] as const)("says the site asked to slow down in %s", (locale, text) => {
+    expect(why({ code: "asked_to_slow_down" }, locale)?.textContent).toBe(text);
   });
 
   it("names the hiring system", () => {

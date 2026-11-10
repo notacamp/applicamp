@@ -711,6 +711,7 @@
       "list_not_allowed": "Las reglas del sitio no dejan que las aplicaciones lean su lista de empleos.",
       "no_job_list": "La aplicación no encontró ninguna lista de empleos en este sitio.",
       "request_limit": "La comprobación usó sus {{detail}} peticiones antes de encontrar dónde están los empleos.",
+      "asked_to_slow_down": "El sitio pidió a la aplicación que fuera más despacio, así que la comprobación se detuvo.",
       "empty_list": "Se encontró una lista de empleos, pero no se pudo leer ningún empleo.",
       "jobs_on_hiring_system": "Todos los empleos piden candidatura en la página de una sola empresa en {{detail}}, así que es una empresa y no un sitio de empleo. Esa página se añade como página de empresa.",
       "not_a_job_board": "Pocos elementos parecen empleos, así que quizá no sea un sitio de empleo.",

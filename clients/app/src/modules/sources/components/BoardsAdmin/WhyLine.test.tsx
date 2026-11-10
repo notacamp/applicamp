@@ -40,19 +40,16 @@ describe("why a site waits", () => {
     );
   });
 
-  it("says the site asked to slow down, in every language", () => {
-    expect(why({ code: "asked_to_slow_down" })?.textContent).toBe(
-      "The site asked the app to slow down, so the check stopped.",
-    );
-    expect(why({ code: "asked_to_slow_down" }, "pt-PT")?.textContent).toBe(
-      "O site pediu à aplicação para abrandar, por isso a verificação parou.",
-    );
-    expect(why({ code: "asked_to_slow_down" }, "es-ES")?.textContent).toBe(
+  it.each([
+    ["en", "The site asked the app to slow down, so the check stopped."],
+    ["pt-PT", "O site pediu à aplicação para abrandar, por isso a verificação parou."],
+    [
+      "es-ES",
       "El sitio pidió a la aplicación que fuera más despacio, así que la comprobación se detuvo.",
-    );
-    expect(why({ code: "asked_to_slow_down" }, "fr")?.textContent).toBe(
-      "Le site a demandé à l'application de ralentir, alors la vérification s'est arrêtée.",
-    );
+    ],
+    ["fr", "Le site a demandé à l'application de ralentir, alors la vérification s'est arrêtée."],
+  ] as const)("says the site asked to slow down in %s", (locale, text) => {
+    expect(why({ code: "asked_to_slow_down" }, locale)?.textContent).toBe(text);
   });
 
   it("names the hiring system", () => {

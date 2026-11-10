@@ -1412,33 +1412,35 @@ async fn slowed_down_pages_do_not_spend_the_request_budget(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn another_host_is_still_read_and_a_list_found_keeps_its_usual_reason(db: PgPool) {
+async fn another_host_is_still_read_after_one_said_slow_down(db: PgPool) {
     let elsewhere = MockServer::start().await;
-    mount(
-        &elsewhere,
-        "/jobs.rss",
-        &dated_feed(&elsewhere),
-        "application/rss+xml",
-    )
-    .await;
+    mount(&elsewhere, "/jobs.rss", "<rss/>", "application/rss+xml").await;
     // The same machine under another name: another host.
     let other = elsewhere.uri().replace("127.0.0.1", "localhost");
     let site = MockServer::start().await;
-    robots(&site, "User-agent: *\nDisallow: /private\n").await;
-    let home = format!(
-        "<html lang=\"en\"><head><link rel=\"alternate\" type=\"application/rss+xml\" \
-         href=\"{other}/jobs.rss\"></head><body><a href=\"/terms\">Terms</a></body></html>"
-    );
-    mount(&site, "/", &home, "text/html").await;
     answering(&site, "/terms", 429).await;
+    mount(&site, "/jobs", "jobs", "text/html").await;
     let h = harness(db).await;
-    let id = candidate(&h.db, &site, 1, "discovery").await;
-    let report = checked(&h, id).await.report().unwrap();
-    assert_eq!(asked(&site, "/terms").await, 1);
+    let reader = reader(&h.deps).unwrap();
+    let mut visits = Visits::new(reader, &h.db);
+    let url = |base: &str, route: &str| Url::parse(&format!("{base}{route}")).unwrap();
+    assert!(!visits.slowed_down());
+    assert!(visits.get(&url(&site.uri(), "/terms")).await.is_none());
+    assert!(visits.slowed_down());
+    assert!(visits.get(&url(&site.uri(), "/jobs")).await.is_none());
+    assert_eq!(asked(&site, "/jobs").await, 0, "the host is not asked again");
+    assert!(visits.get(&url(&other, "/jobs.rss")).await.is_some());
     assert_eq!(asked(&elsewhere, "/jobs.rss").await, 1);
-    assert!(report.found_url.is_some());
-    assert_ne!(
-        report.waiting_because.map(|w| w.code),
-        Some(WaitingCode::AskedToSlowDown)
-    );
+}
+
+#[test]
+fn a_list_found_keeps_its_usual_reason_after_a_slow_down() {
+    // The reason of a found list does not look at the slow down.
+    let facts = waiting::Facts {
+        found: true,
+        slowed_down: true,
+        sample: 0,
+        ..waiting::Facts::default()
+    };
+    assert_eq!(waiting::because(&facts).code, WaitingCode::EmptyList);
 }

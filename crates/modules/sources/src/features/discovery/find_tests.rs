@@ -1428,7 +1428,11 @@ async fn another_host_is_still_read_after_one_said_slow_down(db: PgPool) {
     assert!(visits.get(&url(&site.uri(), "/terms")).await.is_none());
     assert!(visits.slowed_down());
     assert!(visits.get(&url(&site.uri(), "/jobs")).await.is_none());
-    assert_eq!(asked(&site, "/jobs").await, 0, "the host is not asked again");
+    assert_eq!(
+        asked(&site, "/jobs").await,
+        0,
+        "the host is not asked again"
+    );
     assert!(visits.get(&url(&other, "/jobs.rss")).await.is_some());
     assert_eq!(asked(&elsewhere, "/jobs.rss").await, 1);
 }

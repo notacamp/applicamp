@@ -60,6 +60,7 @@ export function summary(whole: Opportunity): OpportunitySummary {
     ...(whole.salary_text === undefined ? {} : { salary_text: whole.salary_text }),
     ...(whole.hidden_reason === undefined ? {} : { hidden_reason: whole.hidden_reason }),
     ...(whole.facts?.region_note === undefined ? {} : { region_note: whole.facts.region_note }),
+    ...(whole.facts === undefined ? {} : { facts: whole.facts }),
     ...(whole.source_name === undefined ? {} : { source_name: whole.source_name }),
   };
 }

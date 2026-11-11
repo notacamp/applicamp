@@ -145,6 +145,46 @@ export function gapText(gap: string, locale: string, t: TFunction<"pipeline">): 
   return gap;
 }
 
+/** Where it is, on one line: "Berlin, Germany · Hybrid"; empty when the posting says neither. */
+export function placeText(
+  row: Pick<OpportunitySummary, "location" | "work_mode">,
+  t: TFunction<"pipeline">,
+): string {
+  const mode = row.work_mode ?? null;
+  return [row.location?.trim() ?? "", mode === null ? "" : t(`workModes.${mode}`)]
+    .filter((part) => part !== "")
+    .join(" · ");
+}
+
+/**
+ * What a job asks of where the person is, one item each: "Open to where you live: EU",
+ * "Hours: CET ± 2 hours", "Work permit: no visa sponsorship", "Moving: to Berlin". None when
+ * its posting was never checked.
+ */
+export function placeRequirements(
+  facts: JobFacts | null | undefined,
+  t: TFunction<"pipeline">,
+): string[] {
+  if (facts === null || facts === undefined) {
+    return [];
+  }
+  const note = (text: string | null | undefined) => text?.trim() ?? "";
+  const open = t(`facts.open.${facts.open_to_candidate}`);
+  const region = note(facts.region_note);
+  const items = [region === "" ? open : t("place.open", { open, note: region })];
+  const notes = [
+    ["place.timeZones", note(facts.time_zone_note)],
+    ["place.workPermit", note(facts.work_permit_note)],
+    ["place.relocation", note(facts.relocation_note)],
+  ] as const;
+  for (const [key, text] of notes) {
+    if (text !== "") {
+      items.push(t(key, { note: text }));
+    }
+  }
+  return items;
+}
+
 /** The facts on one line: "Remote · Open to where you live (EU) · English". */
 export function factsText(facts: JobFacts, locale: string, t: TFunction<"pipeline">): string {
   const note = facts.region_note?.trim() ?? "";

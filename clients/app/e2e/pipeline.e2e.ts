@@ -9,6 +9,11 @@ import {
   signIn,
 } from "./helpers";
 
+// Filmed: CI keeps this spec's videos (the `e2e-recordings` artifact), the
+// recording of where each job is and what it asks of where you are (#111), at
+// desktop width and at 375px.
+test.use({ video: "on" });
+
 /** An invented profile (nobody real), enough for a search to score against. */
 const PROFILE = {
   basics: { label: "Senior software engineer", location: "Lisbon, Portugal", profiles: [] },
@@ -81,11 +86,25 @@ test("someone with a profile and goals presses Search now, sees the matches arri
 
   // The matches are Found: a table on a desktop, cards on a phone.
   await page.getByTestId("pipeline-stage-filter").selectOption("found");
-  const firstRow = page.getByTestId("pipeline-row").first();
+  // The first one the search read (one added by link by another spec says nothing of where).
+  const firstRow = page
+    .getByTestId("pipeline-row")
+    .filter({ has: page.getByTestId("pipeline-row-place-requirements") })
+    .first();
   await expect(firstRow).toBeVisible();
   await expect(page.getByTestId(phone ? "pipeline-cards" : "pipeline-table")).toBeVisible();
   await expect(page.getByTestId(phone ? "pipeline-cards" : "pipeline-table")).not.toContainText(
     "(m/w/d)",
+  );
+  // Each row says where the job is and what it asks of where you are (#111).
+  await expect(firstRow.getByTestId("pipeline-row-place-requirements")).toContainText(
+    "Open to where you live: Europe",
+  );
+  await expect(firstRow.getByTestId("pipeline-row-place-requirements")).toContainText(
+    "Hours: CET ± 3 hours",
+  );
+  await expect(firstRow.getByTestId("pipeline-row-place-requirements")).toContainText(
+    "Work permit: EU work permit, no visa sponsorship",
   );
   await expectNoSidewaysScroll(page);
   await (phone ? firstRow.click() : firstRow.getByTestId("pipeline-row-open").click());
@@ -96,6 +115,11 @@ test("someone with a profile and goals presses Search now, sees the matches arri
   await expect(page.getByTestId("peek-why")).toBeVisible();
   await expect(page.getByTestId("peek-gaps")).toBeVisible();
   await expect(page.getByTestId("peek-open-posting")).toHaveAttribute("href", /^https?:\/\//);
+  // Where the job is: the board's place (the fake boards each say one).
+  await expect(page.getByTestId("peek-where")).not.toContainText("Not said");
+  await expect(page.getByTestId("peek-time-zones")).toContainText("CET ± 3 hours");
+  await expect(page.getByTestId("peek-work-permit")).toContainText("no visa sponsorship");
+  await expect(page.getByTestId("peek-relocation")).toHaveCount(0);
   await expectAccessible(page);
   await expectNoSidewaysScroll(page);
   await page.getByTestId("peek-stage").selectOption("shortlisted");

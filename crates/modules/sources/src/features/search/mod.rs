@@ -50,7 +50,7 @@ use crate::{
     ports::{Attach, OwnBoard, Scored},
     quick::{self, Look},
     readers::{Outcome, PartialRead, Reader, mapping::BoardRef},
-    requirements::{self, Answer, Excluded, Facts, RULES_VERSION, Salary},
+    requirements::{self, Answer, Excluded, Facts, PlaceNotes, RULES_VERSION, Salary},
     scans::{self, Scan},
     scoring::{self, BATCH, KEEP, MAX_ADDED, Read, Score},
 };
@@ -877,6 +877,7 @@ struct CachedRow {
     region_note: Option<String>,
     working_languages: Option<Vec<String>>,
     salary: Option<sqlx::types::Json<Salary>>,
+    place_notes: Option<sqlx::types::Json<PlaceNotes>>,
     ungrounded: bool,
 }
 
@@ -903,7 +904,7 @@ impl Cache {
 async fn cached_scores(db: &PgPool, account: Uuid, input: &MatchInput) -> Result<Cache> {
     let rows: Vec<CachedRow> = sqlx::query_as(
         "SELECT source, source_ref, stage, match_score, why, gaps, read, remote,
-                open_to_candidate, region_note, working_languages, salary, ungrounded
+                open_to_candidate, region_note, working_languages, salary, place_notes, ungrounded
            FROM sources.scores
           WHERE account_id = $1 AND profile_version = $2 AND goals_version = $3
             AND rules_version = $4",
@@ -936,6 +937,7 @@ async fn cached_scores(db: &PgPool, account: Uuid, input: &MatchInput) -> Result
                     region_note: row.region_note,
                     working_languages: row.working_languages.unwrap_or_default(),
                     salary: row.salary.map(|s| s.0),
+                    place: row.place_notes.map(|p| p.0).unwrap_or_default(),
                 },
                 ungrounded: row.ungrounded,
             },
@@ -989,9 +991,9 @@ async fn save_score(
         "INSERT INTO sources.scores
             (account_id, source, source_ref, profile_version, goals_version, rules_version,
              stage, match_score, why, gaps, read, remote, open_to_candidate, region_note,
-             working_languages, salary, excluded_reason, created_at, ungrounded)
+             working_languages, salary, excluded_reason, created_at, ungrounded, place_notes)
          VALUES ($1, $2, $3, $4, $5, $6, 'full', $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-                 $17, $18)
+                 $17, $18, $19)
          ON CONFLICT DO NOTHING",
     )
     .bind(account)
@@ -1012,6 +1014,7 @@ async fn save_score(
     .bind(excluded.map(Excluded::as_str))
     .bind(now)
     .bind(score.ungrounded)
+    .bind((!score.facts.place.is_empty()).then_some(sqlx::types::Json(&score.facts.place)))
     .execute(db)
     .await?;
     Ok(())

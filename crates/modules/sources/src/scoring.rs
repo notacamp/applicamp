@@ -4,7 +4,8 @@
 //! The same call reads each posting's **eligibility facts** (remote, open
 //! to where the person lives, the languages it needs, the pay it states):
 //! the requirement rules ([`crate::requirements`]) decide on them, never
-//! the score. No extra call.
+//! the score. It also reads what the posting asks of where the person is
+//! (time zones, work permit, relocation), only to show it. No extra call.
 //!
 //! Job text is untrusted. It goes to the model as JSON string values inside
 //! a `<jobs>` block the instructions call data; the answer is read only for
@@ -20,7 +21,7 @@ use crate::{
     grounding::Source,
     job::{Job, WorkMode, one_line},
     matching::MatchInput,
-    requirements::{Answer, Facts, Salary, language_code},
+    requirements::{Answer, Facts, PlaceNotes, Salary, language_code},
 };
 
 /// Jobs per model call.
@@ -40,6 +41,8 @@ const WHY: (usize, usize) = (3, 200);
 const GAPS: (usize, usize) = (2, 200);
 /// The longest region note.
 const REGION_NOTE: usize = 80;
+/// The longest note on time zones, work permit or relocation.
+const PLACE_NOTE: usize = 80;
 /// Languages kept per job.
 const LANGUAGES: usize = 6;
 
@@ -99,6 +102,13 @@ limits it to other countries, regions or cities (such as \"remote from Germany o
 someone in Portugal); else \"unclear\".\n\
 - `region_note`: where the posting says it is open, in at most 80 characters (\"Germany or \
 Austria only\", \"EU\", \"anywhere\"); \"\" when it does not say.\n\
+- `time_zones`: the working hours or time zones the posting requires, in at most 80 \
+characters (\"CET ± 2 hours\", \"overlap with US Eastern until 1pm\"); \"\" when it does not say.\n\
+- `work_permit`: what the posting says about the right to work and visa sponsorship, in at most \
+80 characters (\"EU work permit required, no visa sponsorship\", \"visa sponsorship offered\"); \
+\"\" when it does not say.\n\
+- `relocation`: what the posting says about moving for the job, in at most 80 characters \
+(\"must relocate to Berlin, relocation package\", \"no relocation\"); \"\" when it does not say.\n\
 - `working_languages`: the languages the job requires for the work, as ISO 639-1 codes \
 (\"en\", \"de\"): the ones the posting asks for (not the nice-to-haves); when it names none, the \
 language the posting is written in.\n\
@@ -135,6 +145,9 @@ static SCHEMA: LazyLock<Value> = LazyLock::new(|| {
                         "remote": { "type": "string", "enum": ["yes", "no", "unclear"] },
                         "open_to_candidate": { "type": "string", "enum": ["yes", "no", "unclear"] },
                         "region_note": { "type": "string" },
+                        "time_zones": { "type": "string" },
+                        "work_permit": { "type": "string" },
+                        "relocation": { "type": "string" },
                         "working_languages": {
                             "type": "array", "items": { "type": "string" }, "maxItems": 6
                         },
@@ -158,7 +171,8 @@ static SCHEMA: LazyLock<Value> = LazyLock::new(|| {
                     },
                     "required": [
                         "ref", "match", "why", "gaps", "remote", "open_to_candidate",
-                        "region_note", "working_languages", "salary"
+                        "region_note", "time_zones", "work_permit", "relocation",
+                        "working_languages", "salary"
                     ]
                 }
             }
@@ -292,6 +306,11 @@ fn facts(item: &Value) -> Facts {
         region_note: text(item.get("region_note"), REGION_NOTE),
         working_languages,
         salary: salary(item.get("salary")),
+        place: PlaceNotes {
+            time_zones: text(item.get("time_zones"), PLACE_NOTE),
+            work_permit: text(item.get("work_permit"), PLACE_NOTE),
+            relocation: text(item.get("relocation"), PLACE_NOTE),
+        },
     }
 }
 
@@ -509,6 +528,43 @@ mod tests {
         assert_eq!(second.open_to_candidate, Answer::Yes);
         assert_eq!(second.region_note, None);
         assert_eq!(second.salary, None, "no number is no salary");
+    }
+
+    #[test]
+    fn what_a_posting_asks_of_where_they_are_is_read_on_one_line_and_cut() {
+        let answer = json!({ "jobs": [
+            { "ref": "j1", "match": 85, "why": [], "gaps": [],
+              "time_zones": "CET ± 2 hours", "work_permit": " EU work permit,\n  no sponsorship ",
+              "relocation": "x".repeat(200) },
+            { "ref": "j2", "match": 70, "why": [], "gaps": [],
+              "time_zones": " ", "work_permit": "", "relocation": 7 },
+        ]});
+        let scores = parse(&answer, 2);
+        let first = &scores[0].1.facts.place;
+        assert_eq!(first.time_zones.as_deref(), Some("CET ± 2 hours"));
+        assert_eq!(
+            first.work_permit.as_deref(),
+            Some("EU work permit, no sponsorship")
+        );
+        assert_eq!(
+            first.relocation.as_ref().map(|n| n.chars().count()),
+            Some(80)
+        );
+        assert!(
+            scores[1].1.facts.place.is_empty(),
+            "blank or not text: not said"
+        );
+    }
+
+    #[test]
+    fn the_prompt_asks_for_time_zones_work_permit_and_relocation() {
+        assert!(INSTRUCTIONS.contains("`time_zones`"));
+        assert!(INSTRUCTIONS.contains("`work_permit`"));
+        assert!(INSTRUCTIONS.contains("`relocation`"));
+        let required = SCHEMA["properties"]["jobs"]["items"]["required"].clone();
+        for key in ["time_zones", "work_permit", "relocation"] {
+            assert!(required.as_array().unwrap().contains(&json!(key)), "{key}");
+        }
     }
 
     fn scored(match_score: u8, why: &[&str]) -> Score {
